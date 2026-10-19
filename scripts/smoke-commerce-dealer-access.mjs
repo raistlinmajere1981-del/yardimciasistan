@@ -86,6 +86,7 @@ try {
     assert.equal(enabled.access.enabled, true);
     const issued = database.changeDealerWebAccess(id, "invite");
     const token = new URL(issued.inviteUrl).hash.slice(8);
+    assert.equal(new URL(issued.inviteUrl).pathname, "/bayi/");
     assert.equal(token.length, 43); assert.equal(new URL(issued.inviteUrl).search, "");
     const stored = raw.prepare("SELECT * FROM commerce_dealer_web_access WHERE customer_id = ?").get(id);
     assert.equal(stored.invite_hash, createHash("sha256").update(token).digest("hex"));

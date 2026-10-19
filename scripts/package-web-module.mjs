@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
 import { readProductVersion } from "./product-version.mjs";
-import { nexaRuntimePaths } from "./nexa-assets.mjs";
+
+const API_PACKAGE_FILE = /^(?:api\/.*\.php|lib\/.*\.(?:php|json)|config\/(?:\.htaccess|ai\.php|business\.json|version\.json)|data\/(?:\.htaccess|ai-conversations\.json)|knowledge\/(?:\.htaccess|[^/]+\.md)|media\/\.htaccess|README\.md)$/;
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "firm-template", "web-module");
-const widgetBundlePath = join(repoRoot, "packages", "web-widget", "dist", "widget.js");
 const outputRoot = join(repoRoot, "artifacts", "web-module-deploy");
 const packageRoot = join(outputRoot, "yardimci-asistan");
 const manifestPath = join(outputRoot, "manifest.json");
@@ -21,15 +21,9 @@ const requiredFiles = [
   "api/instagram-media.php",
   "lib/instagram-staging.php",
   "lib/marketing.php",
-  "duyurular/index.php",
-  "duyurular/marketing.js",
-  "duyurular/marketing.css",
   "api/whatsapp-webhook.php",
   "api/business-messaging-status.php",
   "lib/business-messaging.php",
-  "bayi/index.php",
-  "bayi/portal.js",
-  "bayi/portal.css",
   "api/dealer/claim.php",
   "api/dealer/session.php",
   "api/dealer/logout.php",
@@ -38,10 +32,6 @@ const requiredFiles = [
   "api/dealer/order.php",
   "lib/dealer-order.php",
   "README.md",
-  "magaza/index.php",
-  "magaza/storefront.js",
-  "magaza/storefront.css",
-  "widget.js",
   "api/request.php",
   "api/sync.php",
   "api/version.php",
@@ -79,7 +69,6 @@ const requiredFiles = [
   "lib/android-device-auth.php",
   "lib/stock-image-analysis.php",
   "lib/identity-image-analysis.php",
-  "assets/yardimci-asistan-symbol.png",
   "config/.htaccess",
   "config/ai.php",
   "config/business.json",
@@ -117,7 +106,6 @@ const businessOverrideFields = [
 ];
 
 validateSource();
-validateWidgetBundle();
 rmSync(packageRoot, { recursive: true, force: true });
 rmSync(tarballPath, { force: true });
 rmSync(zipPath, { force: true });
@@ -126,29 +114,8 @@ cpSync(sourceRoot, packageRoot, {
   recursive: true,
   filter: shouldCopySourcePath
 });
-cpSync(widgetBundlePath, join(packageRoot, "widget.js"));
-// Vite assets may inherit a restrictive local umask (0600). Public web files
-// must be readable by the hosting HTTP worker after FTP deployment.
-chmodSync(join(packageRoot, "widget.js"), 0o644);
-for (const assetPath of nexaRuntimePaths("web")) {
-  const source = join(repoRoot, "packages/web-widget/dist", assetPath);
-  assert.ok(existsSync(source), `Web Nexa build asset missing: ${assetPath}`);
-  const destination = join(packageRoot, assetPath);
-  mkdirSync(join(destination, ".."), { recursive: true });
-  cpSync(source, destination);
-  chmodSync(destination, 0o644);
-}
-// The asset folders must also be traversable by the hosting HTTP worker.
-for (const relativePath of ["assets/nexa", "assets/nexa/states", "assets/nexa/web"]) {
-  chmodSync(join(packageRoot, relativePath), 0o755);
-}
-assert.equal(
-  sha256(join(packageRoot, "widget.js")),
-  sha256(widgetBundlePath),
-  "Deploy paketindeki widget.js güncel web-widget build çıktısıyla eşleşmeli."
-);
-
 zeroPackageBusinessConfig();
+writeFileSync(join(packageRoot, "data/ai-conversations.json"), "[]\n");
 const appliedOverrides = applyPackageOverrides();
 const packageFiles = listFiles(packageRoot);
 const businessConfig = JSON.parse(readFileSync(join(packageRoot, "config", "business.json"), "utf8"));
@@ -183,18 +150,15 @@ validatePackage(manifest, businessConfig);
 const archiveSummary = archives.filter((archive) => archive.status === "created").map((archive) => archive.path).join(", ") || "arşiv yok";
 console.log(`web-module-package-ok: ${relative(repoRoot, packageRoot)} (${manifest.file_count} dosya, ${archiveSummary})`);
 
-function validateWidgetBundle() {
-  assert.ok(
-    existsSync(widgetBundlePath),
-    `Web widget build çıktısı bulunamadı: ${relative(repoRoot, widgetBundlePath)}. Önce npm run build -w @yardimci-asistan/web-widget çalıştırın.`
-  );
-}
-
 function validateSource() {
   assert.ok(existsSync(sourceRoot), `Web modül kaynak klasörü bulunamadı: ${sourceRoot}`);
 
   for (const file of requiredFiles) {
     assert.ok(existsSync(join(sourceRoot, file)), `Web modül kaynak dosyası eksik: ${file}`);
+  }
+
+  for (const file of listFiles(sourceRoot).filter(shouldCopyRelativePath)) {
+    assert.match(file, API_PACKAGE_FILE, `API-only kaynakta beklenmeyen dosya: ${file}`);
   }
 
   assertJsonObject("config/business.json");
@@ -318,9 +282,6 @@ function validateSource() {
     assert.ok(storageModule.includes(runtimeTable), `Runtime reset dinamik tabloyu temizlemeli: ${runtimeTable}`);
   }
 
-  const widget = readFileSync(join(sourceRoot, "widget.js"), "utf8");
-  assert.ok(widget.includes("YardimciAsistanWidget"), "widget.js YardimciAsistanWidget globalini içermeli.");
-
   for (const folder of ["config", "data", "knowledge"]) {
     const htaccess = readFileSync(join(sourceRoot, folder, ".htaccess"), "utf8");
     assert.match(htaccess, /(Deny from all|Require all denied)/, `${folder}/.htaccess doğrudan erişimi kapatmalı.`);
@@ -373,14 +334,9 @@ function validatePackage(manifest, businessConfig) {
     assert.ok(manifestFiles.has(file), `Paket manifestinde eksik dosya: ${file}`);
   }
 
-  const legacyDemoAssets = manifest.files
-    .map((file) => file.path)
-    .filter((path) => /^assets\/menu-.*\.(?:webp|png|jpe?g)$/i.test(path));
-  assert.deepEqual(
-    legacyDemoAssets,
-    [],
-    `Web modül paketi eski demo menü görsellerini içermemeli: ${legacyDemoAssets.join(", ")}`
-  );
+  const presentationFiles = manifest.files.filter(({ path }) =>
+    !API_PACKAGE_FILE.test(path));
+  assert.deepEqual(presentationFiles, [], "API-only paket site tasarımı veya renderer içeremez.");
 
   assertPackageFreeOfDemoData(manifest, businessConfig);
 
@@ -446,24 +402,17 @@ function validatePackage(manifest, businessConfig) {
 
 function shouldCopySourcePath(sourcePath) {
   const relativePath = relative(sourceRoot, sourcePath).replaceAll("\\", "/");
+  return shouldCopyRelativePath(relativePath);
+}
+
+function shouldCopyRelativePath(relativePath) {
+  if (relativePath.startsWith("data/") && !["data/.htaccess", "data/ai-conversations.json"].includes(relativePath)) return false;
+  if (relativePath.startsWith("media/") && relativePath !== "media/.htaccess") return false;
   if (relativePath === ".DS_Store" || relativePath.endsWith("/.DS_Store")) {
     return false;
   }
 
-  if (relativePath === "config/ai.local.php"
-      || relativePath === "data/ai-settings.local.php"
-      || relativePath === "data/google-reviews.local.php"
-      || relativePath === "data/google-reviews-cache.json") {
-    return false;
-  }
-
-  if (relativePath === "data/yardimci-asistan.sqlite"
-      || relativePath.startsWith("data/yardimci-asistan.sqlite-")) {
-    return false;
-  }
-
-
-  return !relativePath.startsWith("data/.ai-settings.");
+  return relativePath !== "config/ai.local.php";
 }
 
 function zeroPackageBusinessConfig() {
@@ -554,7 +503,7 @@ function createDeploymentWarnings(business) {
   if (!String(business.profile_id ?? "").trim()) {
     warnings.push({
       code: "missing_profile_id",
-      message: "config/business.json içindeki profile_id henüz yapılandırılmadı; widget sektör seçeneklerini sınırlayamaz."
+      message: "config/business.json içindeki profile_id henüz yapılandırılmadı; public veri henüz profil bilgisi taşımıyor."
     });
   }
 

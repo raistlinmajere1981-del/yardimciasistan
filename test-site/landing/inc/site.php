@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/language.php';
+
 const SITE_NAME = 'Yardımcı Asistan';
 
 function site_url(string $path = ''): string
@@ -43,7 +45,7 @@ function site_publication(string $name): ?array
     try {
         require_once $storage;
         $publication = ya_storage_get_publication($name, []);
-        return is_array($publication) ? $publication : null;
+        return is_array($publication) ? ($name === 'business_context' ? site_localized_business($publication) : $publication) : null;
     } catch (Throwable) {
         return null;
     }
@@ -87,7 +89,7 @@ function site_gallery_images(): array {
 function render_site_hero(string $eyebrow, string $title, string $description = ''): void
 {
     ?>
-    <section class="demo-page-hero"><div class="shell"><p class="eyebrow"><?= site_e($eyebrow) ?></p><h1><?= site_e($title) ?></h1><?php if ($description !== ''): ?><p><?= site_e($description) ?></p><?php endif; ?></div></section>
+    <section class="demo-page-hero"><div class="shell"><p class="eyebrow"><?= site_e(site_text($eyebrow)) ?></p><h1><?= site_e(site_text($title)) ?></h1><?php if ($description !== ''): ?><p><?= site_e(site_text($description)) ?></p><?php endif; ?></div></section>
     <?php
 }
 
@@ -135,6 +137,6 @@ function render_site_links(): void
 {
     foreach (site_navigation() as $page) {
         $current = $page['path'] === '/' ? site_current_path() === '/' : site_is_current($page['path']);
-        ?><a href="<?= site_e($page['path']) ?>" <?= $current ? 'aria-current="page" class="active"' : '' ?>><?= site_e($page['label']) ?></a><?php
+        ?><a href="<?= site_e($page['path']) ?>" <?= $current ? 'aria-current="page" class="active"' : '' ?>><?= site_e(site_text($page['label'])) ?></a><?php
     }
 }

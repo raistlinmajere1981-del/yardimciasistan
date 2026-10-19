@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 
 const script = readFileSync(resolve("test-site/landing/assets/js/tables.js"), "utf8");
+const languageScript = readFileSync(resolve("test-site/landing/assets/js/language.js"), "utf8");
 let policy = "smoking_allowed";
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -14,6 +15,11 @@ const server = createServer((req, res) => {
       id: "t1", name: "Salon 1", area: "Salon", capacity: 4,
       features: [], smoking_policy: policy, media: []
     }] }));
+    return;
+  }
+  if (url.pathname === "/assets/js/language.js") {
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.end(languageScript);
     return;
   }
   if (url.pathname === "/assets/js/tables.js") {
@@ -28,7 +34,7 @@ const server = createServer((req, res) => {
     '<div data-table-capacity></div><p data-table-smoking></p><p data-table-description></p>' +
     '<div data-table-feature-list></div><img data-table-cover hidden>' +
     '<div data-table-cover-placeholder></div><div data-table-media-section hidden></div>' +
-    '</div></section><script src="/assets/js/tables.js"></script></body></html>');
+    '</div></section><script src="/assets/js/language.js"></script><script src="/assets/js/tables.js"></script></body></html>');
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;

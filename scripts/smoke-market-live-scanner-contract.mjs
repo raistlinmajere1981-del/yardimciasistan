@@ -260,7 +260,7 @@ function assertSourceContracts() {
   const androidAction = read("apps/desktop-app/electron/market-android-actions.ts");
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
   const androidRules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");
-  const androidWorkspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
+  const androidBarcodeFlow = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketBarcodeFlow.java");
   const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
   const hosting = read("firm-template/web-module/api/sync.php");
 
@@ -273,9 +273,9 @@ function assertSourceContracts() {
   assert.doesNotMatch(quickSale, /setPhoneBarcodeMode|Telefon Barkod Modunu Aç/);
   assert.match(androidRules, /market_barcode_scan/);
   assert.match(androidRules, /scanned_at/);
-  assert.match(androidWorkspace, /KASA BARKOD MODU/);
-  assert.match(androidWorkspace, /BarcodeCameraScanner\.show/);
-  assert.doesNotMatch(androidWorkspace, /KASA BARKOD MODU[\s\S]{0,900}Sepete Ekle/);
+  assert.match(androidBarcodeFlow, /KASA BARKOD MODU/);
+  assert.match(androidBarcodeFlow, /BarcodeCameraScanner\.show/);
+  assert.doesNotMatch(androidBarcodeFlow, /KASA BARKOD MODU[\s\S]{0,900}Sepete Ekle/);
   assert.match(syncCoordinator, /NORMAL_PULL_INTERVAL_MS\s*=\s*15_000/);
   assert.match(syncCoordinator, /MARKET_BARCODE_FAST_PULL_INTERVAL_MS\s*=\s*1_500/);
   assert.match(syncCoordinator, /this\.inFlight/);

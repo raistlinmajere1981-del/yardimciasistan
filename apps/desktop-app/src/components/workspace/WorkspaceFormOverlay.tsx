@@ -1,6 +1,5 @@
 import { useId, useLayoutEffect, useRef, type FormEventHandler, type ReactNode } from "react";
-import { X } from "lucide-react";
-import { IconButton } from "../ui/IconButton";
+import { WorkspaceHeader } from "./WorkspaceHeader";
 
 interface WorkspaceFormOverlayProps {
   title: string;
@@ -62,12 +61,7 @@ export function WorkspaceFormOverlay({
       }}
     >
       <form onSubmit={onSubmit}>
-        <header className="workspace-frame__header">
-          <h2 id={id} tabIndex={-1} data-modal-initial-focus>{title}</h2>
-          <IconButton aria-label="Formu kapat" disabled={closeBlocked} onClick={onClose}>
-            <X size={18} aria-hidden="true" />
-          </IconButton>
-        </header>
+        <WorkspaceHeader title={title} titleId={id} closeLabel="Formu kapat" closeBlocked={closeBlocked} onClose={onClose} />
         <div className="workspace-frame__body workspace-frame__body--body">{children}</div>
         <footer className="workspace-frame__footer">{footer}</footer>
       </form>

@@ -30,6 +30,7 @@ export interface RoomPublicCatalogRoom {
 }
 
 export interface RoomPublicCatalog {
+  localization?: import("./public-translations").PublicLocalization;
   version: typeof ROOM_PUBLIC_CATALOG_VERSION;
   enabled: boolean;
   updatedAt: string;

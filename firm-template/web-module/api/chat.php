@@ -414,6 +414,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
 {
     $enabled = ya_chat_bool($aiConfig['enabled'] ?? false);
     $provider = ya_chat_string($aiConfig['provider'] ?? 'disabled') ?: 'disabled';
+    $responseLanguage = ($payload['response_language'] ?? null) === 'en' ? 'en' : 'tr';
     $requestType = ya_chat_normalize_request_type(ya_chat_first_string($payload, ['request_type', 'requestType']));
     if ($requestType === '') {
         $requestType = ya_chat_detect_request_type($message);
@@ -421,14 +422,15 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
     $decision = ya_business_ai_evaluate($businessContext['capability_ids'] ?? [], $requestType, $message, array_column($catalogContext, 'source'));
     if (in_array($decision['kind'], ['unsupported', 'unrecognized'], true)) {
         $unsupportedDomain = $decision['domain'] ?? '';
+        $boundaryAnswer = ya_chat_unsupported_business_answer($unsupportedDomain, $responseLanguage);
         return [
-            'answer' => ya_chat_unsupported_business_answer($unsupportedDomain),
+            'answer' => $boundaryAnswer,
             'fallback' => true,
             'provider' => $provider,
             'model' => '',
             'error' => ya_chat_error(
                 $decision['kind'] === 'unsupported' ? 'unsupported_business_domain' : 'unrecognized_business_intent',
-                ya_chat_unsupported_business_answer($unsupportedDomain),
+                $boundaryAnswer,
                 false
             )
         ];
@@ -439,7 +441,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'ai_disabled',
             'AI bağlantısı işletme ayarlarında kapalı.',
             false
-        ), $businessConfig, $businessContext, $catalogContext, $message);
+        ), $businessConfig, $businessContext, $catalogContext, $message, $responseLanguage);
     }
 
     if ($provider !== 'openai_compatible') {
@@ -447,7 +449,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'unsupported_provider',
             'Seçili AI sağlayıcısı web sohbeti tarafından desteklenmiyor.',
             false
-        ), $businessConfig, $businessContext, $catalogContext, $message);
+        ), $businessConfig, $businessContext, $catalogContext, $message, $responseLanguage);
     }
 
     $baseUrl = ya_chat_string($aiConfig['base_url'] ?? '');
@@ -460,7 +462,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'configuration_incomplete',
             'AI bağlantı adresi, model veya erişim anahtarı ayarlarından biri eksik.',
             false
-        ), $businessConfig, $businessContext, $catalogContext, $message);
+        ), $businessConfig, $businessContext, $catalogContext, $message, $responseLanguage);
     }
 
     $chatOptions = [
@@ -475,7 +477,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
         : ($service === 'cloudflare' ? ya_cloudflare_chat($chatOptions) : ya_chat_call_openai_compatible($chatOptions));
 
     if (!$chatResult['ok']) {
-        return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error'], $businessConfig, $businessContext, $catalogContext, $message);
+        return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error'], $businessConfig, $businessContext, $catalogContext, $message, $responseLanguage);
     }
 
     return [
@@ -493,7 +495,7 @@ function ya_chat_build_messages(array $businessConfig, array $payload, string $m
     $messages = [
         [
             'role' => 'system',
-            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments, $businessContext, $catalogContext)
+            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments, $businessContext, $catalogContext, ($payload['response_language'] ?? null) === 'en' ? 'en' : 'tr')
         ]
     ];
 
@@ -525,7 +527,7 @@ function ya_chat_build_messages(array $businessConfig, array $payload, string $m
     return $messages;
 }
 
-function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments, array $businessContext, array $catalogContext): string
+function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments, array $businessContext, array $catalogContext, string $responseLanguage = 'tr'): string
 {
     $businessName = ya_chat_string(
         $businessContext['business_name']
@@ -542,7 +544,9 @@ function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocu
 
     return implode("\n", [
         $businessName . ' için web sitesinde müşteriye yardımcı olan kısa yanıtlı bir asistansın.',
-        'Türkçe, samimi ve net cevap ver.',
+        $responseLanguage === 'en'
+            ? 'Reply in English only, clearly and concisely. Do not append a Turkish translation.'
+            : 'Türkçe, samimi ve net cevap ver.',
         'Kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı verme.',
         'Müsaitlik veya bağlayıcı fiyat sorulursa yalnız mevcut güncel bilgiye dayan; yoksa işletme sahibinin kontrol edip dönüş yapacağını belirt.',
         'Eksik bilgi varsa yalnız kullanıcının sorusu ve mevcut sektör için gerçekten gerekli olan en fazla iki kısa soru sor.',
@@ -940,7 +944,8 @@ function ya_chat_fallback_result(
     array $businessConfig = [],
     array $businessContext = [],
     array $catalogContext = [],
-    string $message = ''
+    string $message = '',
+    string $responseLanguage = 'tr'
 ): array {
     return [
         'answer' => ya_chat_fallback_answer(
@@ -948,7 +953,8 @@ function ya_chat_fallback_result(
             $businessConfig,
             $businessContext,
             $catalogContext,
-            $message
+            $message,
+            $responseLanguage
         ),
         'fallback' => true,
         'provider' => $provider,
@@ -1195,7 +1201,8 @@ function ya_chat_fallback_answer(
     array $businessConfig = [],
     array $businessContext = [],
     array $catalogContext = [],
-    string $message = ''
+    string $message = '',
+    string $responseLanguage = 'tr'
 ): string {
     $normalized = ya_chat_catalog_normalize($message);
 
@@ -1207,12 +1214,12 @@ function ya_chat_fallback_answer(
             $price = is_numeric($item['price'] ?? null) ? (float) $item['price'] : null;
             $currency = ya_chat_string($item['currency'] ?? 'TRY') ?: 'TRY';
             if ($name !== '') {
-                $parts = [$available
-                    ? $name . ' şu anda mevcut görünüyor.'
-                    : $name . ' şu anda mevcut görünmüyor.'];
+                $parts = [$responseLanguage === 'en'
+                    ? ($available ? $name . ' appears to be available.' : $name . ' does not appear to be available.')
+                    : ($available ? $name . ' şu anda mevcut görünüyor.' : $name . ' şu anda mevcut görünmüyor.')];
                 if ($price !== null) {
                     $formattedPrice = rtrim(rtrim(number_format($price, 2, '.', ''), '0'), '.');
-                    $parts[] = 'Kayıtlı satış fiyatı ' . $formattedPrice . ' ' . $currency . '.';
+                    $parts[] = ($responseLanguage === 'en' ? 'Listed price: ' : 'Kayıtlı satış fiyatı ') . $formattedPrice . ' ' . $currency . '.';
                 }
                 return implode(' ', $parts);
             }
@@ -1220,21 +1227,30 @@ function ya_chat_fallback_answer(
     }
 
     $asksPayment = ya_chat_contains_any($normalized, [
-        'kart', 'kredi kart', 'banka kart', 'nakit', 'odeme', 'pos', 'temassiz'
+        'kart', 'kredi kart', 'banka kart', 'nakit', 'odeme', 'pos', 'temassiz',
+        'payment', 'cash', 'credit card', 'debit card'
     ]);
     if ($asksPayment) {
         $payment = ya_chat_string($businessContext['payment_note'] ?? '');
         if ($payment !== '') {
-            return $payment;
+            // Untranslated source notes cannot be represented as a verified English translation.
+            return $responseLanguage === 'en'
+                ? 'Please contact the business to confirm accepted payment methods.'
+                : $payment;
         }
     }
 
     $asksDirections = ya_chat_contains_any($normalized, [
-        'nasil gel', 'adres', 'konum', 'nerede', 'yol', 'tarif', 'ulasim'
+        'nasil gel', 'adres', 'konum', 'nerede', 'yol', 'tarif', 'ulasim',
+        'address', 'location', 'directions', 'how to get', 'where are'
     ]);
     if ($asksDirections) {
         $directions = ya_chat_string($businessContext['directions_note'] ?? '');
         $address = ya_chat_string($businessContext['address'] ?? $businessConfig['address'] ?? '');
+        if ($responseLanguage === 'en') {
+            // Street address is a proper address, unlike free-form Turkish directions.
+            return $address !== '' ? 'Address: ' . $address : 'Please contact the business for directions.';
+        }
         if ($directions !== '' && $address !== '') {
             return 'Adres: ' . $address . '. Ulaşım tarifi: ' . $directions;
         }
@@ -1246,6 +1262,9 @@ function ya_chat_fallback_answer(
         }
     }
 
+    if ($responseLanguage === 'en') {
+        return 'I cannot confirm that right now. You can send your question to the business for a verified answer.';
+    }
     $prefix = trim($reason);
     if ($prefix !== '') {
         $prefix .= ' ';
@@ -1387,9 +1406,14 @@ function ya_chat_detect_request_type(string $text): string
     return 'general_info';
 }
 
-function ya_chat_unsupported_business_answer(string $domain): string
+function ya_chat_unsupported_business_answer(string $domain, string $responseLanguage = 'tr'): string
 {
     $rule = ya_business_ai_policy()['domains'][$domain] ?? null;
+    if ($responseLanguage === 'en') {
+        return !is_array($rule)
+            ? 'I cannot verify that this business offers the service you mentioned. Could you clarify your question?'
+            : 'That service is not enabled for this business. I can help with other available services.';
+    }
     if (!is_array($rule)) return 'Bu hizmetin işletmemiz tarafından sunulduğunu doğrulayamıyorum. Hangi ürün veya hizmet hakkında bilgi istediğinizi netleştirebilir misiniz?';
     return 'Bu işletmede ' . $rule['label'] . ' hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda yardımcı olabilirim.';
 }

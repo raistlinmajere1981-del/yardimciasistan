@@ -174,7 +174,7 @@ try {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Entry two' })).toBeFocused();
   await page.getByRole('button', { name: 'Entry two' }).click();
-  await page.mouse.click(1, 1);
+  await page.mouse.click(1, 120); // below persistent top bar, inside modal backdrop
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
 

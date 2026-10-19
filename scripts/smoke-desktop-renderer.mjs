@@ -23,7 +23,7 @@ async function expectRegisteredHospitalityNavigation(page) {
   // This fixture is Pension + Restaurant, not retail. Generic commerce
   // dependencies must not resurrect the deliberately removed Sales entry.
   expect(registered.map(item => item.id)).not.toContain("market");
-  await expect(page.locator("#desktop-sidebar .nav-item:not(#sidebar-updates)")).toHaveText(registered.map(item => item.label));
+  await expect(page.locator("#desktop-sidebar .nav-item")).toHaveText(registered.map(item => item.label));
   await expect(page.locator("#desktop-sidebar").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
 }
 
@@ -69,6 +69,7 @@ try {
     window.__reportAiCalls = [];
     window.__androidProvisionCalls = [];
     window.__qrMenuWebPublicationChanges = [];
+    window.__menuReorderCalls = [];
     let qrMenuWebEnabled = true;
     let businessProfile = {
       description: "Smoke işletme açıklaması",
@@ -347,6 +348,20 @@ try {
         projectProducts();
         return { ok: true, message: "Ürün kaydedildi.", savedId, dashboardData: currentDashboardData };
       },
+      reorderMenuRecords: async input => {
+        const rows = input.kind === "categories" ? currentDashboardData.menu.categories
+          : currentDashboardData.menu.items.filter(item => item.category_id === input.categoryId);
+        if (rows.length !== input.orderedIds.length || rows.some(row => !input.orderedIds.includes(row.id)))
+          return { ok: false, message: "Sıralama listesi değişti." };
+        window.__menuReorderCalls.push(structuredClone(input));
+        const order = new Map(input.orderedIds.map((id, index) => [id, (index + 1) * 10]));
+        currentDashboardData = { ...currentDashboardData, menu: {
+          ...currentDashboardData.menu,
+          categories: input.kind === "categories" ? currentDashboardData.menu.categories.map(row => ({ ...row, sort_order: order.get(row.id) ?? row.sort_order })) : currentDashboardData.menu.categories,
+          items: input.kind === "items" ? currentDashboardData.menu.items.map(row => ({ ...row, sort_order: order.get(row.id) ?? row.sort_order })) : currentDashboardData.menu.items
+        } };
+        return { ok: true, message: "Sıralama güncellendi.", dashboardData: currentDashboardData };
+      },
       deleteMenuProductEntry: async (itemId) => {
         currentDashboardData = {
           ...currentDashboardData,
@@ -494,7 +509,7 @@ try {
   await expandSettingsStructure(page);
   await expect(settings.locator("#settings-public-profile")).toBeVisible();
   await expect(settings.getByLabel("İşletme açıklaması")).toBeVisible();
-  await expect(settings.locator(".settings-profile-options")).toBeVisible();
+  await expect(settings.getByRole("group", { name: "Ek özellikler", exact: true })).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
   await expect(settings.getByRole("checkbox", { name: "Online Satış", exact: true })).not.toBeChecked();
   await expect(settings.getByText("WhatsApp / SMS Kampanyaları", { exact: true })).toBeVisible();
@@ -698,6 +713,24 @@ try {
   await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürün ekle", exact: true })).toBeVisible();
+  const categoryRows = page.locator(".menu-category-row.menu-sortable-record");
+  await expect(categoryRows).toHaveCount(2);
+  await categoryRows.first().locator(".menu-drag-handle-hitbox").dragTo(categoryRows.nth(1), {
+    targetPosition: {x: 115, y: 54}, steps: 12
+  });
+  await expect.poll(() => page.evaluate(() => window.__menuReorderCalls.length), {timeout: 5000}).toBe(1);
+  await expect(categoryRows.first()).toContainText("Pasif Kategori");
+  await categoryRows.first().getByRole("button", {name: "Pasif Kategori sırasını değiştir"}).press("ArrowDown");
+  await expect.poll(() => page.evaluate(() => window.__menuReorderCalls.length)).toBe(2);
+  await expect(categoryRows.first()).toContainText("Yerel Kahvaltı");
+  await categoryRows.first().getByRole("button", {name: "Yerel Kahvaltı", exact: true}).click();
+  const itemRows = page.locator(".menu-product-panel .menu-record.menu-sortable-record");
+  await expect(itemRows).toHaveCount(3);
+  await itemRows.first().locator(".menu-drag-handle-hitbox").dragTo(itemRows.nth(1), {
+    targetPosition: {x: 145, y: 50}, steps: 12
+  });
+  await expect.poll(() => page.evaluate(() => window.__menuReorderCalls.length), {timeout: 5000}).toBe(3);
+  await expect(itemRows.first()).toContainText("Kaşarlı Köfte");
   const stockImageTrigger = page.getByRole("button", { name: "AI ile Stok Ekle", exact: true });
   await expect(stockImageTrigger).toBeVisible();
   await stockImageTrigger.click();
@@ -934,10 +967,10 @@ try {
   expect(await countMenuEntries()).toBe(entriesBeforeCreate);
   await page.evaluate(() => { window.__failMenuCreate = false; });
   await createMenuProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
-  const createdProductWorkspace = page.getByRole("dialog", { name: "UI ortak ürün", exact: true });
-  await expect(createdProductWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
-  await expect(createdProductWorkspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("UI ortak ürün");
-  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(createMenuProduct).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const createdMenuRow = page.locator(".menu-product-panel .menu-record").filter({ hasText: "UI ortak ürün" });
+  await expect(createdMenuRow).toBeVisible();
   expect(await countProducts()).toBe(productsBeforeCreate + 1);
   expect(await countMenuEntries()).toBe(entriesBeforeCreate + 1);
   const createInput = await page.evaluate(() => window.__menuCreateInput);
@@ -946,6 +979,10 @@ try {
   expect(createInput.product_id).toBeUndefined();
   expect(createInput.price_override).toBeNull();
   expect(createInput.is_available).toBe(true);
+  await createdMenuRow.click();
+  const createdProductWorkspace = page.getByRole("dialog", { name: "UI ortak ürün", exact: true });
+  await expect(createdProductWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
+  await expect(createdProductWorkspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("UI ortak ürün");
   await expect(createdProductWorkspace.getByText("Menüde mevcut", { exact: true })).toBeVisible();
   await createdProductWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true }).click();
   await createdProductWorkspace.getByRole("region", { name: "Menüden kaldır", exact: true })
@@ -1553,7 +1590,6 @@ try {
   await chooseDate(manualRequestDrawer, "Giriş tarihi", "2026-07-18");
   await chooseTime(manualRequestDrawer, "Saat", "21:00");
   await manualRequestDrawer.getByRole("button", { name: "Talimatı Kaydet" }).click();
-  await manualRequestDrawer.getByRole("button", { name: "Formu kapat" }).click();
   await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Reddet", exact: true }).click();
@@ -1648,11 +1684,10 @@ try {
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
   await customerEditor.getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect(customerEditor).toHaveCount(0);
-  const createdCustomer = conversionPage.getByRole("dialog", { name: "Kimlik Smoke" });
-  await expect(createdCustomer).toBeVisible();
-  await expect(createdCustomer.getByLabel("Kimlik / pasaport no")).toHaveValue("U12345678");
+  await expect(conversionPage.getByRole("dialog")).toHaveCount(0);
+  const createdCustomerRow = conversionPage.locator(".customer-record-row").filter({ hasText: "Kimlik Smoke" });
+  await expect(createdCustomerRow).toBeVisible();
   await expect.poll(() => conversionPage.evaluate(() => window.__identityAnalysisCalls.length)).toBe(1);
-  await createdCustomer.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
 
   await conversionPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
@@ -1663,7 +1698,7 @@ try {
   await expect(stayWorkspace).toBeVisible();
   await chooseDate(stayWorkspace, "Giriş tarihi", "2026-08-01");
   await chooseDate(stayWorkspace, "Çıkış tarihi", "2026-08-03");
-  await stayWorkspace.getByRole("button", { name: /boş misafir slotu/ }).first().click();
+  await stayWorkspace.getByRole("button", { name: /boş yatak/ }).first().click();
   await chooseSearchSelect(stayWorkspace, "Misafir ekle", /^Kimlik Smoke(?:\s|$)/);
   await stayWorkspace.getByText("Giriş notu", { exact: true }).click();
   await stayWorkspace.getByLabel("Giriş notu").fill("Manuel resepsiyon ataması.");
@@ -2360,14 +2395,16 @@ try {
   await compactPage.keyboard.press("Escape");
   await compactPage.getByRole("button", { name: "Menüyü daralt", exact: true }).click();
   await expect(compactPage.locator(".sidebar")).toHaveClass(/is-collapsed/);
-  await compactPage.locator("#sidebar-updates").click();
-  await expect(compactPage.locator("#sidebar-updates-panel")).toBeInViewport();
-  const updateBounds = await compactPage.locator("#sidebar-updates-panel").boundingBox();
+  await expect(compactPage.locator(".page-header-tools > #header-updates + .appearance-menu")).toHaveCount(1);
+  await expect(compactPage.locator("#desktop-sidebar #header-updates")).toHaveCount(0);
+  await compactPage.locator("#header-updates").click();
+  await expect(compactPage.locator("#header-updates-panel")).toBeInViewport();
+  const updateBounds = await compactPage.locator("#header-updates-panel").boundingBox();
   expect(updateBounds.x + updateBounds.width).toBeLessThanOrEqual(901);
   expect(updateBounds.y + updateBounds.height).toBeLessThanOrEqual(769);
   await compactPage.keyboard.press("Escape");
   await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
-  await compactPage.locator("#sidebar-updates").click();
+  await compactPage.locator("#header-updates").click();
   await expect(compactPage.getByLabel("Güncelleme sunucusu")).toBeVisible();
   await compactPage.close();
 

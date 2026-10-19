@@ -524,14 +524,14 @@ export function MarketQuickSaleWorkspace({
         )}
         <div className="market-sale-browse-tools">
           <ChoiceChips ariaLabel="Ürün kategorileri" className="market-category-chips" value={categoryId} onChange={setCategoryId} options={[{ id: "", label: "Tümü" }, { id: "quickAccess", label: "Hızlı Erişim" }, ...categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))]} />
-          <label className="market-field">Ürün görünümü<select aria-label="Ürün görünümü" value={productView.preset} onChange={event => changeProductView({ ...productView, preset: event.target.value as SaleProductViewPreset })}>
+          <label className="form-field form-field--fluid">Ürün görünümü<select aria-label="Ürün görünümü" value={productView.preset} onChange={event => changeProductView({ ...productView, preset: event.target.value as SaleProductViewPreset })}>
             <option value="comfortable">Rahat</option><option value="balanced">Dengeli</option><option value="dense">Yoğun</option><option value="list">Liste</option><option value="custom">Özel</option>
           </select></label>
         </div>
         {productView.preset === "custom" && <div className="market-sale-custom-view" aria-label="Özel ürün görünümü">
-          <label className="market-field">Sütun<select aria-label="Ürün sütun sayısı" value={productView.columns} onChange={event => changeProductView({ ...productView, columns: Number(event.target.value) })}>{[2, 3, 4, 5, 6].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-          <label className="market-check"><input type="checkbox" checked={productView.showImages} onChange={event => changeProductView({ ...productView, showImages: event.target.checked })} /> Görsel göster</label>
-          <label className="market-check"><input type="checkbox" checked={productView.emphasizePrice} onChange={event => changeProductView({ ...productView, emphasizePrice: event.target.checked })} /> Fiyatı vurgula</label>
+          <label className="form-field form-field--fluid">Sütun<select aria-label="Ürün sütun sayısı" value={productView.columns} onChange={event => changeProductView({ ...productView, columns: Number(event.target.value) })}>{[2, 3, 4, 5, 6].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label className="form-check"><input type="checkbox" checked={productView.showImages} onChange={event => changeProductView({ ...productView, showImages: event.target.checked })} /> Görsel göster</label>
+          <label className="form-check"><input type="checkbox" checked={productView.emphasizePrice} onChange={event => changeProductView({ ...productView, emphasizePrice: event.target.checked })} /> Fiyatı vurgula</label>
         </div>}
         <div className={`market-sale-product-grid market-sale-product-grid--${productView.preset}${productView.preset === "custom" && !productView.emphasizePrice ? " market-sale-product-grid--quiet-price" : ""}`} data-columns={productView.columns}>
           {filteredProducts.map((product) => (
@@ -615,7 +615,7 @@ export function MarketQuickSaleWorkspace({
         <div className="market-sale-checkout-fields">
           <div className="market-sale-payment">
             <ChoiceChips ariaLabel="Ödeme yöntemi" value={paymentMethod} onChange={setPaymentMethod} disabled={disabled} options={[...Object.entries(paymentMethodLabels).map(([id, label]) => ({ id, label })), ...(customerCreditEnabled ? [{ id: "credit", label: "Veresiye" }] : [])]} />
-            <label className="market-field">
+            <label className="form-field form-field--fluid">
               İndirim
               <MoneyInput value={discountTotal} onChange={setDiscountTotal} disabled={disabled} />
             </label>

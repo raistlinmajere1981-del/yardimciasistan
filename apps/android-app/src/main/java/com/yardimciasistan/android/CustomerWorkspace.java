@@ -3,7 +3,6 @@ package com.yardimciasistan.android;
 import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.view.View;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -47,27 +46,16 @@ final class CustomerWorkspace {
     boolean canViewRequests = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS)
         && data.hasPermission("customer.view");
     if (!canManageCustomers && !canViewRequests) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Bu cihazın bu alan için yetkisi yok",
           "Yetkiler masaüstü yöneticisi tarafından belirlenir."
       ));
       return UiKit.scroll(activity, page, bottomPaddingDp);
     }
 
-    // V16: section title and the create action share one compact toolbar.
-    LinearLayout toolbar = UiKit.row(activity);
-    TextView heading = UiKit.title(activity, "Müşteriler");
-    toolbar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
-    if (canManageCustomers) {
-      View createCustomer = UiKit.iconButton(
-          activity, "+", "Yeni müşteri", false, view -> listener.onCreateCustomer());
-      toolbar.addView(createCustomer,
-          new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
-    }
-    LinearLayout.LayoutParams toolbarParams = new LinearLayout.LayoutParams(-1, -2);
-    toolbarParams.setMargins(0, 0, 0, UiKit.dp(activity, 12));
-    toolbar.setLayoutParams(toolbarParams);
-    page.addView(toolbar);
+    View createCustomer = canManageCustomers
+        ? UiKit.iconButton(activity, "+", "Yeni müşteri", false, view -> listener.onCreateCustomer()) : null;
+    page.addView(UiKit.workspaceHeader(activity, "Müşteriler", null, createCustomer));
 
     ArrayList<String[]> options = new ArrayList<>();
     if (canViewRequests) {
@@ -84,21 +72,16 @@ final class CustomerWorkspace {
     if (!visibleFilter.equals(currentFilter)) {
       listener.onFilterNormalized(visibleFilter);
     }
-    page.addView(filterBar(options.toArray(new String[0][]), visibleFilter));
+    page.addView(UiKit.filterBar(activity, options.toArray(new String[0][]), visibleFilter, listener::onFilterChanged));
 
     boolean customerList = AndroidUiRules.CUSTOMER_LIST.equals(visibleFilter);
     boolean hasSearchableRows = customerList ? !data.customers.isEmpty() : !data.requests.isEmpty();
     NativeSearchList search = hasSearchableRows
-        ? new NativeSearchList(activity, customerList ? "Müşteri ara" : "Talep ara") : null;
-    if (search != null) {
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
-      searchParams.setMargins(0, 0, 0, UiKit.dp(activity, 12));
-      page.addView(search.input(), searchParams);
-    }
+        ? NativeSearchList.attachTo(page, customerList ? "Müşteri ara" : "Talep ara") : null;
 
     if (customerList) {
       if (data.customers.isEmpty()) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             "Müşteri listesi boş",
             "Masaüstü güncel snapshot yayınladığında müşteriler burada görünür."
         ));
@@ -124,7 +107,7 @@ final class CustomerWorkspace {
         shown += 1;
       }
       if (shown == 0) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             waitingOnly ? "Cevap bekleyen müşteri yok" : "Açık talep yok",
             "Yeni talepler geldiğinde bu liste güncellenir."
         ));
@@ -132,10 +115,7 @@ final class CustomerWorkspace {
     }
 
     if (search != null) {
-      TextView noMatches = UiKit.text(activity, "Aramayla eşleşen kayıt yok.",
-          13, UiKit.MUTED, Typeface.NORMAL);
-      page.addView(noMatches);
-      search.setNoMatchesNotice(noMatches);
+      search.showNoMatchesIn(page, "Aramayla eşleşen kayıt yok.");
     }
     return UiKit.scroll(activity, page, bottomPaddingDp);
   }
@@ -148,36 +128,13 @@ final class CustomerWorkspace {
     return filter;
   }
 
-  private View filterBar(String[][] options, String selected) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 3), 0, UiKit.dp(activity, 6));
-    for (String[] option : options) {
-      row.addView(UiKit.chip(
-          activity,
-          option[1],
-          option[0].equals(selected),
-          view -> listener.onFilterChanged(option[0])
-      ));
-    }
-    scroll.addView(row);
-    return scroll;
-  }
-
   private View customerCard(OperationData.CustomerRecord customer) {
     LinearLayout card = UiKit.card(activity);
     card.setOnClickListener(view -> listener.onOpenCustomer(customer));
 
-    LinearLayout top = UiKit.row(activity);
-    TextView name = UiKit.text(activity, customer.fullName, 16, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
     OperationData.CustomerRoomStayRecord activeStay = activeStayForCustomer(customer.id);
-    if (activeStay != null) {
-      top.addView(UiKit.badge(activity, "Konaklıyor", UiKit.INFO));
-    }
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, customer.fullName, 16, null,
+        activeStay == null ? null : UiKit.badge(activity, "Konaklıyor", UiKit.INFO)));
 
     card.addView(UiKit.text(
         activity,
@@ -251,10 +208,4 @@ final class CustomerWorkspace {
     return null;
   }
 
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(activity, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
-  }
 }

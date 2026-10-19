@@ -416,24 +416,6 @@ final class AndroidUiRules {
     return false;
   }
 
-  static boolean reservationTypeAllowed(OperationData data, String reservationType) {
-    if (data == null || reservationType == null) {
-      return false;
-    }
-    if ("room".equals(reservationType)) {
-      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS);
-    }
-    if ("table".equals(reservationType) || "breakfast".equals(reservationType)) {
-      return data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
-    }
-    if ("room_and_table".equals(reservationType) || "mixed".equals(reservationType)) {
-      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
-          && data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
-    }
-    return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
-        || data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
-  }
-
   static boolean reservationAllowed(OperationData data, OperationData.ReservationRecord reservation) {
     if (data == null || reservation == null) {
       return false;

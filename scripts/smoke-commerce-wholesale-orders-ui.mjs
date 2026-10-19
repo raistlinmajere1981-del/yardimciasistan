@@ -243,6 +243,15 @@ try {
   const port = server.httpServer.address().port;
   await page.goto(`http://127.0.0.1:${port}/wholesale-orders-ui-smoke`, { timeout: 60000 });
 
+  const historyPane = page.locator(".market-order-history");
+  await expect(historyPane.locator(".market-order-draft")).toHaveCount(1);
+  await expect(page.locator(".market-order-compose .market-order-draft")).toHaveCount(0);
+  assert.equal(await historyPane.evaluate(section => {
+    const history = section.querySelector(".market-order-list");
+    const draft = section.querySelector(".market-order-draft");
+    return Boolean(history && draft && (history.compareDocumentPosition(draft) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }), true, "New order draft must follow order history in the right column");
+
   const dealerSelect = page.getByLabel("Sipariş müşterisi", { exact: true });
   await expect(dealerSelect).toBeVisible();
   await chooseSearchSelect(page, "Sipariş müşterisi", { value: customer.savedId });

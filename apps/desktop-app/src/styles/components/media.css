@@ -1,0 +1,28 @@
+.media-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-field);
+  color: var(--color-accent);
+}
+
+.media-preview--surface { background: var(--color-bg-surface); }
+
+.media-preview img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.media-preview--cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

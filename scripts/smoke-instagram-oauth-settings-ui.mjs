@@ -35,6 +35,9 @@ try {
   await expect(section).toHaveCount(0);
   await open();
   await expect(toggle).not.toBeChecked();
+  await expect(section.getByRole("button",{name:"Instagram ile bağlan"})).toBeDisabled();
+  await expect(section.locator(".settings-service-detail > fieldset")).toHaveAttribute("disabled", "");
+  await expect(cancel).toBeEnabled();
   await toggle.check();
   await expect(toggle).toBeChecked();
   await expect(section.getByRole("button",{name:"Instagram ile bağlan"})).toBeVisible();
@@ -53,6 +56,15 @@ try {
   await section.getByRole("button",{name:"Instagram ile bağlan"}).click();
   await expect(section).toContainText("Instagram girişini tarayıcıda tamamlayın");
   assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),1);
+  await expect(section.getByRole("button",{name:"Bağlantıyı İptal Et"})).toBeEnabled();
+  await expect(save).toBeDisabled();
+  await section.getByRole("button",{name:"Bağlantıyı İptal Et"}).click();
+  await expect(section).toContainText("Instagram giriş işlemi iptal edildi.");
+  assert.equal(await page.evaluate(()=>window.__igSettingsState.cancelCount),1);
+  assert.equal(await page.evaluate(()=>window.__igSettingsState.disconnectCount),0,"cancel must keep saved credentials");
+  await expect(section.getByRole("button",{name:"Instagram ile bağlan"})).toBeEnabled();
+  await section.getByRole("button",{name:"Instagram ile bağlan"}).click();
+  assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),2);
   await page.evaluate(()=>{window.__igSettingsState.stage="denied";});
   await expect(section).toContainText("Giriş tamamlanamadı.",{timeout:9000});
   await expect(page.locator('.global-message-bar.is-error')).toContainText('Giriş tamamlanamadı.');
@@ -61,7 +73,7 @@ try {
   await save.click();
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),false);
   await section.getByRole("button",{name:"Instagram ile bağlan"}).click();
-  assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),2);
+  assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),3);
   await page.evaluate(()=>{window.__igSettingsState.stage="complete";});
   await expect(section).toContainText("@ornek_hesap",{timeout:9000});
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),false,"OAuth alone must not commit desired enable state");
@@ -76,6 +88,7 @@ try {
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),true);
   await open();
   await toggle.uncheck();
+  await expect(section.getByRole("button",{name:"Bağlantıyı test et"})).toBeDisabled();
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),true,"off must remain staged");
   await cancel.click();
   await open();
@@ -86,7 +99,7 @@ try {
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),false);
   await open();
   await toggle.check();
-  assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),2,"resuming linked account must not start OAuth");
+  assert.equal(await page.evaluate(()=>window.__igSettingsState.beginCount),3,"resuming linked account must not start OAuth");
   await save.click();
   await expect(section).toHaveCount(0);
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),true);
@@ -97,6 +110,13 @@ try {
   await section.getByRole("button",{name:"Bağlantıyı kesmeyi onayla"}).click();
   await expect(toggle).not.toBeChecked();
   assert.equal(await page.evaluate(()=>window.__igSettingsState.disconnectCount),1);
+  // Closing the service window also cancels an unfinished browser login.
+  await toggle.check();
+  await section.getByRole('button',{name:'Instagram ile bağlan'}).click();
+  await expect(section.getByRole('button',{name:'Bağlantıyı İptal Et'})).toBeVisible();
+  await cancel.click();
+  await expect(section).toHaveCount(0);
+  await expect.poll(()=>page.evaluate(()=>window.__igSettingsState.cancelCount)).toBe(2);
   assert.deepEqual(errors,[]);
   console.log("instagram-oauth-settings-ui-ok: draft toggle, save/revert, test gate, OAuth separate, no auto-login, disconnect");
 } finally {

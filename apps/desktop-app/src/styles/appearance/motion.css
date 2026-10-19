@@ -21,13 +21,11 @@
   }
 }
 
-:root[data-motion="reduced"] .is-spinning,
 :root[data-motion="reduced"] .stock-image-spinner {
   animation-duration: 1500ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-motion="system"] .is-spinning,
   :root[data-motion="system"] .stock-image-spinner {
     animation-duration: 1500ms;
   }

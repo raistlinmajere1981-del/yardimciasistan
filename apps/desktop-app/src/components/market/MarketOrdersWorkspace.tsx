@@ -244,7 +244,7 @@ export function MarketOrdersWorkspace({
         </header>
 
         <div className="market-order-customer">
-          <label className="market-field">
+          <label className="form-field form-field--fluid">
             Aktif bayi
             <RecordPicker pickerType="dealer" alphabetical searchPlaceholder="Firma, ad veya telefon" ariaLabel="Sipariş müşterisi" value={customerId} onChange={changeCustomer} disabled={disabled || Boolean(resolvingProductId)} placeholder="Bayi seçin" options={activeDealers.map(customer => ({ id: customer.id, label: customer.commercialProfile?.companyName || customer.fullName, description: `${customer.fullName} · ${priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}`, keywords: customer.phone }))} />
           </label>
@@ -297,6 +297,43 @@ export function MarketOrdersWorkspace({
               <span>{search.trim() ? "Arama metnini değiştirin veya temizleyin." : "Ürünler sekmesinden aktif bir ürün ekleyin."}</span>
             </div>
           )}
+        </div>
+
+      </section>
+
+      <section className="market-panel market-order-history">
+        <header className="market-panel-heading-row">
+          <div>
+            <span>Siparişler</span>
+            <h2>Sipariş Geçmişi</h2>
+            <p>{orders.length} kayıt · tüm commerce sipariş kaynakları.</p>
+          </div>
+          <ActionButton variant="secondary" size="sm" onClick={() => void reloadOrders()} disabled={disabled}>
+            Yenile
+          </ActionButton>
+        </header>
+
+        <div className="market-order-list">
+          {orders.map((order) => (
+            <button
+              type="button"
+              className={selectedOrder?.order.id === order.id
+                ? "market-order-card interactive-surface interactive-surface--record is-selected"
+                : "market-order-card interactive-surface interactive-surface--record"}
+              key={order.id}
+              onClick={() => void openOrder(order.id)}
+            >
+              <span>
+                <strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
+                <small>{new Date(order.placedAt).toLocaleString("tr-TR")} · {sourceLabel(order.source)}</small>
+              </span>
+              <span className="market-order-card-meta">
+                <StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
+                <b>{money(order.total, order.currency)}</b>
+              </span>
+            </button>
+          ))}
+          {!loadingOrders && orders.length === 0 && <p className="market-muted">Henüz sipariş kaydı yok.</p>}
         </div>
 
         <div className="market-order-draft">
@@ -356,7 +393,7 @@ export function MarketOrdersWorkspace({
             )}
           </div>
 
-          <label className="market-field">
+          <label className="form-field form-field--fluid">
             Sipariş notu
             <textarea
               rows={2}
@@ -384,42 +421,6 @@ export function MarketOrdersWorkspace({
           >
             <ClipboardList size={18} aria-hidden="true" /> Siparişi Kaydet
           </ActionButton>
-        </div>
-      </section>
-
-      <section className="market-panel market-order-history">
-        <header className="market-panel-heading-row">
-          <div>
-            <span>Siparişler</span>
-            <h2>Sipariş Geçmişi</h2>
-            <p>{orders.length} kayıt · tüm commerce sipariş kaynakları.</p>
-          </div>
-          <ActionButton variant="secondary" size="sm" onClick={() => void reloadOrders()} disabled={disabled}>
-            Yenile
-          </ActionButton>
-        </header>
-
-        <div className="market-order-list">
-          {orders.map((order) => (
-            <button
-              type="button"
-              className={selectedOrder?.order.id === order.id
-                ? "market-order-card interactive-surface interactive-surface--record is-selected"
-                : "market-order-card interactive-surface interactive-surface--record"}
-              key={order.id}
-              onClick={() => void openOrder(order.id)}
-            >
-              <span>
-                <strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
-                <small>{new Date(order.placedAt).toLocaleString("tr-TR")} · {sourceLabel(order.source)}</small>
-              </span>
-              <span className="market-order-card-meta">
-                <StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
-                <b>{money(order.total, order.currency)}</b>
-              </span>
-            </button>
-          ))}
-          {!loadingOrders && orders.length === 0 && <p className="market-muted">Henüz sipariş kaydı yok.</p>}
         </div>
 
         {selectedOrder ? (
@@ -503,7 +504,7 @@ export function MarketOrdersWorkspace({
                   <strong>{selectedOrder.order.total === 0 ? "Tahsilat gerekmiyor" : "Tahsilat tercihi"}</strong>
                 </header>
                 {selectedOrder.order.total > 0 && (
-                  <label className="market-field">
+                  <label className="form-field form-field--fluid">
                     Ödeme
                     <select
                       aria-label="Sipariş ödeme tercihi"

@@ -370,6 +370,9 @@ final class LocalNotificationCenter {
     return ledger;
   }
 
+  // applyUpdate persists notifiedAt before posting. A background apply would leave
+  // a process-death window for duplicate notifications on the next foreground/job run.
+  @android.annotation.SuppressLint("ApplySharedPref")
   private void saveLedger(NotificationLedger ledger) {
     JSONArray values = new JSONArray();
     int retained = 0;

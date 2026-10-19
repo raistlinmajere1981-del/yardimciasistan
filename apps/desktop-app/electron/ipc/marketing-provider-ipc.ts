@@ -12,6 +12,7 @@ export function registerMarketingProviderIpc(options: { sms: SmsMessagingService
   ipcMain.handle("marketingProviders:testInstagram",async()=>{options.assertUnlocked();const result=await options.instagram.testConnection();options.assertUnlocked();return result;});
   ipcMain.handle("marketingProviders:beginInstagramOAuth",async()=>{options.assertUnlocked();const result=await options.instagramOAuth.begin();options.assertUnlocked();return result;});
   ipcMain.handle("marketingProviders:pollInstagramOAuth",async()=>{options.assertUnlocked();const result=await options.instagramOAuth.poll();options.assertUnlocked();return result;});
+  ipcMain.handle("marketingProviders:cancelInstagramOAuth",()=>{options.assertUnlocked();return options.instagramOAuth.cancelPending();});
   ipcMain.handle("marketingProviders:disconnectInstagramOAuth",()=>{options.assertUnlocked();return options.instagramOAuth.disconnect();});
   ipcMain.handle("marketingProviders:smsSenders",async(_event,input?:SmsConfigurationInput):Promise<MarketingResult<string[]>>=>{
     options.assertUnlocked();try{const value=await options.sms.listSenderIds(input);options.assertUnlocked();return {ok:true,value};}

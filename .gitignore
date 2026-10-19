@@ -46,3 +46,6 @@ config/credentials.local.json
 # Local assistant files and accidental CLI output
 /.claude/
 /--title
+
+# Demo-owned generated assistant bundle and its image assets.
+test-site/landing/assets/assistant/

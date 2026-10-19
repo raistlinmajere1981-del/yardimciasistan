@@ -3063,3 +3063,44 @@ CREATE TRIGGER trg_kbs_requests_android_snapshot_delete AFTER DELETE ON kbs_deli
   ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
     attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
 END;
+
+-- Public translation service: current schema only, independent of spoken languages.
+CREATE TABLE public_translation_settings (
+  business_id TEXT PRIMARY KEY REFERENCES business(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+  source_language TEXT NOT NULL DEFAULT 'tr' CHECK(source_language='tr'),
+  target_languages_json TEXT NOT NULL DEFAULT '[]',
+  automatic INTEGER NOT NULL DEFAULT 0 CHECK(automatic IN (0,1)),
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE public_translations (
+  business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+  record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing')),
+  record_id TEXT NOT NULL, field TEXT NOT NULL, target_language TEXT NOT NULL,
+  source_text TEXT NOT NULL, source_hash TEXT NOT NULL,
+  translated_text TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL CHECK(status IN ('ready','failed')),
+  origin TEXT NOT NULL CHECK(origin IN ('manual','ai')),
+  failure_code TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY(business_id,record_type,record_id,field,target_language)
+);
+CREATE INDEX idx_public_translations_ai_reuse ON public_translations(business_id,source_hash,target_language)
+  WHERE origin='ai' AND status='ready';
+-- Reconstructable allowlist projection. Never joins customers, bookings, finance or messages.
+CREATE VIEW public_translation_sources AS
+SELECT b.id AS business_id, 'business' AS record_type, b.id AS record_id, b.display_name AS label, json_object('description', p.description, 'about_text', p.about_text, 'directions_note', p.directions_note, 'policy_note', p.policy_note, 'payment_note', p.payment_note) AS fields_json FROM business b JOIN business_public_profile p ON p.business_id=b.id WHERE b.deleted_at='' AND 1
+UNION ALL
+SELECT b.id AS business_id, 'room' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name, 'bed_info', r.bed_info, 'description', r.description, 'price_note', r.price_note) AS fields_json FROM business b CROSS JOIN rooms r WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND b.publish_rooms_web=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='accommodation.rooms' AND c.is_enabled=1)
+UNION ALL
+SELECT b.id AS business_id, 'table' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name, 'area', r.area, 'description', r.public_description) AS fields_json FROM business b CROSS JOIN tables r WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND b.publish_tables_web=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='food_service.tables' AND c.is_enabled=1)
+UNION ALL
+SELECT b.id AS business_id, 'menu_category' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name, 'description', r.description) AS fields_json FROM business b CROSS JOIN menu_categories r WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND b.publish_qr_menu_web=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.qr_menu' AND c.is_enabled=1)
+UNION ALL
+SELECT b.id AS business_id, 'menu_product' AS record_type, e.id AS record_id, p.name AS label, json_object('name', p.name, 'description', p.description) AS fields_json FROM business b JOIN catalog_products p ON p.business_id=b.id JOIN menu_product_entries e ON e.product_id=p.id JOIN menu_categories c ON c.id=e.category_id WHERE b.deleted_at='' AND p.deleted_at='' AND p.is_active=1 AND e.deleted_at='' AND c.deleted_at='' AND c.is_active=1 AND b.publish_qr_menu_web=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.qr_menu' AND c.is_enabled=1)
+UNION ALL
+SELECT b.id AS business_id, 'catalog_product' AS record_type, p.id AS record_id, COALESCE(NULLIF(r.title_override,''),p.name) AS label, json_object('name', COALESCE(NULLIF(r.title_override,''),p.name), 'description', COALESCE(NULLIF(r.description_override,''),p.description)) AS fields_json FROM business b JOIN catalog_products p ON p.business_id=b.id JOIN commerce_product_publications r ON r.product_id=p.id AND r.business_id=b.id WHERE b.deleted_at='' AND p.deleted_at='' AND p.is_active=1 AND r.is_published=1 AND r.channel='online_sales' AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.online_sales' AND c.is_enabled=1)
+UNION ALL
+SELECT b.id AS business_id, 'catalog_category' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name) AS fields_json FROM business b JOIN catalog_categories r ON r.business_id=b.id WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.online_sales' AND c.is_enabled=1) AND EXISTS(SELECT 1 FROM catalog_products p JOIN commerce_product_publications x ON x.product_id=p.id AND x.business_id=b.id WHERE p.category_id=r.id AND p.deleted_at='' AND p.is_active=1 AND x.is_published=1 AND x.channel='online_sales')
+UNION ALL
+SELECT b.id AS business_id, 'marketing' AS record_type, r.id AS record_id, r.title AS label, json_object('title', r.title, 'text', r.text) AS fields_json FROM business b JOIN marketing_publications r ON r.business_id=b.id WHERE b.deleted_at='' AND r.channel='website' AND r.desired_published=1 AND r.status!='draft' AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='marketing.studio' AND c.is_enabled=1);

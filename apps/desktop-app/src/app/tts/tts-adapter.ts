@@ -19,7 +19,7 @@ export interface TtsPreferences {
   volume: number; // Application volume, 0–100; never changes system settings.
 }
 
-export interface TtsFeatures {
+interface TtsFeatures {
   rate: boolean;
   pitch: boolean;
   volume: boolean;

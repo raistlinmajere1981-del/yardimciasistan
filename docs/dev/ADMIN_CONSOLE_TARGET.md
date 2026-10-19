@@ -151,6 +151,14 @@ sonuçlarını anlaşılır bir modele dönüştürür.
 Verification registry'nin görsel yüzüdür. Full Verify ve alt kontroller görülebilir,
 çalıştırılabilir ve geçmiş sonuçları mevcut HEAD ile ilişkilendirilebilir.
 
+`Android Ekranları` görünümü aynı registry'deki dört hedefli kontrolü açar:
+izole gerçek-native UI testi, V16 tarayıcı tasarım referansı ve iki gerçek
+Companion/ADB akışı. Manuel kontroller yalnız açıkça seçildiğinde
+`--include-manual` ile çalıştırılır; ADB gerektirir. Otomatik full/release
+koşularına eklenmez. Hızlı native fixture gerçek uygulama/senkronizasyon
+yolunu doğrulayan yavaş cihaz testinin yerini tutmaz.
+
+
 ### Deploy
 
 Deploy işlemi tek "çalıştır" düğmesi değildir:

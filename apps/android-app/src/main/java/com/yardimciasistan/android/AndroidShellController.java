@@ -37,7 +37,6 @@ final class AndroidShellController {
   }
 
   private static final int BOTTOM_NAV_HEIGHT_DP = 76;
-  private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
   private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
   private static final int LANDSCAPE_SIDE_NAV_WIDTH_DP = 112;
   private static final int PORTRAIT_HEADER_HEIGHT_DP = 72;

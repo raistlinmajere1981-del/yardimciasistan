@@ -1,0 +1,156 @@
+/* settings-utilities feature layout; controls use the shared UI family. */
+.password-settings-grid {
+  max-width: calc(var(--field-width-md) * 2 + var(--space-6));
+}
+
+.settings-application-subsection {
+  min-width: 0;
+}
+
+.password-settings-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.password-settings-recovery {
+  margin-top: var(--space-4);
+}
+
+.password-settings-recovery form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.password-settings-message {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.password-settings-message.is-error {
+  color: var(--color-danger);
+}
+
+.password-settings-message.is-success {
+  color: var(--color-success);
+}
+
+.backup-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block: var(--space-5) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.backup-list-heading span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.backup-list {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.backup-empty {
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.backup-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.backup-row-title,
+.backup-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.backup-row-title {
+  font-size: var(--text-sm);
+}
+
+.backup-row-meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+}
+
+.settings-utility-actions { display: flex; gap: var(--space-2); margin-inline-start: auto; }
+.settings-action-popover {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  width: min(520px, calc(100vw / var(--ui-scale) - 24px));
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.settings-action-popover-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+.settings-action-popover .form-grid { grid-template-columns: minmax(0, 1fr); }
+.settings-action-popover .settings-panel { min-width: 0; }
+.settings-action-popover .form-field { max-width: 100%; }
+.settings-action-popover .backup-row { flex-wrap: wrap; }
+.settings-action-popover .form-actions { flex-wrap: wrap; }
+.settings-update-section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.settings-update-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.settings-update-summary > span { flex: 1 1 100%; color: var(--color-text); }
+.settings-update-address-row {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.settings-update-url { flex: 1 1 auto; min-width: 0; }
+.settings-update-url input { min-width: 0; width: 100%; }
+.settings-update-url-reset { flex: 0 0 auto; }
+.settings-update-checkbox { margin: 0; }
+.settings-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.settings-update-save { margin-left: auto; }
+.settings-update-progress { display: grid; gap: var(--space-1); }
+.settings-update-progress progress { width: 100%; }
+.settings-update-notes { display: grid; gap: var(--space-1); }
+.settings-update-notes ul { margin: 0; padding-inline-start: var(--space-5); }

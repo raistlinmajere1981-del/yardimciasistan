@@ -1,3 +1,5 @@
+import { ActionButton } from "./ActionButton";
+import { IconButton } from "./IconButton";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from "lucide-react";
 
@@ -93,30 +95,30 @@ export function DatePicker({
           data-picker-month={monthKey(visibleMonth)}
         >
           <div className="date-picker-toolbar">
-            <button type="button" className="picker-icon-button" aria-label="Önceki ay" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))}>
+            <IconButton size="sm" aria-label="Önceki ay" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))}>
               <ChevronLeft size={16} aria-hidden="true" />
-            </button>
+            </IconButton>
             <strong>{formatMonth(visibleMonth)}</strong>
-            <button type="button" className="picker-icon-button" aria-label="Sonraki ay" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))}>
+            <IconButton size="sm" aria-label="Sonraki ay" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))}>
               <ChevronRight size={16} aria-hidden="true" />
-            </button>
-            <button type="button" className="picker-icon-button picker-close-button" aria-label="Tarih seçiciyi kapat" onClick={() => setOpen(false)}>
+            </IconButton>
+            <IconButton size="sm" className="picker-close-button" aria-label="Tarih seçiciyi kapat" onClick={() => setOpen(false)}>
               <X size={15} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
 
           {(clearable || quickPresets.length > 0) && (
             <div className="date-picker-presets">
-              {clearable && <button type="button" onClick={() => choose("")} disabled={!value}>Temizle</button>}
+              {clearable && <ActionButton size="sm" variant="secondary" onClick={() => choose("")} disabled={!value}>Temizle</ActionButton>}
               {quickPresets.map((preset) => (
-                <button
-                  type="button"
+                <ActionButton
+                  size="sm" variant="secondary"
                   key={`${preset.label}:${preset.value}`}
                   disabled={isDateDisabled(preset.value, min, max)}
                   onClick={() => choose(preset.value)}
                 >
                   {preset.label}
-                </button>
+                </ActionButton>
               ))}
             </div>
           )}
@@ -231,10 +233,10 @@ export function TimePicker({
               <small>Saat seçimi</small>
               <strong>{draftHour && draftMinute ? `${draftHour}:${draftMinute}` : value || "--:--"}</strong>
             </div>
-            {clearable && <button type="button" className="picker-text-button" onClick={clear} disabled={!value}>Temizle</button>}
-            <button type="button" className="picker-icon-button" aria-label="Saat seçiciyi kapat" onClick={() => setOpen(false)}>
+            {clearable && <ActionButton size="sm" variant="ghost" onClick={clear} disabled={!value}>Temizle</ActionButton>}
+            <IconButton size="sm" aria-label="Saat seçiciyi kapat" onClick={() => setOpen(false)}>
               <X size={15} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
           <div className="time-picker-columns">
             <div>

@@ -6,9 +6,22 @@ import { tmpdir } from "node:os";
 const root = mkdtempSync(join(tmpdir(), "ya-business-gallery-"));
 const source = join(root, "fixture.png");
 writeFileSync(source, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==", "base64"));
+// The real preview source must keep the original orientation: Electron stretches
+// photos when both width and height are passed to nativeImage.resize.
+let previewSize = {width: 300, height: 900};
+const resizeCalls = [];
+const previewData = "data:image/png;base64,dGVzdA==";
 const electronMock = {
   dialog: { showOpenDialog: async () => ({ canceled:false, filePaths:[source] }) },
-  nativeImage: { createFromPath: () => ({ isEmpty:()=>false, resize:()=>({toDataURL:()=> "data:image/png;base64,dGVzdA=="}) }) }
+  nativeImage: { createFromPath: () => ({
+    isEmpty:()=>false,
+    getSize:()=>previewSize,
+    toDataURL:()=>previewData,
+    resize:options=>{
+      resizeCalls.push(options);
+      return {toDataURL:()=>previewData};
+    }
+  }) }
 };
 const originalLoad=Module._load;
 Module._load=function(id,parent,isMain) { return id==="electron" ? electronMock : originalLoad.call(this,id,parent,isMain); };
@@ -20,6 +33,18 @@ try {
   assert.equal(first.ok,true,first.message);
   assert.equal(gallery.galleryDraftState(root).dirty,true);
   assert.equal(first.media.length,1);
+  assert.ok(resizeCalls.some(call => call.height===110 && call.width===undefined),
+    "portrait thumbnail must be height-limited without specifying width");
+  previewSize={width:900,height:300};
+  resizeCalls.length=0;
+  assert.equal(gallery.listBusinessGallery(root).length,1);
+  assert.ok(resizeCalls.some(call => call.width===160 && call.height===undefined),
+    "landscape thumbnail must be width-limited without specifying height");
+  previewSize={width:90,height:70};
+  resizeCalls.length=0;
+  assert.equal(gallery.listBusinessGallery(root).length,1);
+  assert.equal(resizeCalls.length,0,"small originals must not be enlarged");
+  previewSize={width:300,height:900};
   const second=await gallery.addGalleryPhoto(root,null);
   assert.equal(second.ok,true,second.message);
   assert.equal(second.media.length,2);

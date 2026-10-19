@@ -36,6 +36,8 @@ textarea {
   gap: var(--space-4) var(--space-6);
 }
 
+.form-grid--compact { gap: var(--space-3); }
+
 .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -120,9 +122,13 @@ textarea {
   align-items: center;
   gap: var(--space-2);
   min-height: max(var(--interaction-target-min), var(--control-height-sm));
+  min-width: var(--interaction-target-min);
   font-size: var(--text-sm);
   font-weight: var(--weight-normal);
 }
+
+:where(input, textarea)[readonly] { color: var(--color-text-muted); }
+.form-check:has(input:not(:disabled)) { cursor: pointer; }
 
 .form-actions {
   display: flex;

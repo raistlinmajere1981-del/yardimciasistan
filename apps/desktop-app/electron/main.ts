@@ -1,3 +1,5 @@
+import { PublicTranslationService } from "./public-translation-service";
+import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
 import { cleanupOrphanProductImages } from "./product-data-service";
 import { MarketingAnalyticsService } from "./marketing/analytics-service";
 import { registerMarketingAnalyticsIpc } from "./ipc/marketing-analytics-ipc";
@@ -457,7 +459,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([kbsDeliveryRequestProcessor.stopAndDrain(), campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain()])).then(() => {
+  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([publicTranslationService.stopAndDrain(), kbsDeliveryRequestProcessor.stopAndDrain(), campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain()])).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -474,6 +476,11 @@ const marketingAnalyticsService = new MarketingAnalyticsService(getDatabase, { a
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
 const instagramOAuthService = new InstagramOAuthService(getDatabase, fetch, assertAppSessionUnlocked);
 const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()), refreshInstagram: () => instagramOAuthService.refreshIfNeeded() });
+const publicTranslationService = new PublicTranslationService(getDatabase, {
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked())
+    && hasBusinessCapability(enabledBusinessCapabilities(), C.AI),
+  onChanged: () => syncCoordinator?.scheduleSoon()
+});
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
 function publishPendingMarketingWebsiteIntent() {
   // Explicit user publication actions work even when passive automatic sync is disabled.
@@ -516,6 +523,7 @@ let optionalBackgroundReconcile: Promise<void> = Promise.resolve();
 export function reconcileOptionalBackgroundServices(): Promise<void> {
   const operation = optionalBackgroundReconcile.then(async () => {
     if (!desktopDatabase || campaignShutdownStarted) return;
+    publicTranslationService.reconcile();
     const enabled = new Set(enabledBusinessCapabilities());
     const allowed = !maintenanceSyncSuspended && Boolean(appLockService && !appLockService.isLocked());
     if (allowed && enabled.has(C.MARKETING_STUDIO)) marketingSchedulerService.start();
@@ -548,6 +556,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => syncCoordinator?.scheduleSoon()});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
@@ -699,6 +708,7 @@ export function scheduleAutomaticSyncSoon(capabilitiesChanged = false) {
 export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
+  await publicTranslationService.stopAndDrain();
   await marketingSchedulerService.suspendAndDrain();
   await kbsDeliveryRequestProcessor.stopAndDrain();
   await campaignDispatchService.suspendAndDrain();

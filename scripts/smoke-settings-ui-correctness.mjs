@@ -1,3 +1,4 @@
+import { verifySettingsStyleParity, verifySettingsAppearanceParity } from "./test-helpers/settings-style-parity.mjs";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
@@ -59,6 +60,7 @@ try {
             overflow: panel.scrollWidth > panel.clientWidth + 1 || body.scrollWidth > body.clientWidth + 1
           };
         });
+        await verifySettingsStyleParity(page, `business-${width}-${scheme}-${density}`);
         expect(spacing, `${width}px ${scheme} ${density}`).toEqual({ padded: true, aligned: true, contained: true, overflow: false });
       }
     }
@@ -79,6 +81,7 @@ try {
     await page.locator(kind === "rooms" ? "#settings-rooms-button" : "#settings-tables-button").click();
     const management = page.getByRole("dialog", { name: managementTitle, exact: true });
     await expect(management).toBeVisible();
+    await verifySettingsAppearanceParity(page, `${kind}-management`);
     const managementBounds = await management.boundingBox();
     const shell = management.locator(".resource-management-shell");
     const shellBounds = await shell.boundingBox();
@@ -114,6 +117,7 @@ try {
       await smoking.check();
       await expect(smoking).toBeChecked();
     }
+    await verifySettingsStyleParity(page, `${kind}-details`);
     const detailBounds = await detail.boundingBox();
     expect(detailBounds.width).toBeLessThan(managementBounds.width);
     expect(detailBounds.height).toBeLessThan(0.9 * 900);
@@ -123,15 +127,25 @@ try {
     await detail.getByRole("button", { name: "Kaydet", exact: true }).click();
     await expect(management).toBeVisible();
     await expect(management.getByText("Kaydedilmemiş değişiklikler", { exact: true })).toBeVisible();
+    const closeManagement = management.getByRole("button", { name: "Kapat", exact: true });
+    await expect(closeManagement).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(management).toBeVisible();
+    await page.mouse.click(6,6);
+    await expect(management).toBeVisible();
+    await expect(management.getByRole("button", { name: "Kaydet ve geç" })).toHaveCount(0);
     expect(await page.evaluate(() => window.settingsCalls.filter(call => call.kind === "layout").length)).toBe(before);
     await management.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
     await expect(management.getByRole("button", { name: "Kaydet", exact: true })).toBeDisabled();
-    await page.keyboard.press("Escape");
+    await expect(closeManagement).toBeEnabled();
+    await closeManagement.click();
     await expect(management).toHaveCount(0);
   }
 
   // Global update projection must reflect the bridge, including unverified/error states.
-  const updateTrigger = page.locator('#sidebar-updates');
+  await expect(page.locator(".page-header-tools > #header-updates + .appearance-menu")).toHaveCount(1);
+  await expect(page.locator(".sidebar #header-updates")).toHaveCount(0);
+  const updateTrigger = page.locator('#header-updates');
   await expect(updateTrigger).toContainText('Henüz kontrol edilmedi');
   for (const [patch, text] of [
     [{ phase: 'checking' }, 'Kontrol ediliyor'],
@@ -146,7 +160,7 @@ try {
   }
   await page.evaluate(() => window.reopenSettings());
   await updateTrigger.click();
-  const updateSurface = page.locator('#sidebar-updates-panel');
+  const updateSurface = page.locator('#header-updates-panel');
   await expect(updateSurface.locator('.settings-update-summary')).toHaveCount(1);
   await expect(updateSurface.locator('.settings-panel-header')).toHaveCount(0);
   await expect(updateSurface.getByLabel('Otomatik güncellemeleri kontrol et', { exact: true })).toBeVisible();
@@ -182,16 +196,17 @@ try {
     await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
     await page.getByLabel('Arayüz ölçeği').selectOption('1.1');
     await page.keyboard.press('Escape');
-    for (const id of ['sidebar-updates', 'settings-security-button', 'settings-data-button']) {
+    for (const id of ['header-updates', 'settings-security-button', 'settings-data-button']) {
       await page.locator(`#${id}`).click();
       const panel = page.locator(`#${id}-panel`);
       await expect(panel).toBeVisible();
+      await verifySettingsStyleParity(page, `${id}-${width}-scaled`);
       const rect = await panel.boundingBox();
       expect(rect.x).toBeGreaterThanOrEqual(0);
       expect(rect.y).toBeGreaterThanOrEqual(0);
       expect(rect.x + rect.width).toBeLessThanOrEqual(width + 1);
       expect(rect.y + rect.height).toBeLessThanOrEqual(769);
-      if (id === 'sidebar-updates') {
+      if (id === 'header-updates') {
         await panel.getByText('Otomatik güncellemeleri kontrol et', { exact: true }).click();
         await panel.getByText('Otomatik güncellemeleri kontrol et', { exact: true }).click();
       }
@@ -320,10 +335,16 @@ try {
   await page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
   await expect(sector).toHaveValue("restaurant");
   await assertLayout(false, true);
+  const saveSector = async () => {
+    await page.locator(".settings-page-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Değişiklikler kaydedilip uygulama yeniden başlatılsın mı?" });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole("button", { name: "Kaydet ve Yeniden Başlat" }).click();
+  };
   for (const [profileId, rooms, tables] of [["market", false, false], ["pension", true, false], ["restaurant", false, true]]) {
     await expandStructure();
     await sector.selectOption(profileId);
-    await page.locator(".settings-page-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+    await saveSector();
     await expect.poll(() => page.evaluate(() => window.persistedSettings().profileId)).toBe(profileId);
     await assertLayout(rooms, tables);
   }
@@ -340,18 +361,22 @@ try {
     };
   });
   await sector.selectOption("pension");
-  await page.locator(".settings-page-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+  await saveSector();
   await expect.poll(() => page.evaluate(() => typeof window.finishOldLayoutRead)).toBe("function");
   await sector.selectOption("restaurant");
-  await page.locator(".settings-page-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+  await saveSector();
   await assertLayout(false, true);
   await page.evaluate(async () => { window.finishOldLayoutRead(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
   await expect(page.getByRole("heading", { name: "Oda Yönetimi", exact: true })).toHaveCount(0);
   await page.locator("#settings-tables-button").click();
   await page.getByRole("button", { name: "Kategori Ekle", exact: true }).click();
   await page.getByLabel("Kategori adı", { exact: true }).fill("Current profile salon");
+  const tableCloseAfterSave = page.getByRole("dialog", { name: "Masa Yönetimi" }).getByRole("button", { name: "Kapat", exact: true });
+  await expect(tableCloseAfterSave).toBeDisabled();
   await page.locator('.settings-layout-overlay > footer').getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(call => call.kind === "layout").length)).toBe(1);
+  await expect(tableCloseAfterSave).toBeEnabled();
+  await tableCloseAfterSave.click();
 
   await visit("");
   const address = page.getByLabel("Adres", { exact: true });
@@ -414,7 +439,7 @@ try {
   expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain("marketing.studio");
   await page.evaluate(() => window.refreshSettings({ profileOptions: ["commerce.wholesale", "channel.online_sales", "marketing.studio"], onlineSalesDeliveryEnabled: true }));
   // Service-specific overlay/save coverage lives in the Settings platform smoke.
-  await page.locator("#sidebar-updates").click();
+  await page.locator("#header-updates").click();
   for (const [remote, phase, arrow] of [["2.0.1", "up-to-date", false], ["2.0.2", "up-to-date", false], ["2.0.3", "available", true]]) {
     await page.evaluate(({ remote, phase }) => { window.yardimciDesktop.checkForUpdates = async () => ({ phase, message: "Fixture version", currentVersion: "2.0.2", latestVersion: remote, defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: true }); }, { remote, phase });
     await page.getByRole("button", { name: "Güncellemeleri Kontrol Et", exact: true }).click();

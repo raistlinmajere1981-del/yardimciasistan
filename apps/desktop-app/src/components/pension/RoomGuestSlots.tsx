@@ -40,7 +40,7 @@ export function RoomGuestSlots({
       className={`room-guest-slot interactive-surface interactive-surface--record${guest ? " is-occupied" : " is-empty"}${selected ? " is-selected" : ""}`}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={guest ? `${guest.name} misafir slotu` : `${currentIndex + 1}. boş misafir slotu`}
+      aria-label={guest ? `${guest.name} misafir slotu` : `${currentIndex + 1}. boş yatak`}
       onClick={() => onSelectSlot(currentIndex, guest)}
     >
       {guest ? <>
@@ -51,7 +51,7 @@ export function RoomGuestSlots({
         </span>
       </> : <>
         <Plus size={18} aria-hidden="true" />
-        <span className="room-guest-slot__copy"><strong>Misafir ekle</strong><small>Boş slot</small></span>
+        <span className="room-guest-slot__copy"><strong>Misafir ekle</strong><small>Boş yatak</small></span>
       </>}
     </button>;
   }

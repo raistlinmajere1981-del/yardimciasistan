@@ -584,7 +584,17 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
     try {
       const image = nativeImage.createFromPath(absolutePath);
       if (image.isEmpty()) return "";
-      return image.resize({ width, height, quality: "good" }).toDataURL();
+      const size = image.getSize();
+      if (size.width <= 0 || size.height <= 0) return "";
+      // Supplying both dimensions to Electron stretches portrait/landscape photos.
+      // Bound the preview by whichever dimension needs the larger reduction and
+      // let nativeImage preserve the other dimension's aspect ratio.
+      const scale = Math.min(1, width / size.width, height / size.height);
+      if (scale === 1) return image.toDataURL();
+      const resizeOptions = width / size.width <= height / size.height
+        ? { width: Math.max(1, Math.round(size.width * scale)), quality: "good" as const }
+        : { height: Math.max(1, Math.round(size.height * scale)), quality: "good" as const };
+      return image.resize(resizeOptions).toDataURL();
     } catch {
       return "";
     }

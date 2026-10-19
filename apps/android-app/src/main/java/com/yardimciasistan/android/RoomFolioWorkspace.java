@@ -67,10 +67,7 @@ final class RoomFolioWorkspace {
       return;
     }
 
-    NativeSearchList search = new NativeSearchList(context, "Müşteri veya oda ara");
-    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
-    searchParams.setMargins(0, dp(context, 4), 0, dp(context, 12));
-    page.addView(search.input(), searchParams);
+    NativeSearchList search = NativeSearchList.attachTo(page, "Müşteri veya oda ara");
     for (OperationData.RoomFolioRecord folio : data.roomFolios) {
       if (!folio.isOpen()) continue;
       View card = folioCard(context, data, folio, listener);
@@ -79,10 +76,7 @@ final class RoomFolioWorkspace {
           + folio.roomNumber + " " + folio.currency + " "
           + folio.checkInDate + " " + folio.plannedCheckOutDate);
     }
-    TextView noMatches = UiKit.text(context, "Aramayla eşleşen açık hesap yok.",
-        13, UiKit.MUTED, Typeface.NORMAL);
-    page.addView(noMatches);
-    search.setNoMatchesNotice(noMatches);
+    search.showNoMatchesIn(page, "Aramayla eşleşen açık hesap yok.");
 
     TextView note = UiKit.text(
         context,
@@ -303,7 +297,7 @@ final class RoomFolioWorkspace {
     dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
       try {
         if (!(product.getSelectedItem() instanceof MenuChoice)) {
-          status.setText("Önce uygun bir menü ürünü seçin.");
+          status.setText(R.string.folio_select_menu_product);
           return;
         }
         int count = Integer.parseInt(quantity.getText().toString().trim());
@@ -311,9 +305,9 @@ final class RoomFolioWorkspace {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
         dialog.dismiss();
         listener.onAction("room_folio_menu_item_add", payload, "Menü ürünü ekleme işlemi gönderildi; masaüstü onayı bekleniyor.");
-      } catch (NumberFormatException error) { status.setText("Adet 1 ile 1000 arasında olmalı."); }
+      } catch (NumberFormatException error) { status.setText(R.string.folio_quantity_range); }
       catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
-      catch (JSONException error) { status.setText("Menü ürünü bilgileri hazırlanamadı."); }
+      catch (JSONException error) { status.setText(R.string.folio_menu_prepare_failed); }
     }));
     dialog.show();
   }
@@ -343,7 +337,7 @@ final class RoomFolioWorkspace {
         dialog.dismiss();
         listener.onAction("room_folio_manual_charge_add", payload, "Ek ücret ekleme işlemi gönderildi; masaüstü onayı bekleniyor.");
       } catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
-      catch (JSONException error) { status.setText("Ek ücret bilgileri hazırlanamadı."); }
+      catch (JSONException error) { status.setText(R.string.folio_charge_prepare_failed); }
     }));
     dialog.show();
   }
@@ -411,16 +405,16 @@ final class RoomFolioWorkspace {
     dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
       long amountMinor = FinanceWorkspace.parseAmountMinor(amount.getText().toString());
       if (amountMinor <= 0) {
-        status.setText("Geçerli bir tutar girin.");
+        status.setText(R.string.amount_invalid);
         return;
       }
       if (amountMinor > folio.remainingMinor) {
-        status.setText("Ödeme kalan tutardan büyük olamaz.");
+        status.setText(R.string.folio_payment_exceeds_remaining);
         return;
       }
       String noteValue = note.getText().toString().trim().replaceAll("\\s+", " ");
       if (noteValue.length() > 500) {
-        status.setText("Not en fazla 500 karakter olabilir.");
+        status.setText(R.string.folio_note_limit);
         return;
       }
       PaymentChoice selected = (PaymentChoice) method.getSelectedItem();
@@ -432,7 +426,7 @@ final class RoomFolioWorkspace {
         payload.put("payment_method", selected.value);
         payload.put("note", noteValue);
       } catch (Exception error) {
-        status.setText("Tahsilat bilgileri hazırlanamadı.");
+        status.setText(R.string.folio_payment_prepare_failed);
         return;
       }
       dialog.dismiss();

@@ -170,7 +170,7 @@ final class StockImageWorkflow {
       String baseUrl = ConnectionSettings.webModuleUrl(preferences);
       String syncSecret = ConnectionSettings.syncSecret(preferences);
       if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
-        status.setText("Görsel analizi için bağlantı ayarlarını tamamlayın.");
+        status.setText(R.string.stock_image_connection_required);
         status.setTextColor(UiKit.DANGER);
         return;
       }
@@ -178,7 +178,7 @@ final class StockImageWorkflow {
       OperationData currentData = listener.currentData();
       JSONArray candidates = stockImageCandidatesJson(currentData);
       if (candidates.length() == 0) {
-        status.setText("Stok takip edilen menü ürünü bulunamadı.");
+        status.setText(R.string.stock_image_no_tracked_product);
         status.setTextColor(UiKit.DANGER);
         return;
       }
@@ -190,7 +190,7 @@ final class StockImageWorkflow {
       retake.setEnabled(false);
       reselect.setEnabled(false);
       rotate.setEnabled(false);
-      status.setText("Görsel analiz ediliyor; stoklar henüz değişmiyor…");
+      status.setText(R.string.stock_image_analyzing);
       status.setTextColor(UiKit.INFO);
 
       String importId = "stock_import_android_"
@@ -261,7 +261,7 @@ final class StockImageWorkflow {
             }
             prepared[0] = ready;
             preview.setImageBitmap(ready.preview);
-            status.setText("Görsel hazır. Gerekirse döndürüp analizi başlatın.");
+            status.setText(R.string.stock_image_ready);
             status.setTextColor(UiKit.SUCCESS);
             analyze[0].setEnabled(true);
             retake.setEnabled(true);
@@ -471,11 +471,10 @@ final class StockImageWorkflow {
         totals.append(stockQuantity(total.getValue(), total.getKey()));
       }
       summary.setText(
-          valid + " satır · "
-               + (totals.length() == 0 ? "0" : totals.toString())
-              + " · "
-              + review
-              + " kontrol gerekli"
+          activity.getString(R.string.stock_image_review_summary,
+              activity.getResources().getQuantityString(R.plurals.stock_image_row_count, valid, valid),
+              totals.length() == 0 ? "0" : totals.toString(),
+              activity.getResources().getQuantityString(R.plurals.stock_image_review_count, review, review))
       );
       apply.setEnabled(
           valid > 0

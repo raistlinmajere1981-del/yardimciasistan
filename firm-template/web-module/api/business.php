@@ -59,6 +59,7 @@ $publicSurfaces = array_values(array_unique($publicSurfaces));
 
 ya_business_response(200, [
     'ok' => true,
+    'localization' => $publicContext['localization'] ?? ['version'=>1,'source_language'=>'tr','target_languages'=>[],'translations'=>new stdClass()],
     'business' => [
         'id' => ya_business_string($config['id'] ?? ''),
         'name' => ya_business_string($config['name'] ?? ''),
@@ -80,6 +81,7 @@ ya_business_response(200, [
         'longitude' => is_numeric($publicContext['longitude'] ?? null) ? (float) $publicContext['longitude'] : null,
         'description' => ya_business_string($publicContext['description'] ?? ''),
         'about_text' => ya_business_string($publicContext['about_text'] ?? ''),
+        'gallery' => is_array($publicContext['gallery'] ?? null) ? array_values($publicContext['gallery']) : [],
         'directions_note' => ya_business_string($publicContext['directions_note'] ?? ''),
         'policy_note' => ya_business_string($publicContext['policy_note'] ?? ''),
         'payment_note' => ya_business_string($publicContext['payment_note'] ?? ''),

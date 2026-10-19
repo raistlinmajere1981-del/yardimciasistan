@@ -1,3 +1,4 @@
+import type { TranslationBridge } from "@yardimci-asistan/shared";
 import type { BusinessMessagingBridge, MarketingShareBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
@@ -200,7 +201,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
+export interface DesktopBridge extends TranslationBridge, MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
@@ -249,6 +250,7 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   checkoutRoomFolio: (input: CheckoutRoomFolioInput) => Promise<DesktopRoomFolioMutationResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
+  probeWebConnection: (input: WebConnectionTestInput) => Promise<WebConnectionTestResult>;
   testWebConnection: (input: WebConnectionTestInput) => Promise<WebConnectionTestResult>;
   connectWebPublicationSource: (input: WebConnectionTestInput) => Promise<{ok: boolean; message: string}>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
@@ -416,6 +418,14 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  getTranslationSettings: () => invokeWhenUnlocked("translation:settings"),
+  saveTranslationSettings: input => invokeWhenUnlocked("translation:saveSettings", input),
+  getTranslation: (identity, language) => invokeWhenUnlocked("translation:get", identity, language),
+  listTranslations: filter => invokeWhenUnlocked("translation:list", filter),
+  saveTranslation: input => invokeWhenUnlocked("translation:save", input),
+  startTranslation: input => invokeWhenUnlocked("translation:start", input),
+  getTranslationJob: () => invokeWhenUnlocked("translation:job"),
+  cancelTranslation: () => invokeWhenUnlocked("translation:cancel"),
   getSmsConfiguration: () => invokeWhenUnlocked("marketingProviders:smsConfiguration"),
   getInstagramConfiguration: () => invokeWhenUnlocked("marketingProviders:instagramConfiguration"),
   testSmsConnection: (input) => invokeWhenUnlocked("marketingProviders:testSms", input),
@@ -423,6 +433,7 @@ const bridge: DesktopBridge = {
   testInstagramConnection: () => invokeWhenUnlocked("marketingProviders:testInstagram"),
   beginInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:beginInstagramOAuth"),
   pollInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:pollInstagramOAuth"),
+  cancelInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:cancelInstagramOAuth"),
   disconnectInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:disconnectInstagramOAuth"),
   getMarketingSchedules: (month) => invokeWhenUnlocked("marketingSchedules:list", month),
   saveMarketingSchedule: (input) => invokeWhenUnlocked("marketingSchedules:save", input),
@@ -520,6 +531,7 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener("dashboard:dataChanged", handler);
   },
   getSyncStatus: () => ipcRenderer.invoke("sync:getStatus"),
+  probeWebConnection: (input: WebConnectionTestInput) => invokeWhenUnlocked<WebConnectionTestResult>("sync:probeConnection", input),
   testWebConnection: (input: WebConnectionTestInput) => ipcRenderer.invoke("sync:testConnection", input),
   connectWebPublicationSource: (input: WebConnectionTestInput) => invokeWhenUnlocked<{ok: boolean; message: string}>("sync:connectSource", input),
   runSyncNow: () => ipcRenderer.invoke("sync:runNow"),

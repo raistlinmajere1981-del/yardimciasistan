@@ -190,6 +190,3 @@
   background: var(--color-selected-soft);
   box-shadow: var(--shadow-selected-ring);
 }
-
-.sidebar-update-trigger small { display: block; font-size: var(--text-xs); white-space: normal; }
-.sidebar.is-collapsed .sidebar-update-trigger span { display: none; }

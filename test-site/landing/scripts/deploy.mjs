@@ -101,15 +101,19 @@ for (const cmd of ["ssh", "scp", "rsync", "php"]) {
 
 const localIndex = join(repoRoot, "index.php");
 const localFavicon = join(repoRoot, "favicon.png");
+// Build site-owned presentation assets before any upload/preflight.
+const demoBuild = spawnSync("npm", ["run", "build:demo"], { cwd: monorepoRoot, stdio: "inherit" });
+if (demoBuild.status !== 0) fail("Demo sunum derlemesi başarısız.");
 const localAssets = join(repoRoot, "assets");
 const localSite = repoRoot;
 const localRelease = join(repoRoot, "release.json");
-const publicRouteDirs = ["hakkimizda", "galeri", "odalar", "restoran", "qr-menu", "magaza", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu", "instagram"];
+const publicRouteDirs = ["hakkimizda", "galeri", "odalar", "restoran", "qr-menu", "magaza", "bayi", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu", "instagram"];
 const requiredLocal = [
   localIndex,
   localFavicon,
   localRelease,
   join(localSite, "index.php"),
+  join(localSite, "assets", "assistant", "widget.js"),
   join(localSite, "assets", "css", "site.css"),
   join(localSite, "assets", "js", "site.js"),
   join(localSite, "assets", "js", "rooms.js"),
@@ -348,7 +352,7 @@ sshRun(
   `cd ${remoteWww} && ` +
     `for f in index.php index.html favicon.png release.json; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
-    `for d in inc hakkimizda galeri odalar restoran qr-menu magaza yorumlar iletisim duyurular kurulum kullanim-kilavuzu instagram demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
+    `for d in inc hakkimizda galeri odalar restoran qr-menu magaza bayi yorumlar iletisim duyurular kurulum kullanim-kilavuzu instagram demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
     `ls -la ${remoteBackup}/`
 );
 
@@ -635,7 +639,7 @@ async function smoke(base, secret, webModuleBase) {
   if (root.text.includes('type="module"') || root.text.includes('Canlı Sistem')) fail("Eski landing hâlâ aktif.");
   console.log("Kök: yeni showcase, demo anahtarı config ile aynı.");
 
-  for (const path of ["/hakkimizda/", "/galeri/", "/odalar/", "/odalar/oda/", "/qr-menu/", "/magaza/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/", "/kurulum/", "/kullanim-kilavuzu/", "/duyurular/"]) {
+  for (const path of ["/hakkimizda/", "/galeri/", "/odalar/", "/odalar/oda/", "/qr-menu/", "/magaza/", "/bayi/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/", "/kurulum/", "/kullanim-kilavuzu/", "/duyurular/"]) {
     const page = await get(path);
     if (page.response.status !== 200) fail(`Public-site route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
   }

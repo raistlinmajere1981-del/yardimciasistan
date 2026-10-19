@@ -99,7 +99,7 @@ try {
   const catalog = database.createCommerceOnlineCatalog();
   assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
-  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
+  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
   assert.equal(catalog.products[0].price, 25, "resolved retail price, never dealer/cost");
   assert.equal(catalog.products[0].name, "Public title");
   assert.equal(catalog.products[0].description, "Public override");

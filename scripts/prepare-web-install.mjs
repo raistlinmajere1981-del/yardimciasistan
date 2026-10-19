@@ -123,5 +123,5 @@ Script 256-bit rastgele sync secret üretir, deploy paketini hazırlar ve
 artifacts/web-module-deploy/install-info.txt dosyasına masaüstünde kullanılacak
 web modül adresi ile güvenlik anahtarını yazar.
 
-Widget başka bir origin'de çalışacaksa --origin birden fazla kez verilebilir.`);
+Site başka bir origin'de çalışacaksa --origin birden fazla kez verilebilir.`);
 }

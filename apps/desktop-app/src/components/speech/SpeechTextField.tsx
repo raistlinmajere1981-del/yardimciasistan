@@ -49,8 +49,8 @@ export function ReadAloudButton({ text, disabled = false }: { text: string; disa
 }
 
 /** Field draft ownership and business submission remain with the existing canonical editor. */
-export function SpeechTextField({ label, value, onChange, maxLength, rows, placeholder, disabled = false, contextKey }: {
-  label: string; value: string; onChange: (text: string) => void; maxLength: number; rows: number; placeholder?: string; disabled?: boolean; contextKey?: string;
+export function SpeechTextField({ label, value, onChange, maxLength, rows, placeholder, disabled = false, contextKey, showRecordingHint = true }: {
+  label: string; value: string; onChange: (text: string) => void; maxLength: number; rows: number; placeholder?: string; disabled?: boolean; contextKey?: string; showRecordingHint?: boolean;
 }) {
   const [status, setStatus] = useState<DesktopDictationStatus | null>(null);
   const [capture, setCapture] = useState<DictationSnapshot>({ phase: "idle", transcript: "", message: "" });
@@ -89,7 +89,7 @@ export function SpeechTextField({ label, value, onChange, maxLength, rows, place
       {busy && <ActionButton type="button" variant="secondary" size="sm" onClick={() => session.cancel("Kayıt iptal edildi.")}>İptal</ActionButton>}
       <ReadAloudButton text={value} disabled={disabled || busy} />
     </div>
-    {microphone && !busy && <small>Mikrofon ile kayıt başlar. Yalnız Durdur ile ses web hizmetine gönderilir; en fazla 5 MiB / 2 dakika. İptal sesi göndermez.</small>}
+    {showRecordingHint && microphone && !busy && <small>Mikrofon ile kayıt başlar. Yalnız Durdur ile ses web hizmetine gönderilir; en fazla 5 MiB / 2 dakika. İptal sesi göndermez.</small>}
     {capture.phase === "review" && <div className="form-stack">
       <label className="form-field">Dikte önizlemesi<textarea aria-label="Dikte önizlemesi" rows={3} maxLength={16000} value={capture.transcript} onChange={event => session.editTranscript(event.target.value)} /></label>
       {capture.transcript.length > maxLength && <p role="alert">Bu alan en fazla {maxLength} karakter alır. Önizlemeyi kısaltın.</p>}

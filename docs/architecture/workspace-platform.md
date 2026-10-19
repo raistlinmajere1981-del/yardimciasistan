@@ -79,7 +79,7 @@ In an entity consumer, call `useWorkspaceCloseGuard({ busy, dirty })` and pass i
 
 Pass navigation's `returnFocusRef` to the frame to retain the original trigger even after changing entities. Callers can instead supply a meaningful return target ref. A disconnected trigger falls back to the shell content focus target. Native focus restoration and our fallback run only at close, not presentation changes.
 
-`IconButton` requires an accessible label; variants are normal/selected/danger, sizes sm/md. `FormDialog` supplies form submit semantics for one bounded task; it mounts only while open and shares ModalSurface. Nested ModalSurface use is rejected. Workspace subflows and confirmations belong inside the current body; no modal stack API is provided. Legacy `useDialogFocus` is unchanged.
+`IconButton` requires an accessible label; variants are normal/quiet/selected/danger, sizes sm/md. Busy actions are disabled and expose `aria-busy`. `WorkspaceHeader` shares title/action/close presentation between workspace frames, forms, subflows and Settings resource surfaces; each caller retains close guards and modal/focus lifecycle. `FormDialog` supplies form submit semantics for one bounded task; it mounts only while open and shares ModalSurface. Nested ModalSurface use is rejected. Workspace subflows and confirmations belong inside the current body; no modal stack API is provided. Legacy `useDialogFocus` is unchanged.
 
 ## Room integration example
 

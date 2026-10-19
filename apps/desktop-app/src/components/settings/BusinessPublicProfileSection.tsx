@@ -389,14 +389,14 @@ export function BusinessPublicProfileSection({
           </div>
           {draft.mapDisplayMode === "manual" && <div className="business-public-profile-map-point">
             <div className="business-public-profile-address-lookup">
-              <button
-                className="setup-secondary action-button action-button-secondary"
+              <ActionButton
+                variant="secondary"
                 type="button"
                 disabled={addressLookupState === "loading" || !normalizedBusinessAddress}
                 onClick={() => void lookupBusinessAddress()}
               >
                 {addressLookupState === "loading" ? "Adres aranıyor" : "Adresten bul"}
-              </button>
+              </ActionButton>
             </div>
 
             {addressLookupMessage && (

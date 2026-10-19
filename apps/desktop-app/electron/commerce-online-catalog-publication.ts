@@ -1,3 +1,4 @@
+import { PublicTranslationStore } from "./database/public-translation-store";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability, type CommerceOnlineCatalog, type CommerceOrderDeliveryMethod, type CommerceUnit } from "@yardimci-asistan/shared";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
@@ -30,7 +31,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     if (deliveryEnabled && Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
     if (deliveryEnabled && !deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
     const rows = db.prepare(`
-      SELECT p.id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
+      SELECT p.id, p.category_id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
              p.updated_at AS product_updated_at, publication.title_override,
              publication.description_override, publication.sort_order, publication.updated_at
       FROM commerce_product_publications publication
@@ -42,7 +43,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     const products = rows.map((row) => {
       const price = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id) }, false);
       return {
-        productId: String(row.id), name: String(row.title_override || row.name),
+        categoryId: String(row.category_id), productId: String(row.id), name: String(row.title_override || row.name),
         description: String(row.description_override || row.description), sku: String(row.sku),
         unit: String(row.unit) as CommerceUnit, price: price.unitPrice, currency: price.currency,
         taxRate: Number(row.tax_rate), imageUrl: publicImageUrl(row.image_source_url),
@@ -58,6 +59,8 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
         UNION ALL SELECT updated_at FROM business_capabilities WHERE business_id = ? AND capability_id = 'channel.online_sales'
       )
     `).get(businessId, businessId, businessId, businessId);
-    return { version: 1, enabled: true, deliveryMethods, updatedAt: String(timestamp?.updated_at ?? ""), products };
+    const categories = db.prepare("SELECT c.id,c.name FROM catalog_categories c WHERE c.business_id=? AND c.deleted_at='' AND c.is_active=1 AND EXISTS(SELECT 1 FROM catalog_products p JOIN commerce_product_publications x ON x.product_id=p.id AND x.business_id=c.business_id WHERE p.category_id=c.id AND p.is_active=1 AND p.deleted_at='' AND x.is_published=1 AND x.channel='online_sales') ORDER BY c.sort_order,c.id").all(businessId).map(c => ({id: String(c.id), name: String(c.name)}));
+    const localization = new PublicTranslationStore(db).localization([...products.map(p => ({kind: "catalog_product" as const, id: p.productId, fields: {name: p.name, description: p.description}})), ...categories.map(c => ({kind: "catalog_category" as const, id: c.id, fields: {name: c.name}}))]);
+    return { version: 1, enabled: true, categories, localization, deliveryMethods, updatedAt: String(timestamp?.updated_at ?? ""), products };
   } finally { db.exec("RELEASE online_catalog_read"); }
 }

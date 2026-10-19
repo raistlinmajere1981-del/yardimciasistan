@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/public-localization.php';
 
 /** Transport allowlist only. Desktop owns publication selection and retail pricing. */
 function ya_online_catalog_projection(array $candidate): array
@@ -42,7 +43,7 @@ function ya_online_catalog_projection(array $candidate): array
                 || preg_match('/^[\d.:\[\]]+$/', $image['host'] ?? '') === 1
                 || preg_match('/\.(local|localhost|internal|test)$/', $image['host'] ?? '') === 1) $imageUrl = '';
             $products[$id] = [
-                'product_id' => $id, 'name' => $name,
+                'product_id' => $id, 'category_id' => mb_substr(is_string($raw['category_id'] ?? null) ? $raw['category_id'] : '', 0, 180), 'name' => $name,
                 'description' => mb_substr(is_string($raw['description'] ?? null) ? $raw['description'] : '', 0, 2000),
                 'sku' => mb_substr(is_string($raw['sku'] ?? null) ? $raw['sku'] : '', 0, 80),
                 'unit' => $unit, 'price' => $price, 'currency' => $currency, 'tax_rate' => $taxRate,
@@ -54,7 +55,17 @@ function ya_online_catalog_projection(array $candidate): array
     $products = array_values($products);
     usort($products, static fn (array $a, array $b): int =>
         ($a['sort_order'] <=> $b['sort_order']) ?: strcmp($a['name'], $b['name']) ?: strcmp($a['product_id'], $b['product_id']));
+    $categories = [];
+    foreach (($candidate['categories'] ?? []) as $category) {
+        if (!$enabled || !is_array($category) || !is_string($category['id'] ?? null) || !is_string($category['name'] ?? null)) continue;
+        if (!in_array($category['id'], array_column($products, 'category_id'), true)) continue;
+        $categories[] = ['id' => mb_substr($category['id'], 0, 180), 'name' => mb_substr($category['name'], 0, 180)];
+    }
     return [
+        'categories' => $categories,
+        'localization' => ya_public_localization($candidate['localization'] ?? null, [
+            'catalog_product' => ya_localization_records($products, 'product_id', ['name','description']),
+            'catalog_category' => ya_localization_records($categories, 'id', ['name'])]),
         'version' => 1, 'enabled' => $enabled, 'delivery_methods' => $methods,
         'updated_at' => mb_substr(is_string($candidate['updated_at'] ?? null) ? $candidate['updated_at'] : '', 0, 64),
         'products' => $products

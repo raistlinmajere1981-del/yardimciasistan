@@ -3,6 +3,7 @@ import type { TtsPreferences } from "./app/tts/tts-adapter";
 export const SYSTEM_TTS_ENGINE_ID = "system";
 const STORAGE_KEY = "yardimci-asistan.desktop-tts";
 export const TTS_PREFERENCES_CHANGED = "desktop-tts-preferences-changed";
+/** @compiledSmoke scripts/smoke-desktop-tts.mjs (transpiled source) */
 export const DEFAULT_TTS_PREFERENCES: Readonly<TtsPreferences> = {
   version: 1, enabled: true, engineId: SYSTEM_TTS_ENGINE_ID, voiceId: null, language: null,
   rate: 1, pitch: 1, volume: 100

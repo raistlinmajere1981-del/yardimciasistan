@@ -41,9 +41,9 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
         <small>Son hareket</small><div><CustomerCreditMovement entry={account.entries[0]} /></div>
       </div>}
       <div className="action-row">
-        <button ref={toggle} type="button" className="action-button action-button-secondary action-button-sm" aria-expanded={expanded} aria-controls={panelId}
+        <ActionButton ref={toggle} variant="secondary" size="sm" aria-expanded={expanded} aria-controls={panelId}
           disabled={saving}
-          onClick={() => { setExpanded((current) => !current); setForm(null); }}>{expanded ? "Hesabı Kapat" : "Hesabı Aç"}</button>
+          onClick={() => { setExpanded((current) => !current); setForm(null); }}>{expanded ? "Hesabı Kapat" : "Hesabı Aç"}</ActionButton>
         {!account.customer.deletedAt && <ActionButton disabled={loading || !debtExists || form !== null} onClick={() => { setExpanded(true); setForm("payment"); }}>Tahsilat Al</ActionButton>}
       </div>
       {expanded && <div id={panelId} className="customer-credit-detail">

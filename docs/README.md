@@ -23,6 +23,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `DATA_MODEL.md` — ana veri modeli.
 - `EVENTS.md` — event sözleşmeleri.
 - `FINANCE_MODEL.md` — Kasa / oda hesabı / ön muhasebe modeli.
+- `architecture/WEB_DATA_SERVICE_CONTRACT_V1.md` — API-only web hizmeti ve site sunumu sahipliği.
 - `AUTOMATIC_SYNC.md` — hosting ↔ desktop ↔ Android senkron mimarisi.
 - `desktop-sync-identity.md` — desktop sync kimliği.
 - `architecture/hospitality-domain.md` — pansiyon domain sınırları.

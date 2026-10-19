@@ -110,6 +110,8 @@ try {
     await expect(create).toHaveCount(0);
     const saved = createdProducts.at(-1);
     assert.equal(database.getCommerceProductPublication(saved.id).isPublished, !optOut);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.locator('.market-catalog-record[data-sort-kind="products"]').filter({hasText: saved.name}).getByRole("button").filter({hasText:saved.name}).click();
     if (optOut) await expect(checkbox).not.toBeChecked();
     else await expect(checkbox).toBeChecked();
     assert.equal(database.createCommerceOnlineCatalog().products.some((entry) => entry.productId === saved.id), !optOut);
@@ -127,7 +129,7 @@ try {
   await expect(offlineCreate).toHaveCount(0);
   selectOnlineSales(true);
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
-  await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Exercise the real detail editor against the same temporary database. Counting
   // inventory and saving a product remain independent operations after regrouping.

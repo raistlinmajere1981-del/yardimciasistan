@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { installDemoSite } from './test-helpers/demo-site.mjs';
 import { activateFixtureSource, publicationEnvelope } from './test-helpers/publication-protocol.mjs';
 import { spawn } from 'node:child_process';
-import { cpSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -11,15 +12,17 @@ import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { marketingFixture, imageBytes, editorialInput } from './test-helpers/marketing-fixtures.mjs';
 const require=createRequire(import.meta.url),{PhpHostingSyncTransport}=require('../packages/sync-core/dist'),{SyncCoordinator}=require('../apps/desktop-app/dist-electron/sync-coordinator.js');
 const {setBusinessCapability}=require('../apps/desktop-app/dist-electron/business-capability-store.js');
+const {SyncOutboxPublisher}=require('../apps/desktop-app/dist-electron/sync-outbox-publisher.js');
 const root=mkdtempSync(join(tmpdir(),'marketing-host-')),f=marketingFixture(),secret=f.setup.syncSecret;
-cpSync('firm-template/web-module',root,{recursive:true});
-writeFileSync(join(root,'config/business.json'),JSON.stringify({sync_secret:secret,allowed_origins:[]}));
+const hosting = installDemoSite(root);
+writeFileSync(join(hosting,'config/business.json'),JSON.stringify({sync_secret:secret,allowed_origins:[]}));
 const port=await new Promise(resolve=>{const server=http.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});
-const baseUrl=`http://127.0.0.1:${port}`,php=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{stdio:'ignore'});
+const siteUrl=`http://127.0.0.1:${port}`,baseUrl=`${siteUrl}/yardimci-asistan`,php=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{stdio:'ignore'});
 const config={baseUrl,syncSecret:secret},clientId=f.db.getSyncRuntimeStatus().clientId,transport=new PhpHostingSyncTransport({...config,clientId,sourceEpoch:1});
 let browser;
 const coordinator=new SyncCoordinator({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
-const push=async()=>{const result=await coordinator.publishOutbox(transport);assert.equal(result.errors.length,0,JSON.stringify(result.errors));return result;};
+const outbox = new SyncOutboxPublisher({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{}},()=>false,()=>'',()=>{});
+const push=async()=>{const result=await outbox.publishOutbox(transport);assert.equal(result.errors.length,0,JSON.stringify(result.errors));return result;};
 const post=payload=>fetch(`${baseUrl}/api/sync.php`,{method:'POST',headers:{'Content-Type':'application/json','X-YA-Sync-Secret':secret},body:JSON.stringify(publicationEnvelope(payload))});
 try {
   for(let n=0;n<50;n++){try{if((await fetch(`${baseUrl}/api/marketing.php`)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -61,7 +64,7 @@ try {
   await push();pub=f.db.listMarketingPublications()[0];assert.equal(pub.status,'published');
   publicItems=(await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications;assert.equal(publicItems[0].text,'Yeni canlı metin');assert.deepEqual(publicItems[0].images.map(i=>i.assetId),[c.id,b.id]);
   browser=await launchChromiumForSmoke(chromium);const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(`${baseUrl}/duyurular/`);await expect(page.getByRole('heading',{name:'Duyurular / Kampanyalar',exact:true})).toBeVisible();
+  await page.goto(`${siteUrl}/duyurular/`);await expect(page.getByRole('heading',{name:'Duyurular / Kampanyalar',exact:true})).toBeVisible();
   await expect(page.locator('.ya-marketing-card')).toHaveCount(1);await expect(page.locator('.ya-marketing-gallery img')).toHaveCount(2);
   assert.equal(await page.locator('article script').count(),0,'text rendered safely');
   for(const width of [375,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
@@ -99,7 +102,6 @@ try {
   const racingPublisher={prepare:async(...args)=>{const p=await f.publisher.prepare(...args);
     setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:false});return p;},
     acknowledge:(...args)=>f.publisher.acknowledge(...args),fail:(...args)=>f.publisher.fail(...args)};
-  const racingCoordinator=new SyncCoordinator({database:f.db,marketingWebsite:racingPublisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
   // The race may publish an unrelated Android snapshot after capability changes.
   // Assert the stale marketing revision itself was not sent, not total publications.
   const publishMarketing = transport.publishMarketingWebsite.bind(transport);
@@ -108,7 +110,8 @@ try {
     racedMarketingUploads += 1;
     return publishMarketing(...args);
   };
-  const racedResult = await racingCoordinator.publishOutbox(transport);
+  const racedOutbox = new SyncOutboxPublisher({database:f.db,marketingWebsite:racingPublisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{}},()=>false,()=>'',()=>{});
+  const racedResult = await racedOutbox.publishOutbox(transport);
   transport.publishMarketingWebsite = publishMarketing;
   assert.deepEqual(racedResult.errors, []);
   assert.equal(racedMarketingUploads, 0, "stale marketing body must never reach hosting");
@@ -121,8 +124,8 @@ try {
   const retired=f.db.listMarketingPublications()[0];f.service.publish(retired.id,retired.revision);
   const retryJob=f.db.getPendingSyncJobs().find(j=>j.jobType==='marketing_website_publish');assert.ok(retryJob.sourceRevision>job.sourceRevision);
   const wrongAck={...transport,publishMarketingWebsite:async()=>({ok:true,source_revision:retryJob.sourceRevision+1,published_at:new Date().toISOString()})};
-  const failCoordinator=new SyncCoordinator({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
-  await failCoordinator.publishOutbox(wrongAck);assert.ok(f.db.getPendingSyncJobs('9999').some(j=>j.jobType==='marketing_website_publish'));
+  const failOutbox = new SyncOutboxPublisher({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{}},()=>false,()=>'',()=>{});
+  await failOutbox.publishOutbox(wrongAck);assert.ok(f.db.getPendingSyncJobs('9999').some(j=>j.jobType==='marketing_website_publish'));
   assert.equal(f.db.listMarketingPublications().find(p=>p.id===retired.id).status,'failed');
   console.log('D4 real PHP upload, exact sync/ack/revision, capability-off withdrawal, stale enabled replay/race, retained editorial intent/reactivation and explicit unpublish passed.');
 } finally {await browser?.close();coordinator.stop();php.kill();await new Promise(r=>php.once('exit',r));f.dispose();rmSync(root,{recursive:true,force:true});}

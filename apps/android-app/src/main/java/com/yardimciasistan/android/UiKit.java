@@ -13,6 +13,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import java.util.List;
@@ -132,7 +133,7 @@ final class UiKit {
   }
 
   static TextView eyebrow(Context context, String value) {
-    TextView text = text(context, value.toUpperCase(), 11, PRIMARY, Typeface.BOLD);
+    TextView text = text(context, value.toUpperCase(context.getResources().getConfiguration().getLocales().get(0)), 11, PRIMARY, Typeface.BOLD);
     text.setLetterSpacing(0.08f);
     return text;
   }
@@ -148,6 +149,68 @@ final class UiKit {
     layout.setOrientation(LinearLayout.HORIZONTAL);
     layout.setGravity(Gravity.CENTER_VERTICAL);
     return layout;
+  }
+
+  /** Chrome only: visibility, enabled state and callbacks stay with the workspace. */
+  static LinearLayout workspaceHeader(Context context, String title, String subtitle, View action) {
+    LinearLayout header = row(context);
+    LinearLayout identity = column(context);
+    identity.addView(title(context, title));
+    if (subtitle != null && !subtitle.isEmpty()) {
+      identity.addView(text(context, subtitle, 12, SECONDARY, Typeface.NORMAL));
+    }
+    header.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
+    if (action != null) {
+      action.setMinimumHeight(dp(context, 48));
+      header.addView(action, new LinearLayout.LayoutParams(dp(context, 48), -2));
+    }
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, 0, 0, dp(context, 12));
+    header.setLayoutParams(params);
+    return header;
+  }
+
+  interface SelectionListener { void onSelected(String value); }
+
+  /** A horizontal child owns its gesture; it never changes root navigation itself. */
+  static HorizontalScrollView filterBar(Context context, String[][] options, String selected, SelectionListener listener) {
+    HorizontalScrollView scroll = new HorizontalScrollView(context);
+    scroll.setHorizontalScrollBarEnabled(false);
+    LinearLayout choices = row(context);
+    choices.setPadding(0, dp(context, 3), 0, dp(context, 6));
+    Button selectedButton = null;
+    for (String[] option : options) {
+      Button button = chip(context, option[1], option[0].equals(selected),
+          view -> listener.onSelected(option[0]));
+      choices.addView(button);
+      if (option[0].equals(selected)) selectedButton = button;
+    }
+    scroll.addView(choices);
+    if (selectedButton != null) {
+      final Button target = selectedButton;
+      choices.addOnLayoutChangeListener((view, l, t, r, b, oldL, oldT, oldR, oldB) ->
+          scroll.scrollTo(target.getLeft(), 0));
+    }
+    return scroll;
+  }
+
+  /** Only the record's identity/trailing anatomy; domain badges and actions are supplied. */
+  static LinearLayout recordHeader(Context context, String title, int titleSize, String subtitle, View trailing) {
+    LinearLayout header = row(context);
+    LinearLayout identity = column(context);
+    identity.addView(text(context, title, titleSize, TEXT, Typeface.BOLD));
+    if (subtitle != null && !subtitle.isEmpty()) {
+      identity.addView(text(context, subtitle, 12, MUTED, Typeface.NORMAL));
+    }
+    header.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
+    if (trailing != null) header.addView(trailing);
+    return header;
+  }
+
+  static void addCardAction(LinearLayout card, View action, Context context) {
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, dp(context, 8), 0, 0);
+    card.addView(action, params);
   }
 
   static LinearLayout card(Context context) {
@@ -223,8 +286,9 @@ final class UiKit {
     button.setTextColor(statefulText(selected ? CHIP_ACTIVE_TEXT : CHIP_TEXT));
     button.setTypeface(Typeface.create("sans", Typeface.BOLD));
     button.setAllCaps(false);
-    button.setMinHeight(dp(context, 38));
-    button.setMinimumHeight(dp(context, 38));
+    button.setSelected(selected);
+    button.setMinHeight(dp(context, 48));
+    button.setMinimumHeight(dp(context, 48));
     button.setPadding(dp(context, 13), 0, dp(context, 13), 0);
     button.setBackground(statefulRounded(
         context,
@@ -234,7 +298,7 @@ final class UiKit {
         18
     ));
     button.setOnClickListener(listener);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(context, 40));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2);
     params.setMargins(0, 0, dp(context, 7), 0);
     button.setLayoutParams(params);
     return button;
@@ -371,6 +435,27 @@ final class UiKit {
     return input;
   }
 
+  static TextView fieldLabel(Context context, LinearLayout form, String label) {
+    TextView text = text(context, label, 12, SECONDARY, Typeface.BOLD);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, dp(context, 4), 0, dp(context, 5));
+    form.addView(text, params);
+    return text;
+  }
+
+  static EditText labeledInput(Context context, LinearLayout form, String label, String hint) {
+    TextView caption = fieldLabel(context, form, label);
+    EditText input = input(context, hint);
+    input.setId(View.generateViewId());
+    caption.setLabelFor(input.getId());
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, 0, 0, dp(context, 9));
+    form.addView(input, params);
+    return input;
+  }
+
+  // The native API 26+ Switch is the shared control family; preserve its appearance.
+  @android.annotation.SuppressLint("UseSwitchCompatOrMaterialCode")
   static void styleSwitch(Switch toggle) {
     int[][] states = {
         new int[] {-android.R.attr.state_enabled},
@@ -392,7 +477,8 @@ final class UiKit {
   }
 
   static void addAction(LinearLayout row, View action, Context context) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(context, 44), 1f);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
+    action.setMinimumHeight(dp(context, 48));
     if (row.getChildCount() > 0) {
       params.setMargins(dp(context, 7), 0, 0, 0);
     }
@@ -430,6 +516,7 @@ final class UiKit {
         new int[] {android.R.attr.state_pressed},
         rounded(context, pressedFill, stroke, radius)
     );
+    drawable.addState(new int[] {android.R.attr.state_focused}, rounded(context, fill, PRIMARY, radius));
     drawable.addState(new int[] {}, rounded(context, fill, stroke, radius));
     return drawable;
   }

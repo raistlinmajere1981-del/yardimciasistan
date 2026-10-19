@@ -97,7 +97,7 @@ interface RequestsWorkspaceProps {
   manualRequestState: SyncState;
   onSelectRequest: (requestId: string) => void;
   onManualRequestFormChange: (form: ManualRequestFormState) => void;
-  onCreateManualRequest: () => void;
+  onCreateManualRequest: () => Promise<boolean>;
   onWhatsApp: (request: SyncedCustomerRequest) => void;
   onConvert: (request: SyncedCustomerRequest) => void;
   onSuggest: (request: SyncedCustomerRequest) => void;
@@ -401,7 +401,10 @@ export function RequestsWorkspace({
           dismissOnBackdrop
           onSubmit={(event) => {
             event.preventDefault();
-            onCreateManualRequest();
+            if (manualRequestState === "loading") return;
+            void (async () => {
+              if (await onCreateManualRequest()) setManualFormOpen(false);
+            })();
           }}
           footer={(
             <>

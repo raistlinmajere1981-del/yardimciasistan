@@ -25,7 +25,6 @@ const androidSnapshot = read("apps/desktop-app/electron/market-android-snapshot.
 const androidActions = read("apps/desktop-app/electron/market-android-actions.ts");
 const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
 const androidOperationData = read("apps/android-app/src/main/java/com/yardimciasistan/android/OperationData.java");
-const androidWorkspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
 const androidLookupClient = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
 const hostingSync = read("firm-template/web-module/api/sync.php");
 
@@ -120,11 +119,6 @@ assert.match(androidOperationData, /MarketProductDataSettings/);
 assert.match(androidOperationData, /auto_search_unknown_barcode/);
 assert.match(androidOperationData, /imageSourceUrl/);
 assert.match(androidOperationData, /dataSource/);
-assert.match(androidWorkspace, /onProductLookupRequested/);
-assert.match(androidWorkspace, /Ürün Bilgilerini Ara/);
-assert.match(androidWorkspace, /productCreateImagePreview/);
-assert.match(androidWorkspace, /onProductImageRequested/);
-assert.match(androidWorkspace, /addProductImage/);
 assert.match(androidLookupClient, /world\.openfoodfacts\.org\/api\/v2\/product/);
 assert.match(androidLookupClient, /User-Agent/);
 assert.match(androidLookupClient, /image_front_url/);

@@ -55,6 +55,24 @@ Manual Menu/Android publication makes durable intent due immediately and execute
 this same lifecycle, without running unrelated ingress operations. No separate
 manual transport, revision allocator, or ordering guarantee exists.
 
+### Desktop runtime owners
+
+`SyncCoordinator` owns timers, the single automatic cycle, status/backoff, capability
+negotiation, cycle ordering and maintenance suspension. It composes these narrow owners:
+
+- `WebSyncIngress`: paged request/order intake, persisted-prefix acknowledgements and
+  bounded restore replay. `OnlineOrderIngressService` and request intake retain domain writes.
+- `SyncCatalogPublisher`: reconstructable room/table/AI catalogs and availability,
+  including endpoint-support state and media preparation callbacks.
+- `SyncOutboxPublisher`: registered outbox job selection and Menu/Android manual
+  publication. Its in-memory map serializes sends; it is not an outbox or revision store.
+  Maintenance drains both the automatic cycle and manual publications before restore.
+- `sync-network-policy`: bounded fetch cancellation, retry delay and failure classification.
+
+All publication owners delegate frozen-body preparation, exact receipt validation
+and revision completion to `publishDesktopProjection` and the existing durable stores.
+`AndroidActionSyncService` remains the shared action owner for automatic/manual ingress.
+
 ## Source activation and permanent fencing
 
 `activate_publication_source` is authenticated, POST-only and separate from apply.
@@ -183,7 +201,7 @@ intent gets a new key. No automatic reload retry or browser persistence is intro
 ## Deliberately not changed
 
 Restore full payload set and post-restore Marketing/AI reconciliation; QR semantics; resource catalog visibility;
-AI knowledge limits; coordinator decomposition; navigation and domain ownership.
+AI knowledge limits; navigation and domain ownership.
 
 ## Regression evidence
 

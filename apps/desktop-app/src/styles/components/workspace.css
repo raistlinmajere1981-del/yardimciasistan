@@ -14,7 +14,12 @@
   border-radius: var(--radius-dialog);
   box-shadow: var(--shadow-lg);
 }
-.modal-surface::backdrop { background: var(--color-backdrop); }
+/* Keep operation feedback in the persistent top bar legible while a service
+   dialog is open. Modal focus and backdrop interaction remain unchanged. */
+.modal-surface::backdrop {
+  background: var(--color-backdrop);
+  clip-path: inset(var(--header-height) 0 0 0);
+}
 .workspace-frame[open] { display: flex; flex-direction: column; }
 .workspace-page-frame {
   position: relative;
@@ -103,13 +108,22 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   cursor: pointer;
-  transition: background var(--motion-hover) var(--ease-standard);
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    color var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 .icon-button--sm { width: max(var(--interaction-target-min), var(--control-height-sm)); height: max(var(--interaction-target-min), var(--control-height-sm)); }
-.icon-button:hover { background: var(--color-bg-hover); }
+.icon-button--quiet { background: transparent; border-color: transparent; }
+.icon-button:hover:not(:disabled) { background: var(--color-bg-hover); border-color: var(--color-border-strong); }
+.icon-button:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+.icon-button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 .icon-button--selected { color: var(--color-accent); background: var(--color-accent-soft); }
 .icon-button--danger { color: var(--color-danger); background: var(--color-danger-soft); }
 .icon-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-button[aria-busy="true"] { opacity: .82; cursor: progress; }
+.icon-button[aria-invalid="true"] { border-color: var(--color-danger); }
 .form-dialog { width: var(--dialog-width-md); }
 .form-dialog form { display: flex; flex-direction: column; max-height: calc(100dvh / var(--ui-scale) - var(--space-4)); }
 .form-dialog .workspace-frame__body { padding: var(--space-4); }

@@ -1,4 +1,5 @@
 (() => {
+  const { ui, locale } = window.DemoLanguage;
   const root = document.querySelector("[data-qr-menu-root]");
   if (!root) return;
 
@@ -25,7 +26,7 @@
   const formatPrice = (price, currency) => {
     const code = String(currency || "TRY").toUpperCase();
     if (!formatterCache.has(code)) {
-      formatterCache.set(code, new Intl.NumberFormat("tr-TR", {
+      formatterCache.set(code, new Intl.NumberFormat(locale, {
         style: "currency",
         currency: code,
         maximumFractionDigits: 0
@@ -37,7 +38,7 @@
   const formatDate = (value) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value || "");
-    return new Intl.DateTimeFormat("tr-TR", {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short"
     }).format(date);
@@ -49,11 +50,11 @@
 
   const renderTabs = () => {
     tabs.replaceChildren();
-    const categories = [{ id: "all", name: "Tüm Ürünler" }, ...state.categories];
+    const categories = [{ id: "all", name: ui("Tüm Ürünler") }, ...state.categories];
     for (const category of categories) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = category.name || "Kategori";
+      button.textContent = category.name || ui("Kategori");
       const active = state.activeCategoryId === category.id;
       button.className = active ? "is-active" : "";
       button.setAttribute("aria-pressed", String(active));
@@ -73,7 +74,7 @@
     if (imageUrl) {
       const image = document.createElement("img");
       image.src = imageUrl;
-      image.alt = item.name || "Menü ürünü";
+      image.alt = item.name || ui("Menü ürünü");
       image.loading = "lazy";
       article.append(image);
     } else {
@@ -86,7 +87,7 @@
     const titleRow = document.createElement("div");
     titleRow.className = "qr-menu-item-title";
     const title = document.createElement("strong");
-    title.textContent = item.name || "Ürün";
+    title.textContent = item.name || ui("Ürün");
     if (item.is_featured) title.classList.add("is-featured");
     const price = document.createElement("span");
     price.textContent = formatPrice(item.price, item.currency);
@@ -127,7 +128,7 @@
     if (!sections.length) {
       const empty = document.createElement("div");
       empty.className = "qr-menu-empty";
-      empty.textContent = "Bu kategori için aktif ürün bulunmuyor.";
+      empty.textContent = ui("Bu kategori için aktif ürün bulunmuyor.");
       list.append(empty);
       return;
     }
@@ -139,7 +140,7 @@
       heading.className = "qr-menu-category-heading";
 
       const title = document.createElement("h2");
-      title.textContent = category.name || "Kategori";
+      title.textContent = category.name || ui("Kategori");
       heading.append(title);
 
       if (category.description) {
@@ -161,8 +162,8 @@
     renderTabs();
     renderMenu();
     updated.textContent = state.updatedAt
-      ? "Güncelleme: " + formatDate(state.updatedAt)
-      : "Güncelleme bekleniyor.";
+      ? ui("Güncelleme: ") + formatDate(state.updatedAt)
+      : ui("Güncelleme bekleniyor.");
     status.textContent = "";
   };
 
@@ -181,10 +182,11 @@
         window.location.replace("/");
         return;
       }
-      if (!response.ok) throw new Error("Menü şu anda okunamadı.");
+      if (!response.ok) throw new Error(ui("Menü şu anda okunamadı."));
 
-      const payload = await response.json();
-      if (payload?.ok === false) throw new Error(payload.message || "Menü şu anda okunamadı.");
+      const source = await response.json();
+      const payload = window.DemoLanguage?.localize(source, "menu") ?? source;
+      if (payload?.ok === false) throw new Error(ui("Menü şu anda okunamadı."));
 
       state.etag = response.headers.get("ETag") || state.etag;
       state.categories = Array.isArray(payload.categories) ? payload.categories : [];
@@ -199,9 +201,9 @@
       }
 
       render();
-    } catch (error) {
+    } catch {
       if (silent && state.categories.length) return;
-      status.textContent = error instanceof Error ? error.message : "Menü şu anda okunamadı.";
+      status.textContent = ui("Menü şu anda okunamadı.");
       list.replaceChildren();
     }
   };

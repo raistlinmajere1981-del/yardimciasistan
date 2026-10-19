@@ -134,7 +134,7 @@ export function RoomManagementSection({ controller, onEditRoom }: { controller: 
                       <span className="room-management-summary">{room.floor || "—"}</span>
                       <div className="room-management-row-actions" onClick={(event) => event.stopPropagation()}>
                         <ActionButton
-                          variant="secondary"
+                          variant="link"
                           size="sm"
                           type="button"
                           className="room-management-details-button"

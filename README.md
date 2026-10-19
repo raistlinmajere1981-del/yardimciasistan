@@ -2,7 +2,7 @@
 
 Yardımcı Asistan; **tek lokasyonlu küçük fiziksel işletmeler** için tasarlanan modüler, local-first bir işletme sistemidir. İlk çalışan ürün pansiyon/restoran/kafe akışlarıyla olgunlaştı; mimari artık sektör tipine değil persisted **business capability** setine göre çalışma alanlarını açar. Market/perakende de aynı capability-first temel üzerinde desteklenen profiller arasındadır.
 
-Sistem; web sitesi veya gömülebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve sektör çalışma alanlarından oluşur. Merkezi bir cloud servisi zorunlu değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışabilir.
+Sistem; siteye ait web arayüzü, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve sektör çalışma alanlarından oluşur. Merkezi bir cloud servisi zorunlu değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışabilir.
 
 ## Ürün Mimarisi
 
@@ -55,7 +55,7 @@ AI, WhatsApp veya internet bağlantısı sistemin tamamı için tek hata noktas�
 - `apps/desktop-app`: İşletmenin ana yönetim merkezi olan Electron + React uygulaması.
 - `apps/android-app`: Hızlı takip ve yetkili saha işlemleri için native Android companion.
 - `packages/shared`: Ortak tipler, capability registry ve domain sözleşmeleri.
-- `packages/web-widget`: Mevcut web sitelerine eklenebilen widget.
+- `test-site/landing`: Demo sayfaları ve demo asistanı; müşteri backend paketinden bağımsız sunum.
 - `packages/ai-core`: Provider bağımsız AI adapter ve prompt altyapısı.
 - `packages/whatsapp-bridge`: WhatsApp link, manuel kopyalama ve WebView akışları.
 - `packages/sync-core`: Firma hostingi ile PC/Android arasındaki taşıma sözleşmeleri.

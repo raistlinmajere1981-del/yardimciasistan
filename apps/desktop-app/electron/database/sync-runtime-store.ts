@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { encodePublicationPayload, decodePublicationPayload } from "../publication-payload-codec.js";
 import { DESKTOP_PUBLICATIONS } from "../desktop-publication-registry";
 import { getRestoreReconciliationStatus, finishRestoreReconciliationIfReady } from "./restore-reconciliation-store";
@@ -233,4 +233,15 @@ export function recordWebOrderCursor(db: DatabaseSync, cursor: number, acknowled
         updated_at = ?
     WHERE id = 'primary'
   `).run(cursor, acknowledged ? cursor : 0, new Date().toISOString());
+}
+
+/** Called inside the facade's serialized schema/identity initialization transaction. */
+export function ensureSyncClientId(db: DatabaseSync) {
+  db
+    .prepare(`
+      INSERT INTO desktop_sync_identity (id, client_id)
+      VALUES ('primary', ?)
+      ON CONFLICT(id) DO NOTHING
+    `)
+    .run(`desktop-${randomUUID()}`);
 }

@@ -119,7 +119,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
 
   const renderAiConnectionActions = (inline: boolean) => (
     <div id="settings-ai-test" tabIndex={-1} className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
-      <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
+      <ActionButton variant="secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </ActionButton>
@@ -166,7 +166,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
             {form.aiService === "gemini" ? (
               <>
                 <div className="setup-field setup-ai-studio-help">
-                  <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
+                  <ActionButton variant="secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
                   </ActionButton>

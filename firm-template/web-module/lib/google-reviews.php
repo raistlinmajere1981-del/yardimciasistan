@@ -4,7 +4,7 @@ declare(strict_types=1);
 function ya_google_reviews_fetch_place(
     string $apiKey,
     string $placeId,
-    string $fieldMask = 'displayName,rating,userRatingCount,reviews,googleMapsUri'
+    string $fieldMask = 'displayName,rating,userRatingCount,reviews,googleMapsUri,googleMapsLinks.reviewsUri'
 ): array {
     $url = 'https://places.googleapis.com/v1/places/' . rawurlencode($placeId) . '?languageCode=tr';
     $headers = [
@@ -101,6 +101,9 @@ function ya_google_reviews_normalize_place(array $place, int $maxReviews = 5): a
         'user_rating_count' => max(0, (int)($place['userRatingCount'] ?? 0)),
         'google_maps_uri' => filter_var((string)($place['googleMapsUri'] ?? ''), FILTER_VALIDATE_URL)
             ? (string)$place['googleMapsUri']
+            : '',
+        'reviews_uri' => filter_var((string)($place['googleMapsLinks']['reviewsUri'] ?? ''), FILTER_VALIDATE_URL)
+            ? (string)$place['googleMapsLinks']['reviewsUri']
             : '',
         'reviews' => $reviews
     ];

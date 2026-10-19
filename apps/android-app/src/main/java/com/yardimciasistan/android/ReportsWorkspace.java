@@ -4,7 +4,6 @@ import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.view.View;
 import android.widget.Button;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -58,7 +57,7 @@ final class ReportsWorkspace {
   View build(OperationData data) {
     LinearLayout page = UiKit.column(activity);
     if (!data.isAdmin()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Bu cihazın raporlara erişim yetkisi yok",
           "Raporlar yalnız masaüstünde aktif yönetici olarak atanmış telefonlarda açılır."
       ));
@@ -76,7 +75,7 @@ final class ReportsWorkspace {
 
     OperationData.ReportSnapshot report = data.report(preset);
     if (report == null) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Rapor verisi henüz hazır değil",
           "Masaüstünde otomatik senkronu çalıştırın, ardından bu ekrandaki Yenile düğmesine dokunun."
       ));
@@ -141,7 +140,7 @@ final class ReportsWorkspace {
 
       page.addView(sectionLabel("En çok satılan 3 ürün"));
       if (report.topItems.isEmpty()) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             "Satış satırı yok",
             "Seçili dönemde kapanmış hesaplara bağlı ürün satışı bulunmuyor."
         ));
@@ -183,7 +182,7 @@ final class ReportsWorkspace {
     page.addView(attention);
 
     if (report.attentionItems.isEmpty()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Acil başlık yok",
           "Şu anda ayrıca listelenecek dikkat başlığı bulunmuyor."
       ));
@@ -210,7 +209,7 @@ final class ReportsWorkspace {
       page.addView(aiButton(data, "3 kısa öneri ver", "recommendations"));
 
       if (aiLoading) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             "AI yorumu hazırlanıyor",
             "Hazır rapor güvenli sunucu bağlantısı üzerinden yorumlanıyor."
         ));
@@ -257,27 +256,14 @@ final class ReportsWorkspace {
         {AndroidUiRules.REPORT_LAST_7, "Son 7 Gün"},
         {AndroidUiRules.REPORT_LAST_30, "Son 30 Gün"}
     };
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 3), 0, UiKit.dp(activity, 6));
-    for (String[] option : options) {
-      row.addView(UiKit.chip(
-          activity,
-          option[1],
-          option[0].equals(preset),
-          view -> {
-            preset = AndroidUiRules.normalizeReportPreset(option[0]);
-            aiRequestVersion += 1;
-            aiLoading = false;
-            aiAnswer = "";
-            aiMessage = "";
-            listener.onRenderRequested();
-          }
-      ));
-    }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.filterBar(activity, options, preset, value -> {
+      preset = AndroidUiRules.normalizeReportPreset(value);
+      aiRequestVersion += 1;
+      aiLoading = false;
+      aiAnswer = "";
+      aiMessage = "";
+      listener.onRenderRequested();
+    });
   }
 
   private void addMetric(LinearLayout card, String label, String value, int tone) {
@@ -410,10 +396,4 @@ final class ReportsWorkspace {
     return row;
   }
 
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(activity, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
-  }
 }

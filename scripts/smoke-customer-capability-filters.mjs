@@ -7,6 +7,7 @@ import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 
 const data = createCompactUiFixture();
 data.customers = data.customers.slice(0, 2);
+data.customers[1].lastContactAt = "";
 data.customerRoomStays = [{ id: "old-stay", customerId: data.customers[0].id, roomId: data.rooms[0].id, roomName: "Eski oda", roomNumber: "101", status: "checked_in", guests: [] }];
 data.reservations = [{ ...data.reservations[0], id: "old-booking", customerId: data.customers[0].id, reservationType: "room", status: "approved" }];
 data.kbsOverview = { ...data.kbsOverview, enabled: false };
@@ -27,6 +28,14 @@ try {
     window.customerFilterCapabilities = capabilities;
   }, { data, capabilities: [C.CUSTOMERS, C.ACCOMMODATION_STAYS, C.ACCOMMODATION_RESERVATIONS] });
   await page.goto(`${server.resolvedUrls.local[0]}customer-capability-test`);
+  const activityDates = page.locator(".customer-record-row__date time");
+  await expect(activityDates).toHaveCount(2);
+  const expectedDate = await page.evaluate(value => new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }).format(new Date(value)), data.customers[0].lastContactAt);
+  await expect(activityDates.first()).toHaveText(expectedDate);
+  await expect(page.locator(".customer-record-row__date").first()).toContainText("Son temas");
+  await expect(page.locator(".customer-record-row__date").nth(1)).toContainText("Son güncelleme");
   const filters = page.getByRole("group", { name: "Müşteri filtresi", exact: true });
   const staying = filters.getByRole("button", { name: "Konaklayanlar", exact: true });
   const reserved = filters.getByRole("button", { name: "Rezervasyonu Olanlar", exact: true });

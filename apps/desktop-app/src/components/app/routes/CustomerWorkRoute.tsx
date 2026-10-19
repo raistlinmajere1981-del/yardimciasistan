@@ -111,7 +111,7 @@ export function CustomerWorkRoute({
               manualRequestState={manualRequestState}
               onSelectRequest={setSelectedRequestId}
               onManualRequestFormChange={setManualRequestForm}
-              onCreateManualRequest={() => void handleCreateManualRequest()}
+              onCreateManualRequest={handleCreateManualRequest}
               onWhatsApp={openWhatsApp}
               onConvert={(request) => void handleConvertRequestToReservation(request)}
               onSuggest={(request) => void handleCreateOwnerReplySuggestion(request)}

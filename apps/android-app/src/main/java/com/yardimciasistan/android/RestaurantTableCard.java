@@ -27,22 +27,11 @@ final class RestaurantTableCard {
     OperationData.TableOrder order = ordersEnabled ? data.activeOrderForTable(table.id) : null;
 
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout identity = UiKit.column(activity);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(activity, table.name, 16, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(
-        activity,
+    card.addView(UiKit.recordHeader(activity, table.name, 16,
         ordersEnabled
             ? formatTableStatus(table.status) + " · " + (order == null ? "Adisyon yok" : formatOrderStatus(order.status))
             : formatTableStatus(table.status),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(UiKit.badge(activity, formatTableStatus(table.status), resourceTone(table.status)));
-    card.addView(top);
+        UiKit.badge(activity, formatTableStatus(table.status), resourceTone(table.status))));
 
     if (order != null) {
       TextView total = UiKit.text(

@@ -8,7 +8,7 @@ const STYLE_ROOT = "apps/desktop-app/src/styles";
 const TOKEN_FILES = ["tokens/primitives.css", "tokens/semantic.css", "tokens/typography.css", "tokens/dimensions.css"].map((file) => `${STYLE_ROOT}/${file}`);
 const SCAN_ROOTS = [
   "apps/desktop-app/src",
-  "packages/web-widget/src"
+  "test-site/landing/assistant"
 ];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "coverage", ".git"]);
 const args = new Set(process.argv.slice(2));

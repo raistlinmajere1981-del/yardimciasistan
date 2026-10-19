@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <application android:label="Native UI doğrulama" tools:replace="android:label">
+    <activity android:name="com.yardimciasistan.android.NativeUiFamilyFixture$Screen" android:exported="false" />
+  </application>
+  <instrumentation android:name="com.yardimciasistan.android.NativeUiFamilyFixture$Runner"
+    android:targetPackage="com.yardimciasistan.android.uifamily" />
+</manifest>

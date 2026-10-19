@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import ts from "typescript";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { createRequire } from "node:module";
 import {
   getDefaultAutoSelectFamilyAttemptTimeout,
@@ -12,6 +15,45 @@ const {
   configureNetworkFamilyAttemptTimeout,
   MINIMUM_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS
 } = require("../apps/desktop-app/dist-electron/network-runtime.js");
+
+// Probe and explicit Test share the network check; only explicit Test writes save authority.
+{
+  const handlers = new Map();
+  const ipcExports = {};
+  let locked = false, checks = 0, writes = 0, sources = 0;
+  let finishProbe;
+  const compiled = ts.transpileModule(readFileSync(new URL("../apps/desktop-app/electron/web-connection-ipc.ts", import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  runInNewContext(compiled, { exports: ipcExports, require: name => {
+    if (name === "electron") return { ipcMain: { handle: (id, handler) => handlers.set(id, handler) } };
+    if (name === "./web-connection-test") return { testWebConnection: async () => { checks++; return await new Promise(resolve => { finishProbe = resolve; }); } };
+    if (name === "./publication-source-service") return { connectPublicationSource: async () => { sources++; return { ok: true }; } };
+    throw new Error(`Unexpected import: ${name}`);
+  } });
+  ipcExports.registerWebConnectionIpcHandlers({
+    assertUnlocked: () => { if (locked) throw Error("locked"); },
+    getDatabase: () => ({ recordServiceSettingsVerification: () => { writes++; } })
+  });
+  const input = { baseUrl: "https://fixture.test", syncSecret: "fixture-secret-only" };
+  locked = true;
+  await assert.rejects(handlers.get("sync:probeConnection")({}, input), /locked/);
+  assert.equal(checks, 0, "locked sessions cannot start a probe");
+  locked = false;
+  const probe = handlers.get("sync:probeConnection")({}, input);
+  finishProbe({ ok: true });
+  assert.equal((await probe).ok, true);
+  assert.equal(writes, 0, "opening Settings never records verification authority");
+  assert.equal(sources, 0, "opening Settings never activates a source");
+  const stale = handlers.get("sync:probeConnection")({}, input);
+  locked = true; finishProbe({ ok: true });
+  await assert.rejects(stale, /locked/, "a session locked during the probe cannot receive its result");
+  locked = false;
+  const explicit = handlers.get("sync:testConnection")({}, input);
+  finishProbe({ ok: true });
+  await explicit;
+  assert.equal(writes, 1, "explicit Test retains its existing save authority");
+}
 
 const validSecret = "web-connection-secret-123";
 const slowSecret = "slow-connection-secret-123";

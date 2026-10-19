@@ -11,7 +11,7 @@ import { customerCreditError } from "../../app/customer-credit-ui";
 import { reportAppStatus } from "../../app/runtime-state";
 import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 import type { CustomerWorkspaceIntent } from "../workspace/workspace-intent";
-import { DetailWorkspaceLayout } from "../workspace/DetailWorkspaceLayout";
+import { DetailSectionCard, DetailWorkspaceLayout } from "../workspace/DetailWorkspaceLayout";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { ActionButton } from "../ui/ActionButton";
@@ -187,11 +187,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
-        {staysEnabled && <section className="panel customer-operation-card form-stack" aria-label="Konaklama">
-          <div className="customer-operation-card__heading">
-            <div><h3>Konaklama</h3></div>
-            {activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}
-          </div>
+        {staysEnabled && <DetailSectionCard className="customer-operation-card form-stack" title="Konaklama"
+          actions={activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}>
           {activeStay ? <>
             <div className="customer-operation-record">
               <strong>{activeStay.roomNumber ? `Oda ${activeStay.roomNumber}` : activeStay.roomName}</strong>
@@ -225,12 +222,9 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               <BedDouble size={16} aria-hidden="true" />Konaklama Başlat
             </ActionButton>
           </>}
-        </section>}
+        </DetailSectionCard>}
 
-        {(reservationsEnabled || selectedRequests.length > 0) && <section className="panel customer-operation-card form-stack" aria-label="Yakın kayıtlar">
-          <div className="customer-operation-card__heading">
-            <div><h3>Yakın kayıtlar</h3></div>
-          </div>
+        {(reservationsEnabled || selectedRequests.length > 0) && <DetailSectionCard className="customer-operation-card form-stack" title="Yakın kayıtlar">
           {reservationsEnabled && <div className="customer-related-record">
             <span>Rezervasyon</span>
             {latestReservation ? <>
@@ -246,7 +240,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               <small>{formatRequestStatus(latestRequest.status)} · {latestRequest.date_text || latestRequest.start_date || "-"}</small>
             </> : <small>Talep yok.</small>}
           </div>
-        </section>}
+        </DetailSectionCard>}
 
         {accommodationFolioEnabled && <CustomerRoomReceivablesPanel key={`room-receivables-${customer.id}`} customerId={customerId} />}
 
@@ -257,8 +251,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           {...(onPreparedCreditWhatsApp === undefined ? {} : { onPreparedWhatsApp: (message) => leaveFor(() => onPreparedCreditWhatsApp(message)) })}
         />}
 
-        <section className="panel customer-operation-card form-stack" aria-label="Hızlı işlemler">
-          <div className="customer-operation-card__heading"><div><h3>Hızlı işlemler</h3></div></div>
+        <DetailSectionCard className="customer-operation-card form-stack" title="Hızlı işlemler">
           <div className="action-row customer-workspace-quick-actions">
             {whatsappEnabled && <ActionButton
               
@@ -281,7 +274,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
             </ActionButton>
           </div>
-        </section>
+        </DetailSectionCard>
       </>}
     >
       <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>

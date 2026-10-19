@@ -1,7 +1,8 @@
 import { createContext, useContext, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { ModalSurface, type ModalSurfaceProps } from "../ui/ModalSurface";
+import { WorkspaceHeader } from "./WorkspaceHeader";
 import type { WorkspacePresentation } from "./workspace-intent";
 
 /** Shell content bounds; measured only while a modal frame is open. */
@@ -46,29 +47,16 @@ function WorkspaceChrome({
   onPresentationChange
 }: WorkspaceChromeProps) {
   return <>
-    <header className="workspace-frame__header">
-      <div className={`workspace-frame__identity${headerSummary ? " workspace-frame__identity--summary" : ""}`}>
-        <h2
-          ref={titleRef}
-          id={titleId}
-          tabIndex={-1}
-          data-modal-initial-focus
-          className={headerSummary ? "workspace-frame__title--visually-hidden" : undefined}
-        >
-          {title}
-        </h2>
-        {headerSummary}
-        {!headerSummary && context && <div className="workspace-frame__context">{context}</div>}
-      </div>
-      <div className="workspace-frame__actions">
+    <WorkspaceHeader title={title} titleId={titleId} titleRef={titleRef} context={context} summary={headerSummary}
+      closeLabel={closeLabel} closeBlocked={closeBlocked} onClose={onClose}
+      actions={<>
         {actions}
         {presentation && onPresentationChange && <IconButton aria-label={presentation === "centered" ? "Çalışma alanını genişlet" : "Ortalanmış görünüme dön"}
           onClick={() => onPresentationChange(presentation === "centered" ? "full-canvas" : "centered")}>
           {presentation === "centered" ? <Maximize2 size={18} aria-hidden="true" /> : <Minimize2 size={18} aria-hidden="true" />}
         </IconButton>}
-        <IconButton aria-label={closeLabel} disabled={closeBlocked} onClick={onClose}><X size={18} aria-hidden="true" /></IconButton>
-      </div>
-    </header>
+      </>}
+    />
     {navigation && <div className="workspace-frame__navigation">{navigation}</div>}
     <div className={`workspace-frame__body workspace-frame__body--${bodyScroll}`}>{children}</div>
     {footer && <footer className="workspace-frame__footer">{footer}</footer>}

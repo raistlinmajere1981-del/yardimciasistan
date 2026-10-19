@@ -13,6 +13,9 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 /** Intercepts only a deliberate root gesture; child forms, horizontal controls and system edges win. */
+// Created only by AndroidShellController with its required navigation listener;
+// never inflated from XML. A tools-only constructor cannot supply that contract.
+@android.annotation.SuppressLint("ViewConstructor")
 final class AndroidRootSwipeLayout extends FrameLayout {
   interface Listener {
     boolean canSwipeRoot();
@@ -40,6 +43,10 @@ final class AndroidRootSwipeLayout extends FrameLayout {
     return false;
   }
 
+  // This container has no click action. Root navigation is available through the
+  // accessible tab/rail buttons; eligible() disables swipe during touch exploration.
+  // Do not synthesize performClick() for a directional gesture or consume child taps.
+  @android.annotation.SuppressLint("ClickableViewAccessibility")
   @Override public boolean onTouchEvent(MotionEvent event) {
     if (!claimed) return super.onTouchEvent(event);
     if (event.getActionMasked() == MotionEvent.ACTION_MOVE) gesture.move(event.getX() / density, event.getY() / density, event.getPointerCount());

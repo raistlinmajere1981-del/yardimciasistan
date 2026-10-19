@@ -1,3 +1,4 @@
+import { insertDatabaseEvent } from "./event-store.js";
 import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
@@ -342,4 +343,38 @@ export function deleteMenuProductEntryInTransaction(
     category_id: String(item.category_id ?? "")
   }, now);
   return { ok: true, message: androidAction ? "Ürün telefondan menüden kaldırıldı." : "Ürün menüden kaldırıldı." };
+}
+
+/** Exact sent-row acknowledgement; current projection must be read inside this transaction. */
+export function markMenuPublished(db: DatabaseSync, sent: PublishedQrMenu, currentPublication: () => PublishedQrMenu) {
+  const now = new Date().toISOString();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const current = currentPublication();
+    // Ack is evidence about sent row versions, never about all current rows.
+    for (const category of sent.categories) {
+      if (JSON.stringify(current.categories.find((row) => row.id === category.id)) !== JSON.stringify(category)) continue;
+      db.prepare("UPDATE menu_categories SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
+        .run(category.id, category.updated_at);
+    }
+    for (const item of sent.items) {
+      if (JSON.stringify(current.items.find((row) => row.id === item.id)) !== JSON.stringify(item)) continue;
+      db.prepare("UPDATE menu_product_entries SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
+        .run(item.id, item.updated_at);
+    }
+    insertDatabaseEvent(db, {
+      type: "menu.published",
+      entityType: "menu",
+      entityId: "qr_menu",
+      payload: {
+        category_count: sent.categories.length,
+        item_count: sent.items.length
+      },
+      now
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }

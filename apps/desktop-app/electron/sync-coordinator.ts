@@ -1,54 +1,26 @@
 import type { MarketingWebsitePublicationService } from "./marketing/website-publication";
-import { DESKTOP_PUBLICATIONS } from "./desktop-publication-registry";
-import { OnlineOrderIngressService } from "./online-order-ingress-service";
-import { DealerWebOrderAccessRejected } from "./dealer-web-order-rejection";
-import {
-  PhpHostingSyncTransport,
-  pushAiCatalog,
-  pushRoomCatalog,
-  pushTableCatalog,
-  pushAvailability,
-  pushMenu,
-  pushAndroidSnapshot,
-  pushOnlineCatalog,
-  type AndroidOperationsSnapshot,
-  type SyncCapabilitiesSuccess,
-  type SyncFailure,
-  type PushMenuResult,
-  type PushAndroidSnapshotResult,
-  type SyncTransport
-} from "@yardimci-asistan/sync-core";
-import {
-  BUSINESS_CAPABILITIES,
-  hasBusinessCapability,
-  type BusinessAiCatalog,
-  type BusinessCapability,
-  type RoomPublicCatalog,
-  type TablePublicCatalog
-} from "@yardimci-asistan/shared";
-import {
-  DesktopDatabase,
-  type DesktopSyncJob,
-  type DesktopSyncRuntimeStatus
-} from "./database";
+import type { OnlineOrderIngressService } from "./online-order-ingress-service";
+import { PhpHostingSyncTransport, type AndroidOperationsSnapshot, type SyncCapabilitiesSuccess, type PushMenuResult, type PushAndroidSnapshotResult, type SyncTransport } from "@yardimci-asistan/sync-core";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessAiCatalog, type RoomPublicCatalog, type TablePublicCatalog } from "@yardimci-asistan/shared";
+import type { DesktopDatabase, DesktopSyncRuntimeStatus } from "./database";
 import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { logWebFailure, safeWebTarget } from "./web-diagnostics";
 import { AndroidActionSyncService } from "./android-action-sync-service";
-import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
-import { publishDesktopProjection } from "./desktop-publication-service";
 import { ensurePublicationSource } from "./publication-source-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishGoogleReviewsSettings } from "./google-reviews-settings";
+import { WebSyncIngress } from "./web-sync-ingress";
+import { SyncCatalogPublisher } from "./sync-catalog-publisher";
+import { SyncOutboxPublisher } from "./sync-outbox-publisher";
+import { createSyncFetchWithTimeout, calculateRetryDelayMs, classifyFailurePhase, isConnectionFailureMessage, isUsableSyncConfig } from "./sync-network-policy";
+
 
 const NORMAL_PULL_INTERVAL_MS = 15_000;
 const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
 const OUTBOX_SCAN_INTERVAL_MS = 1_000;
 const INITIAL_SYNC_DELAY_MS = 1_500;
 const DEBOUNCE_DELAY_MS = 750;
-const MAX_PULL_PAGES = 20;
-const SYNC_HTTP_TIMEOUT_MS = 15_000;
-const RETRY_DELAYS_SECONDS = [5, 15, 30, 60, 300] as const;
 const REQUIRED_ANDROID_SYNC_FEATURES = ["android_device_sightings", "android_device_permissions"] as const;
 
 /** @compiledSmoke Used via dist-electron by scripts/smoke-automatic-sync.mjs. */
@@ -103,34 +75,32 @@ export interface SyncCoordinatorOptions {
 
 export class SyncCoordinator {
   private readonly androidActions: AndroidActionSyncService;
+  private readonly ingress: WebSyncIngress;
+  private readonly catalogs: SyncCatalogPublisher;
+  private readonly publications: SyncOutboxPublisher;
   private pullTimer: NodeJS.Timeout | null = null;
   private marketBarcodeFastPullTimer: NodeJS.Timeout | null = null;
   private outboxTimer: NodeJS.Timeout | null = null;
   private initialTimer: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private inFlight: Promise<AutomaticSyncCycleResult> | null = null;
-  // Serialization only. Intent, frozen bodies, retries and exact completion are
-  // owned by the durable outbox; losing this map cannot lose publication work.
-  private readonly outboxPublicationsInFlight = new Map<string, { sourceRevision: number; promise: Promise<unknown> }>();
   private phase: AutomaticSyncPhase = "idle";
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
   private webOrdersSupported = false;
   private businessMessagingStatusesSupported = false;
-  private onlineCatalogSupported = false;
-  private dealerAccessSupported = false;
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
-  private availabilityHeartbeatSupported: boolean | null = null;
-  private aiCatalogSupported: boolean | null = null;
-  private roomCatalogSupported: boolean | null = null;
-  private tableCatalogSupported: boolean | null = null;
   private suspendedForMaintenance = false;
   private activeOperationId = "";
   private activeCycleStartedAt = 0;
   private activeTargetUrl = "";
 
   constructor(private readonly options: SyncCoordinatorOptions) {
+    const logFailure = this.logSyncFailure.bind(this);
+    this.ingress = new WebSyncIngress(options, () => this.activeOperationId, logFailure);
+    this.catalogs = new SyncCatalogPublisher(options, () => this.activeOperationId, logFailure);
+    this.publications = new SyncOutboxPublisher(options, () => this.suspendedForMaintenance, () => this.activeOperationId, logFailure);
     // Main injects the same owner used by manual ingress. Standalone coordinator
     // consumers compose one owner here, retained for their entire lifecycle.
     this.androidActions = options.androidActions ?? new AndroidActionSyncService({
@@ -145,9 +115,7 @@ export class SyncCoordinator {
     this.suspendedForMaintenance = false;
     this.androidActions.resume();
     this.stop();
-    this.aiCatalogSupported = null;
-    this.roomCatalogSupported = null;
-    this.tableCatalogSupported = null;
+    this.catalogs.resetCatalogSupport();
     this.emitStatus();
     this.initialTimer = setTimeout(() => {
       this.initialTimer = null;
@@ -197,7 +165,7 @@ export class SyncCoordinator {
       }
     }
     await androidDrain;
-    await Promise.allSettled([...this.outboxPublicationsInFlight.values()].map(item => item.promise));
+    await this.publications.drain();
     // A mutation may have tried to schedule work while the previous cycle was draining.
     this.stop();
   }
@@ -205,7 +173,7 @@ export class SyncCoordinator {
   restart() {
     const restoreMarketBarcodeFastPull = this.marketBarcodeFastPullActive;
     this.capabilitiesTarget = "";
-    this.availabilityHeartbeatSupported = null;
+    this.catalogs.resetAvailabilitySupport();
     this.nextPassiveRunAt = 0;
     this.start();
     if (restoreMarketBarcodeFastPull) {
@@ -283,60 +251,8 @@ export class SyncCoordinator {
     return this.run(true);
   }
 
-  async publishMenuNow(): Promise<PushMenuResult> {
-    const config = this.options.getSyncConfig();
-    this.options.database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
-    this.options.database.prepareSyncPublication("menu_publish", this.options.database.getQrMenuPublication(), true);
-    const job = this.options.database.getPendingSyncJobs().find(item => item.jobType === "menu_publish");
-    if (!job || this.suspendedForMaintenance) return { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
-    return await this.publishMenuJob(job) ?? { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
-  }
-
-  async publishAndroidSnapshotNow(): Promise<PushAndroidSnapshotResult> {
-    const config = this.options.getSyncConfig();
-    const snapshot = this.options.createAndroidSnapshot();
-    this.options.database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
-    this.options.database.prepareSyncPublication("android_snapshot", snapshot, true);
-    const job = this.options.database.getPendingSyncJobs().find(item => item.jobType === "android_snapshot");
-    if (!job || this.suspendedForMaintenance) return { ok: false, message: "Android yayın niyeti hazırlanamadı." };
-    const result: PushAndroidSnapshotResult = await this.publishAndroidSnapshotJob(job) ?? { ok: false, message: "Android yayın niyeti hazırlanamadı." };
-    this.options.database.recordSyncEvent({ direction: "push", entityType: "android_snapshot", ok: result.ok,
-      recordCount: result.ok ? result.task_count + snapshot.requests.length + snapshot.rooms.length + snapshot.tables.length : 0,
-      message: result.message, ...(result.ok || result.status === undefined ? {} : { status: result.status }) });
-    return result;
-  }
-
-  private async publishSerializedOutboxJob<R>(job: DesktopSyncJob, publish: (current: DesktopSyncJob) => Promise<R | null>): Promise<R | null> {
-    const active = this.outboxPublicationsInFlight.get(job.jobKey);
-    if (active) {
-      const result = await active.promise as R | null;
-      const newer = this.options.database.getPendingSyncJobs().find(item => item.jobKey === job.jobKey && item.sourceRevision > active.sourceRevision);
-      return newer ? this.publishSerializedOutboxJob(newer, publish) : result;
-    }
-    if (this.suspendedForMaintenance) return null;
-    const publication = publish(job).finally(() => { this.outboxPublicationsInFlight.delete(job.jobKey); });
-    this.outboxPublicationsInFlight.set(job.jobKey, { sourceRevision: job.sourceRevision, promise: publication });
-    return publication;
-  }
-
-  private publishMenuJob(job: DesktopSyncJob): Promise<PushMenuResult | null> {
-    return this.publishSerializedOutboxJob(job, current => {
-      const config = this.options.getSyncConfig();
-      return publishDesktopProjection(this.options.database, config, "menu_publish", this.options.database.getQrMenuPublication(),
-        (identity, menu) => pushMenu({ ...config, ...identity, menu }),
-        { expectedRevision: current.sourceRevision, nextAttemptAt: calculateNextAttempt(current.attemptCount),
-          acknowledge: sent => this.options.database.markMenuPublished(sent) });
-    });
-  }
-
-  private publishAndroidSnapshotJob(job: DesktopSyncJob): Promise<PushAndroidSnapshotResult | null> {
-    return this.publishSerializedOutboxJob(job, current => {
-      const config = this.options.getSyncConfig();
-      return publishDesktopProjection(this.options.database, config, "android_snapshot", this.options.createAndroidSnapshot(),
-        (identity, snapshot) => pushAndroidSnapshot({ ...config, ...identity, snapshot }),
-        { expectedRevision: current.sourceRevision, nextAttemptAt: calculateNextAttempt(current.attemptCount) });
-    });
-  }
+  publishMenuNow(): Promise<PushMenuResult> { return this.publications.publishMenuNow(); }
+  publishAndroidSnapshotNow(): Promise<PushAndroidSnapshotResult> { return this.publications.publishAndroidSnapshotNow(); }
 
   private run(force: boolean): Promise<AutomaticSyncCycleResult> {
     if (this.suspendedForMaintenance) {
@@ -490,8 +406,7 @@ export class SyncCoordinator {
       }
       this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
       this.businessMessagingStatusesSupported = capabilities.features.includes("business_messaging_status_v1");
-      this.onlineCatalogSupported = capabilities.features.includes("online_catalog_v1");
-      this.dealerAccessSupported = capabilities.features.includes("dealer_access_v1");
+      this.publications.setSupportedFeatures(capabilities.features);
       this.capabilitiesTarget = targetKey;
     }
 
@@ -505,7 +420,7 @@ export class SyncCoordinator {
     const replayRequests = restore?.state === "reconciliation_pending" && !restore.requestsComplete;
     const replayOrders = restore?.state === "reconciliation_pending" && !restore.ordersComplete;
     if (requestsEnabled || replayRequests) {
-      const requestResult = await this.pullRequestPages(transport);
+      const requestResult = await this.ingress.pullRequestPages(transport);
       counts.pulledRequests = requestResult.count;
       dashboardChanged ||= requestResult.count > 0;
       if (requestResult.error) {
@@ -516,7 +431,7 @@ export class SyncCoordinator {
     if (this.webOrdersSupported
         && (replayOrders || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)
           || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.WHOLESALE))) {
-      const orderResult = await this.pullWebOrderPages(transport);
+      const orderResult = await this.ingress.pullWebOrderPages(transport);
       dashboardChanged ||= orderResult.count > 0;
       if (orderResult.count > 0) this.options.onCommerceOrdersChanged?.();
       if (orderResult.error) errors.push(orderResult.error);
@@ -531,28 +446,28 @@ export class SyncCoordinator {
     }
 
     if (requestsEnabled || replayRequests) {
-      const acknowledgementError = await this.acknowledgeImportedRequests(transport);
+      const acknowledgementError = await this.ingress.acknowledgeImportedRequests(transport);
       if (acknowledgementError) {
         errors.push(acknowledgementError);
       }
     }
 
-    const availabilityError = await this.publishAvailabilityHeartbeat(config, enabledCapabilities);
+    const availabilityError = await this.catalogs.publishAvailabilityHeartbeat(config, enabledCapabilities);
     if (availabilityError) {
       errors.push(availabilityError);
     }
 
-    const roomCatalogError = await this.publishRoomCatalogIfChanged(config, clientId);
+    const roomCatalogError = await this.catalogs.publishRoomCatalogIfChanged(config, clientId);
     if (roomCatalogError) {
       errors.push(roomCatalogError);
     }
 
-    const tableCatalogError = await this.publishTableCatalogIfChanged(config, clientId);
+    const tableCatalogError = await this.catalogs.publishTableCatalogIfChanged(config, clientId);
     if (tableCatalogError) {
       errors.push(tableCatalogError);
     }
 
-    const aiCatalogError = await this.publishAiCatalogIfChanged(config);
+    const aiCatalogError = await this.catalogs.publishAiCatalogIfChanged(config);
     if (aiCatalogError) {
       errors.push(aiCatalogError);
     }
@@ -570,7 +485,7 @@ export class SyncCoordinator {
       if (!reviews.ok) errors.push(reviews.message);
     }
 
-    const publicationResult = await this.publishOutbox(transport);
+    const publicationResult = await this.publications.publishOutbox(transport);
     counts.publishedJobs = publicationResult.published;
     errors.push(...publicationResult.errors);
 
@@ -618,453 +533,10 @@ export class SyncCoordinator {
     return this.result(false, this.message, counts);
   }
 
-  private async pullWebOrderPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
-    const ingress = this.options.onlineOrderIngress ?? new OnlineOrderIngressService(this.options.database);
-    let cursor = this.options.database.getSyncRuntimeStatus().webOrderCursor;
-    let count = 0;
-    let errorMessage = "";
-    const restore = this.options.database.getRestoreReconciliationStatus();
-    const replayThroughSeq = restore?.state === "reconciliation_pending" && !restore.ordersComplete ? restore.ordersThrough : undefined;
-    let replayExhausted = false;
-    try {
-      for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100, ...(replayThroughSeq === undefined ? {} : { replayThroughSeq }) });
-        if (!result.ok) {
-          this.logSyncFailure("web-orders-pull", result, { page, cursor });
-          errorMessage = result.message;
-          break;
-        }
-        for (const envelope of result.orders) {
-          try {
-            ingress.importOrder(envelope, cursor, replayThroughSeq !== undefined);
-            count += 1;
-          } catch (error) {
-            if (!(error instanceof DealerWebOrderAccessRejected) || envelope.kind !== "dealer") throw error;
-            this.options.database.recordRejectedDealerWebOrder(envelope.id, envelope.dealerAccessId, envelope.accessRevision);
-            desktopLog.warn({ scope: "online-order-ingress", event: "dealer.order.ingress.rejected",
-              message: "Geçersiz bayi erişimine ait sipariş taşıma kaydı reddedildi.", operationId: this.activeOperationId,
-              meta: { accessId: envelope.dealerAccessId, webOrderId: envelope.id, category: "access_revoked" } });
-          }
-          cursor = envelope.syncSeq;
-          this.options.database.recordWebOrderCursor(cursor);
-        }
-        if (!result.has_more) {
-          replayExhausted = true;
-          break;
-        }
-      }
-    } catch (error) {
-      errorMessage = "Web siparişi içe aktarılamadı. Yeniden denenecek.";
-      desktopLog.error({
-        scope: "online-order-ingress",
-        event: "online-order-ingress.import.failed",
-        message: errorMessage,
-        operationId: this.activeOperationId,
-        meta: { cursor, importedCount: count },
-        error
-      });
-    }
-    // Even on failure, acknowledge only the persisted successful prefix. Ack failure
-    // leaves its own local cursor pending, so a later cycle retries the acknowledgement.
-    const runtime = this.options.database.getSyncRuntimeStatus();
-    if (runtime.webOrderCursor > runtime.webOrderAcknowledgedCursor) {
-      const ack = await transport.acknowledgeWebOrders({ throughSeq: runtime.webOrderCursor });
-      if (!ack.ok) {
-        this.logSyncFailure("web-orders-ack", ack, { cursor: runtime.webOrderCursor });
-        errorMessage ||= ack.message;
-      } else if (ack.acknowledged_cursor !== runtime.webOrderCursor) {
-        errorMessage ||= "Web sipariş onay cursor değeri geçersiz.";
-        this.logSyncFailure("web-orders-ack", { message: errorMessage, error: "invalid_response" });
-      } else {
-        this.options.database.recordWebOrderCursor(ack.acknowledged_cursor, true);
-      }
-    }
-    if (count > 0) {
-      desktopLog.info({
-        scope: "online-order-ingress",
-        event: "online-order-ingress.import.completed",
-        message: "Web siparişleri canonical siparişlere aktarıldı.",
-        operationId: this.activeOperationId,
-        meta: { importedCount: count, cursor }
-      });
-    }
-    if (replayThroughSeq !== undefined && replayExhausted && !errorMessage) this.options.database.finishRestoreReplay("orders");
-    return { count, error: errorMessage };
-  }
-
-  private async pullRequestPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
-    let count = 0;
-    let cursor = this.options.database.getSyncRuntimeStatus().requestCursor;
-    const restore = this.options.database.getRestoreReconciliationStatus();
-    const replayThroughSeq = restore?.state === "reconciliation_pending" && !restore.requestsComplete ? restore.requestsThrough : undefined;
-    for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-      const result = await transport.pullRequests({ afterSeq: cursor, limit: 100, ...(replayThroughSeq === undefined ? {} : { replayThroughSeq }) });
-      if (!result.ok) {
-        this.options.database.recordSyncEvent({
-          direction: "pull",
-          entityType: "request",
-          ok: false,
-          message: result.message,
-          ...(result.status === undefined ? {} : { status: result.status })
-        });
-        this.logSyncFailure("requests-pull", result, { page, cursor });
-        return { count, error: result.message };
-      }
-      if (typeof result.next_cursor !== "number") {
-        const message = "Web modülü geçerli bir talep cursor değeri döndürmedi.";
-        this.logSyncFailure("requests-pull", { message, error: "invalid_response" }, { page, cursor });
-        return { count, error: message };
-      }
-      this.options.database.upsertRequests(result.requests, result.next_cursor);
-      count += result.requests.length;
-      cursor = result.next_cursor;
-      if (!result.has_more) {
-        if (replayThroughSeq !== undefined) {
-          const error = await this.acknowledgeImportedRequests(transport);
-          if (error) return { count, error };
-          this.options.database.finishRestoreReplay("requests");
-        }
-        break;
-      }
-    }
-    this.options.database.recordSyncEvent({
-      direction: "pull",
-      entityType: "request",
-      ok: true,
-      recordCount: count
-    });
-    return { count, error: "" };
-  }
-
-  private async acknowledgeImportedRequests(transport: SyncTransport): Promise<string> {
-    const runtime = this.options.database.getSyncRuntimeStatus();
-    if (runtime.requestCursor <= runtime.acknowledgedCursor) {
-      return "";
-    }
-    const result = await transport.acknowledgeRequests({ throughSeq: runtime.requestCursor });
-    if (!result.ok) {
-      this.logSyncFailure("requests-ack", result, {
-        requestCursor: runtime.requestCursor,
-        acknowledgedCursor: runtime.acknowledgedCursor
-      });
-      return result.message;
-    }
-    this.options.database.acknowledgeRequestCursor(result.acknowledged_cursor);
-    return "";
-  }
-
   private async processAndroidActions(transport: SyncTransport) {
     const result = await this.androidActions.processQueue(false, transport);
     if (result.error) this.logSyncFailure("android-actions", { message: result.error });
     return result;
-  }
-
-  private async publishAvailabilityHeartbeat(
-    config: { baseUrl: string; syncSecret: string },
-    enabledCapabilities: readonly BusinessCapability[]
-  ): Promise<string> {
-    if (this.availabilityHeartbeatSupported === false) {
-      return "";
-    }
-
-    const runtimeFetch = globalThis.fetch;
-    if (!runtimeFetch) {
-      const message = "Canlı müsaitlik yayını için ağ istemcisi kullanılamıyor.";
-      this.logSyncFailure("availability", { message, error: "fetch_unavailable" });
-      return message;
-    }
-
-    const availability = createPublicRoomAvailabilityPublication(
-      this.options.database.getPublicRoomAvailabilityInput(),
-      enabledCapabilities
-    );
-
-    try {
-      const boundedConfig = { ...config, fetchImpl: createSyncFetchWithTimeout(runtimeFetch) };
-      const result = await publishDesktopProjection(this.options.database, boundedConfig, "public_room_availability_publish", availability,
-        (identity, frozen) => pushAvailability({ ...boundedConfig, ...identity, availability: frozen }), { refresh: true });
-      if (!result) return "";
-
-      if (!result.ok && result.status === 404) {
-        // Older hosting packages do not have the availability endpoint. Keep
-        // existing sync healthy until the web module is upgraded.
-        this.availabilityHeartbeatSupported = false;
-        desktopLog.info({
-          scope: "sync",
-          event: "sync.availability.unsupported",
-          message: "Canlı müsaitlik endpoint'i bu hosting sürümünde yok.",
-          operationId: this.activeOperationId,
-          meta: { target: safeWebTarget(config.baseUrl), status: 404 }
-        });
-        return "";
-      }
-
-      if (!result.ok) {
-        const message = result.message;
-        this.logSyncFailure("availability", result);
-        return message;
-      }
-
-      this.availabilityHeartbeatSupported = true;
-      return "";
-    } catch (error) {
-      const message = "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
-      this.logSyncFailure("availability", {
-        message,
-        error: error instanceof Error ? error.message : String(error)
-      }, {
-        endpoint: safeWebTarget(config.baseUrl)
-      });
-      return message;
-    }
-  }
-
-  private async publishRoomCatalogIfChanged(
-    config: { baseUrl: string; syncSecret: string },
-    clientId: string
-  ): Promise<string> {
-    if (this.roomCatalogSupported === false) return "";
-
-    let catalog = this.options.createRoomCatalog?.() ?? { version: 1, enabled: false, updatedAt: "", rooms: [] };
-    if (catalog.enabled) {
-      const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
-      if (preparation && !preparation.ok) {
-        this.logSyncFailure("room-catalog-prepare", {
-          message: preparation.message,
-          ...(preparation.status === undefined ? {} : { status: preparation.status })
-        });
-        if ([400, 404, 405].includes(preparation.status ?? 0)) {
-          this.roomCatalogSupported = false;
-          return "";
-        }
-        return preparation.message;
-      }
-      if (preparation?.uploaded) {
-        catalog = this.options.createRoomCatalog?.() ?? catalog;
-      }
-    }
-
-
-    const runtimeFetch = globalThis.fetch;
-    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
-    const result = await publishDesktopProjection(this.options.database, boundedConfig, "room_catalog_publish", catalog,
-      (identity, frozen) => pushRoomCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
-    if (!result) return "";
-
-    if (result.ok) {
-      this.roomCatalogSupported = true;
-      this.options.database.recordSyncEvent({
-        direction: "push",
-        entityType: "room_catalog",
-        ok: true,
-        recordCount: result.room_count,
-        message: result.message
-      });
-      return "";
-    }
-
-    if ([400, 404, 405].includes(result.status ?? 0)) {
-      this.logSyncFailure("room-catalog", result);
-      this.roomCatalogSupported = false;
-      return "";
-    }
-
-    this.logSyncFailure("room-catalog", result);
-    this.options.database.recordSyncEvent({
-      direction: "push",
-      entityType: "room_catalog",
-      ok: false,
-      recordCount: 0,
-      message: result.message,
-      ...(result.status === undefined ? {} : { status: result.status })
-    });
-    return result.message;
-  }
-
-  private async publishTableCatalogIfChanged(
-    config: { baseUrl: string; syncSecret: string },
-    clientId: string
-  ): Promise<string> {
-    if (this.tableCatalogSupported === false) return "";
-
-    let catalog = this.options.createTableCatalog?.() ?? { version: 1, enabled: false, updatedAt: "", tables: [] };
-    if (catalog.enabled) {
-      const preparation = await this.options.prepareTableCatalog?.(config, clientId);
-      if (preparation && !preparation.ok) {
-        this.logSyncFailure("table-catalog-prepare", {
-          message: preparation.message,
-          ...(preparation.status === undefined ? {} : { status: preparation.status })
-        });
-        if ([400, 404, 405].includes(preparation.status ?? 0)) {
-          this.tableCatalogSupported = false;
-          return "";
-        }
-        return preparation.message;
-      }
-      if (preparation?.uploaded) {
-        catalog = this.options.createTableCatalog?.() ?? catalog;
-      }
-    }
-
-
-    const runtimeFetch = globalThis.fetch;
-    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
-    const result = await publishDesktopProjection(this.options.database, boundedConfig, "table_catalog_publish", catalog,
-      (identity, frozen) => pushTableCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
-    if (!result) return "";
-
-    if (result.ok) {
-      this.tableCatalogSupported = true;
-      this.options.database.recordSyncEvent({
-        direction: "push",
-        entityType: "table_catalog",
-        ok: true,
-        recordCount: result.table_count,
-        message: result.message
-      });
-      return "";
-    }
-
-    if ([400, 404, 405].includes(result.status ?? 0)) {
-      this.logSyncFailure("table-catalog", result);
-      this.tableCatalogSupported = false;
-      return "";
-    }
-
-    this.logSyncFailure("table-catalog", result);
-    this.options.database.recordSyncEvent({
-      direction: "push",
-      entityType: "table_catalog",
-      ok: false,
-      recordCount: 0,
-      message: result.message,
-      ...(result.status === undefined ? {} : { status: result.status })
-    });
-    return result.message;
-  }
-
-  private async publishAiCatalogIfChanged(config: { baseUrl: string; syncSecret: string }): Promise<string> {
-    if (this.aiCatalogSupported === false) return "";
-
-    const catalog = this.options.createAiCatalog?.() ?? { version: 1, updatedAt: "", items: [] };
-
-    const runtimeFetch = globalThis.fetch;
-    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
-    const result = await publishDesktopProjection(this.options.database, boundedConfig, "ai_catalog_publish", catalog,
-      (identity, frozen) => pushAiCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
-    if (!result) return "";
-
-    if (result.ok) {
-      this.aiCatalogSupported = true;
-      this.options.database.recordSyncEvent({
-        direction: "push",
-        entityType: "ai_catalog",
-        ok: true,
-        recordCount: result.item_count,
-        message: result.message
-      });
-      return "";
-    }
-
-    if ([400, 404, 405].includes(result.status ?? 0)) {
-      this.logSyncFailure("ai-catalog", result);
-      this.aiCatalogSupported = false;
-      return "";
-    }
-
-    this.logSyncFailure("ai-catalog", result);
-    this.options.database.recordSyncEvent({
-      direction: "push",
-      entityType: "ai_catalog",
-      ok: false,
-      recordCount: 0,
-      message: result.message,
-      ...(result.status === undefined ? {} : { status: result.status })
-    });
-    return result.message;
-  }
-
-  private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {
-    const jobs = this.options.database.getPendingSyncJobs();
-    const clientId = this.options.database.getSyncRuntimeStatus().clientId;
-    const errors: string[] = [];
-    let published = 0;
-    for (const job of jobs) {
-      // Derived/config publishers above share this outbox but own preparation.
-      if (DESKTOP_PUBLICATIONS[job.jobType].publisher !== "outbox") continue;
-      if (job.jobType === "online_catalog_publish" && !this.onlineCatalogSupported) {
-        // Retain the durable invalidation without turning the outbox scan into a hot loop.
-        this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
-          "Web modülü online ürün kataloğunu desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
-        continue;
-      }
-      if (job.jobType === "dealer_access_publish" && (!this.dealerAccessSupported || !transport.publishDealerAccess)) {
-        this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
-          "Web modülü bayi erişimini desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
-        continue;
-      }
-      if (job.jobType === "marketing_website_publish") {
-        const publisher = this.options.marketingWebsite;
-        const config = this.options.getSyncConfig();
-        const prepared = publisher && transport.publishMarketingWebsite
-          ? await publisher.prepare(config, clientId) : { ok: false as const, message: "Web modülü pazarlama yayınına hazır değil." };
-        const result = prepared.ok ? await publishDesktopProjection(this.options.database, config, job.jobType,
-          { projection: prepared.projection, sent: prepared.sent },
-          (identity, frozen) => transport.publishMarketingWebsite!({ sourceRevision: identity.sourceRevision,
-            idempotencyKey: identity.idempotencyKey, value: frozen.projection }),
-          { expectedRevision: job.sourceRevision, nextAttemptAt: calculateNextAttempt(job.attemptCount),
-            acknowledge: (sent, receipt) => publisher!.acknowledge(sent.sent, receipt.published_at, this.activeOperationId) }) : prepared;
-        if (!result) continue;
-        if (result.ok && prepared.ok) {
-          this.options.onDashboardChanged(); published += 1;
-        } else {
-          publisher?.fail(prepared.ok ? prepared.sent : "sent" in prepared ? prepared.sent ?? [] : []);
-          const message = result.ok ? "Website revision onayı doğrulanamadı." : result.message;
-          if (!prepared.ok) this.options.database.failSyncJob(job.jobKey, job.sourceRevision, message, calculateNextAttempt(job.attemptCount));
-          errors.push(message);
-        }
-        continue;
-      }
-      const config = this.options.getSyncConfig();
-      const result = job.jobType === "menu_publish"
-        ? await this.publishMenuJob(job)
-        : job.jobType === "online_catalog_publish"
-          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createCommerceOnlineCatalog(),
-              (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }),
-              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
-        : job.jobType === "dealer_access_publish"
-          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createDealerAccessProjection(),
-              (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }),
-              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
-        : await this.publishAndroidSnapshotJob(job);
-      if (!result) continue;
-      if (result.ok) {
-        this.options.database.recordSyncEvent({
-          direction: "push",
-          entityType: job.jobType === "menu_publish" ? "menu"
-            : job.jobType === "online_catalog_publish" ? "online_catalog" : job.jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot",
-          ok: true
-        });
-        published += 1;
-        continue;
-      }
-      const nextAttemptAt = calculateNextAttempt(job.attemptCount);
-      this.logSyncFailure("outbox", result, {
-        jobType: job.jobType,
-        attemptCount: job.attemptCount,
-        nextAttemptAt
-      });
-      this.options.database.recordSyncEvent({
-        direction: "push",
-        entityType: job.jobType === "menu_publish" ? "menu"
-            : job.jobType === "online_catalog_publish" ? "online_catalog" : job.jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot",
-        ok: false,
-        message: result.message,
-        ...(result.status === undefined ? {} : { status: result.status })
-      });
-      errors.push(result.message);
-    }
-    return { published, errors };
   }
 
   private logSyncFailure(
@@ -1109,55 +581,6 @@ export class SyncCoordinator {
     this.options.onStatusChanged(status);
     return status;
   }
-}
-
-/** @compiledSmoke Used via dist-electron by scripts/smoke-sync-timeout.mjs. */
-export function createSyncFetchWithTimeout(fetchImpl: typeof fetch, timeoutMs = SYNC_HTTP_TIMEOUT_MS): typeof fetch {
-  const boundedTimeoutMs = Math.max(1, Math.trunc(timeoutMs));
-  return async (input, init = {}) => {
-    const controller = new AbortController();
-    const upstreamSignal = init.signal;
-    const abortFromUpstream = () => controller.abort();
-    if (upstreamSignal) {
-      if (upstreamSignal.aborted) {
-        controller.abort();
-      } else {
-        upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
-      }
-    }
-    const timeout = setTimeout(() => controller.abort(), boundedTimeoutMs);
-    try {
-      return await fetchImpl(input, { ...init, signal: controller.signal });
-    } finally {
-      clearTimeout(timeout);
-      upstreamSignal?.removeEventListener("abort", abortFromUpstream);
-    }
-  };
-}
-
-function isUsableSyncConfig(config: { baseUrl: string; syncSecret: string }) {
-  return /^https?:\/\//.test(config.baseUrl.trim())
-    && config.syncSecret.trim().length >= 12
-    && config.syncSecret.trim() !== "change-this-secret";
-}
-
-function calculateNextAttempt(attemptCount: number) {
-  return new Date(Date.now() + calculateRetryDelayMs(attemptCount)).toISOString();
-}
-
-function calculateRetryDelayMs(attemptCount: number) {
-  const index = Math.min(Math.max(0, attemptCount), RETRY_DELAYS_SECONDS.length - 1);
-  const seconds = RETRY_DELAYS_SECONDS[index] ?? 5;
-  const jitter = 0.9 + Math.random() * 0.2;
-  return Math.round(seconds * jitter * 1000);
-}
-
-function classifyFailurePhase(result: SyncFailure | undefined): AutomaticSyncPhase {
-  return result && isConnectionFailureMessage(result.message) ? "offline" : "error";
-}
-
-function isConnectionFailureMessage(message: string) {
-  return /ulaşılamadı|internet|bağlantı|zaman aşım/i.test(message);
 }
 
 function buildSuccessMessage(counts: {

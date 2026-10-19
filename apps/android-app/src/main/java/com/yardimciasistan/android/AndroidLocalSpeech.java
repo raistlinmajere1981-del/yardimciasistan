@@ -152,9 +152,11 @@ final class AndroidLocalSpeech {
   View settingsView() {
     LinearLayout card = UiKit.card(activity);
     card.addView(UiKit.text(activity, "Yerel seslendirme", 15, UiKit.TEXT, Typeface.BOLD));
+    // API 26+ native control, styled by UiKit; keep the established native appearance.
+    @android.annotation.SuppressLint("UseSwitchCompatOrMaterialCode")
     Switch toggle = new Switch(activity);
     UiKit.styleSwitch(toggle);
-    toggle.setText("Seslendirme etkin");
+    toggle.setText(R.string.speech_enabled);
     toggle.setChecked(enabled());
     toggle.setEnabled(ready && !voices.isEmpty());
     toggle.setOnCheckedChangeListener((b, value) -> {
@@ -223,11 +225,11 @@ final class AndroidLocalSpeech {
     bar.setContentDescription(label);
     bar.setMax(150);
     bar.setProgress(Math.round((preferences.getFloat(key, 1f) - .5f) * 100));
-    value.setText(label + " · " + String.format(Locale.getDefault(), "%.2f", .5f + bar.getProgress() / 100f));
+    value.setText(activity.getString(R.string.speech_range_value, label, .5f + bar.getProgress() / 100f));
     bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
       @Override public void onProgressChanged(SeekBar b, int progress, boolean user) {
         float next = .5f + progress / 100f;
-        value.setText(label + " · " + String.format(Locale.getDefault(), "%.2f", next));
+        value.setText(activity.getString(R.string.speech_range_value, label, next));
         if (user) { preferences.edit().putFloat(key, next).apply(); stop(); }
       }
       @Override public void onStartTrackingTouch(SeekBar b) {}

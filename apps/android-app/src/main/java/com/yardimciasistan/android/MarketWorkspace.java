@@ -1,47 +1,15 @@
 package com.yardimciasistan.android;
 
-import android.Manifest;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
-import android.text.Editable;
-import android.text.InputType;
-import android.text.TextWatcher;
-import android.view.Gravity;
-import android.view.HapticFeedbackConstants;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Spinner;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.activity.ComponentActivity;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.content.ContextCompat;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.text.NumberFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
+import org.json.JSONObject;
 
 /** Phone-first Market companion surface backed only by projected snapshots/actions. */
 final class MarketWorkspace {
@@ -62,145 +30,78 @@ final class MarketWorkspace {
     void onRenderRequested();
   }
 
-  private interface ProductListener {
-    void onProduct(OperationData.MarketProduct product);
-  }
+  static final String SCREEN_HOME = "home";
+  static final String SCREEN_BARCODE_RESULT = "barcode_result";
+  static final String SCREEN_STOCK = "stock";
+  static final String SCREEN_RECEIVING = "receiving";
+  static final String SCREEN_CART = "cart";
+  static final String SCREEN_SALE = "sale";
+  static final String SCREEN_CREDIT = "credit";
+  static final String SCREEN_PRODUCT_CREATE = "product_create";
+  static final String SCREEN_CASH_BARCODE = "cash_barcode";
 
-  private static final String SCREEN_HOME = "home";
-  private static final String SCREEN_BARCODE_RESULT = "barcode_result";
-  private static final String SCREEN_STOCK = "stock";
-  private static final String SCREEN_RECEIVING = "receiving";
-  private static final String SCREEN_CART = "cart";
-  private static final String SCREEN_SALE = "sale";
-  private static final String SCREEN_CREDIT = "credit";
-  private static final String SCREEN_PRODUCT_CREATE = "product_create";
-  private static final String SCREEN_CASH_BARCODE = "cash_barcode";
-
-  private static final String PURPOSE_LOOKUP = "lookup";
-  private static final String PURPOSE_STOCK = "stock";
-  private static final String PURPOSE_RECEIVING = "receiving";
-  private static final String PURPOSE_CART = "cart";
-  private static final String PURPOSE_PRODUCT_CREATE = "product_create";
-  private static final String PURPOSE_CASH = "cash";
+  static final String PURPOSE_LOOKUP = "lookup";
+  static final String PURPOSE_STOCK = "stock";
+  static final String PURPOSE_RECEIVING = "receiving";
+  static final String PURPOSE_CART = "cart";
+  static final String PURPOSE_PRODUCT_CREATE = "product_create";
+  static final String PURPOSE_CASH = "cash";
 
   private final Context context;
   private final Listener listener;
-  private final ComponentActivity activity;
-  private final ActivityResultLauncher<String> cameraPermissionLauncher;
-  private final MarketUiRules.CartDraft cart = new MarketUiRules.CartDraft();
-  private final MarketUiRules.ReceivingDraft receiving = new MarketUiRules.ReceivingDraft();
-  private final MarketUiRules.BarcodeScanCapture barcodeScanCapture =
-      new MarketUiRules.BarcodeScanCapture(MarketUiRules.BARCODE_DEBOUNCE_MS);
-  private final Map<String, Bitmap> productImagePreviews = new HashMap<>();
-  private final Set<String> productImageRequests = new HashSet<>();
-  private final Set<String> productImageFailures = new HashSet<>();
+  private final MarketFormUi ui;
+  private final MarketSubmissionFeedback feedback;
+  private final MarketBarcodeFlow barcodeFlow;
+  private final MarketProductEditor productEditor;
+  private final MarketCatalogBrowser catalog;
+  private final MarketInventoryFlow inventory;
+  private final MarketCheckoutFlow checkout;
+  private final MarketCreditFlow credit;
 
   private OperationData data = new OperationData();
   private String screen = SCREEN_HOME;
   private String resultReturnScreen = SCREEN_HOME;
   private String barcodeResult = "";
   private String barcodeResultProductId = "";
-  private String stockProductId = "";
-  private String stockCountText = "";
-  private String stockNote = "";
-  private String productCreateBarcode = "";
-  private String productCreateName = "";
-  private String productCreateBrand = "";
-  private String productCreateSku = "";
-  private String productCreateUnit = "piece";
-  private String productCreatePurchasePrice = "";
-  private String productCreateSalePrice = "";
-  private String productCreateCategory = "";
-  private String productCreateNote = "";
-  private String productCreateImageUrl = "";
-  private String productCreateDataSource = "";
-  private String productCreateSourceProductUrl = "";
-  private String productCreateDataLicense = "";
-  private String productCreateImageLicense = "";
-  private String productCreateSourceFetchedAt = "";
-  private boolean productLookupLoading;
-  private String productLookupMessage = "";
-  private Bitmap productCreateImagePreview;
-  private String visibleMessage = "";
-  private boolean visibleMessagePending;
-  private String formError = "";
-  private int localPendingCount;
-  private boolean loading;
-  private String cashBarcodeLast = "";
-  private String cashBarcodeStatus = "Kamera hazır";
-  private TextView cashBarcodeLastView;
-  private TextView cashBarcodeStatusView;
-  private String pendingCameraPurpose = "";
-  private boolean pendingCameraContinuous;
-  private boolean cameraPermissionRequestInFlight;
-  private String salePaymentChoice = "cash";
-  private String saleCustomerId = "";
-  private boolean saleExternalConfirmed;
-  private String creditCustomerId = "";
-  private String creditSearch = "";
-  private String creditCurrency = "";
-  private String creditAmountText = "";
-  private String creditPaymentMethod = "cash";
-  private boolean creditExternalConfirmed;
-  private String lastFinancialActionId = "";
 
   MarketWorkspace(Context context, Listener listener) {
     this.context = context;
     this.listener = listener;
-    this.activity = context instanceof ComponentActivity ? (ComponentActivity) context : null;
-    this.cameraPermissionLauncher = activity == null
-        ? null
-        : activity.registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(),
-            granted -> {
-              cameraPermissionRequestInFlight = false;
-              String purpose = pendingCameraPurpose;
-              boolean continuous = pendingCameraContinuous;
-              pendingCameraPurpose = "";
-              pendingCameraContinuous = false;
-              if (Boolean.TRUE.equals(granted)) {
-                launchCameraScanner(purpose, continuous);
-              } else {
-                Toast.makeText(
-                    context,
-                    "Kamera izni verilmedi. Barkodu elle girebilirsiniz.",
-                    Toast.LENGTH_SHORT
-                ).show();
-                showManualBarcodeEntry(purpose);
-              }
-            }
-        );
+    ui = new MarketFormUi(context, this::handleBack);
+    feedback = new MarketSubmissionFeedback(() -> data, listener, ui);
+    barcodeFlow = new MarketBarcodeFlow(context, ui, new MarketBarcodeFlow.Listener() {
+      @Override public void onBarcode(String barcode, String purpose) { handleBarcode(barcode, purpose); }
+      @Override public boolean onCashBarcode(String barcode, JSONObject payload) { return listener.onBarcodeScan(barcode, payload); }
+    }, () -> openScreen(SCREEN_HOME));
+    catalog = new MarketCatalogBrowser(context, () -> data, listener, ui, this::showBarcodeEntry, this::handleSelectedProduct);
+    productEditor = new MarketProductEditor(context, listener, () -> data, ui, feedback, next -> screen = next);
+    inventory = new MarketInventoryFlow(context, listener, () -> data, ui, feedback, next -> screen = next, catalog);
+    checkout = new MarketCheckoutFlow(context, listener, () -> data, ui, feedback, next -> screen = next, catalog, this::openScreen);
+    credit = new MarketCreditFlow(context, listener, () -> data, ui, feedback);
   }
 
   ScrollView create(OperationData nextData, int nextLocalPendingCount, boolean nextLoading) {
     data = nextData == null ? new OperationData() : nextData;
-    localPendingCount = Math.max(0, nextLocalPendingCount);
-    loading = nextLoading;
+    feedback.update(nextLocalPendingCount, nextLoading);
     enforceVisibleScreen();
-    for (OperationData.ActionRecord action : data.actions) {
-      if (action.id.equals(lastFinancialActionId)) {
-        visibleMessage = MarketUiRules.financialFeedback(action.type, action.status);
-        visibleMessagePending = !"applied".equals(action.status);
-      }
-    }
 
     LinearLayout page;
     if (SCREEN_STOCK.equals(screen)) {
-      page = stockScreen();
+      page = inventory.stockScreen();
     } else if (SCREEN_RECEIVING.equals(screen)) {
-      page = receivingScreen();
+      page = inventory.receivingScreen();
     } else if (SCREEN_CART.equals(screen)) {
-      page = cartScreen();
+      page = checkout.cartScreen();
     } else if (SCREEN_SALE.equals(screen)) {
-      page = saleScreen();
+      page = checkout.saleScreen();
     } else if (SCREEN_CREDIT.equals(screen)) {
-      page = creditScreen();
+      page = credit.creditScreen();
     } else if (SCREEN_PRODUCT_CREATE.equals(screen)) {
-      page = productCreateScreen();
+      page = productEditor.productCreateScreen();
     } else if (SCREEN_BARCODE_RESULT.equals(screen)) {
       page = barcodeResultScreen();
     } else if (SCREEN_CASH_BARCODE.equals(screen)) {
-      page = cashBarcodeScreen();
+      page = barcodeFlow.cashBarcodeScreen();
     } else {
       page = homeScreen();
     }
@@ -211,14 +112,14 @@ final class MarketWorkspace {
     if (SCREEN_HOME.equals(screen)) return false;
     if (SCREEN_SALE.equals(screen)) {
       screen = SCREEN_CART;
-    } else if (SCREEN_CREDIT.equals(screen) && !creditCustomerId.isEmpty()) {
-      creditCustomerId = "";
+    } else if (SCREEN_CREDIT.equals(screen)) {
+      if (!credit.backToList()) screen = SCREEN_HOME;
     } else if (SCREEN_BARCODE_RESULT.equals(screen)) {
       screen = resultReturnScreen;
     } else {
       screen = SCREEN_HOME;
     }
-    formError = "";
+    feedback.formError = "";
     listener.onRenderRequested();
     return true;
   }
@@ -227,80 +128,17 @@ final class MarketWorkspace {
     return screen;
   }
 
-  void onSubmissionAccepted(String actionType, String message, String actionId) {
-    if (!isMarketAction(actionType)) return;
-    visibleMessage = message;
-    visibleMessagePending = MarketUiRules.ACTION_SALE.equals(actionType) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(actionType);
-    lastFinancialActionId = visibleMessagePending ? actionId : "";
+  void onSubmissionAccepted(String type, String message, String id) { feedback.onSubmissionAccepted(type, message, id); }
+  void onSubmissionQueued(String type, String message) { feedback.onSubmissionQueued(type, message); }
+  void onBarcodeScanAccepted(String barcode, String message) { barcodeFlow.onScanFeedback(barcode, message); }
+  void onBarcodeScanQueued(String barcode, String message) { barcodeFlow.onScanFeedback(barcode, message); }
+
+  void onProductLookupCompleted(String barcode, ProductDataLookupClient.Result result, String error) {
+    productEditor.onProductLookupCompleted(barcode, result, error);
   }
-
-  void onSubmissionQueued(String actionType, String message) {
-    if (!isMarketAction(actionType)) return;
-    visibleMessage = message;
-    visibleMessagePending = true;
-    lastFinancialActionId = "";
-  }
-
-  void onBarcodeScanAccepted(String barcode, String message) {
-    if (!barcode.equals(cashBarcodeLast)) return;
-    cashBarcodeStatus = message;
-    updateCashBarcodeViews();
-  }
-
-  void onBarcodeScanQueued(String barcode, String message) {
-    if (!barcode.equals(cashBarcodeLast)) return;
-    cashBarcodeStatus = message;
-    updateCashBarcodeViews();
-  }
-
-  void onProductLookupCompleted(
-      String barcode,
-      ProductDataLookupClient.Result result,
-      String errorMessage
-  ) {
-    if (!barcode.equals(productCreateBarcode)) return;
-    productLookupLoading = false;
-    if (result == null) {
-      productLookupMessage = errorMessage == null || errorMessage.trim().isEmpty()
-          ? "Ürün bilgileri alınamadı."
-          : errorMessage.trim();
-      listener.onRenderRequested();
-      return;
-    }
-    if (!result.found) {
-      productLookupMessage = "Bu barkod ürün veri kaynağında bulunamadı.";
-      listener.onRenderRequested();
-      return;
-    }
-
-    if (productCreateName.trim().isEmpty()) productCreateName = result.name;
-    if (productCreateBrand.trim().isEmpty()) productCreateBrand = result.brand;
-    if (productCreateNote.trim().isEmpty() && !result.quantity.isEmpty()) {
-      productCreateNote = "Ambalaj: " + result.quantity;
-    }
-    productCreateImageUrl = result.imageUrl;
-    productCreateDataSource = result.provider;
-    productCreateSourceProductUrl = result.sourceProductUrl;
-    productCreateDataLicense = result.dataLicense;
-    productCreateImageLicense = result.imageLicense;
-    productCreateSourceFetchedAt = result.fetchedAt;
-    productCreateImagePreview = result.imagePreview;
-    productLookupMessage = result.name + " bilgileri bulundu.";
-    listener.onRenderRequested();
-  }
-
   void onProductImageLoaded(String productId, String imageUrl, Bitmap preview) {
-    String key = productImageKey(productId, imageUrl);
-    productImageRequests.remove(key);
-    if (preview == null) {
-      productImageFailures.add(key);
-    } else {
-      productImageFailures.remove(key);
-      productImagePreviews.put(key, preview);
-    }
-    listener.onRenderRequested();
+    catalog.onProductImageLoaded(productId, imageUrl, preview);
   }
-
 
   private void enforceVisibleScreen() {
     if (!MarketUiRules.canOpenMarket(data)) {
@@ -312,8 +150,8 @@ final class MarketWorkspace {
     if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data) && !MarketUiRules.canCompleteSale(data)) screen = SCREEN_HOME;
     if (SCREEN_SALE.equals(screen) && !MarketUiRules.canCompleteSale(data)) screen = SCREEN_HOME;
     if (!MarketUiRules.canViewCredit(data)) {
-      creditCustomerId = ""; saleCustomerId = ""; creditSearch = "";
-      if ("credit".equals(salePaymentChoice)) salePaymentChoice = "cash";
+      credit.revokeCredit();
+      checkout.revokeCredit();
       if (SCREEN_CREDIT.equals(screen)) screen = SCREEN_HOME;
     }
     if (SCREEN_PRODUCT_CREATE.equals(screen) && !MarketUiRules.canCreateProduct(data)) screen = SCREEN_HOME;
@@ -325,13 +163,13 @@ final class MarketWorkspace {
     LinearLayout page = UiKit.column(context);
     // The application shell already shows the "Satış" title.
     // Avoid repeating the same label in the content area.
-    addPendingState(page);
+    feedback.addPendingState(page);
 
     if (MarketUiRules.canScanToDesktop(data)) {
       Button cashBarcode = UiKit.button(context, "▣  Kasa Barkod Modu", UiKit.PRIMARY,
           view -> openCashBarcodeMode());
       cashBarcode.setContentDescription("Telefonu masaüstü kasası için sürekli barkod okuyucu olarak kullan");
-      cashBarcode.setLayoutParams(fullButtonParams(58, 0, 12));
+      ui.sizeButton(cashBarcode, 58, 0, 12);
       page.addView(cashBarcode);
     }
 
@@ -339,7 +177,7 @@ final class MarketWorkspace {
       Button barcode = UiKit.button(context, "▣  Barkod Tara", UiKit.PRIMARY,
           view -> showBarcodeEntry(PURPOSE_LOOKUP));
       barcode.setContentDescription("Barkod tara veya barkod okuyucudan gir");
-      barcode.setLayoutParams(fullButtonParams(58, 0, 12));
+      ui.sizeButton(barcode, 58, 0, 12);
       page.addView(barcode);
     }
 
@@ -360,8 +198,8 @@ final class MarketWorkspace {
     addActionGrid(page, actions);
 
     if (MarketUiRules.canViewProducts(data)) {
-      Button search = UiKit.outlineButton(context, "Ürün Ara", view -> showProductPicker(PURPOSE_LOOKUP, false));
-      search.setLayoutParams(fullButtonParams(48, actions.isEmpty() ? 0 : 2, 10));
+      Button search = UiKit.outlineButton(context, "Ürün Ara", view -> catalog.showProductPicker(PURPOSE_LOOKUP, false));
+      ui.sizeButton(search, 48, actions.isEmpty() ? 0 : 2, 10);
       page.addView(search);
     }
 
@@ -387,15 +225,15 @@ final class MarketWorkspace {
     for (int index = 0; index < actions.size(); index += 2) {
       LinearLayout row = UiKit.row(context);
       LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-      rowParams.setMargins(0, 0, 0, dp(8));
+      rowParams.setMargins(0, 0, 0, ui.dp(8));
       row.setLayoutParams(rowParams);
       addGridAction(row, actions.get(index));
       if (index + 1 < actions.size()) {
         addGridAction(row, actions.get(index + 1));
       } else {
         View spacer = new View(context);
-        LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
-        spacerParams.setMargins(dp(7), 0, 0, 0);
+        LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, ui.dp(52), 1f);
+        spacerParams.setMargins(ui.dp(7), 0, 0, 0);
         spacer.setLayoutParams(spacerParams);
         row.addView(spacer);
       }
@@ -405,20 +243,12 @@ final class MarketWorkspace {
 
   private void addGridAction(LinearLayout row, ActionItem action) {
     Button button = UiKit.outlineButton(context, action.label, view -> action.action.run());
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(52), 1f);
-    if (row.getChildCount() > 0) params.setMargins(dp(7), 0, 0, 0);
+    button.setMinHeight(ui.dp(52));
+    button.setMinimumHeight(ui.dp(52));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
+    if (row.getChildCount() > 0) params.setMargins(ui.dp(7), 0, 0, 0);
     button.setLayoutParams(params);
     row.addView(button);
-  }
-
-  private void addPendingState(LinearLayout page) {
-    String outboxState = MarketUiRules.pendingStatus(localPendingCount, data.pendingActions);
-    if (!outboxState.isEmpty()) {
-      page.addView(messageCard(outboxState, true));
-    }
-    if (!visibleMessage.isEmpty() && !visibleMessage.equals(outboxState)) {
-      page.addView(messageCard(visibleMessage, visibleMessagePending));
-    }
   }
 
   private void addMarketSummary(LinearLayout page) {
@@ -427,7 +257,7 @@ final class MarketWorkspace {
     ArrayList<View> metrics = new ArrayList<>();
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_SALES)) {
       metrics.add(UiKit.metricCard(context, "Bugünkü satış",
-          summary.todaySaleCount + " · " + money(summary.todaySalesTotal, summary.currency),
+          summary.todaySaleCount + " · " + ui.money(summary.todaySalesTotal, summary.currency),
           UiKit.SUCCESS, null));
     }
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)) {
@@ -450,7 +280,7 @@ final class MarketWorkspace {
         card.addView(UiKit.text(context, adjustment.productName, 14, UiKit.TEXT, Typeface.BOLD));
         card.addView(UiKit.text(
             context,
-            "Gerçek stok: " + quantity(adjustment.quantityAfter) + " · " + shortTime(adjustment.createdAt),
+            "Gerçek stok: " + ui.quantity(adjustment.quantityAfter) + " · " + ui.shortTime(adjustment.createdAt),
             12,
             UiKit.SECONDARY,
             Typeface.NORMAL
@@ -479,8 +309,8 @@ final class MarketWorkspace {
         ));
         card.addView(UiKit.text(
             context,
-            purchase.lineCount + " satır · " + money(purchase.total, purchase.currency)
-                + " · " + shortTime(purchase.receivedAt),
+            purchase.lineCount + " satır · " + ui.money(purchase.total, purchase.currency)
+                + " · " + ui.shortTime(purchase.receivedAt),
             12,
             UiKit.SECONDARY,
             Typeface.NORMAL
@@ -491,159 +321,43 @@ final class MarketWorkspace {
     }
   }
 
-  // Line totals remain compact inside stock receiving and cart forms.
-  private void addMetric(LinearLayout card, int index, String label, String value, int tone) {
-    if (index > 0) card.addView(UiKit.divider(context));
-    LinearLayout row = UiKit.row(context);
-    TextView caption = UiKit.text(context, label, 13, UiKit.SECONDARY, Typeface.NORMAL);
-    row.addView(caption, new LinearLayout.LayoutParams(0, -2, 1f));
-    row.addView(UiKit.text(context, value, 14, tone, Typeface.BOLD));
-    card.addView(row);
-  }
-
-  private LinearLayout cashBarcodeScreen() {
-    LinearLayout page = UiKit.column(context);
-    page.addView(UiKit.eyebrow(context, "KASA BARKOD MODU"));
-    TextView title = UiKit.title(context, "Telefon barkod okuyucu");
-    LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-    titleParams.setMargins(0, dp(3), 0, dp(5));
-    title.setLayoutParams(titleParams);
-    page.addView(title);
-    TextView description = UiKit.text(
-        context,
-        "Kamera barkodu gördüğünde tarama otomatik olarak masaüstü Hızlı Satış ekranına gönderilir.",
-        13,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    );
-    LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
-    descriptionParams.setMargins(0, 0, 0, dp(12));
-    description.setLayoutParams(descriptionParams);
-    page.addView(description);
-
-    LinearLayout statusCard = UiKit.card(context);
-    statusCard.addView(UiKit.text(context, "Son taranan", 11, UiKit.MUTED, Typeface.BOLD));
-    cashBarcodeLastView = UiKit.text(
-        context,
-        cashBarcodeLast.isEmpty() ? "Henüz barkod okutulmadı" : cashBarcodeLast,
-        19,
-        UiKit.TEXT,
-        Typeface.BOLD
-    );
-    statusCard.addView(cashBarcodeLastView);
-    cashBarcodeStatusView = UiKit.text(context, cashBarcodeStatus, 13, UiKit.SUCCESS, Typeface.BOLD);
-    statusCard.addView(cashBarcodeStatusView);
-    page.addView(statusCard);
-
-    Button camera = UiKit.button(context, "Kamerayı Aç", UiKit.PRIMARY,
-        view -> requestCameraScanner(PURPOSE_CASH, true));
-    camera.setLayoutParams(fullButtonParams(52, 12, 8));
-    page.addView(camera);
-
-    Button manual = UiKit.outlineButton(context, "Barkodu Elle Gir",
-        view -> showManualBarcodeEntry(PURPOSE_CASH));
-    manual.setLayoutParams(fullButtonParams(48, 0, 12));
-    page.addView(manual);
-
-    TextView transport = UiKit.text(
-        context,
-        "Tarama otomatik gönderilir; ürün ve ödeme masaüstünde çözülür. Aynı barkod kamerada tutulduğunda tekrar eklenmez; yeniden okutmak için barkodu kadrajdan çıkarıp tekrar gösterin.",
-        11,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    );
-    LinearLayout.LayoutParams transportParams = new LinearLayout.LayoutParams(-1, -2);
-    transportParams.setMargins(0, 0, 0, dp(14));
-    transport.setLayoutParams(transportParams);
-    page.addView(transport);
-
-    Button close = UiKit.outlineButton(context, "Modu Kapat", view -> {
-      screen = SCREEN_HOME;
-      formError = "";
-      listener.onRenderRequested();
-    });
-    close.setLayoutParams(fullButtonParams(50, 0, 0));
-    page.addView(close);
-    return page;
-  }
-
   private void openCashBarcodeMode() {
     screen = SCREEN_CASH_BARCODE;
-    formError = "";
+    feedback.formError = "";
     listener.onRenderRequested();
-    requestCameraScanner(PURPOSE_CASH, true);
-  }
-
-  private void captureCashBarcode(String rawBarcode) {
-    String barcode = MarketUiRules.normalizeBarcodeIdentity(rawBarcode);
-    try {
-      JSONObject payload = barcodeScanCapture.capture(
-          barcode,
-          System.currentTimeMillis(),
-          isoTimestamp()
-      );
-      if (payload == null) {
-        cashBarcodeStatus = "Aynı barkod kısa süre önce okundu.";
-        updateCashBarcodeViews();
-        return;
-      }
-      cashBarcodeLast = payload.optString("barcode", barcode);
-      cashBarcodeStatus = "Gönderiliyor";
-      updateCashBarcodeViews();
-      boolean persisted = listener.onBarcodeScan(cashBarcodeLast, payload);
-      if (!persisted) {
-        cashBarcodeStatus = "Gönderilemedi";
-        updateCashBarcodeViews();
-      }
-    } catch (MarketUiRules.ValidationException error) {
-      cashBarcodeStatus = error.getMessage();
-      updateCashBarcodeViews();
-    }
-  }
-
-  private void updateCashBarcodeViews() {
-    if (cashBarcodeLastView != null) {
-      cashBarcodeLastView.setText(cashBarcodeLast.isEmpty() ? "Henüz barkod okutulmadı" : cashBarcodeLast);
-    }
-    if (cashBarcodeStatusView != null) cashBarcodeStatusView.setText(cashBarcodeStatus);
-  }
-
-  private String isoTimestamp() {
-    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
-    format.setTimeZone(TimeZone.getTimeZone("UTC"));
-    return format.format(new Date());
+    barcodeFlow.requestCameraScanner(PURPOSE_CASH, true);
   }
 
   private LinearLayout barcodeResultScreen() {
     LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Barkod sonucu", barcodeResult);
-    addPendingState(page);
+    ui.addBackHeader(page, "Barkod sonucu", barcodeResult);
+    feedback.addPendingState(page);
     OperationData.MarketProduct product = MarketUiRules.productById(data, barcodeResultProductId);
     if (product == null) {
       LinearLayout unknown = UiKit.card(context);
       unknown.addView(UiKit.text(context, "Barkod kayıtlı değil.", 18, UiKit.TEXT, Typeface.BOLD));
       unknown.addView(UiKit.text(context, "Barkod: " + barcodeResult, 13, UiKit.SECONDARY, Typeface.NORMAL));
       if (MarketUiRules.canCreateProduct(data)) {
-        Button draft = UiKit.button(context, "Yeni Ürün", UiKit.PRIMARY, view -> startProductCreate(barcodeResult));
-        draft.setLayoutParams(fullButtonParams(48, 12, 0));
+        Button draft = UiKit.button(context, "Yeni Ürün", UiKit.PRIMARY, view -> productEditor.startProductCreate(barcodeResult));
+        ui.sizeButton(draft, 48, 12, 0);
         unknown.addView(draft);
       }
       page.addView(unknown);
       if (MarketUiRules.canScanBarcode(data)) {
         Button retry = UiKit.outlineButton(context, "Başka Barkod Tara", view -> showBarcodeEntry(PURPOSE_LOOKUP));
-        retry.setLayoutParams(fullButtonParams(48, 2, 0));
+        ui.sizeButton(retry, 48, 2, 0);
         page.addView(retry);
       }
       return page;
     }
 
-    page.addView(productCard(product, true));
+    page.addView(productCard(product));
     return page;
   }
 
-  private LinearLayout productCard(OperationData.MarketProduct product, boolean withActions) {
+  private LinearLayout productCard(OperationData.MarketProduct product) {
     LinearLayout card = UiKit.card(context);
-    addProductImage(card, product);
+    catalog.addProductImage(card, product);
     card.addView(UiKit.text(context, product.name, 18, UiKit.TEXT, Typeface.BOLD));
     if (!product.barcode.isEmpty()) {
       card.addView(UiKit.text(context, "Barkod: " + product.barcode, 12, UiKit.SECONDARY, Typeface.NORMAL));
@@ -651,7 +365,7 @@ final class MarketWorkspace {
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY) && product.trackInventory) {
       card.addView(UiKit.text(
           context,
-          "Stok: " + quantity(product.currentQuantity) + " " + unitLabel(product.unit),
+          "Stok: " + ui.quantity(product.currentQuantity) + " " + ui.unitLabel(product.unit),
           14,
           UiKit.WARNING,
           Typeface.BOLD
@@ -659,789 +373,43 @@ final class MarketWorkspace {
     }
     card.addView(UiKit.text(
         context,
-        "Fiyat: " + money(product.salePrice, product.currency),
+        "Fiyat: " + ui.money(product.salePrice, product.currency),
         14,
         UiKit.SUCCESS,
         Typeface.BOLD
     ));
-    if (!withActions) return card;
 
     ArrayList<ActionItem> actions = new ArrayList<>();
     if (MarketUiRules.canCreateCartDraft(data) || MarketUiRules.canCompleteSale(data)) {
-      actions.add(new ActionItem("Sepete Ekle", () -> addProductToCart(product)));
+      actions.add(new ActionItem("Sepete Ekle", () -> checkout.addProductToCart(product)));
     }
     if (MarketUiRules.canStockCount(data) && product.trackInventory) {
       actions.add(new ActionItem("Stok Say", () -> {
-        stockProductId = product.id;
+        inventory.selectStock(product);
         openScreen(SCREEN_STOCK);
       }));
     }
     if (MarketUiRules.canReceive(data) && product.trackInventory) {
-      actions.add(new ActionItem("Mal Kabule Ekle", () -> showReceivingLineDialog(product)));
+      actions.add(new ActionItem("Mal Kabule Ekle", () -> inventory.showReceivingLineDialog(product)));
     }
     for (ActionItem action : actions) {
       Button button = UiKit.outlineButton(context, action.label, view -> action.action.run());
-      button.setLayoutParams(fullButtonParams(48, 10, 0));
+      ui.sizeButton(button, 48, 10, 0);
       card.addView(button);
     }
     return card;
   }
 
-  private LinearLayout stockScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Stok Say", "Fiziksel miktarı olduğu gibi kaydedin");
-    addPendingState(page);
-    addFormError(page);
-    addProductSelectionActions(page, PURPOSE_STOCK, true);
-
-    OperationData.MarketProduct product = MarketUiRules.productById(data, stockProductId);
-    if (product == null || !product.trackInventory) {
-      page.addView(UiKit.emptyCard(context, "Ürün seçilmedi", "Barkod okutun veya stok takibine açık bir ürün seçin.", UiKit.MUTED));
-      return page;
-    }
-
-    LinearLayout productInfo = UiKit.card(context);
-    addProductImage(productInfo, product);
-    productInfo.addView(UiKit.text(context, product.name, 17, UiKit.TEXT, Typeface.BOLD));
-    productInfo.addView(UiKit.text(
-        context,
-        "Sistem miktarı: " + quantity(product.currentQuantity) + " " + unitLabel(product.unit),
-        13,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    productInfo.addView(UiKit.text(
-        context,
-        "Gönderimden sonra bu değer tahmini olarak değiştirilmez; yeni snapshot beklenir.",
-        11,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    page.addView(productInfo);
-
-    EditText counted = labeledInput(page, "Fiziksel miktar", "0");
-    counted.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(counted, stockCountText, value -> stockCountText = value);
-    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Raf / sayım notu");
-    bind(note, stockNote, value -> stockNote = value);
-
-    Button save = UiKit.button(context, "Sayımı Kaydet", UiKit.PRIMARY, view -> submitStockCount(product));
-    save.setEnabled(!submissionBlocked());
-    save.setLayoutParams(fullButtonParams(52, 4, 0));
-    page.addView(save);
-    return page;
-  }
-
-  private void submitStockCount(OperationData.MarketProduct product) {
-    try {
-      JSONObject payload = MarketUiRules.stockCountPayload(product, stockCountText, stockNote);
-      boolean queued = listener.onSubmit(
-          MarketUiRules.ACTION_STOCK_COUNT,
-          payload,
-          "Sayım masaüstüne gönderildi. Gerçek stok yeni snapshot ile gösterilecek.",
-          "Sayım gönderim kuyruğuna alındı. Gerçek stok yeni snapshot ile gösterilecek."
-      );
-      if (queued) {
-        stockCountText = "";
-        stockNote = "";
-        formError = "";
-        visibleMessage = "Sayım gönderim kuyruğuna alındı. Gerçek stok yeni snapshot ile gösterilecek.";
-        visibleMessagePending = true;
-        listener.onRenderRequested();
-      }
-    } catch (MarketUiRules.ValidationException error) {
-      showFormError(error.getMessage());
-    }
-  }
-
-  private LinearLayout receivingScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Mal Kabul", "Birden çok ürün satırı hazırlayın");
-    addPendingState(page);
-    addFormError(page);
-
-    addSupplierPicker(page);
-    addProductSelectionActions(page, PURPOSE_RECEIVING, true);
-
-    page.addView(UiKit.sectionTitle(context, "Ürün satırları"));
-    if (receiving.size() == 0) {
-      page.addView(UiKit.emptyCard(context, "Henüz ürün yok", "Barkod okutun veya listeden ürün ekleyin.", UiKit.MUTED));
-    } else {
-      for (MarketUiRules.ReceivingLine line : receiving.lines()) {
-        page.addView(receivingLineCard(line));
-      }
-    }
-
-    LinearLayout totals = UiKit.card(context);
-    addMetric(totals, 0, "Toplam satır", String.valueOf(receiving.size()), UiKit.INFO);
-    addMetric(totals, 1, "Tahmini maliyet", money(receiving.total(), receivingCurrency()), UiKit.SUCCESS);
-    page.addView(totals);
-
-    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Mal kabul notu");
-    bind(note, receiving.note, value -> receiving.note = value);
-
-    Button submit = UiKit.button(context, "Mal Kabulü Gönder", UiKit.PRIMARY, view -> confirmReceiving());
-    submit.setEnabled(receiving.size() > 0 && !submissionBlocked());
-    submit.setLayoutParams(fullButtonParams(52, 4, 0));
-    page.addView(submit);
-    return page;
-  }
-
-  private void addSupplierPicker(LinearLayout page) {
-    if (data.market.suppliers.isEmpty()) return;
-    ArrayList<SupplierChoice> choices = new ArrayList<>();
-    choices.add(new SupplierChoice("", "Tedarikçi seçilmedi"));
-    int selected = 0;
-    for (OperationData.MarketSupplier supplier : data.market.suppliers) {
-      if (!supplier.active) continue;
-      choices.add(new SupplierChoice(supplier.id, supplier.name));
-      if (supplier.id.equals(receiving.supplierId)) selected = choices.size() - 1;
-    }
-    if (choices.size() <= 1) return;
-    addFieldLabel(page, "Tedarikçi (isteğe bağlı)");
-    Spinner spinner = new Spinner(context);
-    ArrayAdapter<SupplierChoice> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, choices);
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spinner.setAdapter(adapter);
-    spinner.setSelection(selected);
-    spinner.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 11));
-    spinner.setLayoutParams(fieldParams(50));
-    spinner.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
-      SupplierChoice choice = (SupplierChoice) spinner.getSelectedItem();
-      receiving.supplierId = choice == null ? "" : choice.id;
-    }));
-    page.addView(spinner);
-  }
-
-  private LinearLayout receivingLineCard(MarketUiRules.ReceivingLine line) {
-    LinearLayout card = UiKit.card(context);
-    card.addView(UiKit.text(context, line.productName, 15, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(
-        context,
-        quantity(line.quantity) + " × " + money(line.unitCost, line.currency)
-            + " = " + money(line.quantity * line.unitCost, line.currency),
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    LinearLayout actions = UiKit.row(context);
-    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-    actionParams.setMargins(0, dp(9), 0, 0);
-    actions.setLayoutParams(actionParams);
-    OperationData.MarketProduct product = MarketUiRules.productById(data, line.productId);
-    Button edit = UiKit.outlineButton(context, "Düzenle", view -> {
-      if (product != null) showReceivingLineDialog(product);
-    });
-    edit.setEnabled(product != null);
-    UiKit.addAction(actions, edit, context);
-    UiKit.addAction(actions, UiKit.dangerButton(context, "Kaldır", view -> {
-      receiving.remove(line.productId);
-      listener.onRenderRequested();
-    }), context);
-    card.addView(actions);
-    return card;
-  }
-
-  private void showReceivingLineDialog(OperationData.MarketProduct product) {
-    if (product == null || !product.trackInventory || !MarketUiRules.canReceive(data)) return;
-    MarketUiRules.ReceivingLine existing = receiving.line(product.id);
-    LinearLayout form = dialogForm();
-    form.addView(UiKit.text(context, product.name, 16, UiKit.TEXT, Typeface.BOLD));
-    EditText quantity = labeledInput(form, "Miktar", "1");
-    quantity.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    quantity.setText(existing == null ? "1" : quantity(existing.quantity));
-    EditText unitCost = labeledInput(form, "Birim alış fiyatı", "0,00");
-    unitCost.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    unitCost.setText(existing == null ? "" : quantity(existing.unitCost));
-    TextView status = statusText();
-    form.addView(status);
-
-    AlertDialog dialog = new AlertDialog.Builder(context)
-        .setTitle(existing == null ? "Mal kabule ekle" : "Satırı düzenle")
-        .setView(wrapDialog(form))
-        .setNegativeButton("Vazgeç", null)
-        .setPositiveButton(existing == null ? "Satır Ekle" : "Kaydet", null)
-        .create();
-    dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-      try {
-        receiving.putProduct(product, value(quantity), value(unitCost));
-        formError = "";
-        screen = SCREEN_RECEIVING;
-        dialog.dismiss();
-        listener.onRenderRequested();
-      } catch (MarketUiRules.ValidationException error) {
-        status.setText(error.getMessage());
-      }
-    }));
-    dialog.show();
-  }
-
-  private void confirmReceiving() {
-    final JSONObject payload;
-    try {
-      payload = receiving.toPayload();
-    } catch (MarketUiRules.ValidationException error) {
-      showFormError(error.getMessage());
-      return;
-    }
-    String supplier = supplierName(receiving.supplierId);
-    String message = receiving.size() + " ürün satırı\n"
-        + "Tahmini maliyet: " + money(receiving.total(), receivingCurrency())
-        + (supplier.isEmpty() ? "" : "\nTedarikçi: " + supplier);
-    new AlertDialog.Builder(context)
-        .setTitle("Mal kabulünü gönder")
-        .setMessage(message)
-        .setNegativeButton("Geri Dön", null)
-        .setPositiveButton("Gönder", (dialog, which) -> {
-          boolean queued = listener.onSubmit(
-              MarketUiRules.ACTION_PURCHASE_RECEIVE,
-              payload,
-              "Mal kabulü masaüstüne gönderildi.",
-              "Mal kabulü gönderim kuyruğuna alındı."
-          );
-          if (queued) {
-            receiving.clear();
-            formError = "";
-            visibleMessage = "Mal kabulü gönderim kuyruğuna alındı.";
-            visibleMessagePending = true;
-            listener.onRenderRequested();
-          }
-        })
-        .show();
-  }
-
-  private LinearLayout cartScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Sepet", "Ürünleri ve miktarları kontrol edin");
-    addPendingState(page);
-    addFormError(page);
-    addProductSelectionActions(page, PURPOSE_CART, false);
-
-    page.addView(UiKit.sectionTitle(context, "Sepet satırları"));
-    if (cart.size() == 0) {
-      page.addView(UiKit.emptyCard(context, "Sepet boş", "Barkod okutun veya ürün seçin. Her okutma miktarı 1 artırır.", UiKit.MUTED));
-    } else {
-      for (MarketUiRules.CartLine line : cart.lines()) {
-        page.addView(cartLineCard(line));
-      }
-    }
-
-    LinearLayout total = UiKit.card(context);
-    addMetric(total, 0, "Toplam ürün", String.valueOf(cart.size()), UiKit.INFO);
-    addMetric(total, 1, "Tahmini toplam", money(cart.estimatedTotal(), cartCurrency()), UiKit.SUCCESS);
-    page.addView(total);
-
-    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Masaüstü için sepet notu");
-    bind(note, cart.note, value -> cart.note = value);
-
-    if (MarketUiRules.canCompleteSale(data)) {
-      Button complete = UiKit.button(context, "Satışı Tamamla", UiKit.PRIMARY, view -> openScreen(SCREEN_SALE));
-      complete.setEnabled(cart.size() > 0 && !submissionBlocked());
-      complete.setLayoutParams(fullButtonParams(54, 4, 8));
-      page.addView(complete);
-    }
-    if (MarketUiRules.canCreateCartDraft(data)) {
-    Button send = UiKit.outlineButton(context, "Masaüstüne Sepet Taslağı Gönder", view -> submitCart());
-    send.setEnabled(cart.size() > 0 && !submissionBlocked());
-    send.setLayoutParams(fullButtonParams(54, 4, 0));
-    page.addView(send);
-    }
-    return page;
-  }
-
-  private LinearLayout cartLineCard(MarketUiRules.CartLine line) {
-    LinearLayout card = UiKit.card(context);
-    LinearLayout header = UiKit.row(context);
-    TextView name = UiKit.text(context, line.productName, 15, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    header.addView(name);
-    header.addView(UiKit.text(
-        context,
-        money(line.quantity * line.unitPrice, line.currency),
-        13,
-        UiKit.SUCCESS,
-        Typeface.BOLD
-    ));
-    card.addView(header);
-    card.addView(UiKit.text(context, money(line.unitPrice, line.currency) + " / " + unitLabel(line.unit), 11, UiKit.MUTED, Typeface.NORMAL));
-
-    LinearLayout controls = UiKit.row(context);
-    LinearLayout.LayoutParams controlsParams = new LinearLayout.LayoutParams(-1, -2);
-    controlsParams.setMargins(0, dp(9), 0, 0);
-    controls.setLayoutParams(controlsParams);
-    Button minus = UiKit.outlineButton(context, "−", view -> {
-      cart.changeQuantity(line.productId, -1);
-      listener.onRenderRequested();
-    });
-    minus.setContentDescription(line.productName + " miktarını azalt");
-    UiKit.addAction(controls, minus, context);
-    TextView amount = UiKit.text(context, quantity(line.quantity), 16, UiKit.TEXT, Typeface.BOLD);
-    amount.setGravity(Gravity.CENTER);
-    amount.setLayoutParams(new LinearLayout.LayoutParams(0, dp(48), 1f));
-    controls.addView(amount);
-    amount.setOnClickListener(view -> {
-      LinearLayout form = UiKit.column(context);
-      EditText entered = labeledInput(form, "Miktar", quantity(line.quantity));
-      entered.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-      entered.setText(java.math.BigDecimal.valueOf(line.quantity).stripTrailingZeros().toPlainString().replace('.', ','));
-      AlertDialog dialog = new AlertDialog.Builder(context).setTitle(line.productName).setView(form)
-          .setNegativeButton("Vazgeç", null).setPositiveButton("Uygula", null).create();
-      dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button -> {
-        try {
-          double requested = Double.parseDouble(value(entered).replace(',', '.'));
-          if (!Double.isFinite(requested) || requested <= 0 || requested > 1000000) throw new NumberFormatException();
-          cart.changeQuantity(line.productId, requested - line.quantity); dialog.dismiss(); listener.onRenderRequested();
-        } catch (NumberFormatException error) { entered.setError("Pozitif miktar girin."); }
-      }));
-      dialog.show();
-    });
-    amount.setContentDescription(line.productName + " miktarını düzenle");
-    Button plus = UiKit.outlineButton(context, "+", view -> {
-      cart.changeQuantity(line.productId, 1);
-      listener.onRenderRequested();
-    });
-    plus.setContentDescription(line.productName + " miktarını artır");
-    UiKit.addAction(controls, plus, context);
-    Button remove = UiKit.dangerButton(context, "Sil", view -> {
-      cart.remove(line.productId);
-      listener.onRenderRequested();
-    });
-    UiKit.addAction(controls, remove, context);
-    card.addView(controls);
-    return card;
-  }
-
-  private void addProductToCart(OperationData.MarketProduct product) {
-    try {
-      cart.addProduct(product);
-      screen = SCREEN_CART;
-      formError = "";
-      visibleMessage = product.name + " sepete eklendi.";
-      visibleMessagePending = false;
-      listener.onRenderRequested();
-    } catch (MarketUiRules.ValidationException error) {
-      showFormError(error.getMessage());
-    }
-  }
-
-  private void submitCart() {
-    try {
-      JSONObject payload = cart.toPayload();
-      boolean queued = listener.onSubmit(
-          MarketUiRules.ACTION_CART_DRAFT_CREATE,
-          payload,
-          "Sepet masaüstü için hazırlandı.",
-          "Sepet gönderim kuyruğuna alındı."
-      );
-      if (queued) {
-        cart.clear();
-        formError = "";
-        visibleMessage = "Sepet gönderim kuyruğuna alındı.";
-        visibleMessagePending = true;
-        listener.onRenderRequested();
-      }
-    } catch (MarketUiRules.ValidationException error) {
-      showFormError(error.getMessage());
-    }
-  }
-
-  private LinearLayout saleScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Satışı Tamamla", "Son kayıt masaüstünde doğrulanır. Telefon ödeme almaz.");
-    addPendingState(page); addFormError(page);
-    page.addView(UiKit.text(context, money(cart.estimatedTotal(), cartCurrency()) + " · " + cart.size() + " ürün", 18, UiKit.TEXT, Typeface.BOLD));
-    for (MarketUiRules.CartLine line : cart.lines()) {
-      page.addView(UiKit.text(context, line.productName + " · " + quantity(line.quantity) + " × " + money(line.unitPrice, line.currency), 16, UiKit.SECONDARY, Typeface.NORMAL));
-    }
-    String[] methods = MarketUiRules.canViewCredit(data) ? new String[]{"cash", "card", "bank", "other", "credit"} : new String[]{"cash", "card", "bank", "other"};
-    addPaymentPicker(page, salePaymentChoice, methods, choice -> {
-      if (!choice.equals(salePaymentChoice)) { salePaymentChoice = choice; saleExternalConfirmed = false; listener.onRenderRequested(); }
-    });
-    if ("credit".equals(salePaymentChoice)) {
-      ArrayList<String> labels = new ArrayList<>(); labels.add("Müşteri seçin");
-      int selected = 0;
-      for (OperationData.CustomerCreditAccount account : data.market.customerCreditAccounts) {
-        labels.add(account.fullName); if (account.customerId.equals(saleCustomerId)) selected = labels.size() - 1;
-      }
-      addChoicePicker(page, "Veresiye müşterisi", labels.toArray(new String[0]), selected, position -> {
-        String id = position == 0 ? "" : data.market.customerCreditAccounts.get(position - 1).customerId;
-        if (!id.equals(saleCustomerId)) { saleCustomerId = id; listener.onRenderRequested(); }
-      });
-      OperationData.CustomerCreditAccount account = MarketUiRules.creditAccount(data, saleCustomerId);
-      if (account != null) for (OperationData.CreditBalance balance : account.balances) page.addView(UiKit.text(context, "Mevcut borç: " + money(balance.amountMinor / 100.0, balance.currency), 16, UiKit.SECONDARY, Typeface.NORMAL));
-    } else if ("card".equals(salePaymentChoice)) {
-      addExternalConfirmation(page, saleExternalConfirmed, checked -> saleExternalConfirmed = checked);
-    }
-    Button complete = UiKit.button(context, "Satışı Onayla ve Gönder", UiKit.PRIMARY, view -> {
-      try {
-        JSONObject payload = cart.toSalePayload(data, "credit".equals(salePaymentChoice) ? "credit" : "paid", saleCustomerId, salePaymentChoice, saleExternalConfirmed);
-        String detail = money(cart.estimatedTotal(), cartCurrency()) + " · " + paymentLabel(salePaymentChoice);
-        if ("credit".equals(salePaymentChoice)) detail += " · " + MarketUiRules.creditAccount(data, saleCustomerId).fullName + " hesabına borç";
-        confirmFinancial("Satış kaydı", detail, () -> {
-          if (listener.onSubmit(MarketUiRules.ACTION_SALE, payload, "Masaüstünde onay bekliyor", "Masaüstünde onay bekliyor · işlem telefonda kuyrukta")) {
-            cart.clear(); saleCustomerId = ""; salePaymentChoice = "cash"; saleExternalConfirmed = false;
-            lastFinancialActionId = ""; visibleMessage = "Masaüstünde onay bekliyor"; visibleMessagePending = true; openScreen(SCREEN_HOME);
-          }
-        });
-      } catch (MarketUiRules.ValidationException error) { showFormError(error.getMessage()); }
-    });
-    complete.setEnabled(cart.size() > 0 && !submissionBlocked()); complete.setLayoutParams(fullButtonParams(54, 8, 0)); page.addView(complete);
-    return page;
-  }
-
-  private LinearLayout creditScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Veresiye / Cari", "Son yetkili snapshot · güncel borcu masaüstü doğrular");
-    addPendingState(page); addFormError(page);
-    OperationData.CustomerCreditAccount account = MarketUiRules.creditAccount(data, creditCustomerId);
-    if (account == null) {
-      EditText search = labeledInput(page, "Müşteri ara", "Müşteri adı");
-      bind(search, creditSearch, value -> creditSearch = value);
-      LinearLayout rows = UiKit.column(context); page.addView(rows);
-      Runnable populate = () -> {
-        rows.removeAllViews();
-        for (OperationData.CustomerCreditAccount item : data.market.customerCreditAccounts) {
-          if (!item.fullName.toLowerCase(new Locale("tr", "TR")).contains(creditSearch.toLowerCase(new Locale("tr", "TR")))) continue;
-          Button open = UiKit.outlineButton(context, item.fullName, view -> {
-            creditCustomerId = item.customerId; creditCurrency = ""; creditAmountText = ""; creditExternalConfirmed = false; listener.onRenderRequested();
-          });
-          open.setLayoutParams(fullButtonParams(54, 0, 8)); rows.addView(open);
-        }
-        if (rows.getChildCount() == 0) rows.addView(UiKit.emptyCard(context, "Müşteri bulunamadı", "Yetkili müşteri listesini yenileyin.", UiKit.MUTED));
-      };
-      search.addTextChangedListener(new TextWatcher() {
-        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-        @Override public void onTextChanged(CharSequence s, int start, int before, int count) { creditSearch = s.toString(); populate.run(); }
-        @Override public void afterTextChanged(Editable e) {}
-      });
-      populate.run(); return page;
-    }
-    Button customers = UiKit.outlineButton(context, "Müşteri Listesine Dön", view -> { creditCustomerId = ""; listener.onRenderRequested(); });
-    customers.setLayoutParams(fullButtonParams(48, 0, 8)); page.addView(customers);
-    page.addView(UiKit.text(context, account.fullName, 20, UiKit.TEXT, Typeface.BOLD));
-    ArrayList<OperationData.CreditBalance> debts = new ArrayList<>();
-    for (OperationData.CreditBalance balance : account.balances) {
-      page.addView(UiKit.text(context, "Borç: " + money(balance.amountMinor / 100.0, balance.currency), 18, UiKit.TEXT, Typeface.BOLD));
-      if (balance.amountMinor > 0) debts.add(balance);
-    }
-    if (account.balances.isEmpty()) page.addView(UiKit.text(context, "Açık borç yok", 16, UiKit.SECONDARY, Typeface.NORMAL));
-    page.addView(UiKit.sectionTitle(context, "Son hareketler"));
-    for (OperationData.CreditMovement entry : account.entries) {
-      String kind = "payment".equals(entry.entryType) ? "Tahsilat" : "credit_sale".equals(entry.entryType) ? "Veresiye satış" : "Düzeltme";
-      page.addView(UiKit.text(context, shortTime(entry.occurredAt) + " · " + kind + " · " + ("debit".equals(entry.direction) ? "+" : "−")
-          + money(entry.amountMinor / 100.0, entry.currency), 16, UiKit.SECONDARY, Typeface.NORMAL));
-    }
-    if (!MarketUiRules.canPayCredit(data) || debts.isEmpty()) return page;
-    int selected = 0; String[] currencies = new String[debts.size()];
-    for (int i = 0; i < debts.size(); i++) { currencies[i] = debts.get(i).currency; if (currencies[i].equals(creditCurrency)) selected = i; }
-    creditCurrency = currencies[selected];
-    addChoicePicker(page, "Tahsilat para birimi", currencies, selected, position -> creditCurrency = currencies[position]);
-    EditText amount = labeledInput(page, "Tahsilat tutarı", "0,00");
-    amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(amount, creditAmountText, value -> creditAmountText = value);
-    addPaymentPicker(page, creditPaymentMethod, new String[]{"cash", "card", "bank", "other"}, choice -> {
-      if (!choice.equals(creditPaymentMethod)) { creditPaymentMethod = choice; creditExternalConfirmed = false; listener.onRenderRequested(); }
-    });
-    if ("card".equals(creditPaymentMethod)) addExternalConfirmation(page, creditExternalConfirmed, checked -> creditExternalConfirmed = checked);
-    Button pay = UiKit.button(context, "Tahsilatı Kaydet", UiKit.PRIMARY, view -> {
-      try {
-        JSONObject payload = MarketUiRules.creditPaymentPayload(data, creditCustomerId, creditCurrency, creditAmountText, creditPaymentMethod, creditExternalConfirmed);
-        confirmFinancial("Alınmış tahsilatı kaydet", account.fullName + " · " + money(payload.optLong("amount_minor") / 100.0, creditCurrency) + " · " + paymentLabel(creditPaymentMethod), () -> {
-          if (listener.onSubmit(MarketUiRules.ACTION_CREDIT_PAYMENT, payload, "Masaüstünde onay bekliyor", "Masaüstünde onay bekliyor · tahsilat telefonda kuyrukta")) {
-            creditAmountText = ""; creditExternalConfirmed = false; lastFinancialActionId = ""; visibleMessage = "Masaüstünde onay bekliyor"; visibleMessagePending = true; listener.onRenderRequested();
-          }
-        });
-      } catch (MarketUiRules.ValidationException error) { showFormError(error.getMessage()); }
-    });
-    pay.setEnabled(!submissionBlocked()); pay.setLayoutParams(fullButtonParams(54, 8, 0)); page.addView(pay);
-    return page;
-  }
-
-  private void confirmFinancial(String title, String detail, Runnable submit) {
-    new AlertDialog.Builder(context).setTitle(title).setMessage(detail + "\n\nMasaüstü fiyat, stok ve yetkiyi doğrulamadan kayıt tamamlanmaz.")
-        .setNegativeButton("Vazgeç", null).setPositiveButton("Onayla", (dialog, which) -> { if (!submissionBlocked()) submit.run(); }).show();
-  }
-
-  private void addChoicePicker(LinearLayout page, String label, String[] labels, int selected, PositionListener changed) {
-    addFieldLabel(page, label); Spinner picker = new Spinner(context);
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, labels);
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); picker.setAdapter(adapter); picker.setSelection(selected);
-    picker.setContentDescription(label); picker.setLayoutParams(fieldParams(50));
-    picker.setOnItemSelectedListener(new SimpleItemSelectedListener(changed)); page.addView(picker);
-  }
-
-  private void addPaymentPicker(LinearLayout page, String selectedMethod, String[] methods, ValueListener changed) {
-    String[] labels = new String[methods.length]; int selected = 0;
-    for (int i = 0; i < methods.length; i++) { labels[i] = paymentLabel(methods[i]); if (methods[i].equals(selectedMethod)) selected = i; }
-    addChoicePicker(page, "Ödeme türü", labels, selected, position -> changed.onValue(methods[position]));
-  }
-
-  private String paymentLabel(String method) {
-    if ("card".equals(method)) return "Kart (harici POS)";
-    if ("bank".equals(method)) return "Havale";
-    if ("other".equals(method)) return "Diğer";
-    if ("credit".equals(method)) return "Veresiye";
-    return "Nakit";
-  }
-
-  private interface CheckedListener { void onChecked(boolean checked); }
-  private void addExternalConfirmation(LinearLayout page, boolean checked, CheckedListener changed) {
-    CheckBox confirmation = new CheckBox(context); confirmation.setText("Kart ödemesi harici POS'ta gerçekleşti; yalnız kaydını gönderiyorum.");
-    confirmation.setTextSize(16); confirmation.setMinHeight(dp(48)); confirmation.setChecked(checked);
-    confirmation.setOnCheckedChangeListener((button, value) -> changed.onChecked(value)); page.addView(confirmation);
-  }
-
-  private LinearLayout productCreateScreen() {
-    LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Yeni Ürün", "Ürün bilgileri doğrudan kataloğa kaydedilir.");
-    addPendingState(page);
-    addFormError(page);
-
-    EditText barcode = labeledInput(page, "Barkod", "");
-    barcode.setText(productCreateBarcode);
-    barcode.setEnabled(false);
-
-    if (MarketUiRules.canLookupProductData(data)) {
-      Button lookup = UiKit.outlineButton(
-          context,
-          productLookupLoading ? "Ürün Bilgileri Aranıyor…" : "Ürün Bilgilerini Ara",
-          view -> requestProductLookup()
-      );
-      lookup.setEnabled(!productLookupLoading);
-      lookup.setLayoutParams(fullButtonParams(48, 0, 8));
-      page.addView(lookup);
-      if (!productLookupMessage.isEmpty()) {
-        page.addView(UiKit.text(
-            context,
-            productLookupMessage,
-            12,
-            productLookupMessage.contains("bulunamadı") || productLookupMessage.contains("alınamadı")
-                ? UiKit.WARNING
-                : UiKit.SUCCESS,
-            Typeface.NORMAL
-        ));
-      }
-    }
-
-    if (productCreateImagePreview != null) {
-      ImageView preview = productImageView(productCreateImagePreview, 180);
-      LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, dp(180));
-      previewParams.setMargins(0, dp(4), 0, dp(10));
-      preview.setLayoutParams(previewParams);
-      page.addView(preview);
-    }
-
-    CatalogProductCreateFields.name(page, productCreateName, value -> productCreateName = value);
-    EditText brand = labeledInput(page, "Marka (isteğe bağlı)", "");
-    bind(brand, productCreateBrand, value -> productCreateBrand = value);
-    EditText sku = labeledInput(page, "SKU (isteğe bağlı)", "");
-    bind(sku, productCreateSku, value -> productCreateSku = value);
-
-    CatalogProductCreateFields.unit(page, productCreateUnit, value -> productCreateUnit = value);
-
-    EditText purchase = labeledInput(page, "Alış fiyatı (isteğe bağlı)", "0,00");
-    purchase.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(purchase, productCreatePurchasePrice, value -> productCreatePurchasePrice = value);
-    CatalogProductCreateFields.salePrice(page, productCreateSalePrice, value -> productCreateSalePrice = value);
-    EditText category = labeledInput(page, "Kategori (isteğe bağlı)", "");
-    bind(category, productCreateCategory, value -> productCreateCategory = value);
-    EditText note = labeledMultiline(page, "Not", "Ürün açıklaması / not");
-    bind(note, productCreateNote, value -> productCreateNote = value);
-
-    Button submit = UiKit.button(context, "Ürünü Kaydet", UiKit.PRIMARY, view -> submitProductCreate());
-    // Product creation is already outbox-safe. Another pending Market action must
-    // not lock this form; only wait for the active product-data lookup to finish.
-    submit.setEnabled(!productLookupLoading);
-    submit.setLayoutParams(fullButtonParams(54, 4, 0));
-    page.addView(submit);
-    return page;
-  }
-
-  private void submitProductCreate() {
-    try {
-      JSONObject payload = MarketUiRules.productCreatePayload(
-          productCreateBarcode,
-          productCreateName,
-          productCreateSku,
-          productCreateUnit,
-          productCreatePurchasePrice,
-          productCreateSalePrice,
-          productCreateCategory,
-          productCreateNote
-      );
-      payload.put(
-          "track_inventory",
-          data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
-      );
-      payload.put("brand", productCreateBrand);
-      payload.put("image_source_url", productCreateImageUrl);
-      payload.put("data_source", productCreateDataSource);
-      payload.put("source_product_url", productCreateSourceProductUrl);
-      payload.put("data_license", productCreateDataLicense);
-      payload.put("image_license", productCreateImageLicense);
-      payload.put("source_fetched_at", productCreateSourceFetchedAt);
-      boolean queued = listener.onSubmit(
-          MarketUiRules.ACTION_PRODUCT_CREATE,
-          payload,
-          "Ürün kaydı gönderildi; masaüstünde otomatik olarak kataloğa işlenecek.",
-          "Ürün kaydı gönderim kuyruğuna alındı."
-      );
-      if (queued) {
-        clearProductCreate();
-        screen = SCREEN_HOME;
-        formError = "";
-        visibleMessage = "Ürün kaydı gönderim kuyruğuna alındı.";
-        visibleMessagePending = true;
-        listener.onRenderRequested();
-      }
-    } catch (MarketUiRules.ValidationException error) {
-      showFormError(error.getMessage());
-    } catch (JSONException error) {
-      showFormError("Ürün kaydı hazırlanamadı.");
-    }
-  }
-
-  private void clearProductCreate() {
-    productCreateBarcode = "";
-    productCreateName = "";
-    productCreateBrand = "";
-    productCreateSku = "";
-    productCreateUnit = "piece";
-    productCreatePurchasePrice = "";
-    productCreateSalePrice = "";
-    productCreateCategory = "";
-    productCreateNote = "";
-    productCreateImageUrl = "";
-    productCreateDataSource = "";
-    productCreateSourceProductUrl = "";
-    productCreateDataLicense = "";
-    productCreateImageLicense = "";
-    productCreateSourceFetchedAt = "";
-    productLookupLoading = false;
-    productLookupMessage = "";
-    productCreateImagePreview = null;
-  }
-
-  private void addProductSelectionActions(LinearLayout page, String purpose, boolean inventoryOnly) {
-    LinearLayout row = UiKit.row(context);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, 0, 0, dp(10));
-    row.setLayoutParams(params);
-    if (MarketUiRules.canScanBarcode(data)) {
-      UiKit.addAction(row, UiKit.button(context, "Barkod Tara", UiKit.PRIMARY,
-          view -> showBarcodeEntry(purpose)), context);
-    }
-    UiKit.addAction(row, UiKit.outlineButton(context, "Ürün Seç",
-        view -> showProductPicker(purpose, inventoryOnly)), context);
-    page.addView(row);
-  }
-
   private void showBarcodeEntry(String purpose) {
     boolean directCreate = PURPOSE_PRODUCT_CREATE.equals(purpose);
     if (!directCreate && !MarketUiRules.canScanBarcode(data)) return;
-    requestCameraScanner(purpose, false);
-  }
-
-  private void requestCameraScanner(String purpose, boolean continuous) {
-    if (activity == null || cameraPermissionLauncher == null) {
-      showManualBarcodeEntry(purpose);
-      return;
-    }
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-        == PackageManager.PERMISSION_GRANTED) {
-      launchCameraScanner(purpose, continuous);
-      return;
-    }
-    if (cameraPermissionRequestInFlight) return;
-    pendingCameraPurpose = purpose;
-    pendingCameraContinuous = continuous;
-    cameraPermissionRequestInFlight = true;
-    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
-  }
-
-  private void launchCameraScanner(String purpose, boolean continuous) {
-    if (activity == null || purpose == null || purpose.isEmpty()) return;
-    String title = PURPOSE_CASH.equals(purpose)
-        ? "Kasa Barkod Okuyucu"
-        : PURPOSE_PRODUCT_CREATE.equals(purpose)
-          ? "Yeni ürün barkodu"
-          : "Barkod Tara";
-    BarcodeCameraScanner.show(activity, title, continuous, new BarcodeCameraScanner.Listener() {
-      @Override
-      public void onBarcode(String barcode) {
-        handleBarcode(barcode, purpose);
-      }
-
-      @Override
-      public void onManualEntry() {
-        showManualBarcodeEntry(purpose);
-      }
-
-      @Override
-      public void onError(String message) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-      }
-    });
-  }
-
-  private void showManualBarcodeEntry(String purpose) {
-    boolean directCreate = PURPOSE_PRODUCT_CREATE.equals(purpose);
-    boolean cashMode = PURPOSE_CASH.equals(purpose);
-    LinearLayout form = dialogForm();
-    TextView help = UiKit.text(
-        context,
-        cashMode
-            ? "Kamera yerine barkodu elle girip masaüstüne gönderebilirsiniz."
-            : directCreate
-              ? "Yeni ürünün barkodunu elle girin."
-              : "Barkodu elle girin.",
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    );
-    form.addView(help);
-    EditText barcode = labeledInput(form, "Barkod", "Barkodu girin");
-    barcode.setInputType(InputType.TYPE_CLASS_TEXT);
-    barcode.addTextChangedListener(watcher(value -> {
-      String normalized = MarketUiRules.normalizeBarcodeIdentity(value);
-      if (!normalized.equals(value)) {
-        barcode.setText(normalized);
-        barcode.setSelection(normalized.length());
-      }
-    }));
-    TextView status = statusText();
-    form.addView(status);
-    AlertDialog dialog = new AlertDialog.Builder(context)
-        .setTitle(cashMode ? "Kasa barkodu" : directCreate ? "Yeni ürün barkodu" : "Barkod Gir")
-        .setView(form)
-        .setNegativeButton("Vazgeç", null)
-        .setPositiveButton(cashMode ? "Gönder" : directCreate ? "Devam Et" : "Bul", null)
-        .create();
-    dialog.setOnShowListener(ignored -> {
-      Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-      Runnable submit = () -> {
-        String raw = MarketUiRules.normalizeBarcodeIdentity(value(barcode));
-        if (raw.length() < 3) {
-          status.setText("Geçerli bir barkod girin.");
-          return;
-        }
-        dialog.dismiss();
-        handleBarcode(raw, purpose);
-      };
-      positive.setOnClickListener(view -> submit.run());
-      barcode.setOnEditorActionListener((view, actionId, event) -> {
-        submit.run();
-        return true;
-      });
-      barcode.requestFocus();
-    });
-    dialog.show();
+    barcodeFlow.requestCameraScanner(purpose, false);
   }
 
   private void handleBarcode(String rawBarcode, String purpose) {
     String barcode = MarketUiRules.normalizeBarcodeIdentity(rawBarcode);
     if (PURPOSE_CASH.equals(purpose)) {
-      captureCashBarcode(barcode);
+      barcodeFlow.captureCashBarcode(barcode);
       return;
     }
     if (PURPOSE_PRODUCT_CREATE.equals(purpose)) {
@@ -1450,14 +418,14 @@ final class MarketWorkspace {
         resultReturnScreen = SCREEN_HOME;
         barcodeResult = existingProduct.barcode;
         barcodeResultProductId = existingProduct.id;
-        visibleMessage = "Bu barkod zaten " + existingProduct.name + " ürününe ait.";
-        visibleMessagePending = false;
+        feedback.visibleMessage = "Bu barkod zaten " + existingProduct.name + " ürününe ait.";
+        feedback.visibleMessagePending = false;
         screen = SCREEN_BARCODE_RESULT;
-        formError = "";
+        feedback.formError = "";
         listener.onRenderRequested();
         return;
       }
-      startProductCreate(barcode);
+      productEditor.startProductCreate(barcode);
       return;
     }
     OperationData.MarketProduct product = MarketUiRules.resolveBarcode(data, barcode);
@@ -1466,7 +434,7 @@ final class MarketWorkspace {
       barcodeResult = barcode;
       barcodeResultProductId = "";
       screen = SCREEN_BARCODE_RESULT;
-      formError = "";
+      feedback.formError = "";
       listener.onRenderRequested();
       return;
     }
@@ -1475,359 +443,29 @@ final class MarketWorkspace {
 
   private void handleSelectedProduct(OperationData.MarketProduct product, String purpose) {
     if (PURPOSE_STOCK.equals(purpose)) {
-      stockProductId = product.id;
+      inventory.selectStock(product);
       screen = SCREEN_STOCK;
-      formError = "";
+      feedback.formError = "";
       listener.onRenderRequested();
     } else if (PURPOSE_RECEIVING.equals(purpose)) {
       screen = SCREEN_RECEIVING;
-      showReceivingLineDialog(product);
+      inventory.showReceivingLineDialog(product);
     } else if (PURPOSE_CART.equals(purpose)) {
-      addProductToCart(product);
+      checkout.addProductToCart(product);
     } else {
       resultReturnScreen = screen;
       barcodeResult = product.barcode;
       barcodeResultProductId = product.id;
       screen = SCREEN_BARCODE_RESULT;
-      formError = "";
+      feedback.formError = "";
       listener.onRenderRequested();
     }
   }
 
-  private void showProductPicker(String purpose, boolean inventoryOnly) {
-    if (!MarketUiRules.canViewProducts(data)) return;
-    LinearLayout form = dialogForm();
-    EditText search = labeledInput(form, "Ürün ara", "Ad, SKU veya barkod");
-    LinearLayout results = UiKit.column(context);
-    form.addView(results);
-    ScrollView scroll = wrapDialog(form);
-    AlertDialog dialog = new AlertDialog.Builder(context)
-        .setTitle("Ürün Seç")
-        .setView(scroll)
-        .setNegativeButton("Kapat", null)
-        .create();
-    Runnable refresh = () -> {
-      results.removeAllViews();
-      int shown = 0;
-      for (OperationData.MarketProduct product : MarketUiRules.searchProducts(data, value(search))) {
-        if (inventoryOnly && !product.trackInventory) continue;
-        Button choice = UiKit.outlineButton(
-            context,
-            product.name + productMeta(product),
-            view -> {
-              dialog.dismiss();
-              handleSelectedProduct(product, purpose);
-            }
-        );
-        choice.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        LinearLayout resultRow = UiKit.row(context);
-        Bitmap cached = productImagePreviews.get(productImageKey(product.id, product.imageSourceUrl));
-        if (cached != null) {
-          ImageView preview = productImageView(cached, 58);
-          LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(58), dp(58));
-          imageParams.setMargins(0, 0, dp(8), 0);
-          resultRow.addView(preview, imageParams);
-        } else {
-          TextView placeholder = UiKit.text(context, "Görsel\nyok", 10, UiKit.MUTED, Typeface.NORMAL);
-          placeholder.setGravity(Gravity.CENTER);
-          placeholder.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 10));
-          LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(58), dp(58));
-          imageParams.setMargins(0, 0, dp(8), 0);
-          resultRow.addView(placeholder, imageParams);
-        }
-        resultRow.addView(choice, new LinearLayout.LayoutParams(0, dp(62), 1f));
-        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-        rowParams.setMargins(0, 0, 0, dp(7));
-        results.addView(resultRow, rowParams);
-        shown += 1;
-        if (shown >= 40) break;
-      }
-      if (shown == 0) {
-        results.addView(UiKit.text(
-            context,
-            inventoryOnly ? "Stok takibine açık eşleşen ürün yok." : "Eşleşen ürün yok.",
-            13,
-            UiKit.MUTED,
-            Typeface.NORMAL
-        ));
-      }
-    };
-    search.addTextChangedListener(watcher(value -> refresh.run()));
-    dialog.setOnShowListener(ignored -> refresh.run());
-    dialog.show();
-  }
-
-  private String productMeta(OperationData.MarketProduct product) {
-    String barcode = product.barcode.isEmpty() ? "" : " · " + product.barcode;
-    return "\n" + money(product.salePrice, product.currency) + barcode;
-  }
-
-  private void startProductCreate(String barcode) {
-    if (!MarketUiRules.canCreateProduct(data)) return;
-    clearProductCreate();
-    productCreateBarcode = MarketUiRules.normalizeBarcodeIdentity(barcode);
-    screen = SCREEN_PRODUCT_CREATE;
-    formError = "";
-    listener.onRenderRequested();
-    if (MarketUiRules.canLookupProductData(data) && data.market.productData.autoSearchUnknownBarcode) {
-      requestProductLookup();
-    }
-  }
-
-  private void requestProductLookup() {
-    if (!MarketUiRules.canCreateProduct(data)
-        || !MarketUiRules.canLookupProductData(data)
-        || productCreateBarcode.isEmpty()
-        || productLookupLoading) {
-      return;
-    }
-    productLookupLoading = true;
-    productLookupMessage = "Ürün bilgileri aranıyor…";
-    listener.onRenderRequested();
-    listener.onProductLookupRequested(
-        data.market.productData.provider,
-        productCreateBarcode,
-        data.market.productData.includeImages
-    );
-  }
-
   private void openScreen(String next) {
     screen = next;
-    formError = "";
+    feedback.formError = "";
     listener.onRenderRequested();
-  }
-
-  private void addBackHeader(LinearLayout page, String title, String subtitle) {
-    Button back = UiKit.outlineButton(context, "← Satış", view -> handleBack());
-    back.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-    LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(-1, dp(44));
-    backParams.setMargins(0, 0, 0, dp(10));
-    back.setLayoutParams(backParams);
-    page.addView(back);
-    page.addView(UiKit.title(context, title));
-    if (!subtitle.isEmpty()) {
-      TextView description = UiKit.text(context, subtitle, 12, UiKit.SECONDARY, Typeface.NORMAL);
-      LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
-      descriptionParams.setMargins(0, dp(2), 0, dp(12));
-      description.setLayoutParams(descriptionParams);
-      page.addView(description);
-    }
-  }
-
-  private String productImageKey(String productId, String imageUrl) {
-    return (productId == null ? "" : productId) + "|" + (imageUrl == null ? "" : imageUrl);
-  }
-
-  private void addProductImage(LinearLayout card, OperationData.MarketProduct product) {
-    if (product == null || product.imageSourceUrl.isEmpty() || product.dataSource.isEmpty()) return;
-
-    String key = productImageKey(product.id, product.imageSourceUrl);
-    Bitmap preview = productImagePreviews.get(key);
-    if (preview != null) {
-      ImageView image = productImageView(preview, 168);
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(168));
-      params.setMargins(0, 0, 0, dp(10));
-      image.setLayoutParams(params);
-      card.addView(image);
-      return;
-    }
-
-    if (productImageFailures.contains(key) || !productImageRequests.add(key)) return;
-    listener.onProductImageRequested(product.id, product.dataSource, product.imageSourceUrl);
-  }
-
-  private ImageView productImageView(Bitmap bitmap, int heightDp) {
-    ImageView image = new ImageView(context);
-    image.setImageBitmap(bitmap);
-    image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-    image.setAdjustViewBounds(false);
-    image.setPadding(dp(14), dp(12), dp(14), dp(12));
-    image.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 12));
-    image.setMinimumHeight(dp(heightDp));
-    return image;
-  }
-
-  private View messageCard(String message, boolean pending) {
-    LinearLayout card = UiKit.card(context);
-    int tone = pending ? UiKit.WARNING : UiKit.SUCCESS;
-    card.setBackground(UiKit.rounded(context, UiKit.withAlpha(tone, 25), UiKit.withAlpha(tone, 100), 14));
-    card.addView(UiKit.text(context, message, 13, tone, Typeface.BOLD));
-    return card;
-  }
-
-
-  private void addFormError(LinearLayout page) {
-    if (!formError.isEmpty()) {
-      page.addView(messageCard(formError, true));
-    }
-  }
-
-  private void showFormError(String message) {
-    formError = message == null ? "Bilgileri kontrol edin." : message;
-    listener.onRenderRequested();
-  }
-
-  private void addFieldLabel(LinearLayout form, String label) {
-    TextView text = UiKit.text(context, label, 12, UiKit.SECONDARY, Typeface.BOLD);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, dp(4), 0, dp(5));
-    text.setLayoutParams(params);
-    form.addView(text);
-  }
-
-  private EditText labeledInput(LinearLayout form, String label, String hint) {
-    addFieldLabel(form, label);
-    EditText input = UiKit.input(context, hint);
-    input.setLayoutParams(fieldParams(50));
-    form.addView(input);
-    return input;
-  }
-
-  private EditText labeledMultiline(LinearLayout form, String label, String hint) {
-    addFieldLabel(form, label);
-    EditText input = UiKit.input(context, hint);
-    input.setSingleLine(false);
-    input.setGravity(Gravity.TOP | Gravity.START);
-    input.setPadding(dp(12), dp(11), dp(12), dp(11));
-    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-    input.setLayoutParams(fieldParams(82));
-    form.addView(input);
-    return input;
-  }
-
-  private void bind(EditText input, String initial, ValueListener listener) {
-    input.setText(initial == null ? "" : initial);
-    input.addTextChangedListener(watcher(listener));
-  }
-
-  private TextWatcher watcher(ValueListener listener) {
-    return new TextWatcher() {
-      @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
-      @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
-        listener.onValue(value == null ? "" : value.toString());
-      }
-      @Override public void afterTextChanged(Editable value) {}
-    };
-  }
-
-  private LinearLayout dialogForm() {
-    LinearLayout form = UiKit.column(context);
-    form.setPadding(dp(16), dp(10), dp(16), dp(8));
-    return form;
-  }
-
-  private ScrollView wrapDialog(View content) {
-    ScrollView scroll = new ScrollView(context);
-    scroll.addView(content);
-    return scroll;
-  }
-
-  private TextView statusText() {
-    TextView status = UiKit.text(context, "", 12, UiKit.DANGER, Typeface.BOLD);
-    status.setPadding(0, dp(5), 0, 0);
-    return status;
-  }
-
-  private LinearLayout.LayoutParams fieldParams(int height) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(height));
-    params.setMargins(0, 0, 0, dp(9));
-    return params;
-  }
-
-  private LinearLayout.LayoutParams fullButtonParams(int height, int top, int bottom) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(height));
-    params.setMargins(0, dp(top), 0, dp(bottom));
-    return params;
-  }
-
-  private boolean submissionBlocked() {
-    return loading || localPendingCount > 0 || data.pendingActions > 0;
-  }
-
-  private String supplierName(String supplierId) {
-    for (OperationData.MarketSupplier supplier : data.market.suppliers) {
-      if (supplier.id.equals(supplierId)) return supplier.name;
-    }
-    return "";
-  }
-
-  private String receivingCurrency() {
-    List<MarketUiRules.ReceivingLine> lines = receiving.lines();
-    return lines.isEmpty() ? "TRY" : lines.get(0).currency;
-  }
-
-  private String cartCurrency() {
-    List<MarketUiRules.CartLine> lines = cart.lines();
-    return lines.isEmpty() ? "TRY" : lines.get(0).currency;
-  }
-
-  private String money(double value, String currency) {
-    NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("tr", "TR"));
-    try {
-      format.setCurrency(java.util.Currency.getInstance(
-          currency == null || currency.trim().isEmpty() ? "TRY" : currency.trim().toUpperCase(Locale.ROOT)
-      ));
-    } catch (IllegalArgumentException ignored) {
-      // Snapshot currency is already sanitized; keep the locale default as a safe fallback.
-    }
-    return format.format(Math.max(0, value));
-  }
-
-  private String quantity(double value) {
-    if (value == Math.rint(value)) return String.valueOf((long) value);
-    return String.format(Locale.US, "%.4f", value).replaceAll("0+$", "").replaceAll("\\.$", "").replace('.', ',');
-  }
-
-  private String unitLabel(String unit) {
-    if ("kg".equals(unit)) return "kg";
-    if ("g".equals(unit)) return "g";
-    if ("l".equals(unit)) return "l";
-    if ("ml".equals(unit)) return "ml";
-    if ("pack".equals(unit)) return "paket";
-    if ("box".equals(unit)) return "kutu";
-    if ("meter".equals(unit)) return "metre";
-    if ("other".equals(unit)) return "birim";
-    return "adet";
-  }
-
-  private String shortTime(String raw) {
-    String value = raw == null ? "" : raw.trim().replace('T', ' ');
-    return value.length() > 16 ? value.substring(0, 16) : value;
-  }
-
-  private String value(EditText input) {
-    return input == null || input.getText() == null ? "" : input.getText().toString().trim();
-  }
-
-  private int dp(int value) {
-    return UiKit.dp(context, value);
-  }
-
-  private boolean isMarketAction(String actionType) {
-    return MarketUiRules.requiredPermissionForAction(actionType) != null;
-  }
-
-  private interface ValueListener {
-    void onValue(String value);
-  }
-
-  private interface PositionListener {
-    void onSelected(int position);
-  }
-
-  private static final class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
-    private final PositionListener listener;
-
-    SimpleItemSelectedListener(PositionListener listener) {
-      this.listener = listener;
-    }
-
-    @Override
-    public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-      listener.onSelected(position);
-    }
-
-    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
   }
 
   private static final class ActionItem {
@@ -1838,18 +476,6 @@ final class MarketWorkspace {
       this.label = label;
       this.action = action;
     }
-  }
-
-  private static final class SupplierChoice {
-    final String id;
-    final String label;
-
-    SupplierChoice(String id, String label) {
-      this.id = id;
-      this.label = label;
-    }
-
-    @Override public String toString() { return label; }
   }
 
 }

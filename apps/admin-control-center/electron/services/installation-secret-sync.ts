@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-export type SecretSource = "ssh" | "install-record";
+type SecretSource = "ssh" | "install-record";
 export type SecretReadResult = { value: string; source: SecretSource; verifiedLive: boolean };
 
 export type InstallationTarget = {
@@ -20,6 +20,7 @@ function ensureKey(value: string): string {
   return trimmed;
 }
 
+/** @compiledSmoke scripts/test-admin-credentials.mjs */
 export function readInstallRecord(repoRoot: string, installation: InstallationTarget): SecretReadResult {
   const repo = installation.externalRepo;
   const explicit = repo?.env ? process.env[repo.env]?.trim() : undefined;

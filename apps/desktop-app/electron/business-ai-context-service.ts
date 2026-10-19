@@ -63,12 +63,18 @@ export async function publishBusinessAiContext(
 export function createCurrentBusinessWebContext(database: DesktopDatabase): BusinessWebContext {
   const profile = getBusinessPublicProfile(database.databasePath);
   const context = createCurrentBusinessAiContext(database);
+  const gallery = publishedGallery(database.userDataPath);
+  const businessId = database.translations().businessId();
   return {
     ...context,
+    localization: database.translations().localization([
+      {kind: "business", id: businessId, fields: {description: profile.description, about_text: profile.aboutText ?? "", directions_note: profile.directionsNote, policy_note: profile.policyNote, payment_note: profile.paymentNote}},
+      ...gallery.map(g => ({kind: "gallery" as const, id: g.id, fields: {title: g.title}}))
+    ]),
     latitude: profile.mapDisplayMode === "manual" ? context.latitude : null,
     longitude: profile.mapDisplayMode === "manual" ? context.longitude : null,
     mapDisplayMode: profile.mapDisplayMode,
-    gallery: publishedGallery(database.userDataPath),
+    gallery,
     googleMapsEmbedUrl: profile.mapDisplayMode === "google_maps_embed" ? normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl) : ""
   };
 }

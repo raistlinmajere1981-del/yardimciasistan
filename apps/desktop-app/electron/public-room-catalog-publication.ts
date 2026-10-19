@@ -1,3 +1,4 @@
+import { PublicTranslationStore } from "./database/public-translation-store";
 import { DatabaseSync } from "node:sqlite";
 import { getRoomPublishedMedia } from "./room-media-service";
 import {
@@ -61,6 +62,7 @@ export function createPublicRoomCatalog(
     return {
       version: 1,
       enabled: true,
+      localization: new PublicTranslationStore(db).localization(rows.map(r => ({kind: "room", id: String(r.id), fields: {name: String(r.name), bed_info: String(r.bed_info), description: String(r.description), price_note: String(r.price_note)}}))),
       updatedAt,
       rooms: rooms.map(({ updatedAt: _updatedAt, ...room }) => room)
     };

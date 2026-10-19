@@ -68,3 +68,35 @@ test("runner decodes split chunks and maintains full check-specific output", asy
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("manual Android screen check passes explicit opt-in without changing preset behavior", async () => {
+  const root = mkdtempSync(join(tmpdir(), "nexa-verify-android-manual-"));
+  mkdirSync(join(root, "scripts"));
+  writeFileSync(join(root, "scripts", "verify.mjs"), [
+    'const args = process.argv.slice(2);',
+    'if (!args.includes("--check") || !args.includes("android-native-ui-family") || !args.includes("--include-manual")) {',
+    '  process.stderr.write("Manual opt-in missing\\n"); process.exitCode = 1;',
+    '} else {',
+    '  process.stdout.write("Plan: 1 benzersiz kontrol\\n");',
+    '  process.stdout.write("▶ [1/1] [android-native-ui-family] Native UI\\n");',
+    '  process.stdout.write("✓ [1/1] Native UI (2 ms)\\n");',
+    '}'
+  ].join("\n"));
+  try {
+    const runner = new VerificationRunner(root);
+    const finished = new Promise((resolve, reject) => {
+      runner.subscribe(state => {
+        if (state.startedAt && !state.running) resolve(state);
+      });
+      setTimeout(() => reject(new Error("Manual Android check timed out")), 10000).unref();
+    });
+    assert.equal(runner.start({mode: "check", value: "android-native-ui-family", includeManual: true}).accepted, true);
+    const state = await finished;
+    assert.equal(state.result, "passed");
+    assert.equal(state.checks[0]?.id, "android-native-ui-family");
+    assert.equal(state.checks[0]?.status, "passed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

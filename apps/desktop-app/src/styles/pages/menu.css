@@ -107,6 +107,7 @@
   place-items: center;
   cursor: grab;
   touch-action: none;
+  user-select: none;
   min-width: var(--interaction-target-min);
   min-height: var(--interaction-target-min);
 }
@@ -142,13 +143,11 @@
 }
 
 .menu-sortable-record.is-drop-before {
-  --menu-drop-indicator-top: calc(var(--space-3) * -1);
-  margin-block-start: var(--space-4);
+  --menu-drop-indicator-top: 0px;
 }
 
 .menu-sortable-record.is-drop-after {
-  --menu-drop-indicator-bottom: calc(var(--space-3) * -1);
-  margin-block-end: var(--space-4);
+  --menu-drop-indicator-bottom: 0px;
 }
 
 .menu-sortable-record.is-drop-before::before,

@@ -8,6 +8,13 @@ import {
 } from "./web-connection-test";
 
 export function registerWebConnectionIpcHandlers(options: { assertUnlocked: () => void; getDatabase: () => DesktopDatabase }) {
+  // Opening Settings may check connectivity, but must not update verification/save authority.
+  ipcMain.handle("sync:probeConnection", async (_event, input: WebConnectionTestInput): Promise<WebConnectionTestResult> => {
+    options.assertUnlocked();
+    const result = await testWebConnection(input);
+    options.assertUnlocked();
+    return result;
+  });
   ipcMain.handle(
     "sync:testConnection",
     async (_event, input: WebConnectionTestInput): Promise<WebConnectionTestResult> => {

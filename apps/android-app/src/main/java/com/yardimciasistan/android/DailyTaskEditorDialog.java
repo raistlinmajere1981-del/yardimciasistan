@@ -63,7 +63,7 @@ final class DailyTaskEditorDialog {
 
     String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     CheckBox useDate = new CheckBox(context);
-    useDate.setText("Tarih ekle");
+    useDate.setText(R.string.task_add_date);
     useDate.setChecked(!editing || !existing.dueDate.isEmpty());
     form.addView(useDate);
     EditText dueDate = pickerField(
@@ -77,7 +77,7 @@ final class DailyTaskEditorDialog {
     dueDate.setOnClickListener(view -> NativeDateTimePicker.showDate(context, dueDate, null, false));
 
     CheckBox useTime = new CheckBox(context);
-    useTime.setText("Saat ekle");
+    useTime.setText(R.string.task_add_time);
     useTime.setChecked(editing && !existing.dueTime.isEmpty());
     form.addView(useTime);
     EditText dueTime = pickerField(
@@ -133,7 +133,7 @@ final class DailyTaskEditorDialog {
           payload.put("due_date", date);
           payload.put("due_time", time);
         } catch (Exception error) {
-          status.setText("Günlük iş bilgileri hazırlanamadı.");
+          status.setText(R.string.task_prepare_failed);
           return;
         }
         dialog.dismiss();
@@ -145,8 +145,8 @@ final class DailyTaskEditorDialog {
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> {
           if (!deleteArmed[0]) {
             deleteArmed[0] = true;
-            status.setText("Bu günlük işi silmek için 'Silmeyi Onayla' seçin.");
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setText("Silmeyi Onayla");
+            status.setText(R.string.task_confirm_delete_hint);
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setText(R.string.confirm_delete);
             return;
           }
           dialog.dismiss();

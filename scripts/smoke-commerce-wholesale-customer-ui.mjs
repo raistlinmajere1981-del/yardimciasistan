@@ -145,6 +145,8 @@ try {
   await createDialog.getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect(createDialog).toHaveCount(0);
 
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.locator(".customer-record-row__open", {hasText:"Ada Bayi"}).click();
   let workspace = page.locator("dialog.customer-workspace-frame");
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole("heading", { name: "Ada Bayi", exact: true })).toBeVisible();
@@ -298,6 +300,9 @@ try {
   const normalCreate = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
   await normalCreate.getByLabel("Ad soyad", { exact: true }).fill("Normal Müşteri");
   await normalCreate.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expect(normalCreate).toHaveCount(0);
+  await expect(page.locator("dialog.customer-workspace-frame")).toHaveCount(0);
+  await page.locator(".customer-record-row__open", {hasText:"Normal Müşteri"}).click();
   await expect(page.locator("dialog.customer-workspace-frame")).toBeVisible();
   await expect(page.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
   assert.deepEqual(pageErrors, []);

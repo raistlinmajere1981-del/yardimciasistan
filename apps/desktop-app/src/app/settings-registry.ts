@@ -2,10 +2,10 @@ import { BUSINESS_CAPABILITIES as C, isBusinessServiceAvailable, type BusinessCa
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type SettingsCategoryId = "business" | "services";
+type SettingsCategoryId = "business" | "services";
 export type StagedSettingsCategoryId = "business" | "services";
-export interface SettingsCategoryDefinition { id: SettingsCategoryId; title: string; description: string }
-export const settingsCategories: readonly SettingsCategoryDefinition[] = [
+interface SettingsCategoryDefinition { id: SettingsCategoryId; title: string; description: string }
+const settingsCategories: readonly SettingsCategoryDefinition[] = [
   { id: "business", title: "İşletme", description: "İşletme kimliği, sektör ve müşteriye açık bilgiler." },
   { id: "services", title: "Servisler", description: "Bağlantılar, eşitleme ve yardımcı servisler." }
 ];
@@ -67,7 +67,8 @@ export const instagramProviderDefinition = {
   visible: (caps: readonly BusinessCapability[]) => isBusinessServiceAvailable("instagram", caps)
 } as const satisfies SettingsSectionDefinition;
 
-export const settingsSections: readonly SettingsSectionDefinition[] = [
+const settingsSections: readonly SettingsSectionDefinition[] = [
+  {id:"settings-translation",category:"services",title:"Çoklu Dil",keywords:"çeviri yayın dil türkçe ingilizce manuel otomatik ai dil yönetimi",persistence:"resource",visible:(_,initialized)=>initialized},
   { id: "settings-speech", category: "services", title: "Metin Seslendirme", keywords: "ses tts konuşma yerel sistem dil hız ton volume", persistence: "resource", visible: (_, initialized) => initialized },
   { id: "settings-dictation", category: "services", title: "Konuşmadan Metne", keywords: "stt masaüstü dikte mikrofon ses model bağlantı testi", persistence: "resource", visible: (_, initialized) => initialized },
   smsProviderDefinition, instagramProviderDefinition,

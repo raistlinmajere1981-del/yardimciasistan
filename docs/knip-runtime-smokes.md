@@ -24,6 +24,10 @@ reporting. Each tag names its current consuming smoke:
 | `mapArasShipmentStatus` | `smoke-commerce-aras-provider.mjs` |
 | `parseSoapResult` | `smoke-commerce-aras-provider.mjs` |
 | `moveRecordId` | `smoke-menu-reorder-contract.mjs` (transpiled source) |
+| `reconcileMissingCommerceSaleFinanceInTransaction` | `smoke-market-sale-finance.mjs` and the explicit `reconcile-commerce-sale-finance.mjs` CLI |
+| `DEFAULT_TTS_PREFERENCES` | `smoke-desktop-tts.mjs` (transpiled source) |
+| `validateTranslationAnswer` | `smoke-public-translations.mjs` |
+| `readInstallRecord` | `test-admin-credentials.mjs` (Admin Control Center compiled fixture) |
 
 These are current test APIs, not compatibility promises. Remove a tag and
 reassess the export if its consumer is removed. Do not tag unused helpers or

@@ -1,10 +1,7 @@
 package com.yardimciasistan.android;
 
-import android.graphics.Typeface;
 import android.view.View;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
@@ -291,7 +288,7 @@ final class AndroidWorkspaceCoordinator {
     LinearLayout page = UiKit.column(activity);
     if (!AndroidUiRules.canUseWhatsApp(data)
         || !data.hasPermission("customer.view")) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Bu cihazın bu alan için yetkisi yok",
           "Yetkiler masaüstü yöneticisi tarafından belirlenir."
       ));
@@ -315,15 +312,18 @@ final class AndroidWorkspaceCoordinator {
     }
 
     page.addView(UiKit.title(activity, "Mesajlar"));
-    page.addView(filterBar(options.toArray(new String[0][])));
+    page.addView(UiKit.filterBar(activity, options.toArray(new String[0][]), messageMode, value -> {
+      messageMode = value;
+      listener.render();
+    }));
 
     if (AndroidUiRules.MESSAGES_PREPARED.equals(messageMode)) {
       NativeSearchList search = null;
       if (!data.messages.isEmpty()) {
-        search = addMessageSearch(page, "Müşteri veya mesaj ara");
+        search = NativeSearchList.attachTo(page, "Müşteri veya mesaj ara");
       }
       if (data.messages.isEmpty()) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             "Hazır mesaj yok",
             "Masaüstünde hazırlanan cevaplar burada görünür."
         ));
@@ -334,13 +334,13 @@ final class AndroidWorkspaceCoordinator {
         if (search != null) search.add(row, message.customerName + " " + message.customerPhone
             + " " + message.message + " " + message.status);
       }
-      if (search != null) finishMessageSearch(page, search, "Aramayla eşleşen mesaj yok.");
+      if (search != null) search.showNoMatchesIn(page, "Aramayla eşleşen mesaj yok.");
     } else {
       int shown = 0;
       NativeSearchList search = null;
       for (OperationData.RequestRecord request : data.requests) {
         if (!request.waitingForResponse()) continue;
-        if (search == null) search = addMessageSearch(page, "Yanıt bekleyen müşteri ara");
+        if (search == null) search = NativeSearchList.attachTo(page, "Yanıt bekleyen müşteri ara");
         View row = cards.waitingMessageCard(request);
         page.addView(row);
         search.add(row, request.customerName + " " + request.customerPhone + " "
@@ -348,67 +348,14 @@ final class AndroidWorkspaceCoordinator {
         shown += 1;
       }
       if (shown == 0) {
-        page.addView(emptyCard(
+        page.addView(UiKit.emptyCard(activity,
             "Cevap bekleyen müşteri yok",
             "Yanıt gerektiren talepler burada görünür."
         ));
-      } else finishMessageSearch(page, search, "Aramayla eşleşen talep yok.");
+      } else search.showNoMatchesIn(page, "Aramayla eşleşen talep yok.");
     }
 
     return UiKit.scroll(activity, page, bottomPaddingDp);
   }
 
-  private NativeSearchList addMessageSearch(LinearLayout page, String hint) {
-    NativeSearchList search = new NativeSearchList(activity, hint);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, UiKit.dp(activity, 4), 0, UiKit.dp(activity, 12));
-    page.addView(search.input(), params);
-    return search;
-  }
-
-  private void finishMessageSearch(LinearLayout page, NativeSearchList search, String emptyText) {
-    TextView text = UiKit.text(activity, emptyText, 13, UiKit.MUTED, Typeface.NORMAL);
-    page.addView(text);
-    search.setNoMatchesNotice(text);
-  }
-
-  private View filterBar(String[][] options) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 3), 0, UiKit.dp(activity, 6));
-
-    for (String[] option : options) {
-      row.addView(UiKit.chip(
-          activity,
-          option[1],
-          option[0].equals(messageMode),
-          view -> {
-            messageMode = option[0];
-            listener.render();
-          }
-      ));
-    }
-    scroll.addView(row);
-    return scroll;
-  }
-
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(
-        activity,
-        title,
-        14,
-        UiKit.TEXT,
-        Typeface.BOLD
-    ));
-    card.addView(UiKit.text(
-        activity,
-        detail,
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    return card;
-  }
 }

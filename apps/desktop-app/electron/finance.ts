@@ -164,7 +164,8 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
 }
 
 /** Explicit repair only: existing source links (including deleted entries) are left untouched.
- * Manual income cannot be matched to a sale safely and is never changed here. */
+ * Manual income cannot be matched to a sale safely and is never changed here.
+ * @compiledSmoke scripts/smoke-market-sale-finance.mjs; scripts/reconcile-commerce-sale-finance.mjs */
 export function reconcileMissingCommerceSaleFinanceInTransaction(db: DatabaseSync): { reconciledCount: number } {
   if (!db.isTransaction) throw new Error("Finance reconciliation requires a transaction.");
   const sales = db.prepare(`SELECT s.id FROM commerce_sales s

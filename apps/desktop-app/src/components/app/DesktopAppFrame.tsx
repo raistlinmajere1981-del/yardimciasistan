@@ -24,7 +24,7 @@ import type {
 import type { DesktopDashboardData } from "../../../electron/database";
 import type { UiPreferences } from "../../ui-preferences";
 import { useUpdateSettings } from "../settings/UpdateSettings";
-import { SidebarUpdateStatus } from "../settings/SidebarUpdateStatus";
+import { HeaderUpdateStatus } from "../settings/HeaderUpdateStatus";
 import { AppearanceSettingsSection } from "../settings/AppearanceSettingsSection";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
@@ -217,7 +217,6 @@ function DesktopAppFrameContent({
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
         <Sidebar
-          updateSlot={<SidebarUpdateStatus controller={updates} />}
           items={navigationItems}
           activePage={activePage}
           businessName={setupData.businessName}
@@ -243,6 +242,7 @@ function DesktopAppFrameContent({
                   Açılıyor
                 </span>
               )}
+              <HeaderUpdateStatus controller={updates} />
               <AppearanceSettingsSection preferences={uiPreferences} onPreferencesChange={onUiPreferencesChange} />
               <SyncStatusIndicator
                 automaticSyncStatus={automaticSyncStatus}

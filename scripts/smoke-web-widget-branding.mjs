@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const widgetBundlePath = join(repoRoot, "packages", "web-widget", "dist", "widget.js");
+const widgetBundlePath = join(repoRoot, "test-site/landing/assets/assistant/widget.js");
 
 const browser = await launchChromiumForSmoke(chromium);
 
@@ -15,7 +15,7 @@ try {
     waitUntil: "domcontentloaded"
   });
   await page.route("**/api/business.php", route => route.fulfill({ contentType: "application/json", body: '{"ok":false}' }));
-  await page.route("https://demo.test/assets/yardimci-asistan-symbol.png", route => route.fulfill({ contentType: "image/png", body: readFileSync("firm-template/web-module/assets/yardimci-asistan-symbol.png") }));
+  await page.route("https://demo.test/assets/yardimci-asistan-symbol.png", route => route.fulfill({ contentType: "image/png", body: readFileSync("test-site/landing/assets/yardimci-asistan-symbol.png") }));
   await page.route("https://demo.test/yardimci-asistan/api/chat.php", async (route) => {
     const payload = route.request().postDataJSON();
     if (payload.message !== "Bu akşam 4 kişilik masa var mı?") {

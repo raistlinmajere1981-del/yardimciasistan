@@ -1,11 +1,8 @@
 package com.yardimciasistan.android;
 
-import android.graphics.Typeface;
 import android.view.View;
 import android.widget.Button;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
@@ -75,7 +72,7 @@ final class PensionWorkspace {
     }
 
     page.addView(titleBar(mode));
-    page.addView(filterBar(options.toArray(new String[0][]), mode));
+    page.addView(UiKit.filterBar(activity, options.toArray(new String[0][]), mode, listener::onModeChanged));
 
     if (AndroidUiRules.PENSION_RESERVATIONS.equals(mode)) {
       renderReservations(page);
@@ -114,14 +111,14 @@ final class PensionWorkspace {
           || !AndroidUiRules.reservationAllowed(data, reservation)) {
         continue;
       }
-      if (search == null) search = addSearch(page, "Rezervasyon ara");
+      if (search == null) search = NativeSearchList.attachTo(page, "Rezervasyon ara");
       View row = listener.createReservationCard(reservation);
       page.addView(row);
       search.add(row, reservation.customerName + " " + reservation.title + " "
           + reservation.startDate + " " + reservation.endDate + " " + reservation.status);
       shown += 1;
     }
-    if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
+    if (search != null) search.showNoMatchesIn(page, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
       page.addView(UiKit.emptyCard(activity, "Konaklama rezervasyonu yok", "Yeni rezervasyonlar burada listelenir."));
     }
@@ -140,20 +137,14 @@ final class PensionWorkspace {
       page.addView(UiKit.emptyCard(activity, "Oda verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
     if (!data.rooms.isEmpty()) {
-      NativeSearchList search = new NativeSearchList(activity, "Oda ara");
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
-      searchParams.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
-      page.addView(search.input(), searchParams);
+      NativeSearchList search = NativeSearchList.attachTo(page, "Oda ara");
       for (OperationData.RoomRecord room : data.rooms) {
         View roomCard = listener.createRoomCard(room);
         page.addView(roomCard);
         search.add(roomCard,
             room.name + " " + room.number + " " + room.status + " " + room.activeReservation);
       }
-      TextView none = UiKit.text(activity, "Aramayla eşleşen oda yok.", 13,
-          UiKit.MUTED, Typeface.NORMAL);
-      page.addView(none);
-      search.setNoMatchesNotice(none);
+      search.showNoMatchesIn(page, "Aramayla eşleşen oda yok.");
     }
   }
 
@@ -171,7 +162,7 @@ final class PensionWorkspace {
           "Müşteri-oda atamaları oluşturulduğunda burada saklanır."
       ));
     } else {
-      NativeSearchList search = addSearch(page, "Konuk veya oda ara");
+      NativeSearchList search = NativeSearchList.attachTo(page, "Konuk veya oda ara");
       for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
         View row = listener.createStayCard(stay);
         page.addView(row);
@@ -179,7 +170,7 @@ final class PensionWorkspace {
             + stay.roomNumber + " " + stay.status + " " + stay.checkInDate
             + " " + stay.checkOutDate + " " + stay.notes);
       }
-      finishSearch(page, search, "Aramayla eşleşen konaklama yok.");
+      search.showNoMatchesIn(page, "Aramayla eşleşen konaklama yok.");
     }
   }
 
@@ -195,31 +186,17 @@ final class PensionWorkspace {
       if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
-      if (search == null) search = addSearch(page, "İş veya açıklama ara");
+      if (search == null) search = NativeSearchList.attachTo(page, "İş veya açıklama ara");
       View row = listener.createTaskCard(task);
       page.addView(row);
       search.add(row, task.title + " " + task.description + " " + task.status
           + " " + task.dueDate + " " + task.dueTime);
       shown += 1;
     }
-    if (search != null) finishSearch(page, search, "Aramayla eşleşen iş yok.");
+    if (search != null) search.showNoMatchesIn(page, "Aramayla eşleşen iş yok.");
     if (shown == 0) {
       page.addView(UiKit.emptyCard(activity, "Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
     }
-  }
-
-  private NativeSearchList addSearch(LinearLayout page, String hint) {
-    NativeSearchList search = new NativeSearchList(activity, hint);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
-    page.addView(search.input(), params);
-    return search;
-  }
-
-  private void finishSearch(LinearLayout page, NativeSearchList search, String message) {
-    TextView noMatches = UiKit.text(activity, message, 13, UiKit.MUTED, Typeface.NORMAL);
-    page.addView(noMatches);
-    search.setNoMatchesNotice(noMatches);
   }
 
   private View titleBar(String mode) {
@@ -228,9 +205,6 @@ final class PensionWorkspace {
         : AndroidUiRules.PENSION_STAYS.equals(mode) ? "Konaklamalar"
         : AndroidUiRules.PENSION_FOLIOS.equals(mode) ? "Oda Hesapları"
         : AndroidUiRules.PENSION_TASKS.equals(mode) ? "Günlük İşler" : "KBS";
-    LinearLayout toolbar = UiKit.row(activity);
-    TextView heading = UiKit.title(activity, title);
-    toolbar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
     Button create = null;
     if (AndroidUiRules.PENSION_RESERVATIONS.equals(mode)
         && AndroidUiRules.canCreateRoomReservation(data)) {
@@ -247,29 +221,7 @@ final class PensionWorkspace {
       create = UiKit.iconButton(activity, "+", "Yeni iş", false,
           v -> listener.onCreateTask());
     }
-    if (create != null) toolbar.addView(create,
-        new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, 0, 0, UiKit.dp(activity, 12));
-    toolbar.setLayoutParams(params);
-    return toolbar;
-  }
-
-  private View filterBar(String[][] options, String selected) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 3), 0, UiKit.dp(activity, 6));
-    for (String[] option : options) {
-      row.addView(UiKit.chip(
-          activity,
-          option[1],
-          option[0].equals(selected),
-          view -> listener.onModeChanged(option[0])
-      ));
-    }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.workspaceHeader(activity, title, null, create);
   }
 
   private View statusStrip(CounterValue[] counters) {

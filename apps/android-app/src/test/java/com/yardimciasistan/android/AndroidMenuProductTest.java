@@ -73,7 +73,9 @@ public final class AndroidMenuProductTest {
             .put("menu_entry_id", "").put("stock_unit", "ml").put("stock_quantity", 1.2345)));
     OperationData data = OperationData.fromJson(snapshot, "phone-1");
     assertEquals("product-unlinked", data.menuProductCandidates.get(0).getString("product_id"));
-    assertEquals(1.2345, data.trackedStockByProductId("product-unlinked").stockQuantity, 0);
+    assertEquals(1, data.trackedStockItems.size());
+    assertEquals("product-unlinked", data.trackedStockItems.get(0).productId);
+    assertEquals(1.2345, data.trackedStockItems.get(0).stockQuantity, 0);
     snapshot.put("business_capabilities", new JSONArray().put("commerce.catalog"));
     assertTrue(OperationData.fromJson(snapshot, "phone-1").menuProductCandidates.isEmpty());
   }

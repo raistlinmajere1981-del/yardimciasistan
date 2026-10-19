@@ -92,10 +92,10 @@ export function AppearanceSettingsSection({ preferences: uiPreferences, onPrefer
 
   return (
     <div className="appearance-menu" ref={rootRef}>
-      <button
+      <IconButton
         ref={triggerRef}
         type="button"
-        className="icon-button icon-button--normal icon-button--md appearance-trigger"
+        className="appearance-trigger"
         aria-label="Görünüm"
         title="Görünüm"
         aria-haspopup="dialog"
@@ -104,7 +104,7 @@ export function AppearanceSettingsSection({ preferences: uiPreferences, onPrefer
         onClick={() => setOpen(current => !current)}
       >
         <Palette size={18} aria-hidden="true" />
-      </button>
+      </IconButton>
       {open && (
         <section id="desktop-appearance" ref={panelRef} className="appearance-popover" role="dialog" aria-labelledby="desktop-appearance-title" aria-describedby="desktop-appearance-description">
           <header className="appearance-popover-header">

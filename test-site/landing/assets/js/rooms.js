@@ -1,25 +1,26 @@
 (() => {
+  const { ui, html, locale } = window.DemoLanguage;
   const ROOM_API = "/yardimci-asistan/api/rooms.php";
   const DETAIL_PATH = "/odalar/oda/";
   const FALLBACK_ROOM_IMAGE = "/assets/yardimci-asistan-logo.png";
 
   const featureCatalog = {
-    air_conditioning: ["Klima", "snowflake"],
+    air_conditioning: [ui("Klima"), "snowflake"],
     wifi: ["Wi-Fi", "wifi"],
-    private_bathroom: ["Özel banyo", "bath"],
-    balcony: ["Balkon", "balcony"],
-    terrace: ["Teras", "terrace"],
-    sea_view: ["Deniz manzarası", "waves"],
-    garden_view: ["Bahçe manzarası", "leaf"],
-    mountain_view: ["Dağ manzarası", "mountain"],
+    private_bathroom: [ui("Özel banyo"), "bath"],
+    balcony: [ui("Balkon"), "balcony"],
+    terrace: [ui("Teras"), "terrace"],
+    sea_view: [ui("Deniz manzarası"), "waves"],
+    garden_view: [ui("Bahçe manzarası"), "leaf"],
+    mountain_view: [ui("Dağ manzarası"), "mountain"],
     tv: ["TV", "tv"],
-    mini_fridge: ["Mini buzdolabı", "fridge"],
-    heating: ["Isıtma", "heat"],
-    work_desk: ["Çalışma masası", "desk"],
-    kitchenette: ["Mini mutfak", "kitchen"],
-    step_free_access: ["Basamaksız erişim", "step-free"],
-    wheelchair_friendly: ["Tekerlekli sandalye erişimine uygun", "accessible"],
-    non_smoking: ["Sigara içilmeyen oda", "no-smoking"]
+    mini_fridge: [ui("Mini buzdolabı"), "fridge"],
+    heating: [ui("Isıtma"), "heat"],
+    work_desk: [ui("Çalışma masası"), "desk"],
+    kitchenette: [ui("Mini mutfak"), "kitchen"],
+    step_free_access: [ui("Basamaksız erişim"), "step-free"],
+    wheelchair_friendly: [ui("Tekerlekli sandalye erişimine uygun"), "accessible"],
+    non_smoking: [ui("Sigara içilmeyen oda"), "no-smoking"]
   };
 
   const iconPaths = {
@@ -70,20 +71,20 @@
     if (!(amount > 0)) return "";
     const code = /^[A-Z]{3}$/.test(String(currency || "")) ? String(currency) : "TRY";
     try {
-      return new Intl.NumberFormat("tr-TR", {
+      return new Intl.NumberFormat(locale, {
         style: "currency",
         currency: code,
         maximumFractionDigits: 0
       }).format(amount);
     } catch {
-      return `${amount.toLocaleString("tr-TR")} ${code}`;
+      return `${amount.toLocaleString(locale)} ${code}`;
     }
   };
 
   const formatFloor = (value) => {
     const floor = String(value || "").trim();
     if (!floor) return "";
-    if (/^\d+$/.test(floor)) return `${Number.parseInt(floor, 10)}. kat`;
+    if (/^\d+$/.test(floor)) return ui("{0}. kat", {0: Number.parseInt(floor, 10)});
     return floor;
   };
 
@@ -99,13 +100,13 @@
     if (cover) {
       const image = document.createElement("img");
       image.src = cover;
-      image.alt = String(room.name || "Oda") + " fotoğrafı";
+      image.alt = String(room.name || ui("Oda")) + ui(" fotoğrafı");
       image.loading = "lazy";
       link.append(image);
     } else {
       const placeholder = document.createElement("span");
       placeholder.className = "room-card-media-placeholder";
-      placeholder.textContent = "Oda fotoğrafı hazırlanıyor";
+      placeholder.textContent = ui("Oda fotoğrafı hazırlanıyor");
       link.append(placeholder);
     }
 
@@ -120,12 +121,12 @@
     body.className = "room-card-body";
 
     const title = document.createElement("h3");
-    title.textContent = room.name || "Oda";
+    title.textContent = room.name || ui("Oda");
 
     const meta = document.createElement("p");
     meta.className = "room-meta";
     const metaParts = [];
-    if (Number(room.capacity) > 0) metaParts.push(`${Math.trunc(Number(room.capacity))} kişi`);
+    if (Number(room.capacity) > 0) metaParts.push(ui("{0} kişi", {0: Math.trunc(Number(room.capacity))}));
     if (room.bed_info) metaParts.push(String(room.bed_info));
     meta.textContent = metaParts.join(" · ");
 
@@ -142,7 +143,7 @@
     if (priceText) {
       const price = document.createElement("p");
       price.className = "room-card-price";
-      price.textContent = priceText + " / gece";
+      price.textContent = priceText + ui(" / gece");
       body.append(price);
     }
 
@@ -151,7 +152,7 @@
 
     const details = document.createElement("a");
     details.href = detailUrl(room);
-    details.textContent = "Odayı incele";
+    details.textContent = ui("Odayı incele");
 
     const reserve = document.createElement("button");
     reserve.type = "button";
@@ -160,7 +161,7 @@
     reserve.dataset.yaResourceId = String(room.id || "");
     reserve.dataset.yaResourceName = String(room.name || "");
     if (cover) reserve.dataset.yaImageUrl = cover;
-    reserve.textContent = "Rezervasyon sor";
+    reserve.textContent = ui("Rezervasyon sor");
 
     actions.append(details, reserve);
     body.append(actions);
@@ -176,7 +177,7 @@
       if (!visible.length) {
         const empty = document.createElement("div");
         empty.className = "room-catalog-empty";
-        empty.textContent = "Yayınlanmış aktif oda bulunmuyor.";
+        empty.textContent = ui("Yayınlanmış aktif oda bulunmuyor.");
         root.append(empty);
         return;
       }
@@ -184,7 +185,7 @@
     });
 
     document.querySelectorAll("[data-room-count]").forEach((node) => {
-      node.textContent = `${rooms.length} oda`;
+      node.textContent = ui("{0} oda", {0: rooms.length});
     });
   };
 
@@ -202,7 +203,7 @@
           seen.add(url);
           const image = document.createElement("img");
           image.src = url;
-          image.alt = `${room.name || "Oda"} fotoğrafı`;
+          image.alt = ui("{0} fotoğrafı", {0: room.name || ui("Oda")});
           image.loading = "lazy";
           root.append(image);
         }
@@ -219,7 +220,7 @@
     if (!known.length) {
       const empty = document.createElement("div");
       empty.className = "room-catalog-empty";
-      empty.textContent = "Oda özellikleri henüz yayınlanmadı.";
+      empty.textContent = ui("Oda özellikleri henüz yayınlanmadı.");
       root.append(empty);
       return;
     }
@@ -254,7 +255,7 @@
     }
     card.hidden = false;
     card.dataset.panoramaSrc = url;
-    card.dataset.panoramaTitle = media.title || (kind === "panorama_360" ? "360° oda görünümü" : "180° görünüm");
+    card.dataset.panoramaTitle = media.title || (kind === "panorama_360" ? ui("360° oda görünümü") : ui("180° görünüm"));
     card.dataset.panoramaHfov = kind === "panorama_180" ? "85" : "105";
     card.dataset.panoramaYaw = "0";
     card.dataset.panoramaPitch = "0";
@@ -292,7 +293,7 @@
     video.poster = cover || "";
     video.load();
     const title = document.querySelector("[data-room-video-title]");
-    if (title) title.textContent = media.title || "Oda videosu";
+    if (title) title.textContent = media.title || ui("Oda videosu");
   };
 
   const renderGallery = (room) => {
@@ -310,10 +311,10 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "gallery-item";
-      button.setAttribute("aria-label", `${room.name || "Oda"} fotoğrafı ${count} büyüt`);
+      button.setAttribute("aria-label", ui("{0} fotoğrafı {1} büyüt", {0: room.name || ui("Oda"), 1: count}));
       const image = document.createElement("img");
       image.src = url;
-      image.alt = `${room.name || "Oda"} fotoğrafı ${count}`;
+      image.alt = ui("{0} fotoğrafı {1}", {0: room.name || ui("Oda"), 1: count});
       image.loading = "lazy";
       button.append(image);
       button.addEventListener("click", () => {
@@ -343,8 +344,8 @@
       if (loading) {
         loading.className = "room-detail-error";
         loading.textContent = roomId
-          ? "Bu oda artık yayında değil veya bulunamadı."
-          : "Gösterilecek oda seçilmedi.";
+          ? ui("Bu oda artık yayında değil veya bulunamadı.")
+          : ui("Gösterilecek oda seçilmedi.");
       }
       if (content instanceof HTMLElement) content.hidden = true;
       return;
@@ -353,23 +354,23 @@
     if (loading instanceof HTMLElement) loading.hidden = true;
     if (content instanceof HTMLElement) content.hidden = false;
 
-    document.title = `${room.name || "Oda"} | Yardımcı Asistan`;
+    document.title = `${room.name || ui("Oda")} | Yardımcı Asistan`;
     const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) metaDescription.setAttribute("content", String(room.description || "Yardımcı Asistan canlı demo oda detayları."));
+    if (metaDescription) metaDescription.setAttribute("content", String(room.description || ui("Yardımcı Asistan canlı demo oda detayları.")));
 
     const heroTitle = document.querySelector(".scenic-page-hero h1");
-    if (heroTitle) heroTitle.textContent = room.name || "Oda";
+    if (heroTitle) heroTitle.textContent = room.name || ui("Oda");
     const heroDescription = document.querySelector(".scenic-page-hero-content > p:not(.eyebrow)");
-    if (heroDescription) heroDescription.textContent = room.description || "Oda detayları ve konaklama bilgileri.";
+    if (heroDescription) heroDescription.textContent = room.description || ui("Oda detayları ve konaklama bilgileri.");
 
-    setText("[data-room-name]", room.name || "Oda");
+    setText("[data-room-name]", room.name || ui("Oda"));
     const descriptionNode = document.querySelector("[data-room-description]");
     if (descriptionNode instanceof HTMLElement) {
       const description = String(room.description || "").trim();
       descriptionNode.textContent = description;
       descriptionNode.hidden = !description;
     }
-    setText("[data-room-capacity]", Number(room.capacity) > 0 ? `${Math.trunc(Number(room.capacity))} kişi` : "");
+    setText("[data-room-capacity]", Number(room.capacity) > 0 ? ui("{0} kişi", {0: Math.trunc(Number(room.capacity))}) : "");
     setText("[data-room-bed]", room.bed_info || "");
     setText("[data-room-floor]", formatFloor(room.floor));
     const priceNote = document.querySelector("[data-room-price-note]");
@@ -382,7 +383,7 @@
     const price = formatPrice(room.nightly_price_minor, room.currency);
     const priceNode = document.querySelector("[data-room-price]");
     if (priceNode instanceof HTMLElement) {
-      priceNode.textContent = price ? `${price} / gece` : "";
+      priceNode.textContent = price ? ui("{0} / gece", {0: price}) : "";
       priceNode.hidden = !price;
     }
 
@@ -393,7 +394,7 @@
     const coverPlaceholder = document.querySelector("[data-room-cover-placeholder]");
     if (coverImage instanceof HTMLImageElement && cover) {
       coverImage.src = cover;
-      coverImage.alt = `${room.name || "Oda"} fotoğrafı`;
+      coverImage.alt = ui("{0} fotoğrafı", {0: room.name || ui("Oda")});
       coverImage.hidden = false;
       if (coverPlaceholder instanceof HTMLElement) coverPlaceholder.hidden = true;
     } else {
@@ -432,13 +433,14 @@
         cache: "no-store"
       });
       payload = await response.json().catch(() => null);
-      if (!response.ok || payload?.ok !== true) throw new Error(payload?.message || "Odalar okunamadı.");
-    } catch (error) {
+      payload = window.DemoLanguage?.localize(payload, "room_catalog") ?? payload;
+      if (!response.ok || payload?.ok !== true) throw new Error(ui("Odalar okunamadı."));
+    } catch {
       document.querySelectorAll("[data-room-list]").forEach((root) => {
-        root.innerHTML = '<div class="room-catalog-empty">Oda bilgilerine şu anda ulaşılamıyor.</div>';
+        root.innerHTML = `<div class="room-catalog-empty">${html("Oda bilgilerine şu anda ulaşılamıyor.")}</div>`;
       });
       const detailLoading = document.querySelector("[data-room-detail-loading]");
-      if (detailLoading) detailLoading.textContent = error instanceof Error ? error.message : "Oda bilgilerine ulaşılamıyor.";
+      if (detailLoading) detailLoading.textContent = ui("Oda bilgilerine ulaşılamıyor.");
       return;
     }
 

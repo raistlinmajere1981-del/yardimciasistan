@@ -58,6 +58,9 @@ export function ServicesSettingsSection({
     update("birthdaySettings", { ...form.birthdaySettings, [key]: value });
   };
 
+  const androidReady = !setupData.setupRequired && setupData.servicePreferences.android
+    && enabledCapabilities.includes("service.android");
+
   return (
         <>
 
@@ -106,17 +109,17 @@ export function ServicesSettingsSection({
                     Yerel ağ bağlantısı
                   </label>
                 </div>
-                {setupData.setupRequired || !setupData.servicePreferences.android ? (
-                  <p className="settings-service-empty">
-                    Android servisini Kaydet ile etkinleştirdikten sonra cihaz yönetimi kullanılabilir.
-                  </p>
-                ) : (
+                {form.androidEnabled && <>
+                  {!androidReady && <p className="settings-service-empty" role="status">
+                    Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.
+                  </p>}
                   <AndroidDevicesSection
+                    operationsEnabled={androidReady && !disabled}
                     devices={dashboardData?.androidDevices ?? []}
                     enabledCapabilities={enabledCapabilities}
                     state={androidDeviceState}
-                                  installState={androidInstallState}
-                                  installSnapshot={androidInstallSnapshot}
+                    installState={androidInstallState}
+                    installSnapshot={androidInstallSnapshot}
                     {...(onRefreshAndroidInstallDevices === undefined ? {} : { onRefreshInstallDevices: onRefreshAndroidInstallDevices })}
                     {...(onInstallAndroidApp === undefined ? {} : { onInstallApp: onInstallAndroidApp })}
                     {...(onProvisionAndroidApp === undefined ? {} : { onProvisionApp: onProvisionAndroidApp })}
@@ -127,7 +130,7 @@ export function ServicesSettingsSection({
                     {...(onResetAndroidDevicePermissions === undefined ? {} : { onResetPermissions: onResetAndroidDevicePermissions })}
                     {...(onRevokeAndroidDevice === undefined ? {} : { onRevoke: onRevokeAndroidDevice })}
                   />
-                )}
+                </>}
               </div>
           </ServiceSettingsCard>
           )}

@@ -49,10 +49,7 @@ final class KbsWorkspace {
     }
     NativeSearchList search = null;
     if (!data.kbs.notifications.isEmpty()) {
-      search = new NativeSearchList(context, "Misafir, oda veya durum ara");
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
-      searchParams.setMargins(0, UiKit.dp(context, 8), 0, UiKit.dp(context, 12));
-      page.addView(search.input(), searchParams);
+      search = NativeSearchList.attachTo(page, "Misafir, oda veya durum ara");
     }
     for (OperationData.KbsNotification row : data.kbs.notifications) {
       LinearLayout card = UiKit.card(context);
@@ -82,10 +79,7 @@ final class KbsWorkspace {
       }
     }
     if (search != null) {
-      TextView none = UiKit.text(context, "Aramayla eşleşen KBS bildirimi yok.",
-          13, UiKit.MUTED, Typeface.NORMAL);
-      page.addView(none);
-      search.setNoMatchesNotice(none);
+      search.showNoMatchesIn(page, "Aramayla eşleşen KBS bildirimi yok.");
     }
     if (data.kbs.notifications.isEmpty()) page.addView(UiKit.text(context, "KBS bildirim kaydı yok.", 16, UiKit.MUTED, Typeface.NORMAL));
     if (data.kbs.notifications.size() >= 500) page.addView(UiKit.text(context, "En fazla 500 bildirim gösterilir. Tüm durumların sayıları yukarıdadır.", 16, UiKit.MUTED, Typeface.NORMAL));
@@ -103,7 +97,7 @@ final class KbsWorkspace {
         .setNegativeButton("Vazgeç", null).setPositiveButton("Kaydı kontrol ettim, devam et", (dialog, which) -> {
           dialog.dismiss();
           CheckBox verified = new CheckBox(context);
-          verified.setText("Bu misafirin bu giriş/çıkış/oda değişimi kaydını resmi kurum portalında gördüm; haricen gönderildi olarak kaydedilmesini onaylıyorum.");
+          verified.setText(R.string.kbs_external_submission_confirmation);
           verified.setPadding(UiKit.dp(context, 16), UiKit.dp(context, 12), UiKit.dp(context, 16), UiKit.dp(context, 12));
           AlertDialog second = new AlertDialog.Builder(context).setTitle("İkinci onay · " + row.customerName)
               .setView(verified).setNegativeButton("Vazgeç", null).setPositiveButton("Haricen gönderildi olarak kaydet", null).create();

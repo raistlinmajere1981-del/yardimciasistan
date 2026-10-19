@@ -23,9 +23,7 @@ Hosting panelinde sitenin herkese açık klasörünü bulun. Bu klasör çoğu h
 ```text
 public_html/
   yardimci-asistan/
-    widget.js
-    assets/
-      yardimci-asistan-symbol.png
+    lib/
     api/
     config/
     data/
@@ -45,7 +43,7 @@ Yükleme öncesi doğrulanmış bir kopya üretmek için:
 npm run pack:web-module
 ```
 
-Bu komut `packages/web-widget` çıktısını günceller, web modül dosyalarını kontrol eder ve hosting paneline yüklenebilecek klasörü şurada hazırlar:
+Bu komut yalnız PHP API hizmetini doğrular ve paketler; site tasarımı, widget veya demo derlemesi içermez. Hosting paneline yüklenebilecek klasör:
 
 ```text
 artifacts/web-module-deploy/yardimci-asistan/
@@ -76,7 +74,7 @@ dosyasına `0600` izinle yazılır. Masaüstünde `Ayarlar → Web Bağlantısı
 bu dosyadaki **Web modül adresi** ve **Web güvenlik anahtarı** değerlerini girin.
 Anahtarı Git'e, site HTML'ine, widget koduna veya herkese açık bir dosyaya koymayın.
 
-Widget web modülünden farklı bir origin'de çalışıyorsa ek olarak bir veya daha fazla
+Site web modülünden farklı bir origin'de çalışıyorsa ek olarak bir veya daha fazla
 `--origin https://site.example` parametresi verilebilir.
 
 ### SSH ile canlı güncelleme
@@ -101,7 +99,7 @@ Script varsayılan olarak `yardimciasistan@ssh-yardimciasistan.alwaysdata.net` h
 
 Her yayında paket yeniden üretilir ve PHP dosyaları hem yerelde hem sunucudaki geçici
 alanda doğrulanır. Canlı `data/` dizini, `config/business.json`, yerel AI ayarları,
-`knowledge/`, `assets/` ve `.env*` dosyaları yeni sürüme taşınır. Önceki sürüm runtime
+`knowledge/`, `media/` ve `.env*` dosyaları yeni sürüme taşınır. Önceki sürüm runtime
 verileriyle birlikte `/home/yardimciasistan/backups/` altında saklanır; bu yedekler API
 anahtarı ve sync secret içerebileceği için herkese açık bir dizine taşınmamalıdır.
 
@@ -122,7 +120,7 @@ npm run deploy:web -- --fresh --skip-pack
 ```
 
 kullanın. `--fresh`, eski `data/`, `config/business.json`, local config,
-knowledge, assets, media ve `.env*` dosyalarını yeni sürüme taşımaz. Buna rağmen eski canlı
+knowledge, media ve `.env*` dosyalarını yeni sürüme taşımaz. Buna rağmen eski canlı
 kurulum önce normal yedek dizinine alınır; yani yanlışlık durumunda geri dönüş kopyası
 bulunur. `--fresh` mevcut paket içinde gerçek bir `sync_secret` yoksa çalışmayı
 reddeder.
@@ -193,49 +191,20 @@ Desteklenen örnekler:
 
 Türkiye cep telefonu formatı kullanın. Sabit hatlar WhatsApp linki için uygun değildir.
 
-## 4. Widget Ekleme
+## 4. Site entegrasyonu
 
-Müşteri talep formu ve hızlı WhatsApp butonu için `widget.js` dosyası siteye eklenir.
-`data-api-base-url` verildiğinde widget bilgi panelindeki kısa soru alanı da
-`api/chat.php` üzerinden güvenli AI cevabı gösterebilir.
+Modül HTML/CSS, widget, navigasyon veya hazır mağaza/duyuru/bayi sayfası sağlamaz.
+Müşteri sitesi kendi tasarımını ve etkileşimlerini koruyarak API'leri tüketir.
+Alanlar, görünürlük, medya ve işlem kuralları
+[Web veri hizmeti sözleşmesi v1](architecture/WEB_DATA_SERVICE_CONTRACT_V1.md) içindedir.
+Örneğin işletme bilgileri ve galeri `api/business.php`, ürünler `api/catalog.php`,
+kampanyalar `api/marketing.php` üzerinden okunur. Talepler `api/request.php`,
+siparişler `api/order.php` üzerinden gönderilir. `sync_secret` tarayıcıya verilmez.
 
-### Düz HTML Site
-
-Sitenin `</body>` kapanış etiketinden hemen önce ekleyin:
-
-```html
-<script
-  src="/yardimci-asistan/widget.js"
-  data-business-name="Firma Adı"
-  data-whatsapp-phone="+90 532 123 45 67"
-  data-api-base-url="/yardimci-asistan"
-  data-logo-url="/yardimci-asistan/assets/yardimci-asistan-symbol.png"
-  data-primary-color="#2F6F5E"
-  data-accent-color="#E47863"
-></script>
-<script>
-  window.YardimciAsistanWidget?.init();
-</script>
-```
-
-Site farklı bir alt klasörde çalışıyorsa `src`, `data-api-base-url` ve `data-logo-url` yollarını tam URL olarak yazabilirsiniz:
-
-```text
-https://firma.com/yardimci-asistan/widget.js
-https://firma.com/yardimci-asistan
-https://firma.com/yardimci-asistan/assets/yardimci-asistan-symbol.png
-```
-
-### WordPress Site
-
-En güvenli yöntem WordPress yönetim panelinde tema ayarları veya bir "header/footer script" alanı kullanmaktır.
-
-1. WordPress panelinde tema veya script ekleme alanını açın.
-2. Yukarıdaki HTML kodunu footer bölümüne ekleyin.
-3. Cache eklentisi varsa cache temizleyin.
-4. Siteyi gizli pencerede açıp sağ altta Yardımcı Asistan butonunu kontrol edin.
-
-Tema dosyasından eklemek gerekiyorsa kod `footer.php` içinde `</body>` öncesine konur. Tema güncellemelerinde kaybolmaması için child theme kullanın.
+Tek demo kaynağı `test-site/landing` dizinidir. Demo kendi mağaza, kampanya, bayi,
+harita ve asistan kodunu barındırır. `npm run build:demo` yalnız demo asset'lerini
+üretir; müşteri web modülünün paketi veya deploy'u bu derlemeye bağlı değildir.
+Bayi davetinin açılacağı modüle kardeş `/bayi/` sayfasını da site sağlar.
 
 ## 5. QR Menü Sayfası
 
@@ -269,7 +238,7 @@ Telefonun PC'ye doğrudan ağ erişimi gerekmez.
 
 ## 6. AI Ayarları
 
-AI varsayılan olarak kapalıdır. Kapalıyken `api/chat.php` güvenli fallback cevap döndürür. Endpoint AI sorunlarını `ai_disabled`, `configuration_incomplete`, `provider_authentication_failed`, `provider_model_or_endpoint_not_found`, `provider_rate_limited`, `provider_timeout`, `provider_connection_failed` ve `provider_unavailable` gibi güvenli hata kodlarıyla ayırır. Widget açıklamayı, varsa sağlayıcı HTTP durumunu ve yeniden deneme bilgisini gösterir; API anahtarı ve ham sağlayıcı cevabı frontend'e gönderilmez.
+AI varsayılan olarak kapalıdır. Kapalıyken `api/chat.php` güvenli fallback cevap döndürür. Endpoint AI sorunlarını `ai_disabled`, `configuration_incomplete`, `provider_authentication_failed`, `provider_model_or_endpoint_not_found`, `provider_rate_limited`, `provider_timeout`, `provider_connection_failed` ve `provider_unavailable` gibi güvenli hata kodlarıyla ayırır. Site kendi sunumunda açıklamayı, varsa sağlayıcı HTTP durumunu ve yeniden deneme bilgisini gösterebilir; API anahtarı ve ham sağlayıcı cevabı frontend'e gönderilmez.
 
 `api/chat.php`, sohbet yanıtını üretirken konuşmayı `data/ai-conversations.json` içine kaydeder. İstek gövdesinde veya mesaj içinde talep niyeti bulunduğunda ve `customer_name` ile geçerli Türkiye cep telefonu geldiğinde ayrıca hosting SQLite'ında `source=web_ai`, `sync_status=pending` olan müşteri talebi açar. Tarih, saat ve kişi sayısı varsa kayda eklenir; eksik bilgiler işletme sahibi tarafından konuşmada tamamlanabilir.
 
@@ -282,13 +251,10 @@ AI anahtarı frontend dosyalarına veya `widget.js` içine yazılmamalıdır. An
 
 Canlı web modül adresi HTTPS olmalıdır. HTTP üzerinden gizli anahtar yayını yalnız yerel geliştirmede `localhost`, `127.0.0.1` veya `::1` için kabul edilir. Web yayını başarısız olursa masaüstü ayarı kaybolmaz; Ayarlar ekranında hata gösterilir ve kaydetme tekrar denenebilir.
 
-Başarılı yayından sonra hostingde şu ignored runtime dosyası oluşur:
-
-```text
-yardimci-asistan/data/ai-settings.local.php
-```
-
-Dosya `0600` izinle oluşturulur, API anahtarı hiçbir sync cevabında dönmez ve paketleme sırasında deploy arşivine alınmaz. `data/` klasörü PHP tarafından yazılabilir olmalıdır.
+Başarılı yayından sonra ayarlar hosting SQLite içindeki korumalı
+`private_publication_config` kaydında publication receipt ile atomik saklanır.
+API anahtarı public/sync cevaplarına veya deploy arşivine girmez.
+`data/` klasörü PHP tarafından yazılabilir olmalıdır.
 
 Masaüstü ve Android'deki `AI ile Stok Ekle` akışı aynı ayarı
 `api/stock-image-analysis.php` üzerinden kullanır. Endpoint `X-YA-Sync-Secret`
@@ -370,8 +336,8 @@ curl -X POST 'https://firma.com/yardimci-asistan/api/sync.php' \
   --data '{"action":"capabilities"}'
 ```
 
-Başarılı yanıtta `protocol_version: 2` ve `storage: "sqlite"` görünmelidir. Ardından
-sitedeki widget'tan örnek talep gönderin; `data/yardimci-asistan.sqlite` oluşur ve
+Başarılı yanıtta `protocol_version: 3` ve `storage: "sqlite"` görünmelidir. Ardından
+sitenin kendi talep formundan örnek talep gönderin; `data/yardimci-asistan.sqlite` oluşur ve
 masaüstündeki `Şimdi Eşitle` komutundan sonra talep panelde görünür.
 
 ## 9. PC Uygulamasıyla Eşleştirme
@@ -392,11 +358,11 @@ Canlı kurulumda `sync_secret` değerini kimseyle paylaşmayın. Anahtar sızars
 
 ## 10. Sık Hatalar
 
-Widget görünmüyor:
+Site verileri görünmüyor:
 
-- `widget.js` yolu yanlış olabilir.
-- Cache eklentisi eski sayfayı gösteriyor olabilir.
-- `window.YardimciAsistanWidget.init()` çağrısı eklenmemiş olabilir.
+- Sayfanın kendi API yolunu, HTTP durumunu ve yayın `enabled` bilgisini kontrol edin.
+- Modülün içinde hazır sayfa veya `widget.js` aranmaz; sunum kodu siteye aittir.
+- Cache eklentisi eski site dosyalarını gösteriyor olabilir.
 
 Talep kaydedilmiyor:
 

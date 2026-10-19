@@ -22,7 +22,7 @@ interface CustomerCreateEditorProps {
   onClose: () => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
-  onCreated: (customerId: string) => void;
+  onCreated?: (customerId: string) => void;
 }
 
 export function CustomerCreateEditor({
@@ -79,7 +79,7 @@ export function CustomerCreateEditor({
       return;
     }
 
-    onCreated(result.savedId);
+    onCreated?.(result.savedId);
     closeForm();
   }
 

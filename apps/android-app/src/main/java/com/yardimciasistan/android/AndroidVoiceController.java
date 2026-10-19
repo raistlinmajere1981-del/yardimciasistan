@@ -232,7 +232,7 @@ final class AndroidVoiceController {
           | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
       use = UiKit.outlineButton(activity, "Metni Kullan", v -> {
         String edited = preview.getText().toString();
-        if (edited.length() > maxChars) { status.setText("Bu alan en fazla " + maxChars + " karakter kabul eder."); return; }
+        if (edited.length() > maxChars) { status.setText(activity.getResources().getQuantityString(R.plurals.field_character_limit, maxChars, maxChars)); return; }
         session.useText(edited);
       });
       preview.addTextChangedListener(new android.text.TextWatcher() {

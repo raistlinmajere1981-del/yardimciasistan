@@ -606,15 +606,6 @@ final class OperationData {
     return null;
   }
 
-  TrackedStockItem trackedStockByProductId(String productId) {
-    for (TrackedStockItem item : trackedStockItems) {
-      if (productId.equals(item.productId)) {
-        return item;
-      }
-    }
-    return null;
-  }
-
   ReportSnapshot report(String preset) {
     return reports.get(preset == null ? "" : preset);
   }

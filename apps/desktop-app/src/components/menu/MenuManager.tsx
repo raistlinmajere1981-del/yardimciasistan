@@ -91,7 +91,6 @@ export function MenuManager({
   const [editingCategoryForm, setEditingCategoryForm] = useState<CategoryFormState | null>(null);
   const [newCategoryForm, setNewCategoryForm] = useState<CategoryFormState>(() => emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
-  const [pendingItemId, setPendingItemId] = useState("");
   const [priceValidationVisible, setPriceValidationVisible] = useState(false);
   const [productForm, setProductForm] = useState(() => ({ ...emptyProductForm(false), purchasePrice: "0" }));
   const [manualImageDataUrl, setManualImageDataUrl] = useState("");
@@ -116,7 +115,7 @@ export function MenuManager({
   }, [dashboardData.menu.items, selectedCategoryId, sortedCategories]);
   const categoryScroll = usePageViewScroll("menu.categories.scroll", sortedCategories.length);
   const productScroll = usePageViewScroll(`menu.products.scroll.${selectedCategoryId}`, visibleItems.length);
-  const { dragging, dropTarget, reorderBusy, suppressRowClickRef, handleDragStart, handleDragOver, handleDrop, finishDrag,
+  const { dragging, dropTarget, suppressRowClickRef,
     handleKeyDown, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } = useRecordReorder<"category" | "item">({
     canDrag: (kind, id) => kind === "category" ? editingCategoryId !== id : Boolean(selectedCategoryId),
     getIds: (kind, id) => kind === "category" ? sortedCategories.map(record => record.id) : dashboardData.menu.items
@@ -139,21 +138,6 @@ export function MenuManager({
       setEditingCategoryForm(null);
     }
   }, [dashboardData.menu.categories, editingCategoryId]);
-
-  useEffect(() => {
-    if (itemCreateOpen || !pendingItemId) return;
-    const entry = dashboardData.menu.items.find(item => item.id === pendingItemId);
-    if (!entry?.product_id) return;
-    if (navigation.openWorkspace({
-      entityType: "product",
-      entityId: entry.product_id,
-      menuEntryId: entry.id,
-      mode: "details",
-      returnContext: { page: "menu", entityId: pendingItemId }
-    })) {
-      setPendingItemId("");
-    }
-  }, [dashboardData.menu.items, itemCreateOpen, navigation, pendingItemId]);
 
   function openItem(item: PublishedMenuItem) {
     onSelectItem(item);
@@ -275,14 +259,9 @@ export function MenuManager({
                   key={category.id}
                   data-sort-kind="category"
                   data-sort-id={category.id}
-                  onDragOver={(event) => handleDragOver(event, "category", category.id)}
-                  onDrop={(event) => void handleDrop(event, "category", category.id)}
                 >
                   <span
                     className="menu-drag-handle-hitbox"
-                    draggable={!reorderBusy}
-                    onDragStart={(event) => handleDragStart(event, "category", category.id)}
-                    onDragEnd={finishDrag}
                     role="button"
                     tabIndex={0}
                     aria-label={`${category.name} sırasını değiştir`}
@@ -386,8 +365,6 @@ export function MenuManager({
                     key={item.id}
                     data-sort-kind="item"
                     data-sort-id={item.id}
-                    onDragOver={(event) => handleDragOver(event, "item", item.id)}
-                    onDrop={(event) => void handleDrop(event, "item", item.id)}
                     onClick={() => {
                       if (!suppressRowClickRef.current) openItem(item);
                     }}
@@ -397,9 +374,6 @@ export function MenuManager({
                     leading={<span className="menu-product-row__leading">
                       <span
                         className={`menu-drag-handle-hitbox${!selectedCategoryId ? " is-disabled" : ""}`}
-                        draggable={!reorderBusy && Boolean(selectedCategoryId)}
-                        onDragStart={(event) => handleDragStart(event, "item", item.id)}
-                        onDragEnd={finishDrag}
                         role="button"
                         tabIndex={selectedCategoryId ? 0 : -1}
                         aria-label={`${item.name} sırasını değiştir`}
@@ -453,7 +427,6 @@ export function MenuManager({
               ...(productId ? { id: productId } : {}),
               ...(manualImageDataUrl ? { manualImageDataUrl } : {}) });
             if (!result?.ok) return;
-            setPendingItemId(result.savedId);
             setItemCreateOpen(false);
             try { await onCatalogReload(); } catch { setCreateMessage("Ürün kaydedildi; katalog görünümü yenilenemedi."); }
           })()}

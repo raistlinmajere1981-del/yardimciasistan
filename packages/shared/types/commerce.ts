@@ -451,6 +451,7 @@ export interface SaveCommerceProductPublicationInput {
 
 /** Public allowlist: no barcode, cost, dealer price or private product metadata. */
 export interface PublishedCommerceProduct {
+  categoryId?: string;
   productId: string;
   name: string;
   description: string;
@@ -466,6 +467,8 @@ export interface PublishedCommerceProduct {
 }
 
 export interface CommerceOnlineCatalog {
+  categories?: Array<{id: string; name: string}>;
+  localization?: import("./public-translations").PublicLocalization;
   /** Empty when delivery is disabled: public catalog, no new online orders. */
   deliveryMethods: CommerceOrderDeliveryMethod[];
   version: 1;

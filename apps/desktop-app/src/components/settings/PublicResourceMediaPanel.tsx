@@ -12,6 +12,8 @@ import type {
   PublicResourceMediaKind
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { IconButton } from "../ui/IconButton";
+import { MediaPreview } from "../ui/MediaPreview";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { reportAppStatus } from "../../app/runtime-state";
 
@@ -260,13 +262,9 @@ export function PublicResourceMediaPanel({
             {media.map((item) => (
               <article className="room-media-card" key={item.id}>
                 <div className="room-media-card-top">
-                  <div className="room-media-card-preview" aria-hidden="true">
-                    {item.previewDataUrl ? (
-                      <img src={item.previewDataUrl} alt="" />
-                    ) : (
-                      <MediaKindIcon kind={item.kind} />
-                    )}
-                  </div>
+                  <MediaPreview className="room-media-card-preview" src={item.previewDataUrl} alt="" fit="cover" surface="surface" aria-hidden="true">
+                    <MediaKindIcon kind={item.kind} />
+                  </MediaPreview>
                   <div className="room-media-card-copy">
                     <strong title={item.originalName}>{item.originalName}</strong>
                     <span>
@@ -275,18 +273,18 @@ export function PublicResourceMediaPanel({
                       {item.remoteUrl ? "Web'e hazır" : "Yayın bekliyor"}
                     </span>
                   </div>
-                  <ActionButton
-                    variant="ghost"
+                  <IconButton
                     size="sm"
                     type="button"
                     className="room-media-card-remove"
-                    disabled={!mediaEnabled || busy}
+                    disabled={!mediaEnabled}
+                    busy={busy}
                     onClick={() => void remove(item)}
                     aria-label={`${item.originalName} medyasını kaldır`}
                     title="Medyayı kaldır"
                   >
                     <Trash2 size={15} aria-hidden="true" />
-                  </ActionButton>
+                  </IconButton>
                 </div>
 
                 <ChoiceChips

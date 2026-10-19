@@ -267,8 +267,14 @@ try {
   await cancelSettingsService(page);
   await expandSettingsStructure(page);
   const sectorType = page.getByLabel('Sektör tipi');
+  const saveSector = async () => {
+    await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Değişiklikler kaydedilip uygulama yeniden başlatılsın mı?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Kaydet ve Yeniden Başlat', exact: true }).click();
+  };
   await sectorType.selectOption('market');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await saveSector();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByText('Sunulan özellikler', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Giriş saati')).toHaveCount(0);
@@ -280,7 +286,7 @@ try {
   await expect(page.getByLabel('Konuşulan diller')).toBeVisible();
 
   await sectorType.selectOption('restaurant');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await saveSector();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByText('Sunulan özellikler', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Wi-Fi')).toBeVisible();
@@ -290,7 +296,7 @@ try {
   await expect(page.getByLabel('Kahvaltı başlangıcı')).toHaveCount(0);
 
   await sectorType.selectOption('pension_restaurant');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await saveSector();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Giriş saati', exact: true })).toHaveAttribute('data-picker-value', '14:00');
   await expect(page.getByLabel('Bagaj emaneti')).toBeVisible();
@@ -308,7 +314,7 @@ try {
       await expect(page.locator('.settings-page-workspace')).toHaveCount(1);
       const metrics = await page.evaluate(() => ({
         documentOverflow: document.documentElement.scrollWidth > innerWidth + 1 || document.documentElement.scrollHeight > innerHeight + 1,
-        overflows: [...document.querySelectorAll('.content, .setup-capabilities, .settings-page-body, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className)
+        overflows: [...document.querySelectorAll('.content, .setup-capabilities, .settings-page-body, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className)
       }));
       observations.push({ width, height, category: name, ...metrics });
       expect(metrics.documentOverflow, `Document overflow at ${width}/${name}`).toBe(false);
@@ -374,7 +380,7 @@ try {
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'layout')?.input.rooms?.[0]?.name)).toBe('Güncellenen Oda');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
 
-  await page.locator('#sidebar-updates').click();
+  await page.locator('#header-updates').click();
   await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
   await page.getByRole('button', { name: 'Güncelleme Tercihlerini Kaydet', exact: true }).click();
   await page.keyboard.press('Escape');

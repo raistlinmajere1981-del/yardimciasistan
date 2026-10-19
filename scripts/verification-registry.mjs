@@ -1,4 +1,10 @@
 const SMOKE_FILES = [
+  "scripts/smoke-market-pilot-web.mjs",
+  "scripts/smoke-desktop-ui-family.mjs",
+  "scripts/smoke-public-translations.mjs",
+  "scripts/smoke-public-translations-web.mjs",
+  "scripts/smoke-public-translations-ui.mjs",
+  "scripts/smoke-web-data-service.mjs",
   "scripts/smoke-android-auto-repair.mjs",
   "scripts/smoke-web-table-smoking-icons.mjs",
   "scripts/smoke-android-companion-v3.mjs",
@@ -36,6 +42,7 @@ const SMOKE_FILES = [
   "scripts/smoke-instagram-staging.mjs",
   "scripts/smoke-instagram-oauth-web.mjs",
   "scripts/smoke-instagram-oauth-settings-ui.mjs",
+  "scripts/smoke-instagram-oauth-cancel.mjs",
   "scripts/smoke-instagram-staged-activation.mjs",
   "scripts/smoke-instagram-oauth-refresh.mjs",
   "scripts/smoke-showcase-website.mjs",
@@ -67,6 +74,7 @@ const SMOKE_FILES = [
   "scripts/smoke-android-device-approval-hosting.mjs",
   "scripts/smoke-android-device-token.mjs",
   "scripts/smoke-android-device-ui.mjs",
+  "scripts/smoke-android-native-ui-family.mjs",
   "scripts/smoke-android-finance-actions.mjs",
   "scripts/smoke-android-hosting-contract.mjs",
   "scripts/smoke-android-permission-matrix.mjs",
@@ -211,6 +219,7 @@ export const IGNORED_SMOKE_FILES = new Set([
 const MANUAL_SMOKE_FILES = new Set([
   // Requires a real Android device/ADB.
   "scripts/smoke-android-device-ui.mjs",
+  "scripts/smoke-android-native-ui-family.mjs",
   // Requires configured live AI credentials/network.
   "scripts/smoke-live-ai.mjs"
 ]);
@@ -276,6 +285,9 @@ const BASE_CHECKS = [
   check("unit-tests", "Tüm workspace birim testleri", "npm", ["test"], {
     phase: 20, presets: ["full"], domains: ["platform"], requires: ["build-packages"]
   }),
+  check("build-demo", "Demo site sunum derlemesi", "npm", ["run", "build:demo"], {
+    phase: 21, domains: ["web"], requires: ["build-packages"]
+  }),
   check("build-packages", "Ortak paketleri derle", "npm", ["run", "build:packages"], {
     phase: 25, presets: ["full"], domains: ["platform"]
   }),
@@ -330,7 +342,7 @@ const BASE_CHECKS = [
   }),
   check("package-web-module", "Web modülü paketleme doğrulaması", "node", ["scripts/package-web-module.mjs"], {
     phase: 85, presets: ["release"], domains: ["web", "release"],
-    requires: ["build-packages"]
+    requires: []
   }),
   check("package-desktop-dir", "Desktop unpacked paket üretimi", "npm", ["run", "pack:dir", "-w", "@yardimci-asistan/desktop-app"], {
     phase: 86, presets: ["release"], domains: ["desktop", "release"],
@@ -570,6 +582,13 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  // Own disposable native fixture build; does not consume the customer APK or Desktop.
+  if (file === "scripts/smoke-android-native-ui-family.mjs") return [];
+  if (file === "scripts/smoke-desktop-ui-family.mjs") return [];
+  if (file === "scripts/smoke-market-pilot-web.mjs") return ["build-desktop", "php-lint"];
+  if (file === "scripts/smoke-public-translations-web.mjs") return ["build-desktop", "build-demo", "php-lint"];
+  if (file.startsWith("scripts/smoke-public-translations")) return ["build-desktop"];
+  if (file === "scripts/smoke-web-data-service.mjs") return [];
   if (file === "scripts/smoke-android-auto-repair.mjs") return ["build-packages"];
   if (file === "scripts/smoke-web-table-smoking-icons.mjs") return [];
   if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["php-lint"];
@@ -581,13 +600,13 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-android-companion-v3.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-nexa-assets.mjs") return [];
-  if (file === "scripts/smoke-web-nexa.mjs") return ["build-packages"];
+  if (["scripts/smoke-web-nexa.mjs", "scripts/smoke-web-widget-branding.mjs", "scripts/smoke-web-widget-module.mjs"].includes(file)) return ["build-demo"];
   if (file === "scripts/smoke-marketing-log-privacy.mjs") return ["php-lint"];
   if (file === "scripts/smoke-instagram-staging.mjs" || file === "scripts/smoke-instagram-oauth-web.mjs") return ["php-lint"];
-  if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "php-lint"];
+  if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
-  if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "php-lint"];
-  if (file === "scripts/smoke-web-storefront.mjs") return ["php-lint"];
+  if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "build-demo", "php-lint"];
+  if (file === "scripts/smoke-web-storefront.mjs") return ["build-demo", "php-lint"];
   if (file === "scripts/smoke-web-order-submission.mjs") return ["php-lint"];
   if (file === "scripts/smoke-support-endpoint.mjs" || file === "scripts/smoke-web-version.mjs") return [];
   if (file === "scripts/smoke-desktop-package.mjs") return ["package-desktop-dir"];
@@ -599,6 +618,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file.startsWith("scripts/smoke-public-translations")) return ["translations", "settings", "web", "desktop"];
   if (file === "scripts/smoke-android-auto-repair.mjs") return ["android", "desktop", "settings"];
   if (file === "scripts/smoke-android-kbs.mjs") return ["android", "hospitality", "desktop"];
   if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["android", "hospitality", "web"];

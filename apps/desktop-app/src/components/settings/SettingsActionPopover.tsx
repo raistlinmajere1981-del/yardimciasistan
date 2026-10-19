@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
+import { ActionButton } from "../ui/ActionButton";
 
 /** A non-modal action surface; existing global confirmations retain modal ownership. */
-export function SettingsActionPopover({ id, label, open, onOpenChange, children, sidebar = false, trigger }: {
+export function SettingsActionPopover({ id, label, open, onOpenChange, children, sidebar = false, iconButton = false, trigger }: {
   id: string; label: string; open: boolean; onOpenChange: (open: boolean) => void;
-  children: ReactNode; sidebar?: boolean; trigger?: ReactNode;
+  children: ReactNode; sidebar?: boolean; iconButton?: boolean; trigger?: ReactNode;
 }) {
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
@@ -51,10 +52,15 @@ export function SettingsActionPopover({ id, label, open, onOpenChange, children,
       document.removeEventListener("keydown", key);
     };
   }, [open, sidebar]);
+  const triggerProps = { ref: button, id, type: "button" as const, "aria-label": label, title: label,
+    "aria-haspopup": "dialog" as const, "aria-expanded": open, "aria-controls": open ? `${id}-panel` : undefined,
+    onClick: () => onOpenChange(!open) };
   return <>
-    <button ref={button} id={id} type="button" className={sidebar ? "nav-item sidebar-update-trigger" : "action-button action-button-secondary"}
-      aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? `${id}-panel` : undefined}
-      onClick={() => onOpenChange(!open)}>{trigger ?? label}</button>
+    {sidebar
+      ? <button {...triggerProps} className="nav-item sidebar-update-trigger">{trigger ?? label}</button>
+      : iconButton
+        ? <IconButton {...triggerProps} className="header-update-trigger">{trigger ?? label}</IconButton>
+        : <ActionButton {...triggerProps} variant="secondary">{trigger ?? label}</ActionButton>}
     {open && createPortal(<section ref={panel} id={`${id}-panel`} role="dialog" aria-label={label} tabIndex={-1}
       className="settings-action-popover" style={position}>
       <header className="settings-action-popover-header"><strong>{label}</strong>

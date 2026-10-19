@@ -205,11 +205,13 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
     ...publicationIdentity(options),
     online_catalog: {
       version: options.catalog.version,
+      ...(options.catalog.localization ? {localization: options.catalog.localization} : {}),
       enabled: options.catalog.enabled,
       delivery_methods: options.catalog.deliveryMethods,
+      ...(options.catalog.categories ? {categories: options.catalog.categories} : {}),
       updated_at: options.catalog.updatedAt,
       products: options.catalog.products.map((product) => ({
-        product_id: product.productId, name: product.name, description: product.description,
+        product_id: product.productId, ...("categoryId" in product ? {category_id: product.categoryId} : {}), name: product.name, description: product.description,
         sku: product.sku, unit: product.unit, price: product.price, currency: product.currency,
         tax_rate: product.taxRate, image_url: product.imageUrl,
         availability: product.availability, sort_order: product.sortOrder
@@ -284,6 +286,7 @@ export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<
     client_id: options.clientId,
     room_catalog: {
       version: options.catalog.version,
+      ...(options.catalog.localization ? {localization: options.catalog.localization} : {}),
       enabled: options.catalog.enabled,
       updated_at: options.catalog.updatedAt,
       rooms: options.catalog.rooms.map((room) => ({
@@ -319,6 +322,7 @@ export async function pushTableCatalog(options: PushTableCatalogOptions): Promis
     client_id: options.clientId,
     table_catalog: {
       version: options.catalog.version,
+      ...(options.catalog.localization ? {localization: options.catalog.localization} : {}),
       enabled: options.catalog.enabled,
       updated_at: options.catalog.updatedAt,
       tables: options.catalog.tables.map((table) => ({
@@ -350,6 +354,7 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
     client_id: options.clientId,
     business_context: {
       version: options.context.version,
+      ...(options.context.localization ? {localization: options.context.localization} : {}),
       business_name: options.context.businessName,
       profile_id: options.context.profileId,
       profile_label: options.context.profileLabel,

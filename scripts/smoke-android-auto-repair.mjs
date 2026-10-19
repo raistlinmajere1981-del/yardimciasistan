@@ -17,10 +17,10 @@ import {createRoot} from '${repo}/node_modules/react-dom/client.js';
 import {AndroidDevicesSection} from '${repo}/apps/desktop-app/src/components/settings/AndroidDevicesSection.tsx';
 const root=createRoot(document.querySelector('#app'));
 window.autoCalls=[];
-window.renderCase=(cred, actualId='android-device-test123', active=true)=>{
+window.renderCase=(cred, actualId='android-device-test123', active=true, operationsEnabled=true)=>{
   root.render(React.createElement(AndroidDevicesSection,{
     devices: [{deviceId:'android-device-test123',deviceName:'Test Phone',role:'admin',isActive:active,revokedAt:'',permissionGroups:{}}],
-    enabledCapabilities:[], state:'idle', installState:'success',
+    operationsEnabled, enabledCapabilities:[], state:'idle', installState:'success',
     installSnapshot:{ok:true,adbAvailable:true,apkAvailable:true,devices:[{
       serial:'testserial',deviceId:actualId,model:'Test Phone',state:'device',
       appInstalled:true,credentialState:cred,action:'current',installedVersionName:'2.0.8-debug',
@@ -53,6 +53,10 @@ try {
     const calls=await page.evaluate(()=>window.autoCalls.length);
     assert.equal(calls,expected,label);
   };
+  await page.evaluate(() => window.renderCase('missing', 'android-device-test123', true, false));
+  await page.waitForTimeout(130);
+  assert.equal(await page.evaluate(() => window.autoCalls.length), 0, 'pending activation never auto-provisions');
+  assert.ok(await page.getByRole('button', { name: 'Yeniden Eşleştir' }).isDisabled(), 'pending activation disables explicit pairing');
   await check('missing','android-device-test123',true,1,'first clean install auto-provisions');
   await check('missing','android-device-test123',true,1,'rerender never duplicates a provisioning attempt');
   await check('present','android-device-test123',true,1,'healthy connection never rekeys');
@@ -61,7 +65,7 @@ try {
   await check('unknown','android-device-test123',true,2,'opaque production credential is not guessed missing');
   await check('missing','android-device-different',true,2,'same phone model with another identity is never auto-paired');
   await check('missing','android-device-test123',false,2,'inactive device is never auto-paired');
-  console.log('android-auto-repair-ui: 8/8 PASS');
+  console.log('android-auto-repair-ui: 9/9 PASS');
 } finally {
   await browser.close();
   rmSync(temporary,{recursive:true,force:true});

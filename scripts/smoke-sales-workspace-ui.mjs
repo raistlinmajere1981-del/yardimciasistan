@@ -219,6 +219,19 @@ try {
   await expect(categories.getByRole("button")).toHaveText(["Tümü", "Hızlı Erişim", "Gıda", "İçecek"]);
   await categories.getByRole("button", { name: "Hızlı Erişim", exact: true }).click();
   await expect(grid.locator(".market-sale-product > span > strong")).toHaveText(["Su", "Ekmek", "Elma kg"]);
+  // Creating a retail product saves to the list without launching its detail workspace.
+  await tabs.getByRole("button", { name: /Ürünler/ }).click();
+  await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+  const createProduct = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
+  await expect(createProduct).toBeVisible();
+  await createProduct.getByLabel("Ürün adı", { exact: true }).fill("Duman test ürünü");
+  await createProduct.getByLabel("Perakende fiyat", { exact: true }).fill("19");
+  await createProduct.getByLabel("Alış fiyatı", { exact: true }).fill("0");
+  await createProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(createProduct).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator('.market-catalog-record[data-sort-kind="products"]').filter({ hasText: "Duman test ürünü" })).toBeVisible();
+  assert.equal(runtime.listRuntimeCatalogProducts(path).some(product => product.name === "Duman test ürünü"), true);
   assert.deepEqual(errors, []);
   // Canonical Settings save/read fencing is covered by smoke-profile-transition-ui.
   console.log("sales-workspace-ui-smoke-ok");

@@ -6,7 +6,6 @@ import android.graphics.Typeface;
 import android.text.InputType;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -33,17 +32,10 @@ final class FinanceWorkspace {
         ? new OperationData.FinanceSnapshot()
         : data.finance;
 
-    LinearLayout header = UiKit.row(context);
-    TextView title = UiKit.title(context, "Kasa");
-    header.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
-    if (data.hasPermission("finance.create")) {
-      Button add = UiKit.iconButton(context, "+", "Kasa hareketi ekle", false,
-          view -> showCreateDialog(context, data, listener));
-      header.addView(add, new LinearLayout.LayoutParams(dp(context, 48), dp(context, 48)));
-    }
-    LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
-    headingParams.setMargins(0, 0, 0, dp(context, 12));
-    page.addView(header, headingParams);
+    View add = data.hasPermission("finance.create")
+        ? UiKit.iconButton(context, "+", "Kasa hareketi ekle", false,
+            view -> showCreateDialog(context, data, listener)) : null;
+    page.addView(UiKit.workspaceHeader(context, "Kasa", null, add));
 
     ArrayList<View> summary = new ArrayList<>();
     summary.add(UiKit.metricCard(context, "Gelir", money(finance.todayIncomeMinor), UiKit.SUCCESS, null));
@@ -58,15 +50,10 @@ final class FinanceWorkspace {
 
     page.addView(UiKit.sectionTitle(context, "Son hareketler"));
     if (finance.recentEntries.isEmpty()) {
-      LinearLayout empty = UiKit.card(context);
-      empty.addView(UiKit.text(context, "Kasa hareketi yok", 14, UiKit.TEXT, Typeface.BOLD));
-      empty.addView(UiKit.text(context, "Gelir ve gider kayıtları burada kısa liste halinde görünür.", 12, UiKit.MUTED, Typeface.NORMAL));
-      page.addView(empty);
+      page.addView(UiKit.emptyCard(context, "Kasa hareketi yok",
+          "Gelir ve gider kayıtları burada kısa liste halinde görünür.", UiKit.MUTED));
     } else {
-      NativeSearchList search = new NativeSearchList(context, "Hareket ara");
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
-      searchParams.setMargins(0, 0, 0, dp(context, 10));
-      page.addView(search.input(), searchParams);
+      NativeSearchList search = NativeSearchList.attachTo(page, "Hareket ara");
       int shown = 0;
       for (OperationData.FinanceEntry entry : finance.recentEntries) {
         if (shown >= 20) break;
@@ -76,10 +63,7 @@ final class FinanceWorkspace {
             + " " + entry.occurredAt + " " + (entry.isIncome() ? "Gelir" : "Gider"));
         shown += 1;
       }
-      TextView noMatches = UiKit.text(context, "Aramayla eşleşen kasa hareketi yok.",
-          13, UiKit.MUTED, Typeface.NORMAL);
-      page.addView(noMatches);
-      search.setNoMatchesNotice(noMatches);
+      search.showNoMatchesIn(page, "Aramayla eşleşen kasa hareketi yok.");
     }
 
     TextView note = UiKit.text(
@@ -128,9 +112,9 @@ final class FinanceWorkspace {
         new Choice("Gelir", "income"),
         new Choice("Gider", "expense")
     });
-    EditText amount = input(context, form, "Tutar (TL)", "0,00");
+    EditText amount = UiKit.labeledInput(context, form, "Tutar (TL)", "0,00");
     amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    EditText description = input(context, form, "Açıklama", "");
+    EditText description = UiKit.labeledInput(context, form, "Açıklama", "");
     description.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
     Spinner payment = spinner(context, form, "Ödeme şekli", new Choice[] {
         new Choice("Nakit", "cash"),
@@ -159,12 +143,12 @@ final class FinanceWorkspace {
     dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
       long amountMinor = parseAmountMinor(amount.getText().toString());
       if (amountMinor <= 0) {
-        status.setText("Geçerli bir tutar girin.");
+        status.setText(R.string.amount_invalid);
         return;
       }
       String normalizedDescription = description.getText().toString().trim().replaceAll("\\s+", " ");
       if (normalizedDescription.length() > 160) {
-        status.setText("Açıklama en fazla 160 karakter olabilir.");
+        status.setText(R.string.finance_description_limit);
         return;
       }
       Choice selectedDirection = (Choice) direction.getSelectedItem();
@@ -178,7 +162,7 @@ final class FinanceWorkspace {
         payload.put("category", selectedCategory.value);
         payload.put("description", normalizedDescription);
       } catch (Exception error) {
-        status.setText("Kasa bilgileri hazırlanamadı.");
+        status.setText(R.string.finance_prepare_failed);
         return;
       }
       dialog.dismiss();
@@ -239,7 +223,7 @@ final class FinanceWorkspace {
   }
 
   private static Spinner spinner(Context context, LinearLayout form, String label, Choice[] choices) {
-    addLabel(context, form, label);
+    UiKit.fieldLabel(context, form, label);
     Spinner spinner = new Spinner(context);
     setChoices(context, spinner, choices);
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 50));
@@ -253,26 +237,6 @@ final class FinanceWorkspace {
     ArrayAdapter<Choice> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, choices);
     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     spinner.setAdapter(adapter);
-  }
-
-  private static EditText input(Context context, LinearLayout form, String label, String hint) {
-    addLabel(context, form, label);
-    EditText field = new EditText(context);
-    field.setSingleLine(true);
-    field.setHint(hint);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 50));
-    params.setMargins(0, 0, 0, dp(context, 10));
-    field.setLayoutParams(params);
-    form.addView(field);
-    return field;
-  }
-
-  private static void addLabel(Context context, LinearLayout form, String label) {
-    TextView text = new TextView(context);
-    text.setText(label);
-    text.setTextSize(12);
-    text.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-    form.addView(text);
   }
 
   private static String money(long minor) {

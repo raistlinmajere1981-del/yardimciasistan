@@ -279,7 +279,8 @@ try {
   assert.equal(web.latitude, 39);
   assert.equal(web.googleMapsEmbedUrl, "");
   const mapWindow = {};
-  runInNewContext(readFileSync(resolve("firm-template/web-module/assets/business-map.js"), "utf8"), { window: mapWindow, URL });
+  runInNewContext(readFileSync(resolve("test-site/landing/assets/js/language.js"), "utf8"), { window: mapWindow, document: { documentElement: { lang: "tr" } } });
+  runInNewContext(readFileSync(resolve("test-site/landing/assets/js/business-map.js"), "utf8"), { window: mapWindow, URL });
   const frame = { removeAttribute: () => { delete frame.src; }, style: {} };
   const mapRoot = { querySelectorAll: selector => selector === "[data-business-map-frame]" ? [frame] : [] };
   mapWindow.YardimciBusinessMap.render({ latitude: 39, longitude: 32, mapDisplayMode: "manual", googleMapsEmbedUrl: embed }, mapRoot);

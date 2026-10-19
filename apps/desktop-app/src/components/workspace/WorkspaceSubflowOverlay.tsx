@@ -1,6 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
-import { X } from "lucide-react";
-import { IconButton } from "../ui/IconButton";
+import { WorkspaceHeader } from "./WorkspaceHeader";
 
 interface WorkspaceSubflowOverlayProps {
   title: string;
@@ -103,12 +102,7 @@ export function WorkspaceSubflowOverlay({
         }
       }}
     >
-      <header className="workspace-frame__header">
-        <h2 id={id} tabIndex={-1} data-modal-initial-focus>{title}</h2>
-        <IconButton aria-label="Alt işlemi kapat" disabled={closeBlocked} onClick={onClose}>
-          <X size={18} aria-hidden="true" />
-        </IconButton>
-      </header>
+      <WorkspaceHeader title={title} titleId={id} closeLabel="Alt işlemi kapat" closeBlocked={closeBlocked} onClose={onClose} />
       <div className="workspace-subflow-overlay__body">{children}</div>
       {footer && <footer className="workspace-frame__footer">{footer}</footer>}
     </div>

@@ -28,6 +28,7 @@ export interface MarketingProviderBridge {
   testInstagramConnection(): Promise<MarketingProviderConnectionResult>;
   beginInstagramOAuth(): Promise<{ok:boolean;message:string}>;
   pollInstagramOAuth(): Promise<InstagramOAuthProgress>;
+  cancelInstagramOAuth(): Promise<{ok:boolean;message:string}>;
   disconnectInstagramOAuth(): Promise<InstagramConfiguration>;
 }
 export interface InstagramPublicationState {

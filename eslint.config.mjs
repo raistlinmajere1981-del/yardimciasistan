@@ -19,11 +19,7 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.demo-runtime/**",
       "**/release/**",
-      // Only the hand-written web-module scripts are linted. widget.js is a
-      // tracked build snapshot of packages/web-widget (linted at its source)
-      // and widget-core.js is a minified bundle, so both stay out of scope.
-      "firm-template/web-module/widget.js",
-      "firm-template/web-module/widget-core.js",
+      "test-site/landing/assets/assistant/**",
       "demo-data/**"
     ]
   },
@@ -72,7 +68,7 @@ export default tseslint.config(
   {
     files: [
       "apps/desktop-app/src/**/*.{ts,tsx}",
-      "packages/web-widget/**/*.{ts,tsx}"
+      "test-site/landing/assistant/**/*.{ts,tsx}"
     ],
     plugins: {
       "react-hooks": reactHooks
@@ -90,7 +86,7 @@ export default tseslint.config(
     // Promise correctness gates. Scoped to tsconfig-covered sources;
     // scripts/tests fixtures live outside every project and would
     // otherwise fail type-aware parsing.
-    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}", "test-site/landing/**/*.ts"],
     ignores: ["apps/desktop-app/scripts/**"],
     languageOptions: {
       parserOptions: {
@@ -103,7 +99,7 @@ export default tseslint.config(
           "./packages/sync-core/tsconfig.json",
           "./packages/ai-core/tsconfig.json",
           "./packages/whatsapp-bridge/tsconfig.json",
-          "./packages/web-widget/tsconfig.json"
+          "./test-site/landing/tsconfig.json"
         ],
         tsconfigRootDir: import.meta.dirname
       }

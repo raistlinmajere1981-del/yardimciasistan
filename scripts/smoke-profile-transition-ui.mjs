@@ -27,6 +27,12 @@ try {
   const save = page.getByRole("button", { name: "Kaydet", exact: true });
   const revert = page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true });
   const warning = page.getByText("İşletme tipi değiştirildi. Kaydedildiğinde yeni sektörün varsayılan özellikleri uygulanacak ve uygulama yeniden başlatılacak.", { exact: true });
+  const restartDialog = page.getByRole("dialog", { name: "Değişiklikler kaydedilip uygulama yeniden başlatılsın mı?" });
+  const confirmSectorSave = async () => {
+    await save.click();
+    await expect(restartDialog).toBeVisible();
+    await restartDialog.getByRole("button", { name: "Kaydet ve Yeniden Başlat" }).click();
+  };
   await page.evaluate(() => window.refreshSettings({ profileOptions: ["messaging.campaigns"], servicePreferences: { whatsapp: false, android: true } }));
   await expect(options.getByLabel("Talepler", { exact: true })).not.toBeChecked();
   const before = await page.evaluate(() => structuredClone(window.persistedSettings()));
@@ -61,12 +67,18 @@ try {
   expect(await page.evaluate(() => window.settingsCalls)).toEqual(beforeCalls);
 
   await select.selectOption("market");
-  await page.evaluate(() => { window.failSetup = true; });
   await save.click();
+  await expect(restartDialog).toBeVisible();
+  expect(await page.evaluate(() => window.persistedSettings())).toEqual(before);
+  await restartDialog.getByRole("button", { name: "Vazgeç" }).click();
+  await expect(select).toHaveValue("market");
+  expect(await page.evaluate(() => window.persistedSettings())).toEqual(before);
+  await page.evaluate(() => { window.failSetup = true; });
+  await confirmSectorSave();
   await expect(warning).toBeVisible();
   expect(await page.evaluate(() => window.persistedSettings())).toEqual(before);
   await page.evaluate(() => { window.failSetup = false; });
-  await save.click();
+  await confirmSectorSave();
   await expect(warning).toHaveCount(0);
   await expect(options.getByLabel("Satın alma", { exact: true })).toBeChecked();
   await expect(options.getByLabel("Satın alma", { exact: true })).toBeDisabled();
@@ -76,7 +88,7 @@ try {
   await options.getByLabel("WhatsApp / SMS Kampanyaları", { exact: true }).check();
   await save.click();
   await select.selectOption("pension");
-  await save.click();
+  await confirmSectorSave();
   await expect(options.getByLabel("Talepler", { exact: true })).toBeChecked();
   await expect(options.getByLabel("WhatsApp / SMS Kampanyaları", { exact: true })).not.toBeChecked();
 

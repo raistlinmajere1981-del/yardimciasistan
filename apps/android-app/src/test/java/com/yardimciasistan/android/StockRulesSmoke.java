@@ -48,9 +48,6 @@ public final class StockRulesSmoke {
     assertEquals("out_of_stock", out.derivedStatus(), "zero stock status");
     assertEquals("low_stock", low.derivedStatus(), "minimum threshold status");
     assertEquals("in_stock", in.derivedStatus(), "positive stock status");
-    data.trackedStockItems.add(low);
-    assertSame(low, data.trackedStockByProductId("low"), "tracked stock list lookup");
-
     data.permissions.add("menu.stock_update");
     assertTrue(data.hasPermission("menu.stock_update"), "explicit update permission should enable manual stock actions");
 

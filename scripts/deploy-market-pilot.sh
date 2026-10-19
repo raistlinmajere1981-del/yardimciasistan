@@ -50,7 +50,9 @@ expected_home='/home/yardimciasistantest'
 for executable in node npm php ssh rsync curl; do
   command -v "$executable" >/dev/null || { echo "Gerekli komut eksik: $executable" >&2; exit 1; }
 done
-php -l "$site_source/index.php" >/dev/null
+while IFS= read -r -d '' source_php; do
+  php -l "$source_php" >/dev/null
+done < <(find "$site_source" -name '*.php' -type f -print0)
 [[ -s "$site_source/assets/market.css" ]] || { echo 'Market CSS bulunamadı.' >&2; exit 1; }
 
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=12 -o StrictHostKeyChecking=yes)
@@ -99,7 +101,7 @@ REMOTE_SITE_CHECK
 
 if [[ "$dry_run" == true ]]; then
   echo 'Ön kontrol geçti. Site ve modül yayınlandığında yalnız Market Pilot hesabı değişecek.'
-  echo 'Site: index.php + assets/market.css (diğer içerikler korunur).'
+  echo 'Site: index.php + assets/ + inc/ + magaza/ (diğer içerikler korunur).'
   if [[ "$module_state" == first ]]; then
     echo 'İlk kurulumda yeni ve bağımsız güvenlik anahtarı oluşturulacak.'
   else
@@ -144,7 +146,9 @@ fi
 echo 'Market ana sayfası hazırlanıyor...'
 stamp="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 stage_index="$www_root/.market-pilot-index-$stamp.php"
-rsync -az -e "$ssh_cmd" "$site_source/assets/" "$host:$www_root/assets/"
+for site_directory in assets inc magaza; do
+  rsync -az -e "$ssh_cmd" "$site_source/$site_directory/" "$host:$www_root/$site_directory/"
+done
 rsync -az -e "$ssh_cmd" "$site_source/index.php" "$host:$stage_index"
 ssh "${ssh_opts[@]}" "$host" bash -s -- "$www_root" "$backup_dir" "$stage_index" "$stamp" <<'REMOTE_SITE_ACTIVATE'
 set -Eeuo pipefail

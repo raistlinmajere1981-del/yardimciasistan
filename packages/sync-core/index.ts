@@ -234,6 +234,7 @@ export interface PublishedMenuItem {
 }
 
 export interface PublishedQrMenu {
+  localization?: import("@yardimci-asistan/shared").PublicLocalization;
   /** Web QR menu publication visibility; omitted payloads remain visible for compatibility. */
   enabled?: boolean;
   categories: PublishedMenuCategory[];

@@ -37,7 +37,7 @@ The architecture constitution and decision register take precedence over histori
 
 - Use the structured desktop diagnostics API with stable `scope`/`event` and meaningful severity. Start investigations with `npm run logs:errors`; consult `docs/diagnostics/logging.md`. Renderer logs use the preload bridge and must honor the session lock.
 - Never record secrets, credentials, auth headers, tokens, customer message bodies or unnecessary personal data; defensive redaction is not permission to collect them.
-- Build/test must not modify tracked generated files. Web widget build writes to `packages/web-widget/dist/widget.js`; `firm-template/web-module/widget.js` is an intentional snapshot refreshed only via `npm run sync:web-widget-template`. Do not conceal incidental worktree changes.
+- Build/test must not modify tracked generated files. The API-only web module contains no presentation assets. Demo assistant build writes only to ignored `test-site/landing/assets/assistant/` via `npm run build:demo`. Do not conceal incidental worktree changes.
 
 ## Verification
 

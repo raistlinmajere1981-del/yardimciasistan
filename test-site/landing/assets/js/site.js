@@ -1,4 +1,5 @@
 (() => {
+  const { ui, html, locale } = window.DemoLanguage;
   const menuButton = document.querySelector("[data-menu-toggle]");
   const nav = document.querySelector("[data-site-nav]");
 
@@ -25,22 +26,22 @@
       const field = document.getElementById(button.dataset.copyTarget);
       const status = document.querySelector('[data-copy-status]');
       if (!field?.value) return;
-      try { await navigator.clipboard.writeText(field.value); if (status) status.textContent = 'Kopyalandı.'; }
-      catch { field.focus(); field.select(); if (status) status.textContent = 'Seçilen bilgiyi kopyalayabilirsiniz.'; }
+      try { await navigator.clipboard.writeText(field.value); if (status) status.textContent = ui("Kopyalandı."); }
+      catch { field.focus(); field.select(); if (status) status.textContent = ui("Seçilen bilgiyi kopyalayabilirsiniz."); }
     });
   });
 
   const businessFeatureCatalog = {
     wifi: ["Wi-Fi", "⌁"],
     parking: ["Otopark", "P"],
-    pet_friendly: ["Evcil hayvan kabul edilir", "♡"],
-    family_friendly: ["Çocuklu ailelere uygun", "⌂"],
-    wheelchair_access: ["Tekerlekli sandalye erişimine uygun", "♿"],
-    step_free_access: ["Basamaksız erişim", "↔"],
-    garden: ["Bahçe", "♧"],
-    terrace: ["Teras", "▱"],
-    luggage_storage: ["Bagaj emaneti", "▣"],
-    airport_transfer: ["Havalimanı transferi", "↗"]
+    pet_friendly: [ui("Evcil hayvan kabul edilir"), "♡"],
+    family_friendly: [ui("Çocuklu ailelere uygun"), "⌂"],
+    wheelchair_access: [ui("Tekerlekli sandalye erişimine uygun"), "♿"],
+    step_free_access: [ui("Basamaksız erişim"), "↔"],
+    garden: [ui("Bahçe"), "♧"],
+    terrace: [ui("Teras"), "▱"],
+    luggage_storage: [ui("Bagaj emaneti"), "▣"],
+    airport_transfer: [ui("Havalimanı transferi"), "↗"]
   };
 
   const renderBusinessFeatures = (featureIds) => {
@@ -50,7 +51,7 @@
     const ids = [...new Set(featureIds.map((value) => String(value || "").trim()))]
       .filter((id) => businessFeatureCatalog[id]);
     if (!ids.length) {
-      root.innerHTML = '<div class="room-catalog-empty">İşletme olanakları henüz yayınlanmadı.</div>';
+      root.innerHTML = `<div class="room-catalog-empty">${html("İşletme olanakları henüz yayınlanmadı.")}</div>`;
       return;
     }
     for (const id of ids) {
@@ -156,7 +157,8 @@
     try {
       const response = await fetch("/yardimci-asistan/api/business.php", { headers: { Accept: "application/json" } });
       if (!response.ok) return;
-      const data = await response.json();
+      const source = await response.json();
+      const data = window.DemoLanguage?.localize(source, "business_context") ?? source;
       const surfaces = new Set(Array.isArray(data?.business?.public_surfaces) ? data.business.public_surfaces : []);
       document.querySelectorAll("[data-ya-surface]").forEach((node) => {
         const surface = node.getAttribute("data-ya-surface");
@@ -253,14 +255,14 @@
     roots.forEach((root) => { root.hidden = false; });
 
     const ratingValue = Number(payload.rating || 0);
-    const ratingText = ratingValue > 0 ? ratingValue.toFixed(1) : "—";
-    const count = Number(payload.user_rating_count || 0);
+    const ratingText = ratingValue > 0 ? new Intl.NumberFormat(locale,{minimumFractionDigits:1,maximumFractionDigits:1}).format(ratingValue) : "—";
+    const count = new Intl.NumberFormat(locale).format(Number(payload.user_rating_count || 0));
 
     if (summary) {
       const score = summary.querySelector("[data-google-summary-score]");
       const summaryCount = summary.querySelector("[data-google-summary-count]");
       if (score) score.textContent = `${ratingText} ★`;
-      if (summaryCount) summaryCount.textContent = `${count} Google Maps değerlendirmesi`;
+      if (summaryCount) summaryCount.textContent = ui("{0} Google Maps değerlendirmesi", {0: count});
       summary.hidden = false;
     }
 
@@ -271,17 +273,17 @@
       const limit = Math.max(1, Number(root.dataset.reviewLimit || 5));
 
       if (rating) {
-        rating.innerHTML = `<strong>Google Maps ${escapeHtml(ratingText)} ★</strong><span>${escapeHtml(count)} değerlendirme</span>`;
+        rating.innerHTML = `<strong>Google Maps ${escapeHtml(ratingText)} ★</strong><span>${escapeHtml(ui("{0} değerlendirme", {0:count}))}</span>`;
       }
 
       const reviews = Array.isArray(payload.reviews) ? payload.reviews.slice(0, limit) : [];
       if (list) {
         if (!reviews.length) {
-          list.innerHTML = '<div class="review-unavailable"><strong>Google Maps puanı bağlı.</strong><span>Gösterilebilecek yorum metni bulunamadı.</span></div>';
+          list.innerHTML = `<div class="review-unavailable"><strong>${html("Google Maps puanı bağlı.")}</strong><span>${html("Gösterilebilecek yorum metni bulunamadı.")}</span></div>`;
         } else {
           list.innerHTML = reviews.map((review) => {
             const stars = "★".repeat(Math.max(0, Math.min(5, Number(review.rating || 0))));
-            const authorName = escapeHtml(review.author || "Google Maps kullanıcısı");
+            const authorName = escapeHtml(review.author || ui("Google Maps kullanıcısı"));
             const authorPhoto = review.author_photo_uri
               ? `<img src="${escapeHtml(review.author_photo_uri)}" alt="" loading="lazy">`
               : "";
@@ -289,11 +291,11 @@
               ? `<a href="${escapeHtml(review.author_uri)}" target="_blank" rel="noopener noreferrer">${authorName}</a>`
               : `<strong>${authorName}</strong>`;
             const sourceLink = review.google_maps_uri
-              ? `<a class="review-source-link" href="${escapeHtml(review.google_maps_uri)}" target="_blank" rel="noopener noreferrer">Yorumu Google Maps'te gör ↗</a>`
+              ? `<a class="review-source-link" href="${escapeHtml(review.google_maps_uri)}" target="_blank" rel="noopener noreferrer">${html("Yorumu Google Maps'te gör ↗")}</a>`
               : "";
 
             return `<blockquote>
-              <div class="review-stars" aria-label="${escapeHtml(review.rating)} üzerinden 5 yıldız">${escapeHtml(stars)}</div>
+              <div class="review-stars" aria-label="${escapeHtml(ui("{0} üzerinden 5 yıldız",{0:review.rating}))}">${escapeHtml(stars)}</div>
               <p>“${escapeHtml(review.text)}”</p>
               <footer>
                 <span class="review-author">${authorPhoto}<span class="review-author-copy">${author}<small>${escapeHtml(review.relative_time)}</small></span></span>
@@ -374,7 +376,7 @@
 
       destroyPanorama();
       if (panoramaTitle) {
-        panoramaTitle.textContent = button.dataset.panoramaTitle || "Panoramik görünüm";
+        panoramaTitle.textContent = button.dataset.panoramaTitle || ui("Panoramik görünüm");
       }
 
       panoramaDialog.showModal();
@@ -402,7 +404,7 @@
     button.addEventListener("click", () => {
       if (!galleryDialog || !galleryImage) return;
       galleryImage.src = button.dataset.gallerySrc || "";
-      galleryImage.alt = button.dataset.galleryAlt || "Oda fotoğrafı";
+      galleryImage.alt = button.dataset.galleryAlt || ui("Oda fotoğrafı");
       galleryDialog.showModal();
     });
   });

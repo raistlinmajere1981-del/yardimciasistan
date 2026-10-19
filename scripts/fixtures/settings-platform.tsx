@@ -8,7 +8,7 @@ import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-con
 import { createCapabilitySnapshotFixture } from "../test-helpers/business-capability-fixtures.mjs";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { useUpdateSettings } from "../../apps/desktop-app/src/components/settings/UpdateSettings";
-import { SidebarUpdateStatus } from "../../apps/desktop-app/src/components/settings/SidebarUpdateStatus";
+import { HeaderUpdateStatus } from "../../apps/desktop-app/src/components/settings/HeaderUpdateStatus";
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
 import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
 import { AppearanceSettingsSection } from "../../apps/desktop-app/src/components/settings/AppearanceSettingsSection";
@@ -139,7 +139,19 @@ async function dictationStatus() {
     message: !canTest ? "AI modeli veya HTTPS web bağlantısı gerekli" : !ready ? "STT bağlantısı doğrulanmadı"
       : enabled ? "Etkin · Masaüstü dikte hazır" : "Kapalı · STT bağlantısı doğrulandı" };
 }
+const translationFixture = async (method: string, input?: unknown) => {
+  if (!new URLSearchParams(window.location.search).has("translations")) return {ok:true,value:method === "settings" ? {enabled:false,sourceLanguage:"tr",targetLanguages:[],automatic:false} : null};
+  return (await fetch(`/fixture-translations/${method}`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(input ?? {})})).json();
+};
 window.yardimciDesktop = {
+  getTranslationSettings: () => translationFixture("settings"),
+  saveTranslationSettings: input => translationFixture("saveSettings",input),
+  getTranslation: (identity, language) => translationFixture("get",{identity,language}),
+  listTranslations: input => translationFixture("list",input),
+  saveTranslation: input => translationFixture("save",input),
+  startTranslation: input => translationFixture("start",input),
+  getTranslationJob: () => translationFixture("job"),
+  cancelTranslation: () => translationFixture("cancel"),
   getDictationStatus: dictationStatus,
   saveDictationEnabled: async enabled => {
     window.settingsCalls.push({ kind: "dictation-save", enabled });
@@ -171,6 +183,13 @@ window.yardimciDesktop = {
   pollInstagramOAuth: async () => ({ status: "failed", message: "OAuth fixture bağlı değil." }),
   disconnectInstagramOAuth: async () => structuredClone(canonical.instagram),
   testInstagramConnection: async () => ({ ok: false, message: "OAuth fixture bağlı değil.", testedAt: new Date().toISOString() }),
+  probeWebConnection: async input => {
+    window.settingsCalls.push({ kind: "web-probe", input });
+    if (new URLSearchParams(window.location.search).has("deferWebTest")) {
+      return new Promise(resolve => { (window.pendingWebProbes ??= []).push(ok => resolve({ ok, message: "Fixture probe" })); });
+    }
+    return { ok: !window.failWebTest, message: "Fixture probe" };
+  },
   testWebConnection: async input => {
     window.settingsCalls.push({ kind: "web-test", input });
     const ok = !window.failWebTest;
@@ -464,7 +483,7 @@ function Fixture() {
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
     {voiceDesktop && <nav aria-label="Ses testi ekranı"><button onClick={() => setVoiceScreen("settings")}>Ayarları Aç</button><button onClick={() => setVoiceScreen("editor")}>Editörü Aç</button><button onClick={() => setVoiceScreen("ai")}>Metin Asistanını Aç</button></nav>}
-    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar"><SidebarUpdateStatus controller={updates} /></aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions"><AppearanceSettingsSection preferences={preferences} onPreferencesChange={setPreferences} /></div></div></header>}>
+    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar" />} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions page-header-tools"><HeaderUpdateStatus controller={updates} /><AppearanceSettingsSection preferences={preferences} onPreferencesChange={setPreferences} /></div></div></header>}>
       {voiceDesktop && voiceScreen === "editor" && <section className="form-stack" aria-label="Paylaşım düzenleyicisi">
         <SpeechTextField label="Paylaşım metni" value={voiceText} maxLength={12000} rows={6} onChange={setVoiceText} />
         <ReadAloudButton text="Görünür yanıt metni" />

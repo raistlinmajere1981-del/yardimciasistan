@@ -52,6 +52,21 @@ function normalizeVerificationRunState(state: VerificationRunState): Verificatio
   return { ...state, totalPlanned: state.totalPlanned ?? 0, checks: Array.isArray(state.checks) ? state.checks : [] };
 }
 
+// Android screen checks are separate from unattended verification presets:
+// isolated native fixture, archived browser parity, and real Companion flows.
+const ANDROID_SCREEN_CHECKS = new Set([
+  "android-native-ui-family",
+  "android-ui-parity-v16",
+  "android-companion-device-ui",
+  "android-companion-commerce-device-ui"
+]);
+const ANDROID_SCREEN_LABELS: Record<string, string> = {
+  "android-native-ui-family": "Hızlı native ekran testi · izole APK",
+  "android-ui-parity-v16": "V16 tasarım ekranları · tarayıcı",
+  "android-companion-device-ui": "Gerçek Companion · cihaz arayüzü",
+  "android-companion-commerce-device-ui": "Gerçek Companion · ticari işlemler"
+};
+
 const NAV_ITEMS: Array<{ id: Section; label: string; icon: typeof Home }> = [
   { id: "overview", label: "Genel Bakış", icon: Home },
   { id: "installations", label: "Kurulumlar", icon: Server },
@@ -1189,6 +1204,7 @@ function Tests({
   const defaultPreset = verification.presets.includes("full") ? "full" : verification.presets[0] ?? "";
   const [preset, setPreset] = useState(defaultPreset);
   const [domain, setDomain] = useState("all");
+  const [androidScreens, setAndroidScreens] = useState(false);
   const [runState, setRunState] = useState<VerificationRunState>({
     totalPlanned: 0,
     checks: [],
@@ -1255,7 +1271,9 @@ function Tests({
 
   const planIds = new Set(verification.plans[preset] ?? []);
   const visibleChecks = verification.checks.filter((check) =>
-    planIds.has(check.id) && (domain === "all" || check.domains.includes(domain))
+    androidScreens
+      ? ANDROID_SCREEN_CHECKS.has(check.id)
+      : planIds.has(check.id) && (domain === "all" || check.domains.includes(domain))
   );
 
   const activeCheck = runState.checks.find((check) => check.status === "running");
@@ -1296,13 +1314,13 @@ function Tests({
           ? "warning"
           : "unknown";
 
-  const startRun = useCallback(async (mode: "preset" | "domain" | "check", value: string) => {
+  const startRun = useCallback(async (mode: "preset" | "domain" | "check", value: string, includeManual = false) => {
     if (!value || runState.running) return;
     setExpandedCheckId("");
     setExpandedOutput("");
     setCopyStatus("");
     setRunMessage("");
-    const result = await window.adminControlCenter.startVerification({ mode, value });
+    const result = await window.adminControlCenter.startVerification({ mode, value, includeManual });
     setRunMessage(result.message);
     if (!result.accepted) {
       setTimeout(() => setRunMessage(""), 4000);
@@ -1333,11 +1351,13 @@ function Tests({
           ) : (
             <button
               className="button button--primary"
-              disabled={!preset}
-              onClick={() => void startRun("preset", preset)}
+              disabled={!androidScreens && !preset}
+              onClick={() => void (androidScreens
+                ? startRun("check", "android-native-ui-family", true)
+                : startRun("preset", preset))}
             >
               <Play size={16} />
-              {preset || "Plan"} Çalıştır
+              {androidScreens ? "Hızlı Native Test" : (preset || "Plan") + " Çalıştır"}
             </button>
           )}
           <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
@@ -1464,11 +1484,18 @@ function Tests({
       <section className="panel verification-panel">
         <div className="panel-header verification-toolbar">
           <div>
-            <p className="panel-kicker">CANONICAL PLAN</p>
-            <h2>{preset || "Plan"} kontrolleri</h2>
+            <p className="panel-kicker">{androidScreens ? "ANDROID EKRAN / CİHAZ KONTROLLERİ" : "CANONICAL PLAN"}</p>
+            <h2>{androidScreens ? "Android ekran testleri" : `${preset || "Plan"} kontrolleri`}</h2>
           </div>
           <div className="verification-toolbar-actions">
-            {domain !== "all" ? (
+            <button
+              className={androidScreens ? "button button--primary button--compact" : "button button--secondary button--compact"}
+              aria-pressed={androidScreens}
+              onClick={() => setAndroidScreens(value => !value)}
+            >
+              {androidScreens ? "Plan Kontrolleri" : "Android Ekranları"}
+            </button>
+            {!androidScreens && domain !== "all" ? (
               <button
                 className="button button--secondary button--compact"
                 disabled={runState.running}
@@ -1478,7 +1505,7 @@ function Tests({
                 {domain} çalıştır
               </button>
             ) : null}
-            <div className="domain-filter">
+            {!androidScreens && <div className="domain-filter">
               <button
                 className={domain === "all" ? "filter-chip filter-chip--active" : "filter-chip"}
                 onClick={() => setDomain("all")}
@@ -1494,10 +1521,14 @@ function Tests({
                   {item}
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
 
+        {androidScreens && <p className="verification-screen-note">
+          Hızlı native test gerçek Android görünümlerini izole bir test APK’sında ölçer; V16 tarayıcı testi tasarım referansını kontrol eder.
+          Companion testleri ise kurulu uygulamayı ADB ile sınar. Cihaz testleri isteğe bağlıdır, full/release otomatik koşusuna dahil değildir.
+        </p>}
         <div className="verification-list">
           {visibleChecks.map((check, index) => {
             const live = runChecksById.get(check.id);
@@ -1516,10 +1547,10 @@ function Tests({
               <div className={`verification-row verification-row--action${live?.status === "running" ? " verification-row--running" : ""}`}>
                 <span className="verification-index">{String(index + 1).padStart(2, "0")}</span>
                 <div className="verification-check-copy">
-                  <strong>{check.label}</strong>
+                  <strong>{androidScreens ? ANDROID_SCREEN_LABELS[check.id] ?? check.label : check.label}</strong>
                   <small>
                     {check.id} · {check.domains.join(", ")}
-                    {check.manual ? " · manuel" : ""}
+                    {check.manual ? " · ADB cihazı gerekli · manuel" : ""}
                   </small>
                 </div>
                 <div className="verification-deps">
@@ -1551,7 +1582,7 @@ function Tests({
                   <button
                     className="text-button verification-run-check"
                     disabled={runState.running}
-                    onClick={() => void startRun("check", check.id)}
+                    onClick={() => void startRun("check", check.id, check.manual)}
                   >
                     Çalıştır
                   </button>

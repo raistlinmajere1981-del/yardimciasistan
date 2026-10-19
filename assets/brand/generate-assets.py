@@ -75,7 +75,7 @@ def fit_square(art, pixels, ratio=.83):
     return square
 
 def app_icon(art,pixels):
-    # Shared transparent silhouette for desktop, web and Android legacy launchers.
+    # Shared transparent silhouette for desktop and demo web icons.
     # Do not paint a rounded tile: the OS/launcher controls icon framing.
     return fit_square(art,pixels,.87)
 
@@ -108,8 +108,7 @@ def main():
     save(full, "assets/brand/yardimci-asistan-logo-full.png")
     for dir in ("apps/desktop-app/public/assets","test-site/landing/assets"):
         save(fit_square(mark,512,.87),f"{dir}/yardimci-asistan-symbol.png")
-        save(full,f"{dir}/yardimci-asistan-logo.png")
-    save(fit_square(mark,512,.87),"firm-template/web-module/assets/yardimci-asistan-symbol.png")
+    save(full,"test-site/landing/assets/yardimci-asistan-logo.png")
     for p in ("apps/desktop-app/public/favicon.png","test-site/landing/favicon.png"):
         save(app_icon(mark,64),p)
     save(app_icon(mark,1024),"apps/desktop-app/assets/app-icon.png")
@@ -117,8 +116,6 @@ def main():
     ico.save(ROOT/"apps/desktop-app/assets/app-icon.ico",format="ICO",sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
     print("apps/desktop-app/assets/app-icon.ico")
     save(fit_square(mark,432,.63),"apps/android-app/src/main/res/drawable/ic_launcher_foreground.png")
-    for dpi,sz in (("mdpi",48),("hdpi",72),("xhdpi",96),("xxhdpi",144),("xxxhdpi",192)):
-        save(app_icon(mark,sz),f"apps/android-app/src/main/res/mipmap-{dpi}/ic_launcher.png")
     # preview: mascot extracted against contrasting backgrounds and the generated lockup
     view=Image.new("RGB",(1040,540),(240,244,248));v=ImageDraw.Draw(view)
     v.rounded_rectangle((520,0,1040,540),radius=5,fill=(16,29,47))

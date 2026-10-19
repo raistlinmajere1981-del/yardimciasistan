@@ -65,6 +65,7 @@ export interface MarketingStudioSnapshot {
   shares?: Array<{contentId: string; channels: MarketingChannel[]; submitted: boolean}>;
 }
 export interface MarketingWebsiteProjection {
+  localization?: import("./public-translations").PublicLocalization;
   version: 1; enabled: boolean; publications: Array<{
     id: string; channel: "website"; placement: MarketingPlacement; revision: number;
     published: boolean; title: string; text: string; images: Array<{ assetId: string; url: string; altText: string; width: number; height: number; sortOrder: number }>;

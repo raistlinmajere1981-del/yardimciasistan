@@ -54,7 +54,7 @@ export function useCustomerController({
       setManualRequestMessage("");
       setSyncState("error");
       setStatusMessage("Talep kaydı hazır değil. Uygulamayı yeniden başlatın.");
-      return;
+      return false;
     }
 
     const input: CreateManualRequestInput = {
@@ -78,7 +78,7 @@ export function useCustomerController({
       setManualRequestMessage("");
       setSyncState("error");
       setStatusMessage(result.message);
-      return;
+      return false;
     }
 
     setDashboardData(result.dashboardData);
@@ -93,6 +93,7 @@ export function useCustomerController({
     setManualRequestMessage("");
     setSyncState("success");
     setStatusMessage(result.message);
+    return true;
   }
 
   async function handleConvertRequestToReservation(request: SyncedCustomerRequest) {

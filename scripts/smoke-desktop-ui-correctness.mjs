@@ -149,6 +149,9 @@ try {
 
   await scenario('Google Reviews rejection retains draft and reports global feedback', 'settings-platform', '', async page => {
     const card = await openSettingsService(page, 'settings-google-reviews');
+    await expect(card.getByLabel('Google Place ID')).toBeDisabled();
+    await expect(card.getByRole('button', { name: 'Google Bağlantısını Dene' })).toBeDisabled();
+    await card.getByRole('switch').check();
     await card.getByLabel('Google Place ID').fill('fixture-place');
     await card.getByLabel('Places API anahtarı').fill('fixture-key');
     await page.evaluate(() => {

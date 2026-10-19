@@ -142,7 +142,7 @@ final class ReservationEditorDialog {
     TextView status = UiKit.text(context, "", 12, UiKit.DANGER, android.graphics.Typeface.BOLD);
     status.setPadding(0, dp(context, 8), 0, 0);
     if (editing && !detailsEditable) {
-      status.setText("Web talebinden oluşan rezervasyonda tarih, saat ve kişi bilgisi korunur; oda/masa ve not değiştirilebilir.");
+      status.setText(R.string.reservation_web_details_preserved);
     }
     form.addView(status);
 
@@ -197,7 +197,7 @@ final class ReservationEditorDialog {
         payload.put("guest_count", guests);
         payload.put("notes", notes.getText().toString().trim());
       } catch (Exception error) {
-        status.setText("Rezervasyon bilgileri hazırlanamadı.");
+        status.setText(R.string.reservation_prepare_failed);
         return;
       }
       dialog.dismiss();
@@ -306,7 +306,7 @@ final class ReservationEditorDialog {
 
   private static TextView valueBlock(Context context, String label, String value) {
     TextView text = new TextView(context);
-    text.setText(label + "\n" + value);
+    text.setText(context.getString(R.string.reservation_labeled_value, label, value));
     text.setTextSize(14);
     text.setPadding(0, dp(context, 4), 0, dp(context, 12));
     return text;

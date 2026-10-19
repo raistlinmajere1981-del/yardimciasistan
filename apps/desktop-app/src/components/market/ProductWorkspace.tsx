@@ -386,8 +386,8 @@ export function ProductWorkspace({
 
   const stockPanel = inventoryEnabled && product.trackInventory && <DetailSectionCard title="Stok güncelleme" className="market-product-stock-update">
     <strong>Mevcut stok: {balance?.quantity ?? "—"} {product.unit}</strong>
-    <label className="market-field">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
-    <label className="market-field">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+    <label className="form-field form-field--fluid">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+    <label className="form-field form-field--fluid">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
     <ActionButton variant="secondary" disabled={dirty || mutationBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
     <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); }}>Sayım taslağını temizle</ActionButton>
     {dirty && <small>Stok güncellemeden önce ürün değişikliklerini kaydedin veya geri alın.</small>}
@@ -455,7 +455,7 @@ export function ProductWorkspace({
             disabled={mutationBusy || stockDraftDirty || resourceState !== "success"}
             mode="all"
             statusFields={onlineSalesEnabled ? <>
-              <label className="market-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || !publicationLoaded} onChange={event => void savePublication(event.target.checked)} /> Web satışında yayınla</label>
+              <label className="form-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || !publicationLoaded} onChange={event => void savePublication(event.target.checked)} /> Web satışında yayınla</label>
               {publicationMessage && <p role="status">{publicationMessage}</p>}
             </> : null}
             localImageDataUrl={effectiveImageDataUrl}

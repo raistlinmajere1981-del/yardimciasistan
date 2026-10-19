@@ -119,7 +119,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange, refres
       <section className="market-panel">
         <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
         {utilityAction}
-        <label className="market-field">
+        <label className="form-field form-field--fluid">
           Ürün
           <MarketCatalogPicker ariaLabel="Ürün" value={productId} products={products} onChange={setProductId} onProductSelected={setPickedProduct} disabled={busy} />
         </label>
@@ -149,8 +149,8 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange, refres
             )}
           </div>
         )}
-        <label className="market-field">Sayılan miktar<input type="number" min="0" step="0.0001" value={countedQuantity} onChange={(event) => setCountedQuantity(event.target.value)} /></label>
-        <label className="market-field">Sayım notu<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="İsteğe bağlı" /></label>
+        <label className="form-field form-field--fluid">Sayılan miktar<input type="number" min="0" step="0.0001" value={countedQuantity} onChange={(event) => setCountedQuantity(event.target.value)} /></label>
+        <label className="form-field form-field--fluid">Sayım notu<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="İsteğe bağlı" /></label>
         <div className="market-form-actions"><ActionButton type="button" busy={busy} onClick={() => void saveCount()} disabled={!productId}><Save size={16} aria-hidden="true" /> Sayımı Kaydet</ActionButton></div>
       </section>
 

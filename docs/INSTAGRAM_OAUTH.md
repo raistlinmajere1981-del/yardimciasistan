@@ -32,6 +32,10 @@ Masaüstü özel doğrulayıcıyla yalnız bir kez alır, hesabı tekrar doğrul
 Electron safeStorage ile şifrelenmiş tokenı yerel veritabanına kaydeder.
 Eski manuel bağlantı bu sırada atomik olarak değiştirilir.
 
+Tarayıcı açıldıktan sonra giriş bekleniyorsa servis penceresinde **Bağlantıyı İptal Et**
+butonu görünür. Bu işlem yalnız bekleyen yerel OAuth oturumunu iptal eder, mevcut
+bağlı hesabı silmez. Pencerenin İptal/Kapat işlemleri de bekleyen oturumu durdurur.
+
 Yetkilendirme oturumu 10 dakika geçerlidir; başarısız giriş otomatik döngü
 oluşturmaz. Bir süre kullanılmayan uzun ömürlü tokenlar yayın öncesinde,
 süreleri dolmadan yenilenmeye çalışılır. Süre bitmişse yeniden giriş gerekir.

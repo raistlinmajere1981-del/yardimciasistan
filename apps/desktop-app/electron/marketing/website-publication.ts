@@ -28,7 +28,8 @@ export class MarketingWebsitePublicationService {
       if (result.url!==expected) return {ok:false,message:"Website medya yolu doğrulanamadı.",sent};
       urls.set(asset.id,expected);
     }
-    return {ok:true,sent,projection:{version:1,enabled:true,publications:sent.map(p=>({
+    return {ok:true,sent,projection:{version:1,enabled:true,
+      localization:db.translations().localization(sent.filter(p=>p.desiredPublished).map(p=>({kind:"marketing",id:p.id,fields:{title:p.title,text:p.text}}))),publications:sent.map(p=>({
       id:p.id,channel:"website",placement:p.placement,revision:p.revision,published:p.desiredPublished,title:p.title,text:p.text,
       images:p.desiredPublished?p.mediaAssetIds.map((id,sortOrder)=>{const asset=assets.get(id)!;return {assetId:id,url:urls.get(id)!,altText:asset.altText,width:asset.width,height:asset.height,sortOrder};}):[]
     }))}};

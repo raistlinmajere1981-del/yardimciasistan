@@ -1,12 +1,14 @@
 import { MarketCatalogPicker } from "./MarketCatalogPicker";
 import { RecordPicker } from "../ui/RecordPicker";
-import { PackagePlus, Plus, Save, Truck } from "lucide-react";
+import { PackagePlus, Plus, Save, Truck, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type CommercePurchaseOrder, type CommerceSupplier } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { MoneyInput } from "../ui/MoneyInput";
 import { ActionButton } from "../ui/ActionButton";
+import { IconButton } from "../ui/IconButton";
+import { StatusBadge } from "../ui/StatusBadge";
 
 interface SupplierFormState {
   id: string;
@@ -178,18 +180,18 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
                 onClick={() => editSupplier(supplier)}
               >
                 <span><strong>{supplier.name}</strong><small>{supplier.phone || supplier.email || "İletişim bilgisi yok"}</small></span>
-                <span className={supplier.isActive ? "market-badge" : "market-badge is-muted"}>{supplier.isActive ? "Aktif" : "Pasif"}</span>
+                <StatusBadge tone={supplier.isActive ? "success" : "muted"}>{supplier.isActive ? "Aktif" : "Pasif"}</StatusBadge>
               </button>
             ))}
           </div>
-          <div className="market-form-grid market-form-divider">
-            <label className="market-field market-field-wide">Tedarikçi adı<input value={supplierForm.name} onChange={(event) => setSupplierForm((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label className="market-field">Telefon<input value={supplierForm.phone} onChange={(event) => setSupplierForm((current) => ({ ...current, phone: event.target.value }))} /></label>
-            <label className="market-field">E-posta<input value={supplierForm.email} onChange={(event) => setSupplierForm((current) => ({ ...current, email: event.target.value }))} /></label>
-            <label className="market-field">Vergi no<input value={supplierForm.taxNumber} onChange={(event) => setSupplierForm((current) => ({ ...current, taxNumber: event.target.value }))} /></label>
-            <label className="market-field market-field-wide">Not<textarea value={supplierForm.notes} onChange={(event) => setSupplierForm((current) => ({ ...current, notes: event.target.value }))} /></label>
-            <label className="market-check"><input type="checkbox" checked={supplierForm.isActive} onChange={(event) => setSupplierForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif tedarikçi</label>
-            <div className="market-form-actions market-field-wide"><ActionButton type="button" busy={busy} onClick={() => void saveSupplier()}><Save size={16} aria-hidden="true" /> Tedarikçiyi Kaydet</ActionButton></div>
+          <div className="form-grid form-grid--compact market-form-divider">
+            <label className="form-field form-field--fluid form-field--span">Tedarikçi adı<input value={supplierForm.name} onChange={(event) => setSupplierForm((current) => ({ ...current, name: event.target.value }))} /></label>
+            <label className="form-field form-field--fluid">Telefon<input value={supplierForm.phone} onChange={(event) => setSupplierForm((current) => ({ ...current, phone: event.target.value }))} /></label>
+            <label className="form-field form-field--fluid">E-posta<input value={supplierForm.email} onChange={(event) => setSupplierForm((current) => ({ ...current, email: event.target.value }))} /></label>
+            <label className="form-field form-field--fluid">Vergi no<input value={supplierForm.taxNumber} onChange={(event) => setSupplierForm((current) => ({ ...current, taxNumber: event.target.value }))} /></label>
+            <label className="form-field form-field--fluid form-field--span">Not<textarea value={supplierForm.notes} onChange={(event) => setSupplierForm((current) => ({ ...current, notes: event.target.value }))} /></label>
+            <label className="form-check"><input type="checkbox" checked={supplierForm.isActive} onChange={(event) => setSupplierForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif tedarikçi</label>
+            <div className="market-form-actions form-field--span"><ActionButton type="button" busy={busy} onClick={() => void saveSupplier()}><Save size={16} aria-hidden="true" /> Tedarikçiyi Kaydet</ActionButton></div>
           </div>
         </section>
       )}
@@ -197,19 +199,19 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
       {purchasingEnabled && (
         <section className="market-panel">
           <header className="market-panel-heading"><span>Alım</span><h2>Stok Girişi</h2><p>Teslim alınmış alımı tek transaction ile sipariş + stok hareketine dönüştürür.</p></header>
-          {suppliersEnabled && <label className="market-field">Tedarikçi<RecordPicker loadOptions={searchSuppliers} resultLimit={500} disabled={busy} pickerType="supplier" searchPlaceholder="Firma, telefon veya e-posta" ariaLabel="Tedarikçi" value={purchaseSupplierId} placeholder="Tedarikçisiz alım" onChange={setPurchaseSupplierId} options={suppliers.filter(supplier => supplier.isActive).map(supplier => ({ id: supplier.id, label: supplier.name, description: supplier.phone, keywords: supplier.email }))} /></label>}
+          {suppliersEnabled && <label className="form-field form-field--fluid">Tedarikçi<RecordPicker loadOptions={searchSuppliers} resultLimit={500} disabled={busy} pickerType="supplier" searchPlaceholder="Firma, telefon veya e-posta" ariaLabel="Tedarikçi" value={purchaseSupplierId} placeholder="Tedarikçisiz alım" onChange={setPurchaseSupplierId} options={suppliers.filter(supplier => supplier.isActive).map(supplier => ({ id: supplier.id, label: supplier.name, description: supplier.phone, keywords: supplier.email }))} /></label>}
           <div className="market-purchase-lines">
             {purchaseLines.map((line, index) => (
               <div className="market-purchase-line" key={line.key}>
-                <label className="market-field">Ürün<MarketCatalogPicker ariaLabel={`${index + 1}. alım ürünü`} value={line.productId} products={products} disabled={busy} onChange={productId => updatePurchaseLine(line.key, { productId })} /></label>
-                <label className="market-field">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
-                <label className="market-field">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
-                {purchaseLines.length > 1 && <ActionButton variant="secondary" type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</ActionButton>}
+                <label className="form-field form-field--fluid">Ürün<MarketCatalogPicker ariaLabel={`${index + 1}. alım ürünü`} value={line.productId} products={products} disabled={busy} onChange={productId => updatePurchaseLine(line.key, { productId })} /></label>
+                <label className="form-field form-field--fluid">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
+                <label className="form-field form-field--fluid">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
+                {purchaseLines.length > 1 && <IconButton aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}><X size={16} aria-hidden="true" /></IconButton>}
               </div>
             ))}
           </div>
           <ActionButton variant="secondary" type="button" onClick={() => setPurchaseLines((current) => [...current, createPurchaseLine(current.length)])}><PackagePlus size={16} aria-hidden="true" /> Kalem Ekle</ActionButton>
-          <label className="market-field market-form-divider">Alım notu<textarea value={purchaseNotes} onChange={(event) => setPurchaseNotes(event.target.value)} /></label>
+          <label className="form-field form-field--fluid market-form-divider">Alım notu<textarea value={purchaseNotes} onChange={(event) => setPurchaseNotes(event.target.value)} /></label>
           <div className="market-form-actions"><ActionButton type="button" busy={busy} onClick={() => void receivePurchase()} disabled={!purchaseLines.some((line) => line.productId)}><Truck size={16} aria-hidden="true" /> Teslim Al ve Stoğa İşle</ActionButton></div>
         </section>
       )}

@@ -3,6 +3,7 @@ import type { useBusinessLayoutSettings } from "../../app/use-business-layout-se
 import { reportAppStatus } from "../../app/runtime-state";
 import { ModalSurface } from "../ui/ModalSurface";
 import { ActionButton } from "../ui/ActionButton";
+import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { RoomManagementSection } from "./RoomManagementSection";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 import { TablePublicDetailsEditor } from "../operations/TablePublicDetailsEditor";
@@ -14,33 +15,27 @@ export function BusinessLayoutOverlay({ kind, controller, onClose }: {
   onClose: () => void;
 }) {
   const [detailKey, setDetailKey] = useState("");
-  const [leave, setLeave] = useState(false);
   const [busy, setBusy] = useState(false);
   const blocked = busy || controller.loading || controller.saving;
   const selectedRoom = kind === "rooms" && detailKey ? controller.draft.rooms.find(room => room.key === detailKey) : null;
   const selectedTable = kind === "tables" && detailKey ? controller.draft.tables.find(table => table.key === detailKey) : null;
   const title = kind === "rooms" ? "Oda Yönetimi" : "Masa Yönetimi";
+  const closeBlocked = blocked || controller.dirty;
   function close() {
-    if (blocked) return;
-    if (controller.dirty) setLeave(true);
-    else onClose();
+    if (!closeBlocked) onClose();
   }
-  async function save(closeAfter = false) {
+  async function save() {
     setBusy(true);
     try {
       const result = await controller.save();
       if (!result.ok) { reportAppStatus("error", result.message); return; }
       if (result.changed) reportAppStatus("success", result.message || `${title} kaydedildi.`);
-      if (closeAfter) onClose();
-      else setLeave(false);
     } finally { setBusy(false); }
   }
-  async function discard(closeAfter = false) {
+  async function discard() {
     setBusy(true);
     try {
-      if (!await controller.discard()) return;
-      if (closeAfter) onClose();
-      else setLeave(false);
+      await controller.discard();
     } finally { setBusy(false); }
   }
   // Exclusive modal surfaces: a detail dialog temporarily replaces management.
@@ -77,31 +72,17 @@ export function BusinessLayoutOverlay({ kind, controller, onClose }: {
     }}
   />;
   return <ModalSurface labelledBy="settings-layout-title" className="settings-layout-overlay"
-    dismissOnBackdrop closeBlocked={blocked} onClose={close}>
-    <header className="workspace-frame__header">
-      <h2 id="settings-layout-title">{title}</h2>
-      <ActionButton variant="secondary" disabled={blocked} onClick={close}>Kapat</ActionButton>
-    </header>
+    dismissOnBackdrop closeBlocked={closeBlocked} onClose={close}>
+    <WorkspaceHeader title={title} titleId="settings-layout-title" closeLabel="Kapat" closeButton="text" closeBlocked={closeBlocked} onClose={close} />
     <div className="settings-layout-body">
       {controller.message && <p role={controller.state === "error" ? "alert" : "status"}>{controller.message}</p>}
-      <div hidden={leave}>
-        {kind === "rooms" ? <RoomManagementSection controller={controller} onEditRoom={setDetailKey} />
-          : <LayoutSettingsSection controller={controller} onEditTable={setDetailKey} />}
-      </div>
-      {leave && <section className="form-stack" aria-label="Kaydedilmemiş değişiklikler">
-        <h3>{title} değişiklikleri bekliyor</h3>
-        <p>Ayrılmadan önce değişiklikleri kaydedin veya geri alın.</p>
-        <div className="action-row">
-          <ActionButton disabled={blocked} onClick={() => void save(true)}>Kaydet ve geç</ActionButton>
-          <ActionButton variant="secondary" disabled={blocked} onClick={() => void discard(true)}>Değişiklikleri geri al ve geç</ActionButton>
-          <ActionButton variant="secondary" disabled={blocked} onClick={() => setLeave(false)}>Burada kal</ActionButton>
-        </div>
-      </section>}
+      {kind === "rooms" ? <RoomManagementSection controller={controller} onEditRoom={setDetailKey} />
+        : <LayoutSettingsSection controller={controller} onEditTable={setDetailKey} />}
     </div>
-    {!leave && <footer className="workspace-frame__footer action-row">
+    <footer className="workspace-frame__footer action-row">
       {controller.dirty && <span>Kaydedilmemiş değişiklikler</span>}
       <ActionButton disabled={blocked || !controller.dirty} onClick={() => void save()}>Kaydet</ActionButton>
       <ActionButton variant="secondary" disabled={blocked || !controller.dirty} onClick={() => void discard()}>Değişiklikleri Geri Al</ActionButton>
-    </footer>}
+    </footer>
   </ModalSurface>;
 }

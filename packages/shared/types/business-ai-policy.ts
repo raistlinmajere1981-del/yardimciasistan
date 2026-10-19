@@ -28,20 +28,25 @@ export const BUSINESS_AI_INTENT_POLICY: Record<BusinessAiDomain, { requestTypes:
       "(^|\\s)oda(\\s|$).*?(musait|bos|rezerv|gece|kisi|konak|kalma|yatak)",
       "(musait|bos|rezerv|gece|kisi|konak|kalma|yatak).*?(^|\\s)oda(\\s|$)",
       "(^|\\s)oda\\s+(var|fiyat|istiyorum)",
-      "(balkonlu|manzarali)\\s+oda(\\s|$)"
+      "(balkonlu|manzarali)\\s+oda(\\s|$)",
+      "(^|\\s)(rooms|hotel|guesthouse|accommodation|lodging)(\\s|$)",
+      "(^|\\s)room(\\s|$).*?(available|availability|vacan|reserv|booking|price|rate|cost|guest|stay|night|bed|capacity|with|for)",
+      "(available|availability|vacan|reserv|booking|price|rate|cost|guest|stay|night|bed|capacity).*?(^|\\s)room(\\s|$)"
     ]
   },
-  food_service: { requestTypes: ["restaurant_reservation"], patterns: ["(^|\\s)(restoran[a-z]*|restaurant)(\\s|$)", "masa\\s+(rezerv|ayirt|musait)", "aksam\\s+yemegi"] },
-  tables: { requestTypes: ["restaurant_reservation"], patterns: ["masa\\s+(rezerv|ayirt|musait|var|fiyat)", "kisilik\\s+masa"] },
-  menu: { requestTypes: ["qr_menu_question"], patterns: ["(^|\\s)(menu|menunuz)(\\s|$)"] },
-  breakfast: { requestTypes: ["breakfast_request"], patterns: ["(^|\\s)(kahvalti[a-z]*|serpme)(\\s|$)"] },
-  commerce: { requestTypes: [], patterns: ["(^|\\s)(urun[a-z]*|stok[a-z]*|satiyor|satis|katalog|barkod)(\\s|$)"] },
+  food_service: { requestTypes: ["restaurant_reservation"], patterns: ["(^|\\s)(restoran[a-z]*|restaurant|dining)(\\s|$)", "masa\\s+(rezerv|ayirt|musait)", "aksam\\s+yemegi", "(^|\\s)(dinner|dining)(\\s|$)"] },
+  tables: { requestTypes: ["restaurant_reservation"], patterns: ["masa\\s+(rezerv|ayirt|musait|var|fiyat)", "kisilik\\s+masa", "(^|\\s)table(\\s|$).*?(available|availability|reserv|book|seat|person|people)", "(book|reserv|available|availability).*?(^|\\s)table(\\s|$)"] },
+  menu: { requestTypes: ["qr_menu_question"], patterns: ["(^|\\s)(menu|menunuz|menus)(\\s|$)"] },
+  breakfast: { requestTypes: ["breakfast_request"], patterns: ["(^|\\s)(kahvalti[a-z]*|serpme|breakfast)(\\s|$)"] },
+  commerce: { requestTypes: [], patterns: ["(^|\\s)(urun[a-z]*|stok[a-z]*|satiyor|satis|katalog|barkod|product[a-z]*|stock|catalog|barcode)(\\s|$)", "(^|\\s)(buy|sell|purchase)(\\s|$)"] },
   appointment: { requestTypes: ["appointment"], patterns: ["(^|\\s)(randevu[a-z]*|appointment)(\\s|$)"] }
 };
 
 export const BUSINESS_AI_INFORMATION_PATTERNS = [
   "(^|\\s)(merhaba|selam|adres|konum|ulasim|telefon|iletisim|odeme|kart|nakit|dil|saat|acik|kapali)(\\s|$)",
-  "nasil\\s+(gel|geleb)", "(^|\\s)(fiyat[a-z]*|ucret[a-z]*)(\\s|$)", "(^|\\s)(tanitim|kampanya|indirim)(\\s|$)"
+  "nasil\\s+(gel|geleb)", "(^|\\s)(fiyat[a-z]*|ucret[a-z]*)(\\s|$)", "(^|\\s)(tanitim|kampanya|indirim)(\\s|$)",
+  "(^|\\s)(hello|hi|address|location|directions|phone|contact|payment|cash|card|hours|open|closed|price|prices|cost|fee|discount|offers)(\\s|$)",
+  "(how\\s+(can|do)\\s+i\\s+(get|reach|find))", "(where\\s+(are|is)\\s+(you|the))"
 ];
 
 export function normalizeBusinessAiIntentText(value: string): string {

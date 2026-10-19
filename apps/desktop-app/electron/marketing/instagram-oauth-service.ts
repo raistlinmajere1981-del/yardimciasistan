@@ -96,9 +96,15 @@ export class InstagramOAuthService {
       return { status: "connected", username: verified.username };
     } catch (error) {
       // The server grant may be one-time consumed. Restarting requires explicit user action.
-      this.pending = null;
+      if (epoch === this.connectionEpoch) this.pending = null;
       return { status: "failed", message: error instanceof Error ? error.message : "Instagram bağlantısı doğrulanamadı." };
     } finally { this.inFlight = false; }
+  }
+  /** Stop only the pending login. Preserve any previously linked account and publication settings. */
+  cancelPending() {
+    this.connectionEpoch++;
+    this.pending = null;
+    return { ok: true, message: "Instagram giriş işlemi iptal edildi." };
   }
   disconnect() {
     this.connectionEpoch++;

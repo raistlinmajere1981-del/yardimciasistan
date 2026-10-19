@@ -27,7 +27,7 @@ checkFile("apps/android-app/package.json", true);
 checkFile("packages/shared/package.json", true);
 checkFile("packages/whatsapp-bridge/package.json", true);
 checkFile("packages/ai-core/package.json", true);
-checkFile("packages/web-widget/package.json", true);
+checkFile("test-site/landing/package.json", true);
 checkFile("firm-template/web-module/api/request.php", true);
 checkFile("firm-template/web-module/api/menu.php", true);
 checkFile("firm-template/web-module/api/chat.php", true);

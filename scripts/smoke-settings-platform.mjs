@@ -1,3 +1,4 @@
+import { verifySettingsStyleParity } from "./test-helpers/settings-style-parity.mjs";
 import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { resolve } from 'node:path';
@@ -16,6 +17,7 @@ try {
   browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
   page.setDefaultTimeout(7000);
+  page.setDefaultNavigationTimeout(30000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
 
@@ -64,12 +66,30 @@ try {
     await expect(row.getByRole('button')).toHaveCount(1);
     await expect(row.locator('input, textarea, select')).toHaveCount(0);
     await expect(row.getByRole('img')).toHaveAttribute('aria-label', /Etkin|Kapalı/);
-    await expect(row.getByRole('button')).toHaveText('');
+    await expect(row.getByRole('button')).toHaveText('Ayarlar');
     await expect(row.locator('[aria-label="Canlı kontrol durumu"]')).toHaveCount(0);
     await expect(row).not.toContainText(/Test edilmedi|Test kullanılamıyor|Hazır/);
   }
   await expect(page.locator('.settings-service-card')).toHaveCount(0);
-  for (const [width, columns] of [[1440, 4], [1200, 3], [900, 2], [600, 1]]) {
+  const servicePanel = page.locator('.settings-services-list > fieldset.settings-profile-options');
+  await expect(servicePanel.locator('legend')).toHaveText('Servisler');
+  const groupStyles = await page.evaluate(() => {
+    const feature = document.querySelector('#settings-options');
+    const services = document.querySelector('.settings-services-panel');
+    const css = node => ({ bg: getComputedStyle(node).backgroundColor,
+      border: getComputedStyle(node).borderColor,
+      radius: getComputedStyle(node).borderRadius });
+    return { feature: css(feature), services: css(services) };
+  });
+  expect(groupStyles.services).toEqual(groupStyles.feature);
+  const action = page.locator('#settings-android .settings-service-action');
+  await expect(action).toHaveText('Ayarlar');
+  await expect(action).toHaveAttribute('aria-label', 'Android ayarları');
+  const beforeHover = await action.evaluate(node => getComputedStyle(node).backgroundColor);
+  await action.hover();
+  const afterHover = await action.evaluate(node => getComputedStyle(node).backgroundColor);
+  expect(afterHover).not.toBe(beforeHover);
+  for (const [width, columns] of [[1920, 4], [1649, 4], [1440, 4], [1200, 3], [900, 2], [600, 1]]) {
     await page.setViewportSize({ width, height: 900 });
     const grid = page.locator('.settings-services-grid');
     expect(await grid.evaluate(node => getComputedStyle(node).gridTemplateColumns.split(' ').length)).toBe(columns);
@@ -82,8 +102,57 @@ try {
     expect(layout, `${width}px service grid`).toEqual({ contained: true, compact: true, aligned: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  // Actual provider calls occur only after explicit tests; opening a row never claims verification.
+  // Saved web settings get one bounded probe; opening services never runs their provider tests.
+  await expect(page.locator('.settings-web-indicator')).toHaveText('Bağlantı doğrulandı');
+  expect(await page.evaluate(() => window.settingsCalls.filter(call => call.kind === 'web-probe').length)).toBe(1);
   expect(await page.evaluate(() => window.settingsCalls.filter(call => /-test$/.test(call.kind)).length)).toBe(0);
+  expect(await page.evaluate(() => window.settingsCalls.filter(call => ['setup', 'web-connect-source'].includes(call.kind)))).toHaveLength(0);
+  await expect(page.locator('.global-message-bar')).toHaveCount(0);
+  await page.getByLabel('Web güvenlik anahtarı', { exact: true }).fill('draft-secret');
+  await expect(page.locator('.settings-web-indicator')).toHaveText('Bağlantı değişikliği bekliyor');
+  expect(await page.evaluate(() => window.settingsCalls.filter(call => call.kind === 'web-probe').length)).toBe(1);
+  await page.getByLabel('Web güvenlik anahtarı', { exact: true }).fill('settings-platform-secret');
+  await expect(page.locator('.settings-web-indicator')).toHaveText('Bağlantı doğrulandı');
+  // All disabled services share the same fieldset gate, not ad hoc per-input behavior.
+  const disabledService = await manage('settings-google-reviews');
+  await expect(disabledService.getByRole('switch')).not.toBeChecked();
+  await expect(disabledService.locator('.settings-service-detail > fieldset')).toHaveAttribute('disabled', '');
+  await expect(disabledService.getByLabel('Google Place ID')).toBeDisabled();
+  await expect(disabledService.getByRole('button', { name: 'Kaydet', exact: true })).toBeEnabled();
+  await disabledService.getByRole('switch').check();
+  await expect(disabledService.locator('.settings-service-detail > fieldset')).not.toHaveAttribute('disabled', '');
+  await expect(disabledService.getByLabel('Google Place ID')).toBeEnabled();
+  await cancel();
+  // Every service form fits the viewport and owns its scroll region in both schemes.
+  for (const scheme of ['Açık', 'Koyu']) {
+    await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
+    await page.getByRole('radio', { name: scheme, exact: true }).check();
+    await page.keyboard.press('Escape');
+    for (const width of [1649, 900]) {
+      await page.setViewportSize({ width, height: 928 });
+      for (const id of expectedServices) {
+        const detail = await manage(id);
+        if (id === 'settings-android') await detail.getByRole('switch').check();
+        const layout = await detail.evaluate(node => {
+          const box = node.getBoundingClientRect();
+          const body = node.querySelector('.workspace-frame__body');
+          const row = node.querySelector('.android-device-card');
+          const list = node.querySelector('.android-device-list');
+          return { fits: box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1,
+            noOverflow: body.scrollWidth <= body.clientWidth + 1,
+            scrollOwner: getComputedStyle(body).overflowY === 'auto',
+            fullDeviceRow: !row || Math.abs(row.getBoundingClientRect().width - list.getBoundingClientRect().width) <= 1 };
+        });
+        expect(layout, `${id} ${scheme} ${width}px`).toEqual({ fits: true, noOverflow: true, scrollOwner: true, fullDeviceRow: true });
+        await verifySettingsStyleParity(page, `${id}-${scheme}-${width}`);
+        if (process.env.SETTINGS_UI_CAPTURE_DIR && width === 1649 && id === 'settings-android') {
+          await detail.screenshot({ path: resolve(process.env.SETTINGS_UI_CAPTURE_DIR, `android-${scheme === 'Açık' ? 'light' : 'dark'}.png`) });
+        }
+        await cancel();
+      }
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => window.refreshSettings({ whatsapp: '+905555551111' }));
   await page.getByLabel('Firma adı', { exact: true }).fill('Unsaved business');
   await page.getByRole('textbox', { name: /İşletme açıklaması/ }).fill('Unsaved public profile');
@@ -133,7 +202,8 @@ try {
   await expect(overlay.getByRole('switch')).toBeChecked({ checked: !originalWhatsapp });
   await expect(overlay.getByLabel('Canlı kontrol durumu')).toHaveText('Test kullanılamıyor');
   await expect(page.locator('.global-message-bar')).toContainText('Test kayıt hatası');
-  await page.mouse.click(5, 5);
+  // Header feedback stays visible above the clipped backdrop, so dismiss below it.
+  await page.mouse.click(5, 120);
   await expect(decision).toBeVisible();
   await decision.getByRole('button', { name: 'Burada kal', exact: true }).click();
   await expect(decision).toHaveCount(0);
@@ -201,7 +271,10 @@ try {
   await cancel();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'dictation-test').length)).toBe(0);
   overlay = await manage('settings-kbs');
-  await overlay.getByRole('button', { name: /KBS Girişini Dene|Bağlantısını Dene/ }).first().click();
+  const kbsTest = overlay.getByRole('button', { name: /KBS Girişini Dene|Bağlantısını Dene/ }).first();
+  await expect(kbsTest).toBeDisabled();
+  await overlay.getByRole('switch').check();
+  await kbsTest.click();
   await expect(overlay.getByLabel('Canlı kontrol durumu')).not.toHaveText('Hazır');
   expect(await page.evaluate(() => window.settingsCalls.some(c => /send.*kbs|kbs.*send/.test(c.kind)))).toBe(false);
   await cancel();
@@ -211,11 +284,38 @@ try {
   await expect(page.locator('.settings-search-results').getByRole('button')).toHaveCount(0);
   await search.fill('');
   overlay = await manage('settings-android');
+  await expect(overlay.locator('#settings-devices')).toHaveCount(0);
+  await overlay.getByRole('switch').check();
+  await expect(overlay.locator('#settings-devices')).toBeVisible();
+  await expect(overlay).toContainText('Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.');
+  await expect(overlay.getByRole('button', { name: 'Personel Yap', exact: true })).toBeDisabled();
+  await expect(overlay.getByRole('button', { name: 'Kaldır', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(false);
+  await overlay.getByRole('switch').uncheck();
+  await expect(overlay.locator('#settings-devices')).toHaveCount(0);
+  await cancel();
+  overlay = await manage('settings-android');
+  await expect(overlay.getByRole('switch')).not.toBeChecked();
   await overlay.getByRole('switch').check();
   await serviceSave();
   expect(await page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(true);
   expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain('service.android');
   await expect(page.locator('#settings-android').getByRole('img')).toHaveAttribute('data-state', 'active');
+  overlay = await manage('settings-android');
+  expect(await overlay.locator('.android-device-permission-grid input').count()).toBeGreaterThan(0);
+  await expect(overlay.getByRole('button', { name: 'Kaldır', exact: true })).toBeEnabled();
+  if (process.env.SETTINGS_UI_CAPTURE_DIR) {
+    await page.setViewportSize({ width: 1649, height: 928 });
+    await overlay.screenshot({ path: resolve(process.env.SETTINGS_UI_CAPTURE_DIR, 'android-enabled.png') });
+    await page.setViewportSize({ width: 1440, height: 900 });
+  }
+  await overlay.getByRole('switch').uncheck();
+  await expect(overlay.locator('#settings-devices')).toHaveCount(0);
+  await cancel();
+  overlay = await manage('settings-android');
+  await expect(overlay.getByRole('switch')).toBeChecked();
+  await expect(overlay.locator('#settings-devices')).toBeVisible();
+  await cancel();
   // Synonyms and titles may differ. Both paths must open the canonical service owner.
   for (const [term, resultTitle, overlayTitle] of [
     ['places', 'Google Yorumları'], ['ai', 'AI Yardımcı'], ['AI', 'AI Yardımcı'],
@@ -264,6 +364,7 @@ try {
   for (const id of ['settings-dealer-portal', 'settings-online-delivery', 'settings-marketing-sms', 'settings-marketing-instagram', 'settings-whatsapp-business', 'settings-product-data']) {
     overlay = await manage(id);
     await expect(overlay).toBeVisible();
+    expect(await overlay.locator('.workspace-frame__body').evaluate(node => node.scrollWidth <= node.clientWidth + 1), `${id} content fits`).toBe(true);
     await expect(overlay.getByRole('button', { name: 'Kaydet', exact: true })).toBeEnabled();
     await cancel();
   }
@@ -273,6 +374,8 @@ try {
     await cancel();
   }
   overlay = await manage('settings-marketing-sms');
+  const smsEnabled = overlay.getByRole('switch');
+  if (!await smsEnabled.isChecked()) await smsEnabled.check();
   await overlay.getByLabel('SMS API Key', { exact: true }).fill('fixture-sms-key');
   await overlay.getByLabel('SMS API Hash', { exact: true }).fill('fixture-sms-hash');
   await overlay.getByLabel('SMS Sender ID', { exact: true }).fill('FIXTURE');
@@ -306,8 +409,26 @@ try {
   await visit('?missingRuntime');
   for (const term of ['AI', 'Android', 'KBS', 'Google Yorumları', 'barkod', 'Telefon Kurulumu']) {
     await search.fill(term);
-    await expect(page.locator('.settings-search-results').getByRole('button')).toHaveCount(0);
+    // Translation is sector-independent and its manual path does not require AI.
+    if (term === 'AI') await expect(page.locator('.settings-search-results').getByRole('button', {name:'Çoklu Dil',exact:true})).toHaveCount(1);
+    else await expect(page.locator('.settings-search-results').getByRole('button')).toHaveCount(0);
+    await expect(page.locator('.settings-search-results').getByRole('button', {name:'AI Yardımcı',exact:true})).toHaveCount(0);
   }
+  // Nonempty configuration is not success. An older response cannot verify a newer connection.
+  await visit('?deferWebTest');
+  const webStatus = page.locator('.settings-web-indicator');
+  await expect(webStatus).toHaveText('Bağlantı kontrol ediliyor…');
+  await expect.poll(() => page.evaluate(() => window.pendingWebProbes?.length)).toBe(1);
+  await page.evaluate(() => window.refreshSettings({ webModuleUrl: 'https://new.example.test/yardimci-asistan' }));
+  await expect.poll(() => page.evaluate(() => window.pendingWebProbes.length)).toBe(2);
+  await page.evaluate(() => window.pendingWebProbes[0](true));
+  await expect(webStatus).toHaveText('Bağlantı kontrol ediliyor…');
+  await page.evaluate(() => window.pendingWebProbes[1](false));
+  await expect(webStatus).toHaveText('Bağlantı doğrulanamadı');
+  await page.evaluate(() => window.refreshSettings({ syncSecret: '' }));
+  await expect(webStatus).toHaveText('Bağlantı yapılandırılmadı');
+  expect(await page.evaluate(() => window.settingsCalls.filter(call => ['setup', 'web-connect-source'].includes(call.kind)))).toHaveLength(0);
+  await expect(page.locator('.global-message-bar')).toHaveCount(0);
   expect(errors).toEqual([]);
   console.log('settings-platform-smoke-ok: unified page, independent service save/discard, provider tests, first run, collapse, search, keyboard and viewport');
 } finally {

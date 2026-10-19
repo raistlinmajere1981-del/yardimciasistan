@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/storage.php';
+require_once __DIR__ . '/../lib/public-localization.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ya_menu_response(405, [
@@ -65,6 +66,9 @@ ya_menu_response(200, [
     'ok' => true,
     'categories' => $categories,
     'items' => $items,
+    'localization' => ya_public_localization($menu['localization'] ?? null, [
+        'menu_category' => ya_localization_records($categories, 'id', ['name','description']),
+        'menu_product' => ya_localization_records($items, 'id', ['name','description'])]),
     'updated_at' => $menu['updated_at'] ?? '',
     'source_revision' => (int) ($publication['source_revision'] ?? 0),
     'server_revision' => $serverRevision

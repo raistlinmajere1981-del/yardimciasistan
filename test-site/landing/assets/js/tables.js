@@ -1,23 +1,24 @@
 (() => {
+  const { ui, html } = window.DemoLanguage;
   const TABLE_API = "/yardimci-asistan/api/tables.php";
   const DETAIL_PATH = "/restoran/masa/";
 
   const featureCatalog = {
-    indoor: "İç mekân",
-    outdoor: "Açık alan",
-    terrace: "Teras / veranda",
-    window_side: "Cam kenarı",
-    sea_view: "Deniz manzarası",
-    garden_view: "Bahçe manzarası",
-    quiet_area: "Sakin bölüm",
-    wheelchair_friendly: "Tekerlekli sandalye erişimine uygun"
+    indoor: ui("İç mekân"),
+    outdoor: ui("Açık alan"),
+    terrace: ui("Teras / veranda"),
+    window_side: ui("Cam kenarı"),
+    sea_view: ui("Deniz manzarası"),
+    garden_view: ui("Bahçe manzarası"),
+    quiet_area: ui("Sakin bölüm"),
+    wheelchair_friendly: ui("Tekerlekli sandalye erişimine uygun")
   };
 
   const smokingLabels = {
     unspecified: "",
-    non_smoking: "Sigara içilmez",
-    smoking_allowed: "Sigara içilebilir",
-    outdoor_only: "Yalnız açık alanda sigara içilebilir"
+    non_smoking: ui("Sigara içilmez"),
+    smoking_allowed: ui("Sigara içilebilir"),
+    outdoor_only: ui("Yalnız açık alanda sigara içilebilir")
   };
 
   const normalizeMediaUrl = (value) => {
@@ -50,13 +51,13 @@
     if (cover) {
       const image = document.createElement("img");
       image.src = cover;
-      image.alt = String(table.name || "Masa") + " fotoğrafı";
+      image.alt = String(table.name || ui("Masa")) + ui(" fotoğrafı");
       image.loading = "lazy";
       mediaLink.append(image);
     } else {
       const placeholder = document.createElement("span");
       placeholder.className = "room-card-media-placeholder";
-      placeholder.textContent = "Masa fotoğrafı hazırlanıyor";
+      placeholder.textContent = ui("Masa fotoğrafı hazırlanıyor");
       mediaLink.append(placeholder);
     }
 
@@ -70,12 +71,12 @@
     const body = document.createElement("div");
     body.className = "room-card-body";
     const title = document.createElement("h3");
-    title.textContent = table.name || "Masa";
+    title.textContent = table.name || ui("Masa");
     body.append(title);
 
     const metaParts = [];
     if (table.area) metaParts.push(String(table.area));
-    if (Number(table.capacity) > 0) metaParts.push(`${Math.trunc(Number(table.capacity))} kişi`);
+    if (Number(table.capacity) > 0) metaParts.push(ui("{0} kişi", {0: Math.trunc(Number(table.capacity))}));
     const smoking = smokingLabels[String(table.smoking_policy || "unspecified")] || "";
     if (smoking) metaParts.push(smoking);
     if (metaParts.length) {
@@ -96,7 +97,7 @@
     actions.className = "card-actions";
     const details = document.createElement("a");
     details.href = detailUrl(table);
-    details.textContent = "Masayı incele";
+    details.textContent = ui("Masayı incele");
     actions.append(details);
     body.append(actions);
 
@@ -110,7 +111,7 @@
       if (!enabled) {
         const empty = document.createElement("div");
         empty.className = "room-catalog-empty";
-        empty.textContent = "Restoran / masa web yayını masaüstünden kapalı.";
+        empty.textContent = ui("Restoran / masa web yayını masaüstünden kapalı.");
         root.append(empty);
         return;
       }
@@ -119,7 +120,7 @@
       if (!visible.length) {
         const empty = document.createElement("div");
         empty.className = "room-catalog-empty";
-        empty.textContent = "Yayınlanmış aktif masa bulunmuyor.";
+        empty.textContent = ui("Yayınlanmış aktif masa bulunmuyor.");
         root.append(empty);
         return;
       }
@@ -127,7 +128,7 @@
     });
 
     document.querySelectorAll("[data-table-count]").forEach((node) => {
-      node.textContent = enabled ? `${tables.length} masa` : "Yayın kapalı";
+      node.textContent = enabled ? ui("{0} masa", {0: tables.length}) : ui("Yayın kapalı");
     });
   };
 
@@ -143,7 +144,7 @@
     if (!known.length && !smokingLabel) {
       const empty = document.createElement("div");
       empty.className = "room-catalog-empty";
-      empty.textContent = "Masa özellikleri henüz yayınlanmadı.";
+      empty.textContent = ui("Masa özellikleri henüz yayınlanmadı.");
       root.append(empty);
       return;
     }
@@ -182,7 +183,7 @@
     }
     card.hidden = false;
     card.dataset.panoramaSrc = url;
-    card.dataset.panoramaTitle = media.title || (kind === "panorama_360" ? "360° masa görünümü" : "180° masa görünümü");
+    card.dataset.panoramaTitle = media.title || (kind === "panorama_360" ? ui("360° masa görünümü") : ui("180° masa görünümü"));
     card.dataset.panoramaHfov = kind === "panorama_180" ? "85" : "105";
     card.dataset.panoramaYaw = "0";
     card.dataset.panoramaPitch = "0";
@@ -236,10 +237,10 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "gallery-item";
-      button.setAttribute("aria-label", `${table.name || "Masa"} fotoğrafı ${count} büyüt`);
+      button.setAttribute("aria-label", ui("{0} fotoğrafı {1} büyüt", {0: table.name || ui("Masa"), 1: count}));
       const image = document.createElement("img");
       image.src = url;
-      image.alt = `${table.name || "Masa"} fotoğrafı ${count}`;
+      image.alt = ui("{0} fotoğrafı {1}", {0: table.name || ui("Masa"), 1: count});
       image.loading = "lazy";
       button.append(image);
       button.addEventListener("click", () => {
@@ -275,10 +276,10 @@
       if (loading) {
         loading.className = "room-detail-error";
         loading.textContent = !enabled
-          ? "Restoran / masa web yayını masaüstünden kapalı."
+          ? ui("Restoran / masa web yayını masaüstünden kapalı.")
           : tableId
-            ? "Bu masa artık yayında değil veya bulunamadı."
-            : "Gösterilecek masa seçilmedi.";
+            ? ui("Bu masa artık yayında değil veya bulunamadı.")
+            : ui("Gösterilecek masa seçilmedi.");
       }
       if (content instanceof HTMLElement) content.hidden = true;
       return;
@@ -287,18 +288,18 @@
     if (loading instanceof HTMLElement) loading.hidden = true;
     if (content instanceof HTMLElement) content.hidden = false;
 
-    document.title = `${table.name || "Masa"} | Yardımcı Asistan`;
+    document.title = `${table.name || ui("Masa")} | Yardımcı Asistan`;
     const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) metaDescription.setAttribute("content", String(table.description || "Yardımcı Asistan canlı demo masa detayları."));
+    if (metaDescription) metaDescription.setAttribute("content", String(table.description || ui("Yardımcı Asistan canlı demo masa detayları.")));
 
     const heroTitle = document.querySelector(".scenic-page-hero h1");
-    if (heroTitle) heroTitle.textContent = table.name || "Masa";
+    if (heroTitle) heroTitle.textContent = table.name || ui("Masa");
     const heroDescription = document.querySelector(".scenic-page-hero-content > p:not(.eyebrow)");
-    if (heroDescription) heroDescription.textContent = table.description || "Masa özellikleri ve yayınlanmış müşteri bilgileri.";
+    if (heroDescription) heroDescription.textContent = table.description || ui("Masa özellikleri ve yayınlanmış müşteri bilgileri.");
 
-    setText("[data-table-name]", table.name || "Masa");
-    setText("[data-table-area]", table.area || "Bölüm belirtilmedi");
-    setText("[data-table-capacity]", Number(table.capacity) > 0 ? `${Math.trunc(Number(table.capacity))} kişi` : "");
+    setText("[data-table-name]", table.name || ui("Masa"));
+    setText("[data-table-area]", table.area || ui("Bölüm belirtilmedi"));
+    setText("[data-table-capacity]", Number(table.capacity) > 0 ? ui("{0} kişi", {0: Math.trunc(Number(table.capacity))}) : "");
     const smokingNotice = document.querySelector("[data-table-smoking]");
     if (smokingNotice instanceof HTMLElement) {
       const policy = String(table.smoking_policy || "unspecified");
@@ -321,7 +322,7 @@
     const coverPlaceholder = document.querySelector("[data-table-cover-placeholder]");
     if (coverImage instanceof HTMLImageElement && cover) {
       coverImage.src = cover;
-      coverImage.alt = `${table.name || "Masa"} fotoğrafı`;
+      coverImage.alt = ui("{0} fotoğrafı", {0: table.name || ui("Masa")});
       coverImage.hidden = false;
       if (coverPlaceholder instanceof HTMLElement) coverPlaceholder.hidden = true;
     } else {
@@ -351,15 +352,16 @@
         cache: "no-store"
       });
       payload = await response.json().catch(() => null);
-      if (!response.ok || payload?.ok !== true) throw new Error(payload?.message || "Masalar okunamadı.");
+      payload = window.DemoLanguage?.localize(payload, "table_catalog") ?? payload;
+      if (!response.ok || payload?.ok !== true) throw new Error(payload?.message || ui("Masalar okunamadı."));
     } catch {
       document.querySelectorAll("[data-table-list]").forEach((root) => {
-        root.innerHTML = '<div class="room-catalog-empty">Masa bilgilerine şu anda ulaşılamıyor.</div>';
+        root.innerHTML = `<div class="room-catalog-empty">${html("Masa bilgilerine şu anda ulaşılamıyor.")}</div>`;
       });
       const loading = document.querySelector("[data-table-detail-loading]");
       if (loading) {
         loading.className = "room-detail-error";
-        loading.textContent = "Masa bilgilerine şu anda ulaşılamıyor.";
+        loading.textContent = ui("Masa bilgilerine şu anda ulaşılamıyor.");
       }
       return;
     }

@@ -14,6 +14,8 @@ try {
   mkdirSync('artifacts/marketing',{recursive:true});await page.screenshot({path:'artifacts/marketing/workspace-empty.png'});
   await page.getByRole('button',{name:'Yeni paylaşım',exact:true}).click();await page.getByLabel('Başlık',{exact:true}).fill('Yeni ürün duyurusu');await page.getByLabel('Paylaşım metni',{exact:true}).fill('Ürün duyurusu amacı');
   const share = page.getByRole('dialog', {name: 'Yeni paylaşım oluştur', exact: true});
+  await expect(share.getByText(/Mikrofon ile kayıt başlar/)).toHaveCount(0);
+  await expect(share.getByText(/Kanala özel metinler ayrıntılarda düzenlenir/)).toHaveCount(0);
   for (const name of ['Paylaşım içeriği', 'Kanallar ve hedef kitle', 'Yayın planı']) await expect(share.getByRole('region', {name, exact: true})).toBeVisible();
   await expect(share.getByRole('region', {name:'Yayın kontrolü', exact:true})).toBeVisible();
   for (const width of [1440,1280]) {await page.setViewportSize({width,height:800});await assertMarketingDialog(page,share);}

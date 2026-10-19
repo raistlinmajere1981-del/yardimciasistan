@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { installDemoSite } from "./test-helpers/demo-site.mjs";
 import { activateFixtureSource } from "./test-helpers/publication-protocol.mjs";
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import http from "node:http";
@@ -17,8 +18,7 @@ const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coor
 const { createAndroidOperationsSnapshot } = require("../apps/desktop-app/dist-electron/android-operations-snapshot.js");
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 const root = mkdtempSync(join(tmpdir(), "ya-web-dealer-"));
-const hosting = join(root, "web-module");
-cpSync(join(process.cwd(), "firm-template/web-module"), hosting, { recursive: true });
+const hosting = installDemoSite(root);
 for (const file of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) rmSync(join(hosting, "data", file), { force: true });
 const secret = "dealer-portal-test-secret";
 const config = join(hosting, "config/business.json");
@@ -27,8 +27,9 @@ const port = await new Promise((resolve, reject) => {
   const server = http.createServer(); server.once("error", reject);
   server.listen(0, "127.0.0.1", () => { const port = server.address().port; server.close(() => resolve(port)); });
 });
-const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", hosting], { stdio: ["ignore", "pipe", "pipe"] });
+const siteUrl = `http://127.0.0.1:${port}`;
+const baseUrl = `${siteUrl}/yardimci-asistan`;
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", root], { stdio: ["ignore", "pipe", "pipe"] });
 let serverOutput = ""; let browser;
 server.stdout.on("data", (chunk) => { serverOutput += chunk; });
 server.stderr.on("data", (chunk) => { serverOutput += chunk; });
@@ -91,7 +92,7 @@ try {
   for (const sentinel of ["PRIVATE_PHONE_SENTINEL", "PRIVATE_EMAIL_SENTINEL", "PRIVATE_TAX_SENTINEL", "PRIVATE_NOTES_SENTINEL"]) assert.equal(privatePayload.includes(sentinel), false);
   genericFailure(await post("claim", { invite_token: "wrong" }));
   const valid = await post("claim", { invite_token: token }); assert.equal(valid.status, 200); assert.deepEqual(valid.body, { ok: true });
-  assert.match(valid.cookie, /HttpOnly/i); assert.match(valid.cookie, /SameSite=Strict/i); assert.match(valid.cookie, /path=\/api\/dealer\//i); assert.match(valid.cookie, /Max-Age=28800/);
+  assert.match(valid.cookie, /HttpOnly/i); assert.match(valid.cookie, /SameSite=Strict/i); assert.match(valid.cookie, /path=\/yardimci-asistan\/api\/dealer\//i); assert.match(valid.cookie, /Max-Age=28800/);
   const cookie = valid.cookie.split(";")[0]; const sessionToken = cookie.split("=")[1];
   assert.equal(sessionToken.length, 43);
   assert.deepEqual(await session(cookie), { status: 200, body: { authenticated: true, dealer: { access_id: accessId, display_name: row.display_name } } });
@@ -137,7 +138,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "tr-TR" });
   const page = await context.newPage(); page.setDefaultTimeout(10000); const errors = []; const urls = [];
   page.on("pageerror", (error) => errors.push(error.message)); page.on("request", (request) => urls.push(request.url()));
-  await page.goto(`${baseUrl}/bayi/#invite=${token}`);
+  await page.goto(`${siteUrl}/bayi/#invite=${token}`);
   await expect(page.getByRole("button", { name: "Daveti kullan" })).toBeVisible(); assert.equal(new URL(page.url()).hash, "");
   await page.getByRole("button", { name: "Daveti kullan" }).click();
   await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
@@ -148,7 +149,7 @@ try {
   await page.reload(); await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
   await page.getByRole("button", { name: "Oturumu kapat" }).click(); await expect(page.getByRole("heading", { name: "Bayi erişimi gerekli" })).toBeVisible();
   await publish({ rotate: true });
-  await page.goto(`${baseUrl}/bayi/#invite=${token}`); await page.getByRole("button", { name: "Daveti kullan" }).click(); await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
+  await page.goto(`${siteUrl}/bayi/#invite=${token}`); await page.getByRole("button", { name: "Daveti kullan" }).click(); await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
   await publish({ enabled: false, rotate: true }); await page.reload(); await expect(page.getByRole("heading", { name: "Bayi erişimi gerekli" })).toBeVisible();
   assert.deepEqual(errors, []);
   const catalog = await (await fetch(`${baseUrl}/api/catalog.php`)).text(); assert.equal(catalog.includes(accessId), false); assert.equal(catalog.includes(customerRef), false);

@@ -149,7 +149,7 @@ export function LayoutSettingsSection({ controller, onEditTable }: { controller:
                           : getTableSmokingPolicyLabel(table.smokingPolicy)}
                       </span>
                       <ActionButton
-                        variant="secondary"
+                        variant="link"
                         size="sm"
                         type="button"
                         className="room-management-details-button"

@@ -135,7 +135,17 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 265, "all production invoke registrations must execute");
+assert.equal(handlers.size, 275, "all production invoke registrations must execute, including the eight translation operations");
+for (const action of ["settings", "saveSettings", "get", "list", "save", "start", "job", "cancel"]) {
+  assert.ok(handlers.has(`translation:${action}`), `translation:${action}: included in the production lock sweep`);
+}
+for (const [channel, module] of [
+  ["sync:probeConnection", "web-connection-ipc"],
+  ["marketingProviders:cancelInstagramOAuth", "ipc/marketing-provider-ipc"]
+]) {
+  assert.ok(modules.has(resolve(root, module)), `${channel}: actual production registration module must execute`);
+  assert.ok(handlers.has(channel), `${channel}: production handler must be included in the locked invocation sweep`);
+}
 assert.ok(handlers.has("sync:connectSource"), "explicit web publication ownership transfer must retain the production session lock gate");
 assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
@@ -174,6 +184,14 @@ for (const [channel, input] of representatives) {
   const before = calls.length;
   assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
+}
+for (const [channel, input, dependency] of [
+  ["sync:probeConnection", { baseUrl: "https://fixture.invalid", syncSecret: "fixture-only-secret" }, "web-connection-test.testWebConnection"],
+  ["marketingProviders:cancelInstagramOAuth", undefined, "marketing/instagram-oauth-service.cancelPending"]
+]) {
+  const before = calls.length;
+  assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked production handler delegates`);
+  assert.deepEqual(calls.slice(before), [dependency], `${channel}: only its operation runs after the real session gate`);
 }
 const beforeManualAndroid = calls.filter((call) => call === "android-action-sync-service.processQueue").length;
 assert.equal((await invoke("sync:pullRequests")).ok, true);

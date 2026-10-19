@@ -1,4 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Yardımcı Asistan</string>
+    <string name="speech_enabled">Seslendirme etkin</string>
+    <string name="task_add_date">Tarih ekle</string>
+    <string name="task_add_time">Saat ekle</string>
+    <string name="task_prepare_failed">Günlük iş bilgileri hazırlanamadı.</string>
+    <string name="task_confirm_delete_hint">Bu günlük işi silmek için \'Silmeyi Onayla\' seçin.</string>
+    <string name="confirm_delete">Silmeyi Onayla</string>
+    <string name="amount_invalid">Geçerli bir tutar girin.</string>
+    <string name="finance_description_limit">Açıklama en fazla 160 karakter olabilir.</string>
+    <string name="finance_prepare_failed">Kasa bilgileri hazırlanamadı.</string>
+    <string name="kbs_external_submission_confirmation">Bu misafirin bu giriş/çıkış/oda değişimi kaydını resmi kurum portalında gördüm; haricen gönderildi olarak kaydedilmesini onaylıyorum.</string>
+    <string name="barcode_invalid">Geçerli bir barkod girin.</string>
+    <string name="external_pos_confirmation">Kart ödemesi harici POS\'ta gerçekleşti; yalnız kaydını gönderiyorum.</string>
+    <string name="menu_create_shared_product">Yeni ortak ürün oluştur</string>
+    <string name="inventory_tracking">Stok takibi</string>
+    <string name="menu_available">Menüde mevcut</string>
+    <string name="menu_featured">Öne çıkan</string>
+    <string name="menu_hide_out_of_stock">Stokta yokken QR menüden gizle</string>
+    <string name="reservation_web_details_preserved">Web talebinden oluşan rezervasyonda tarih, saat ve kişi bilgisi korunur; oda/masa ve not değiştirilebilir.</string>
+    <string name="reservation_prepare_failed">Rezervasyon bilgileri hazırlanamadı.</string>
+    <string name="folio_select_menu_product">Önce uygun bir menü ürünü seçin.</string>
+    <string name="folio_quantity_range">Adet 1 ile 1000 arasında olmalı.</string>
+    <string name="folio_menu_prepare_failed">Menü ürünü bilgileri hazırlanamadı.</string>
+    <string name="folio_charge_prepare_failed">Ek ücret bilgileri hazırlanamadı.</string>
+    <string name="folio_payment_exceeds_remaining">Ödeme kalan tutardan büyük olamaz.</string>
+    <string name="folio_note_limit">Not en fazla 500 karakter olabilir.</string>
+    <string name="folio_payment_prepare_failed">Tahsilat bilgileri hazırlanamadı.</string>
+    <string name="stock_image_connection_required">Görsel analizi için bağlantı ayarlarını tamamlayın.</string>
+    <string name="stock_image_no_tracked_product">Stok takip edilen menü ürünü bulunamadı.</string>
+    <string name="stock_image_analyzing">Görsel analiz ediliyor; stoklar henüz değişmiyor…</string>
+    <string name="stock_image_ready">Görsel hazır. Gerekirse döndürüp analizi başlatın.</string>
+    <string name="speech_range_value">%1$s · %2$.2f</string>
+    <plurals name="field_character_limit">
+        <item quantity="one">Bu alan en fazla %1$d karakter kabul eder.</item>
+        <item quantity="other">Bu alan en fazla %1$d karakter kabul eder.</item>
+    </plurals>
+    <string name="menu_stock_consumption">Satış başına stok tüketimi · %1$s</string>
+    <string name="reservation_labeled_value">%1$s\n%2$s</string>
+    <string name="stock_image_review_summary">%1$s · %2$s · %3$s</string>
+    <plurals name="stock_image_row_count">
+        <item quantity="one">%1$d satır</item>
+        <item quantity="other">%1$d satır</item>
+    </plurals>
+    <plurals name="stock_image_review_count">
+        <item quantity="one">%1$d kontrol gerekli</item>
+        <item quantity="other">%1$d kontrol gerekli</item>
+    </plurals>
 </resources>

@@ -20,6 +20,26 @@ Tek giriş noktası:
 apps/desktop-app/src/styles/index.css
 ```
 
+Ayarlar stil sahipliği:
+`components/panels.css` işletme, kaynak ve yardımcı panellerin ortak
+bölüm yüzeyini; `settings.css` sayfa/kategori yerleşimini;
+`settings-business-profile.css` işletme iletişim/profil alanlarını;
+`resource-management.css` oda/masa ve bunların staged medya çalışma alanlarını;
+`settings-services.css` servis ve web bağlantısı panellerini;
+`settings-utilities.css` güvenlik, veri ve güncelleme yüzeylerini;
+`settings-gallery.css` işletme galerisini yönetir. Kontrol görünümü shared ailede
+kalır; oda/masa detay eylemleri ortak `ActionButton` ailesinin `link` varyantını kullanır.
+Dosyalar yeni cascade katmanı veya feature görünüm motoru oluşturmaz.
+Ortak bölüm stilleri panel ailesinin mevcut `components.primitives` katmanında,
+genel `settings.css` ise önceki cascade'deki responsive alan sınırlarını korumak için
+bu dosyalardan sonra yüklenir. CSS taşıma doğrulaması, mevcut Settings ve
+Galeri smoke testlerinde `SETTINGS_CSS_BASELINE` ile açılır: aynı DOM üzerinde eski
+ve yeni CSS'in tüm computed stilleri/pseudo-element'leri ve ölçüleri karşılaştırılır,
+önce/sonra görüntüleri saklanır. `SETTINGS_CSS_PARITY_MATCH` yalnız ek CSS
+karşılaştırmalarını adlarına göre daraltır; smoke'ın davranış kontrolleri yine
+tam çalışır. Baseline, HEAD yerine taşıma öncesindeki çalışma
+ağacından alınmalıdır.
+
 Katman yönü:
 
 ```text
@@ -149,8 +169,29 @@ Güncel ortak sözlük:
 - `PageHeader`
 - `AppShell`
 - `ResourceCard`
+- `WorkspaceHeader`
+- `MediaPreview`
+- `ReorderButtons`
 
 Yeni component yalnız tekrar eden gerçek bir semantic contract varsa çıkarılır.
+
+`WorkspaceHeader`, WorkspaceFrame/PageFrame, FormDialog, workspace alt işlemleri ve
+ayarların kaynak yöneticilerinde aynı başlık/eylem/kapatma anatomisini kullanır.
+Modal sınırı, focus dönüşü ve dirty/busy kararı mevcut yüzey sahibinde kalır.
+Metinli Kapat ve ikonlu kapatma aynı ActionButton/IconButton ailesindedir.
+
+`MediaPreview`, galeri ile oda/masa medyasında önizleme çerçevesini sahiplenir;
+boyut ve konum feature düzeninde, `contain`/`cover` seçimi tüketicide kalır.
+Medya okuma, staged save/undo ve silme işlemlerini sahiplenmez. `ReorderButtons`,
+galeri ve pazarlamadaki yukarı/aşağı eylemlerini IconButton üzerinden sunar;
+sınırlar ve sıralama mutasyonu koleksiyon sahibine aittir.
+
+IconButton'ın `quiet` varyantı alan içi yardımcı eylemler içindir; `busy`, düğmeyi
+devre dışı bırakır ve `aria-busy` bildirir. ActionButton ve IconButton mevcut DOM
+ref'lerini iletir; odak sahipliği bileşen geçişinde korunur. Market alanları ortak
+`form-field`, `form-check` ve `form-grid` stillerini kullanır; kompakt form aralığı
+`form-grid--compact` ile seçilir. Tarih/saat seçicilerinin yardımcı eylemleri bu
+düğme ailesindedir; takvim günleri ve saat seçenekleri kendi seçim semantiğini korur.
 
 ### Yüksek hacimli kayıt seçimi
 

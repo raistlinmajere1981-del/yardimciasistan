@@ -92,7 +92,6 @@ export function MarketProductsWorkspace({
   const [manualImageDataUrl, setManualImageDataUrl] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "loading" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
-  const [pendingProductId, setPendingProductId] = useState("");
   const beginCreateRequest = useRequestGeneration();
   const [listMode, setListMode] = usePageViewState<"products" | "quickAccess">("market.products.listMode", "products");
   const [mutationBusy, setMutationBusy] = useState(false);
@@ -131,18 +130,6 @@ export function MarketProductsWorkspace({
     setOnlineSalesPublished(onlineSalesEnabled);
     setCreateOpen(true);
   }, [inventoryEnabled, onlineSalesEnabled, productLookupRequest]);
-
-  useEffect(() => {
-    if (createOpen || !pendingProductId) return;
-    if (navigation.openWorkspace({
-      entityType: "product",
-      entityId: pendingProductId,
-      mode: "details",
-      returnContext: { page: "market", view: "products", entityId: pendingProductId }
-    })) {
-      setPendingProductId("");
-    }
-  }, [createOpen, navigation, pendingProductId]);
 
   function openCreate() {
     setProductForm(emptyProductForm(inventoryEnabled));
@@ -248,7 +235,6 @@ export function MarketProductsWorkspace({
     if (!isCurrent()) return;
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
     onStateChange("success", message);
-    setPendingProductId(saved.id);
     setImageDraftMode("keep");
     setManualImageDataUrl("");
     setCreateOpen(false);
@@ -273,8 +259,7 @@ export function MarketProductsWorkspace({
           <div ref={pageScroll} className="market-list">
             {filteredProducts.map((product) => (
               <article className={`market-catalog-record ${sortClass(listMode, product.id)}`} key={product.id}
-                data-sort-kind={listMode} data-sort-id={product.id}
-                onDragOver={event => reorder.handleDragOver(event, listMode, product.id)} onDrop={event => void reorder.handleDrop(event, listMode, product.id)}>
+                data-sort-kind={listMode} data-sort-id={product.id}>
                 <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${product.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps(listMode, product.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
                 <DataListButton className="market-list-row" onClick={() => { if (!reorder.suppressRowClickRef.current) openProduct(product); }}
                   leading={<MarketProductThumbnail product={product} className="market-list-product-thumb" />} title={product.name}
@@ -300,8 +285,7 @@ export function MarketProductsWorkspace({
             <div className="market-list compact">
               {categories.map((category) => (
                 <article className={`market-catalog-record ${sortClass("categories", category.id)}`} key={category.id}
-                  data-sort-kind="categories" data-sort-id={category.id}
-                  onDragOver={event => reorder.handleDragOver(event, "categories", category.id)} onDrop={event => void reorder.handleDrop(event, "categories", category.id)}>
+                  data-sort-kind="categories" data-sort-id={category.id}>
                   <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${category.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps("categories", category.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
                   <button type="button" className="market-list-row interactive-surface interactive-surface--record" aria-pressed={categoryForm.id === category.id} onClick={() => editCategory(category)}>
                   <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"}</small></span>
@@ -311,12 +295,12 @@ export function MarketProductsWorkspace({
                 </article>
               ))}
             </div>
-            <div className="market-form-grid">
-              <label className="market-field">Kategori adı<input value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="market-field">Kod<input value={categoryForm.code} onChange={(event) => setCategoryForm((current) => ({ ...current, code: event.target.value }))} /></label>
-              <label className="market-field">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={categoryForm.parentId} placeholder="Ana kategori" onChange={parentId => setCategoryForm(current => ({ ...current, parentId }))} options={categories.filter(category => category.id !== categoryForm.id).map(category => ({ id: category.id, label: category.name }))} /></label>
-              <label className="market-check"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif kategori</label>
-              <div className="market-form-actions market-field-wide">
+            <div className="form-grid form-grid--compact">
+              <label className="form-field form-field--fluid">Kategori adı<input value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label>
+              <label className="form-field form-field--fluid">Kod<input value={categoryForm.code} onChange={(event) => setCategoryForm((current) => ({ ...current, code: event.target.value }))} /></label>
+              <label className="form-field form-field--fluid">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={categoryForm.parentId} placeholder="Ana kategori" onChange={parentId => setCategoryForm(current => ({ ...current, parentId }))} options={categories.filter(category => category.id !== categoryForm.id).map(category => ({ id: category.id, label: category.name }))} /></label>
+              <label className="form-check"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif kategori</label>
+              <div className="market-form-actions form-field--span">
                 <ActionButton type="button" busy={busy} onClick={() => void saveCategory()}><Save size={16} aria-hidden="true" /> Kategoriyi Kaydet</ActionButton>
               </div>
             </div>
@@ -352,7 +336,7 @@ export function MarketProductsWorkspace({
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
             wholesaleEnabled={wholesaleEnabled}
-            statusFields={onlineSalesEnabled ? <label className="market-check"><input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"} onChange={event => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla</label> : null}
+            statusFields={onlineSalesEnabled ? <label className="form-check"><input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"} onChange={event => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla</label> : null}
             disabled={busy || saveState === "loading"}
             mode="all"
             localImageDataUrl={imageDraftMode === "manual" ? manualImageDataUrl : ""}

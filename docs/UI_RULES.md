@@ -53,8 +53,9 @@ ikincil, non-canonical bir yüzey gerekirse düşünülebilir.
 
 Ayarlar tek sayfadır; kategori sekmeleri yoktur. İşletme Yapısı ve Özellikler,
 sektör/yetenekler ve genişliğe göre 3–4 kolonlu kompakt servis grid’ini içerir.
-Dar ekranlarda kolon sayısı azalır. Her hücre yalnız ad, açıklamalı renkli etkinlik
-göstergesi ve ayar ikonunu taşır; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
+Dar ekranlarda kolon sayısı azalır. Servisler, Ek özellikler ile aynı çerçeve ve
+iç yüzeyi paylaşır. Her hücre yalnız ad, açıklamalı etkinlik göstergesi ve
+belirgin Ayarlar düğmesini taşır; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
 açıktır; normal her ziyarette kapalı başlar. Kurulum tamamlanınca taslaklar temiz
 olduğunda kapanır. Her servis ortak, klavye erişimli detay penceresinde kendi
 Kaydet/İptal işlemlerini kullanır. Etkinleştirme tercihi ile gerçek test sonucu ayrı
@@ -63,6 +64,11 @@ belirtilir. Kirli detayda X, Escape ve dış tıklama ortak kaydedilmemiş deği
 kararını mevcut modal sınırı içinde gösterir: Burada kal / Değişiklikleri geri al ve
 kapat / Kaydet ve kapat. Alttaki form inert olur; ikinci native dialog açılmaz.
 Başarısız kayıt taslağı ve servis penceresini açık tutar. İptal yalnız o servisi geri alır.
+Servis etkin kutusu kapalıyken yalnız yapılandırma alanındaki tüm kontroller (test ve bağlantı eylemleri dahil) devre dışıdır; etkinleştirme kutusu ile pencerenin Kaydet/İptal işlemleri kullanılabilir. Kutuyu seçmek kontrolleri aynı pencerede açar, henüz kaydedilmemiş etkinlik arka uç yetkilerini otomatik açmaz. Bekleyen harici hesap girişinde kullanıcı aynı servis penceresinden giriş denemesini iptal edebilir; iptal önceki bağlı hesabı silmez ve geç gelen yanıtlar yeni bağlantı olarak işlenmez.
+Etkinleştirme için başarılı doğrulama gerektiren STT bağlantı testi, kayıtlı AI/web
+ön koşulları hazırsa servis kapalıyken ortak bileşenin ayrı ön koşul doğrulama alanında
+çalışabilir. Başarısız test etkinleştirmeyi açmaz; yapılandırma kontrolleri servis
+kutusu seçilene kadar pasif kalır. Bu alan genel servis yapılandırmasını serbest bırakmaz.
 
 Güncellemeler global sidebar altındaki durum göstergesinden açılır; tercihleri kendi
 Kaydet/Geri Al eylemlerini kullanır. Güvenlik ve Veriler, arama satırının sağında
@@ -77,11 +83,28 @@ sınırında kendi BusinessLayout Kaydet/Geri Al ve ayrılma korumasını kullan
 İlk kurulumda firma adı isteğe bağlıdır. Otomatik eşitleme açıksa aynı web bağlantısı
 ana süreçte test edilmiş olmalıdır; kapalıysa web anahtarı ve testi gerekmez.
 
+Galeri Yönetimi yaklaşık 600px genişlikli, fotoğraf sayısından bağımsız sabit
+boyutlu bir medya listesidir. Fotoğraflar önizleme kaynağı hazırlanırken de en-boy
+oranları korunarak (kırpılmadan) kareye yakın çerçevelere sığdırılır; kayıtlar ayrıca
+kart çerçevesi taşımaz, ince ayraçlarla tek sütunda dizilir. Açıklama alanı resim ve
+işlem oklarının arasını doldurur, gereksiz boş kolon bırakılmaz. Liste içeride
+kaydırılır, sayfalama önizleme yükünü sınırlar.
+Oda, Masa ve Galeri Yönetiminde kaydedilmemiş değişiklikler varken Kapat/X pasiftir;
+Escape ve pencere dışına tıklama da kapatmaz. İkinci bir ayrılma onay ekranı yoktur.
+Kaydet veya Değişiklikleri Geri Al başarılı olup taslak temizlenince Kapat yeniden açılır.
+
 Alt Kaydet yalnız işletme/sektör/yetenekler ve public profile içindir; servisleri
 kaydetmez. Servis kaydı yalnız kendi alanlarını güncel kalıcı snapshot'a birleştirir,
 diğer sahiplerin taslaklarını korur. Arama aynı servis detayını açar; kategori
 geçişi yoktur. Appearance immediate preference'tır. Backup, update, password ve cihaz revoke gibi
 işlemler staged field gibi davranmaz; açık action/resource lifecycle'ı kullanır.
+
+Çoklu Dil kendi servis kayıt sahibini kullanır; AI manuel çeviri için ön koşul değildir.
+Kalıcı servis etkinse Dil Yönetimi, İşletme Bilgileri yönetim düğmelerinde sektör
+bağımsız görünür. Tek overlay içinde yaklaşık 65/35 kayıt/işlem düzeni ve sınırlı
+sayfalama kullanır; dar görünümde liste/editör aşamaları filtre, seçim ve taslağı
+korur. Kirli çeviri kapanışı engeller; Kaydet veya Geri Al aynı yüzeydedir.
+Stale manuel metin kaynakla karşılaştırılıp değişmeden yeniden onaylanabilir.
 
 Yeni staged Settings katkıları mevcut typed contribution seam'i ve field ownership
 modelini kullanır. Yeni top-level Settings tabı varsayılan çözüm değildir.
@@ -146,12 +169,16 @@ sunmalıdır.
 Gerçek yetki masaüstü SQLite/capability/permission katmanındadır. UI'da bir düğmenin
 gizlenmesi güvenlik sınırı değildir.
 
-## Web widget
+## Web veri hizmeti ve site sunumu
 
-Widget sade, mobil öncelikli ve mevcut siteyi bozmayan bir müşteri giriş yüzeyidir.
-Sektör/capability'ye göre uygun talep veya rezervasyon seçenekleri gösterilir.
+Web modülü yalnız veri, medya, yayın ve işlem API'lerini sağlar. Müşteri sitesine
+HTML/CSS, widget, sayfa yapısı veya navigasyon eklemez. Site bu API'leri kendi
+sunum koduyla tüketir. Demo sunumunun tek sahibi `test-site/landing` dizinidir;
+widget ve talep formları da demo kodudur. Menü/oda/masa/katalog görünürlüğü ve
+işlem yetkileri mevcut backend publication/capability kurallarını korur.
 
 Telefon formatı ülkeye kilitlenmez. Tarih/saat gösterimi kullanıcı diline uygun olmalıdır.
+Sözleşme: `docs/architecture/WEB_DATA_SERVICE_CONTRACT_V1.md`.
 
 ## Erişilebilirlik ve responsive davranış
 

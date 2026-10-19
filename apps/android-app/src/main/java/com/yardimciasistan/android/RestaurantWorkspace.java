@@ -3,7 +3,6 @@ package com.yardimciasistan.android;
 import android.graphics.Typeface;
 import android.view.View;
 import android.widget.Button;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -77,7 +76,7 @@ final class RestaurantWorkspace {
     }
 
     page.addView(titleBar(mode));
-    page.addView(filterBar(options.toArray(new String[0][]), mode));
+    page.addView(UiKit.filterBar(activity, options.toArray(new String[0][]), mode, listener::onModeChanged));
 
     if (AndroidUiRules.RESTAURANT_TABLES.equals(mode)) {
       renderTables(page);
@@ -109,13 +108,13 @@ final class RestaurantWorkspace {
       page.addView(UiKit.emptyCard(activity, "Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
     if (!data.tables.isEmpty()) {
-      NativeSearchList search = addSearch(page, "Masa ara");
+      NativeSearchList search = NativeSearchList.attachTo(page, "Masa ara");
       for (OperationData.TableRecord table : data.tables) {
         View row = listener.createTableCard(table);
         page.addView(row);
         search.add(row, table.name + " " + table.area + " " + table.status + " " + table.activeReservation);
       }
-      finishSearch(page, search, "Aramayla eşleşen masa yok.");
+      search.showNoMatchesIn(page, "Aramayla eşleşen masa yok.");
     }
   }
 
@@ -133,14 +132,14 @@ final class RestaurantWorkspace {
           || !AndroidUiRules.reservationAllowed(data, reservation)) {
         continue;
       }
-      if (search == null) search = addSearch(page, "Rezervasyon ara");
+      if (search == null) search = NativeSearchList.attachTo(page, "Rezervasyon ara");
       View row = listener.createReservationCard(reservation);
       page.addView(row);
       search.add(row, reservation.customerName + " " + reservation.startDate + " "
           + reservation.time + " " + reservation.status);
       shown += 1;
     }
-    if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
+    if (search != null) search.showNoMatchesIn(page, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
       page.addView(UiKit.emptyCard(activity,
           "Restoran rezervasyonu yok",
@@ -160,7 +159,7 @@ final class RestaurantWorkspace {
     if (activeOrders == 0) {
       page.addView(UiKit.emptyCard(activity, "Aktif adisyon yok", "Sipariş açılan masalar burada ayrıca görünür."));
     } else {
-      NativeSearchList search = addSearch(page, "Adisyon veya masa ara");
+      NativeSearchList search = NativeSearchList.attachTo(page, "Adisyon veya masa ara");
       for (OperationData.TableOrder order : data.tableOrders) {
         if (order.isActive()) {
           View row = listener.createOrderCard(order);
@@ -168,7 +167,7 @@ final class RestaurantWorkspace {
           search.add(row, order.tableName + " " + order.status + " " + order.id);
         }
       }
-      finishSearch(page, search, "Aramayla eşleşen adisyon yok.");
+      search.showNoMatchesIn(page, "Aramayla eşleşen adisyon yok.");
     }
   }
 
@@ -184,14 +183,14 @@ final class RestaurantWorkspace {
       if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
-      if (search == null) search = addSearch(page, "İş veya açıklama ara");
+      if (search == null) search = NativeSearchList.attachTo(page, "İş veya açıklama ara");
       View row = listener.createTaskCard(task);
       page.addView(row);
       search.add(row, task.title + " " + task.description + " " + task.status
           + " " + task.dueDate + " " + task.dueTime);
       shown += 1;
     }
-    if (search != null) finishSearch(page, search, "Aramayla eşleşen iş yok.");
+    if (search != null) search.showNoMatchesIn(page, "Aramayla eşleşen iş yok.");
     if (shown == 0) {
       page.addView(UiKit.emptyCard(activity, "Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
     }
@@ -235,13 +234,13 @@ final class RestaurantWorkspace {
     if (data.trackedStockItems.isEmpty()) {
       page.addView(UiKit.emptyCard(activity, "Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
     } else {
-      NativeSearchList search = addSearch(page, "Stok ürünü ara");
+      NativeSearchList search = NativeSearchList.attachTo(page, "Stok ürünü ara");
       for (OperationData.TrackedStockItem item : data.trackedStockItems) {
         View row = listener.createStockCard(item);
         page.addView(row);
         search.add(row, item.name + " " + item.stockStatus);
       }
-      finishSearch(page, search, "Aramayla eşleşen stok ürünü yok.");
+      search.showNoMatchesIn(page, "Aramayla eşleşen stok ürünü yok.");
     }
   }
 
@@ -279,9 +278,6 @@ final class RestaurantWorkspace {
         : AndroidUiRules.RESTAURANT_ORDERS.equals(mode) ? "Açık Adisyon"
         : AndroidUiRules.RESTAURANT_TASKS.equals(mode) ? "Günlük İşler"
         : AndroidUiRules.RESTAURANT_STOCK.equals(mode) ? "Stok" : "Menü Yönetimi";
-    LinearLayout row = UiKit.row(activity);
-    TextView heading = UiKit.title(activity, title);
-    row.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
     Button create = null;
     if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(mode)
         && AndroidUiRules.canCreateTableReservation(data)) {
@@ -294,43 +290,7 @@ final class RestaurantWorkspace {
       create = UiKit.iconButton(activity, "+", "Yeni iş", false,
           view -> listener.onCreateTask());
     }
-    if (create != null) row.addView(create,
-        new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, 0, 0, UiKit.dp(activity, 12));
-    row.setLayoutParams(params);
-    return row;
-  }
-
-  private NativeSearchList addSearch(LinearLayout page, String hint) {
-    NativeSearchList search = new NativeSearchList(activity, hint);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
-    page.addView(search.input(), params);
-    return search;
-  }
-
-  private void finishSearch(LinearLayout page, NativeSearchList search, String emptyText) {
-    TextView noMatches = UiKit.text(activity, emptyText, 13, UiKit.MUTED, Typeface.NORMAL);
-    page.addView(noMatches);
-    search.setNoMatchesNotice(noMatches);
-  }
-
-  private View filterBar(String[][] options, String selected) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 3), 0, UiKit.dp(activity, 6));
-    for (String[] option : options) {
-      row.addView(UiKit.chip(
-          activity,
-          option[1],
-          option[0].equals(selected),
-          view -> listener.onModeChanged(option[0])
-      ));
-    }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.workspaceHeader(activity, title, null, create);
   }
 
   private View statusStrip(CounterValue[] counters) {

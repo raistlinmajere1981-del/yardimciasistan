@@ -1,3 +1,5 @@
+import { TranslationSettingsSection, useTranslationSettings } from "./TranslationSettingsSection";
+import { LanguageManagementWorkspace } from "./LanguageManagementWorkspace";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES as C, isBusinessServiceAvailable } from "@yardimci-asistan/shared";
@@ -41,6 +43,7 @@ import { PasswordSettings, usePasswordSettings } from "../security/PasswordSetti
 import { SettingsActionPopover } from "./SettingsActionPopover";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { ActionButton } from "../ui/ActionButton";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
 import { DesktopDictationSetup } from "./DesktopDictationSetup";
 import { WebSettingsSection } from "./WebSettingsSection";
@@ -68,6 +71,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
+  const [profileRestartConfirmation, setProfileRestartConfirmation] = useState<"save" | "navigate" | null>(null);
   const [guardBusy, setGuardBusy] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const { snapshot: runtimeCapabilities } = useBusinessCapabilityRuntime();
@@ -79,6 +83,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const initialized = !props.setupData.setupRequired;
   const capabilities = runtimeCapabilities?.enabledCapabilities ?? [];
 
+  const translations = useTranslationSettings(initialized);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const profile = useBusinessPublicProfileSettings({
@@ -111,8 +117,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const businessDirty = drafts.dirty.business || profile.dirty;
   const canSaveBusiness = businessDirty || !initialized;
+  const profileRestartRequired = initialized && drafts.form.profileId !== drafts.canonical.profileId;
   const businessBusy = drafts.busy || profile.saving;
-  const allDirty = businessDirty || drafts.dirty.services || googleReviews.dirty || kbs.dirty || tts.dirty || dictation.dirty || androidPermissions.dirty;
+  const allDirty = translations.dirty || businessDirty || drafts.dirty.services || googleReviews.dirty || kbs.dirty || tts.dirty || dictation.dirty || androidPermissions.dirty;
   const wasSetupRequired = useRef(props.setupData.setupRequired);
   const collapsePending = useRef(false);
   useEffect(() => {
@@ -129,6 +136,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     .filter(result => initialized || result.category === "business" || result.id === "settings-web");
 
   function serviceOwner(id: string): ServiceSettingsOwner {
+    if (id === "settings-translation") return {dirty:translations.dirty,busy:translations.loading || translations.saving,savedEnabled:translations.saved.enabled,save:translations.save,discard:translations.discard};
     if (id === "settings-google-reviews") return { dirty: googleReviews.dirty, busy: googleReviews.loading || googleReviews.saving || googleReviews.testing,
       savedEnabled: googleReviews.settings.enabled, save: googleReviews.save, discard: googleReviews.discard };
     if (id === "settings-kbs") return { dirty: kbs.dirty, busy: kbs.loading || kbs.saving || kbs.testing,
@@ -191,9 +199,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   function reportResult(result: SettingsOperationResult) {
     reportAppStatus(result.ok ? "success" : "error", result.message || (result.ok ? "İşletme ayarları kaydedildi." : "Ayarlar kaydedilemedi."));
   }
-  async function saveBusinessSettings() { if (canSaveBusiness) reportResult(await saveBusiness()); }
+  async function saveBusinessSettings() {
+    if (!canSaveBusiness || businessBusy || guardBusy) return;
+    if (profileRestartRequired) { setProfileRestartConfirmation("save"); return; }
+    reportResult(await saveBusiness());
+  }
   function discardBusinessSettings() { if (!businessBusy) discardBusiness(); }
   async function saveAndContinue() {
+    if (!pendingTransition || guardBusy || businessBusy) return;
+    if (profileRestartRequired) { setProfileRestartConfirmation("navigate"); return; }
+    await saveAndNavigate();
+  }
+  async function saveAndNavigate() {
     if (!pendingTransition || guardBusy || businessBusy) return;
     setGuardBusy(true);
     try {
@@ -201,6 +218,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       reportResult(result);
       if (result.ok) { const next = pendingTransition; setPendingTransition(null); next.continueNavigation(); }
     } finally { setGuardBusy(false); }
+  }
+  async function confirmProfileRestart() {
+    const intent = profileRestartConfirmation;
+    if (!intent || guardBusy || businessBusy) return;
+    setProfileRestartConfirmation(null);
+    if (intent === "navigate") {
+      await saveAndNavigate();
+      return;
+    }
+    setGuardBusy(true);
+    try { reportResult(await saveBusiness()); }
+    finally { setGuardBusy(false); }
   }
   function discardAndContinue() {
     if (!pendingTransition || guardBusy || businessBusy) return;
@@ -211,7 +240,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (!registerPageLeaveGuard) return;
 
     return registerPageLeaveGuard((destination, continueNavigation) => {
-      if (layoutOpen || layout.dirty || serviceOpen) return false;
+      if (languageOpen || galleryOpen || layoutOpen || layout.dirty || serviceOpen) return false;
       if (!businessDirty) return true;
       if (pendingTransition || guardBusy) return false;
       setPendingTransition({
@@ -220,7 +249,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       });
       return false;
     });
-  }, [businessDirty, guardBusy, pendingTransition, registerPageLeaveGuard, layoutOpen, layout.dirty, serviceOpen]);
+  }, [businessDirty, guardBusy, pendingTransition, registerPageLeaveGuard, languageOpen, galleryOpen, layoutOpen, layout.dirty, serviceOpen]);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -258,8 +287,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         {query.trim() && (
           <div className="settings-search-results" aria-label="Ayar arama sonuçları">
             {results.length ? results.map((result) => (
-              <button
-                className="action-button action-button-ghost"
+              <ActionButton
+                variant="ghost"
                 key={result.id}
                 type="button"
                 onClick={() => {
@@ -281,7 +310,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 }}
               >
                 {result.title}
-              </button>
+              </ActionButton>
             )) : <p role="status">Ayar bulunamadı.</p>}
           </div>
         )}
@@ -311,8 +340,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 initialized={initialized}
                 runtimeSnapshot={runtimeCapabilities}
               />
-              {initialized && <section className="settings-services-list" aria-label="Servisler"><h3>Servisler</h3>
-              <div className="settings-services-grid">
+              {initialized && <section className="settings-services-list" aria-label="Servisler">
+                <fieldset className="settings-profile-options settings-services-panel">
+                  <legend>Servisler</legend>
+                  <div className="settings-services-grid">
               {isBusinessServiceAvailable("googleReviews", capabilities) && (
                     <GoogleReviewsSettingsSection
                       controller={googleReviews}
@@ -322,6 +353,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               {isBusinessServiceAvailable("ai", capabilities) &&
                 <AiSettingsSection form={drafts.form} onFormChange={drafts.setDraft} {...ai}
                   disabled={businessBusy || guardBusy} onTestAiConnection={() => void ai.testAiConnection()} />}
+              <TranslationSettingsSection controller={translations} aiAvailable={capabilities.includes(C.AI) && drafts.form.aiEnabled && Boolean(drafts.form.aiModel && (drafts.form.aiStoredApiKeyConfigured || drafts.form.aiApiKey || drafts.form.aiGoogleCurl) && !drafts.form.clearAiApiKey)} disabled={businessBusy || guardBusy} />
               <SpeechSettingsSection controller={tts} disabled={businessBusy || guardBusy} />
               <DesktopDictationSetup controller={dictation} form={drafts.form} canonical={drafts.canonical}
                 aiCapability={capabilities.includes(C.AI)} disabled={businessBusy || guardBusy} />
@@ -351,7 +383,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 initialized={initialized}
                 runtimeSnapshot={runtimeCapabilities}
               />
-              </div>
+                  </div>
+                </fieldset>
               </section>}
             </div>
           </section>
@@ -365,6 +398,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                     <div className="settings-company-management-actions">
                       {roomsEnabled && <ActionButton id="settings-rooms-button" variant="secondary" onClick={() => setLayoutOpen("rooms")}>Oda Yönetimi</ActionButton>}
                       {tablesEnabled && <ActionButton id="settings-tables-button" variant="secondary" onClick={() => setLayoutOpen("tables")}>Masa Yönetimi</ActionButton>}
+                      {initialized && translations.saved.enabled && <ActionButton id="settings-language-button" variant="secondary" onClick={() => setLanguageOpen(true)}>Dil Yönetimi</ActionButton>}
                       {initialized && <ActionButton id="settings-gallery-button" variant="secondary" onClick={() => setGalleryOpen(true)}>Galeri Yönetimi</ActionButton>}
                     </div>
                   </div>
@@ -410,9 +444,25 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       </section>
 
       {layoutOpen && <BusinessLayoutOverlay kind={layoutOpen} controller={layout} onClose={() => setLayoutOpen(null)} />}
+      {languageOpen && <LanguageManagementWorkspace settings={translations.saved} onClose={() => setLanguageOpen(false)} />}
       {galleryOpen && <BusinessGalleryOverlay onClose={() => setGalleryOpen(false)} />}
+      {profileRestartConfirmation && <ConfirmDialog
+        tone="warning"
+        eyebrow="Sektör değişikliği"
+        title="Değişiklikler kaydedilip uygulama yeniden başlatılsın mı?"
+        description="Yeni sektörün varsayılan özellikleri uygulanacak. Kaydettikten sonra Yardımcı Asistan otomatik olarak yeniden başlatılacak."
+        confirmLabel="Kaydet ve Yeniden Başlat"
+        cancelLabel="Vazgeç"
+        busy={guardBusy || businessBusy}
+        onCancel={() => {
+          if (guardBusy || businessBusy) return;
+          setProfileRestartConfirmation(null);
+          if (profileRestartConfirmation === "navigate") setPendingTransition(null);
+        }}
+        onConfirm={() => void confirmProfileRestart()}
+      />}
       <SettingsUnsavedChangesDialog
-        open={Boolean(pendingTransition)}
+        open={Boolean(pendingTransition) && !profileRestartConfirmation}
         busy={guardBusy || businessBusy}
         categoryTitle="İşletme"
         onSaveAndContinue={() => { void saveAndContinue(); }}

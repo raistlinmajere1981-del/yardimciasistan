@@ -118,7 +118,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
 
   const phone = draft && normalizeInternationalPhone(draft.account.customer.phone);
   return <section className="form-stack customer-credit-share" aria-label="Veresiye WhatsApp paylaşımı">
-    <button ref={trigger} type="button" className="action-button action-button-ghost action-button-sm" disabled={disabled || busy || !account.balances.some((balance) => balance.amountMinor > 0)} onClick={() => void share()}>WhatsApp'ta Paylaş</button>
+    <ActionButton ref={trigger} variant="ghost" size="sm" disabled={disabled || busy || !account.balances.some((balance) => balance.amountMinor > 0)} onClick={() => void share()}>WhatsApp'ta Paylaş</ActionButton>
     {draft && <div className="form-stack customer-credit-compose" role="region" aria-label="Borç durumunu paylaş" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); close(); } }}>
       <h4>Borç durumunu paylaş</h4>
       <p><strong>{draft.account.customer.fullName || "Müşteri"}</strong><br />{phone && phone.ok ? phone.display : draft.account.customer.phone}</p>

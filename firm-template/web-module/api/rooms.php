@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/storage.php';
+require_once __DIR__ . '/../lib/public-localization.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ya_rooms_response(405, [
@@ -53,6 +54,7 @@ ya_rooms_response(200, [
     'enabled' => $enabled,
     'updated_at' => (string) ($catalog['updated_at'] ?? ''),
     'rooms' => $rooms,
+    'localization' => ya_public_localization($catalog['localization'] ?? null, ['room' => ya_localization_records($rooms, 'id', ['name','bed_info','description','price_note'])]),
     'source_revision' => (int) ($publication['source_revision'] ?? 0),
     'server_revision' => $serverRevision
 ]);

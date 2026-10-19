@@ -63,12 +63,14 @@
 
 .android-device-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 9px;
 }
 
 .android-device-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: start;
   min-width: 0;
   gap: 9px;
   padding: 11px;
@@ -159,14 +161,12 @@
   color: var(--color-text);
   font-size: var(--text-sm);
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.android-device-details div:last-child dd {
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 
 .android-device-all-permissions {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -189,6 +189,7 @@
 }
 
 .android-device-permission-groups {
+  grid-column: 1 / -1;
   display: grid;
   min-width: 0;
   gap: 6px;
@@ -259,6 +260,7 @@
 }
 
 .android-device-actions {
+  grid-column: 1 / -1;
   flex-wrap: wrap;
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
@@ -346,25 +348,13 @@
   font-size: var(--text-xs);
 }
 
-@media (max-width: 1180px) {
-
-  .android-device-list {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1180px) {
-
+/* Reflow the full-width device rows without dropping management controls. */
+@media (max-width: 760px) {
+  .android-device-card,
   .android-device-permission-grid,
-.android-device-details {
-    grid-template-columns: 1fr;
-  }
+  .android-device-details,
+  .android-removed-device-row { grid-template-columns: minmax(0, 1fr); }
+  .android-removed-device-row { align-items: stretch; }
 }
 
-@media (max-width: 1180px) {
-
-  .android-removed-device-row {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-}
+.android-device-identity { flex-wrap: wrap; }

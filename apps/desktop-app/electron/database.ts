@@ -1,3 +1,7 @@
+import { getAppLockPasswordVerifier as getAppLockPasswordVerifierStored, setAppLockPasswordVerifier as setAppLockPasswordVerifierStored, getAppLockNotificationCount as getAppLockNotificationCountStored } from "./database/app-lock-store.js";
+import { recordRejectedDealerWebOrder } from "./dealer-web-order-rejection.js";
+import { PublicTranslationStore } from "./database/public-translation-store";
+import { publishedGallery } from "./business-gallery-service";
 import * as marketingAnalyticsStore from "./marketing/analytics-read-store";
 import * as marketingScheduleStore from "./marketing/schedule-store";
 import * as marketingScheduleTargetStore from "./marketing/schedule-target-store";
@@ -38,7 +42,6 @@ import { KbsDeliveryService } from "./kbs-delivery-service.js";
 import { readAndroidKbsSnapshot } from "./android-kbs-projection.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
-import { reportReservationCapabilitySqlClause, reportTaskCapabilitySqlClause } from "./database/report-utils.js";
 import { getReservationById } from "./database/reservation-store.js";
 import { getDailyTaskById } from "./database/daily-task-store.js";
 import { assignReservationRoom } from "./stay-reservation-service.js";
@@ -50,7 +53,6 @@ import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
 export type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
-import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -281,13 +283,15 @@ export class DesktopDatabase {
 
       assertCurrentDesktopSchema(this.db, schemaSql);
 
-      this.ensureSyncClientId();
+      ensureSyncClientId(this.db);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
   }
+
+  translations() { return new PublicTranslationStore(this.db, () => publishedGallery(this.userDataPath)); }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
     return readEnabledBusinessCapabilities(this.db);
@@ -831,63 +835,15 @@ export class DesktopDatabase {
   }
 
   getAppLockPasswordVerifier(): string {
-    const settings = this.db
-      .prepare("SELECT app_password_verifier FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { app_password_verifier?: string } | undefined;
-    return String(settings?.app_password_verifier ?? "").trim();
+    return getAppLockPasswordVerifierStored(this.db);
   }
 
   setAppLockPasswordVerifier(verifier: string): void {
-    const normalizedVerifier = verifier.trim();
-    if (normalizedVerifier.length > 1024 || /[\x00-\x1F\x7F]/.test(normalizedVerifier)) {
-      throw new Error("Uygulama şifre kaydı geçersiz.");
-    }
-
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare(`
-        UPDATE settings
-        SET app_password_verifier = ?,
-            app_password_updated_at = ?,
-            updated_at = ?
-        WHERE deleted_at = ''
-      `)
-      .run(normalizedVerifier, now, now);
-    if (Number(result.changes) === 0) {
-      throw new Error("Uygulama şifresinin kaydedileceği ayar bulunamadı.");
-    }
+    return setAppLockPasswordVerifierStored(this.db, verifier);
   }
 
   getAppLockNotificationCount(): number {
-    const enabled = new Set(this.getEnabledBusinessCapabilities());
-    const requestsEnabled = enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) && enabled.has(BUSINESS_CAPABILITIES.REQUESTS);
-    const row = this.db
-      .prepare(`
-        SELECT
-          (
-            (SELECT COUNT(*) FROM requests WHERE status = 'new' AND deleted_at = '' AND ?)
-            + (SELECT COUNT(*) FROM reservations WHERE status = 'pending' AND deleted_at = '' ${reportReservationCapabilitySqlClause(enabled)})
-            + (SELECT COUNT(*) FROM daily_tasks WHERE status = 'pending' AND deleted_at = '' ${reportTaskCapabilitySqlClause(enabled)})
-            + (
-              SELECT COUNT(DISTINCT tables.id)
-              FROM tables
-              LEFT JOIN table_orders
-                ON table_orders.table_id = tables.id
-                AND table_orders.status = 'payment'
-              WHERE tables.deleted_at = ''
-                AND tables.is_active = 1
-                AND ?
-                AND (tables.status = 'bill_waiting' OR table_orders.id IS NOT NULL)
-            )
-            + (
-              SELECT COUNT(*)
-              FROM events
-              WHERE type = 'android.action_failed' AND deleted_at = ''
-            )
-          ) AS count
-      `)
-      .get(requestsEnabled ? 1 : 0, enabled.has(BUSINESS_CAPABILITIES.FOOD_ORDERS) ? 1 : 0) as { count?: number } | undefined;
-    return Math.max(0, Number(row?.count ?? 0));
+    return getAppLockNotificationCountStored(this.db);
   }
 
   getAiServiceProfiles(): DesktopAiServiceProfile[] {
@@ -1101,10 +1057,7 @@ export class DesktopDatabase {
   }
 
   recordRejectedDealerWebOrder(orderId: string, accessId: string, accessRevision: number) {
-    // Durable transport outcome, with no order/customer/contact/address payload.
-    this.db.prepare(`INSERT INTO commerce_dealer_order_rejections (web_order_id, dealer_access_id, access_revision, reason, created_at)
-      VALUES (?, ?, ?, 'access_revoked', ?) ON CONFLICT(web_order_id) DO NOTHING`)
-      .run(orderId, accessId, accessRevision, new Date().toISOString());
+    recordRejectedDealerWebOrder(this.db, orderId, accessId, accessRevision);
   }
 
   recordWebOrderCursor(cursor: number, acknowledged = false) {
@@ -1124,7 +1077,7 @@ export class DesktopDatabase {
   }
 
   getServiceSettingsVerificationTime(service: TestedSettingsService): string {
-    return String(this.db.prepare("SELECT tested_at FROM service_settings_verifications WHERE service = ?").get(service)?.tested_at ?? "");
+    return readServiceVerificationTime(this.db, service);
   }
 
   recordServiceSettingsVerification(service: TestedSettingsService, config: Record<string, unknown>): void {
@@ -1132,7 +1085,7 @@ export class DesktopDatabase {
   }
 
   clearServiceSettingsVerification(service: TestedSettingsService): void {
-    this.db.prepare("DELETE FROM service_settings_verifications WHERE service = ?").run(service);
+    clearServiceVerification(this.db, service);
   }
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
@@ -1177,6 +1130,10 @@ export class DesktopDatabase {
 
   getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
     const menu = getStoredQrMenuPublication(this.db);
+    menu.localization = this.translations().localization([
+      ...menu.categories.filter(c => c.is_active).map(c => ({kind: "menu_category" as const, id: c.id, fields: {name: c.name, description: c.description}})),
+      ...menu.items.map(p => ({kind: "menu_product" as const, id: p.id, fields: {name: p.name, description: p.description}}))
+    ]);
     return menu.enabled && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.QR_MENU)
       ? menu : { ...menu, enabled: false, categories: [], items: [] };
   }
@@ -1257,36 +1214,7 @@ export class DesktopDatabase {
   }
 
   markMenuPublished(sent: PublishedQrMenu) {
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const current = this.getQrMenuPublication();
-      // Ack is evidence about sent row versions, never about all current rows.
-      for (const category of sent.categories) {
-        if (JSON.stringify(current.categories.find((row) => row.id === category.id)) !== JSON.stringify(category)) continue;
-        this.db.prepare("UPDATE menu_categories SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
-          .run(category.id, category.updated_at);
-      }
-      for (const item of sent.items) {
-        if (JSON.stringify(current.items.find((row) => row.id === item.id)) !== JSON.stringify(item)) continue;
-        this.db.prepare("UPDATE menu_product_entries SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
-          .run(item.id, item.updated_at);
-      }
-      insertDatabaseEvent(this.db, {
-        type: "menu.published",
-        entityType: "menu",
-        entityId: "qr_menu",
-        payload: {
-          category_count: sent.categories.length,
-          item_count: sent.items.length
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    markStoredMenuPublished(this.db, sent, () => this.getQrMenuPublication());
   }
 
   recordSyncEvent(input: RecordSyncEventInput) {
@@ -1352,25 +1280,10 @@ export class DesktopDatabase {
     this.db.close();
   }
 
-
-  private getScalarCount(sql: string, ...params: Array<string | number | null>): number {
-    const row = this.db.prepare(sql).get(...params) as { count?: number } | undefined;
-    return Number(row?.count ?? 0);
-  }
-
-  private ensureSyncClientId() {
-    this.db
-      .prepare(`
-        INSERT INTO desktop_sync_identity (id, client_id)
-        VALUES ('primary', ?)
-        ON CONFLICT(id) DO NOTHING
-      `)
-      .run(`desktop-${randomUUID()}`);
-  }
-
 }
 
 import {
+  ensureSyncClientId,
   setAutoSyncEnabled as setStoredAutoSyncEnabled,
   getSyncRuntimeStatus as getStoredSyncRuntimeStatus,
   getPendingSyncJobs as getStoredPendingSyncJobs,
@@ -1414,6 +1327,7 @@ import {
 } from "./database/android-local-credential-store.js";
 
 import {
+  markMenuPublished as markStoredMenuPublished,
   getPublishedMenu as getStoredPublishedMenu,
   getMenuEntryMutationBaseline as getStoredMenuEntryMutationBaseline,
   getMenuProductCandidates as getStoredMenuProductCandidates,
@@ -1525,4 +1439,4 @@ import {
   failStockImageImport as failStoredStockImageImport,
   applyStockImageImport as applyStoredStockImageImport,
 } from "./database/stock-image-store.js";
-import { readServiceVerification, recordServiceVerification, serviceConfigFingerprint, type TestedSettingsService } from "./service-settings-validation";
+import { readServiceVerification, readServiceVerificationTime, clearServiceVerification, recordServiceVerification, serviceConfigFingerprint, type TestedSettingsService } from "./service-settings-validation";

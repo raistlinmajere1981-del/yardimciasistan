@@ -1,3 +1,4 @@
+import { PublicTranslationStore } from "./database/public-translation-store";
 import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
@@ -58,6 +59,7 @@ export function createPublicTableCatalog(
     return {
       version: 1,
       enabled: true,
+      localization: new PublicTranslationStore(db).localization(rows.map(r => ({kind: "table", id: String(r.id), fields: {name: String(r.name), area: String(r.area), description: String(r.public_description)}}))),
       updatedAt,
       tables: tables.map(({ updatedAt: _updatedAt, ...table }) => table)
     };

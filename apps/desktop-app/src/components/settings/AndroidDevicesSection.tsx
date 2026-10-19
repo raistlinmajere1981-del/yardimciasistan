@@ -50,6 +50,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
 ];
 
 interface AndroidDevicesSectionProps {
+  operationsEnabled?: boolean;
   devices: DesktopAndroidDevice[];
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
@@ -67,6 +68,7 @@ interface AndroidDevicesSectionProps {
 }
 
 export function AndroidDevicesSection({
+  operationsEnabled = true,
   devices,
   enabledCapabilities,
   state,
@@ -82,7 +84,7 @@ export function AndroidDevicesSection({
   onResetPermissions,
   onRevoke
 }: AndroidDevicesSectionProps) {
-  const busy = state === "loading";
+  const busy = !operationsEnabled || state === "loading";
   const installBusy = installState === "loading";
   const { confirm, confirmDialog } = useConfirmDialog();
   const availableDevices = devices.filter((device) => !device.revokedAt);
@@ -103,7 +105,7 @@ export function AndroidDevicesSection({
   // Only exact registered identities can silently restore a missing debug
   // credential. No model-name guesses, no rekey of connected healthy phones.
   useEffect(() => {
-    if (!onProvisionApp || installBusy || busy) return;
+    if (!operationsEnabled || !onProvisionApp || installBusy || busy) return;
     for (const { usbDevice, registeredDevice } of usbRows) {
       const exact = Boolean(usbDevice.deviceId && usbDevice.deviceId === registeredDevice?.deviceId);
       if (!exact || !registeredDevice?.isActive || usbDevice.state !== "device"
@@ -117,11 +119,11 @@ export function AndroidDevicesSection({
         break;
       }
     }
-  }, [installBusy, busy, onProvisionApp, usbRows]);
+  }, [operationsEnabled, installBusy, busy, onProvisionApp, usbRows]);
   const offlineRegisteredDevices = availableDevices.filter((device) => !matchedDeviceIds.has(device.deviceId));
 
   const restoreDevice = async (device: DesktopAndroidDevice) => {
-    if (!onSetActive) return;
+    if (!operationsEnabled || !onSetActive) return;
     const shortId = compactAndroidDeviceId(device.deviceId);
     const deviceName = device.deviceName || "Android Telefon";
     const roleLabel = device.role === "admin" ? "Yönetici" : "Personel";
@@ -151,6 +153,9 @@ export function AndroidDevicesSection({
         ) : (
           <fieldset className="android-device-permission-groups" disabled={busy}>
             <legend>Görev alanları</legend>
+            {permissionGroupOptions.length === 0 && <p className="form-status">
+              Servis ve işletme özellikleri etkinleştirildiğinde görev alanları burada görünür.
+            </p>}
             <div className="android-device-permission-grid">
               {permissionGroupOptions.map((group) => {
                 const checked = Boolean(permissionGroups?.[group.id]);
@@ -242,7 +247,7 @@ export function AndroidDevicesSection({
             size="sm"
             type="button"
             onClick={onRefreshInstallDevices}
-            disabled={!onRefreshInstallDevices || installBusy}
+            disabled={!operationsEnabled || !onRefreshInstallDevices || installBusy}
           >
             <RefreshCw size={15} aria-hidden="true" />
             {installBusy ? "Taranıyor" : "Yenile"}
@@ -280,7 +285,7 @@ export function AndroidDevicesSection({
                   : canCompleteSetup
                     ? "Kurulumu Tamamla"
                     : "";
-            const primaryDisabled = installBusy
+            const primaryDisabled = !operationsEnabled || installBusy
               || (installAction
                 ? !canInstall || !onInstallApp
                 : canCompleteSetup
@@ -366,7 +371,7 @@ export function AndroidDevicesSection({
                   <div className="android-device-actions">
                     <ActionButton variant="secondary" size="sm" type="button"
                       onClick={() => onProvisionApp?.(usbDevice.serial)}
-                      disabled={installBusy || !onProvisionApp}>
+                      disabled={!operationsEnabled || installBusy || !onProvisionApp}>
                       Yeniden Eşleştir
                     </ActionButton>
                   </div>

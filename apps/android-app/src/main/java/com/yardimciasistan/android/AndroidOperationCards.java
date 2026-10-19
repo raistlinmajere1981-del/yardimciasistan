@@ -63,22 +63,8 @@ final class AndroidOperationCards {
 
   View todayRequestCard(OperationData.RequestRecord request) {
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    TextView name = UiKit.text(
-        activity,
-        request.customerName,
-        15,
-        UiKit.TEXT,
-        Typeface.BOLD
-    );
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
-    top.addView(UiKit.badge(
-        activity,
-        formatRequestStatus(request.status),
-        requestTone(request.status)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, request.customerName, 15, null,
+        UiKit.badge(activity, formatRequestStatus(request.status), requestTone(request.status))));
     card.addView(UiKit.text(
         activity,
         formatRequestType(request.type) + " · " + requestDate(request),
@@ -118,30 +104,8 @@ final class AndroidOperationCards {
     LinearLayout card = UiKit.card(activity);
     card.setOnClickListener(view -> listener.showRequestDetail(request));
 
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout identity = UiKit.column(activity);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(
-        activity,
-        request.customerName,
-        16,
-        UiKit.TEXT,
-        Typeface.BOLD
-    ));
-    identity.addView(UiKit.text(
-        activity,
-        formatRequestType(request.type),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(UiKit.badge(
-        activity,
-        formatRequestStatus(request.status),
-        requestTone(request.status)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, request.customerName, 16, formatRequestType(request.type),
+        UiKit.badge(activity, formatRequestStatus(request.status), requestTone(request.status))));
 
     String meta = requestDate(request);
     if (request.guestCount > 0) {
@@ -234,24 +198,9 @@ final class AndroidOperationCards {
     LinearLayout card = UiKit.card(activity);
     card.setOnClickListener(view -> listener.showReservationDetail(reservation));
 
-    LinearLayout top = UiKit.row(activity);
-    TextView title = UiKit.text(
-        activity,
-        reservation.customerName.isEmpty()
-            ? reservation.title
-            : reservation.customerName,
-        15,
-        UiKit.TEXT,
-        Typeface.BOLD
-    );
-    title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(title);
-    top.addView(UiKit.badge(
-        activity,
-        formatReservationStatus(reservation.status),
-        reservationTone(reservation.status)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity,
+        reservation.customerName.isEmpty() ? reservation.title : reservation.customerName, 15, null,
+        UiKit.badge(activity, formatReservationStatus(reservation.status), reservationTone(reservation.status))));
 
     String dates = joinDateRange(reservation.startDate, reservation.endDate);
     if (!reservation.time.isEmpty()) dates += " · " + reservation.time;
@@ -470,18 +419,8 @@ final class AndroidOperationCards {
 
   View stockCard(OperationData.TrackedStockItem item) {
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout identity = UiKit.column(activity);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(activity, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(activity, item.category, 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(identity);
-    top.addView(UiKit.badge(
-        activity,
-        formatStockStatus(item.stockStatus),
-        stockTone(item.stockStatus)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, item.name, 15, item.category,
+        UiKit.badge(activity, formatStockStatus(item.stockStatus), stockTone(item.stockStatus))));
 
     card.addView(UiKit.text(
         activity,
@@ -501,11 +440,7 @@ final class AndroidOperationCards {
           "Stok Güncelle",
           view -> listener.showStockActions(item)
       );
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-      params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-      update.setLayoutParams(params);
-      card.addView(update);
+      UiKit.addCardAction(card, update, activity);
     }
     return card;
   }
@@ -563,11 +498,7 @@ final class AndroidOperationCards {
             )
         )
     );
-    LinearLayout.LayoutParams params =
-        new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-    params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-    delete.setLayoutParams(params);
-    card.addView(delete);
+    UiKit.addCardAction(card, delete, activity);
     return card;
   }
 
@@ -612,11 +543,7 @@ final class AndroidOperationCards {
             )
         )
     );
-    LinearLayout.LayoutParams params =
-        new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-    params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-    delete.setLayoutParams(params);
-    card.addView(delete);
+    UiKit.addCardAction(card, delete, activity);
     return card;
   }
 
@@ -674,57 +601,22 @@ final class AndroidOperationCards {
 
   View priorityStockCard(OperationData.TrackedStockItem item) {
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout identity = UiKit.column(activity);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(activity, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(
-        activity,
-        item.category
-            + " · Stok "
-            + stockQuantity(item.stockQuantity, item.stockUnit),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(UiKit.badge(
-        activity,
-        formatStockStatus(item.stockStatus),
-        stockTone(item.stockStatus)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, item.name, 15,
+        item.category + " · Stok " + stockQuantity(item.stockQuantity, item.stockUnit),
+        UiKit.badge(activity, formatStockStatus(item.stockStatus), stockTone(item.stockStatus))));
 
     Button open = UiKit.outlineButton(activity, "Stoku Aç", view -> {
       listener.openRoute("restaurant:stock");
       listener.render();
     });
-    LinearLayout.LayoutParams params =
-        new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-    params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-    open.setLayoutParams(params);
-    card.addView(open);
+    UiKit.addCardAction(card, open, activity);
     return card;
   }
 
   View activeOrderCard(OperationData.TableOrder order) {
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    TextView table = UiKit.text(
-        activity,
-        order.tableName,
-        15,
-        UiKit.TEXT,
-        Typeface.BOLD
-    );
-    table.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(table);
-    top.addView(UiKit.badge(
-        activity,
-        formatOrderStatus(order.status),
-        orderTone(order.status)
-    ));
-    card.addView(top);
+    card.addView(UiKit.recordHeader(activity, order.tableName, 15, null,
+        UiKit.badge(activity, formatOrderStatus(order.status), orderTone(order.status))));
     card.addView(UiKit.text(
         activity,
         order.itemCount
@@ -751,11 +643,7 @@ final class AndroidOperationCards {
           UiKit.PRIMARY,
           view -> listener.showTableOrder(selectedTable)
       );
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-      params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-      open.setLayoutParams(params);
-      card.addView(open);
+      UiKit.addCardAction(card, open, activity);
     }
     return card;
   }

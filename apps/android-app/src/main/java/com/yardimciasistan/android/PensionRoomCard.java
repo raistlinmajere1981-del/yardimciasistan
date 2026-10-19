@@ -25,20 +25,9 @@ final class PensionRoomCard {
     LinearLayout card = UiKit.card(activity);
     OperationData.CustomerRoomStayRecord activeStay = data.activeStayForRoom(room.id);
 
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout name = UiKit.column(activity);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    name.addView(UiKit.text(activity, room.name, 15, UiKit.TEXT, Typeface.BOLD));
-    name.addView(UiKit.text(
-        activity,
+    card.addView(UiKit.recordHeader(activity, room.name, 15,
         (room.number.isEmpty() ? "" : room.number + " · ") + room.capacity + " kişi",
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(name);
-    top.addView(UiKit.badge(activity, formatRoomStatus(room.status), resourceTone(room.status)));
-    card.addView(top);
+        UiKit.badge(activity, formatRoomStatus(room.status), resourceTone(room.status))));
 
     if (activeStay != null) {
       String summary = activeStay.customerName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate);
@@ -61,11 +50,8 @@ final class PensionRoomCard {
             }
           }
       );
-      LinearLayout.LayoutParams assignmentParams = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-      assignmentParams.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-      assignment.setLayoutParams(assignmentParams);
       assignment.setEnabled(activeStay != null || !data.customers.isEmpty());
-      card.addView(assignment);
+      UiKit.addCardAction(card, assignment, activity);
     }
 
     if (data.hasPermission("room.update_status") && activeStay == null) {
@@ -74,10 +60,7 @@ final class PensionRoomCard {
           "Durumu Değiştir",
           view -> listener.onChangeStatus(room)
       );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-      params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-      status.setLayoutParams(params);
-      card.addView(status);
+      UiKit.addCardAction(card, status, activity);
     }
 
     return card;

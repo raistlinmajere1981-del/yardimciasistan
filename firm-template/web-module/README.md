@@ -1,45 +1,32 @@
-# Web Module
+# Yardımcı Asistan Web Veri Hizmeti
 
-Firma hostinginde çalışacak mini API ve gömülebilir widget dosyaları burada yer alır.
+Bu dizin yalnız PHP veri, medya, yayın ve işlem servisidir. HTML/CSS, widget,
+sayfa yapısı, navigasyon, hazır mağaza/duyuru/bayi veya harita renderer'ı içermez.
+Her müşteri sitesi kendi sunum koduyla API'leri tüketir. Tek demo sunum kaynağı
+`test-site/landing` dizinidir ve müşteri paketine girmez.
 
-İlk hedef düz PHP hostinglerde çalışabilen, API key bilgisini frontend'e çıkarmayan sade bir yapı kurmaktır.
+- `api/`: public veri ve işlemler; sync-secret/device/dealer korumalı hizmetler.
+- `lib/`: canonical Hosting storage, projection, submission ve provider kitaplıkları.
+- `config/`, `data/`, `knowledge/`: korumalı yapılandırma, SQLite ve AI bağlamı.
+- `media/`: yayınlanmış medya; mevcut URL, MIME ve boyut kuralları korunur.
 
-## Klasörler
+`npm run pack:web-module` build gerektirmeden backend arşivlerini üretir.
+Site tasarım dosyaları ve runtime verileri pakete giremez. `config/business.json`
+içindeki sync_secret ve allowed_origins yalnız üretilen kurulum paketinde ayarlanır.
+PHP/PDO_SQLITE gerekir; config/data/knowledge erişim kuralları korunmalıdır.
 
-```text
-widget.js
-assets/
-api/
-  request.php
-  chat.php
-  availability.php
-  availability-sync.php
-  stock-image-analysis.php
-  identity-image-analysis.php
-  menu.php
-  sync.php
-config/
-  business.json
-  ai.php
-data/
-  yardimci-asistan.sqlite (çalışırken oluşur)
-  ai-conversations.json
-  ai-settings.local.php (masaüstünden yayınlanınca oluşur)
-  (JSON çalışma deposu yok; current SQLite storage kullanılır)
-lib/
-  storage.php
-  public-room-availability.php
-  public-room-availability-intent.php
-  public-room-availability-storage.php
-  stock-image-analysis.php
-  identity-image-analysis.php
-knowledge/
-  firma.md
-  odalar.md
-  restoran.md
-  menu.md
-  sik-sorulan-sorular.md
-```
+Public veri uçları: business (galeri dahil), menu, rooms, tables, catalog, marketing,
+availability, google-reviews. İşlemler: request, order, chat, audio-transcribe,
+dealer claim/session/logout/catalog/order. WhatsApp webhook/status, medya yüklemeleri,
+Android ve Desktop publication/restore hizmetleri mevcut yetki kurallarını korur.
+
+Bayi davet sayfası sitenin modüle kardeş `bayi/` yoludur. Davet fragment'i site
+kodunca hemen temizlenir; claim/logout aynı-origin JSON ve X-YA-Dealer gerektirir.
+HttpOnly/Secure/Strict session cookie yalnız modülün api/dealer/ yoluna gönderilir.
+
+Ayrıntılar: [veri sözleşmesi v1](../../docs/architecture/WEB_DATA_SERVICE_CONTRACT_V1.md),
+[kurulum](../../docs/WEB_MODULE_INSTALLATION.md),
+[publication v3](../../docs/architecture/DESKTOP_HOSTING_PUBLICATION_PROTOCOL_V3.md).
 
 ## Dosya İzinleri
 
@@ -58,14 +45,14 @@ talep, action ve yayın yazımları SQLite'a gider.
 
 `config/`, `data/` ve `knowledge/` klasörlerinde Apache için doğrudan tarayıcı erişimini kapatan `.htaccess` dosyaları bulunur. Nginx kullanılan hostinglerde aynı kural sunucu panelinden eklenmelidir.
 
-AI anahtarı tarayıcıdan erişilebilir bir dosyada gösterilmemelidir. Masaüstünden yayınlanan anahtar `data/ai-settings.local.php` içinde `0600` izinle tutulur; bu dosya deploy paketine ve Git'e dahil edilmez. `data/.htaccess` doğrudan erişimi kapatır; Nginx kullanılan hostingde aynı engel panelden tanımlanmalıdır.
+AI anahtarı tarayıcıdan erişilebilir bir dosyada gösterilmemelidir. Masaüstünden yayınlanan anahtar korumalı SQLite `private_publication_config` içinde exact publication receipt ile atomik tutulur; runtime veritabanı deploy paketine ve Git'e dahil edilmez. `data/.htaccess` doğrudan erişimi kapatır; Nginx kullanılan hostingde aynı engel panelden tanımlanmalıdır.
 
 ## Google yorumları
 
 Google yorumları yapılandırması masaüstü uygulamasındaki `Ayarlar → İşletme → Google Yorumları`
 alanından yönetilir. Place ID ve Places API (New) anahtarı `sync_secret` ile korunan
 `api/sync.php` üzerinden web modülüne yayınlanır. API anahtarı public business bağlamına,
-HTML'e veya JavaScript'e eklenmez; hostingde `data/google-reviews.local.php` içinde tutulur.
+HTML'e veya JavaScript'e eklenmez; hosting SQLite `private_publication_config` içinde tutulur.
 
 Public site yalnız normalize edilmiş yorumu aşağıdaki endpoint'ten okur:
 
@@ -76,8 +63,7 @@ api/google-reviews.php
 Ayar kapalı veya eksikse endpoint `available=false` döndürür. Google Places yorum içeriği
 kalıcı olarak önbelleklenmez; public endpoint her içerik isteğinde güncel veriyi Google Places'tan
 okur ve `Cache-Control: no-store` döndürür. Kalıcı tutulan yalnız işletmenin Place ID ayarı ve
-sunucu tarafında korunan API credential'ıdır. `data/google-reviews.local.php` deploy paketine
-dahil edilmez.
+sunucu tarafında korunan API credential'ıdır. Runtime özel ayarları deploy paketine dahil edilmez.
 
 ## AI Chat Endpoint
 
@@ -108,7 +94,7 @@ Masaüstündeki firma adı, sektör tipi ve “Müşteriye Açık Bilgiler” al
 
 ## Canlı Oda Müsaitliği
 
-Web widget'ı oda müsaitliği sorularını genel AI cevabına bırakmadan önce salt-okunur
+Demo sitesinin asistanı oda müsaitliği sorularını genel AI cevabına bırakmadan önce salt-okunur
 canlı availability hattında kontrol eder:
 
 ```text
@@ -146,7 +132,7 @@ retry'ları aynı key'i taşır. Aynı key + normalize edilmiş aynı intent, il
 aynı `request_id` ve response'unu döndürür; farklı intent 409 `idempotency_conflict`
 olur. Yeni key yeni taleptir. Request ID hâlâ server-generated'dır. Request kuyruğu
 ve receipt aynı SQLite transaction'ında yazılır. Mevcut capability/abuse guard'ları
-korunur; rate limit idempotency yerine geçmez. Widget/form key'i başarısız retry
+korunur; rate limit idempotency yerine geçmez. Site formu key'i başarısız retry
 boyunca memory'de tutar; otomatik page-reload retry sözleşmesi yoktur.
 
 Marketing capability OFF, editorial `desired_published` tercihini silmeden ordered
@@ -449,37 +435,12 @@ Ayrıntılı canlı kurulum adımları için:
 docs/WEB_MODULE_INSTALLATION.md
 ```
 
-## Online mağaza (A4)
+## Siteye ait mağaza
 
-Reusable public yüzey: web modülünün köküne göre `magaza/` (standart kurulumda
-`/yardimci-asistan/magaza/`). PHP sayfası, bağımlılıksız browser JS/CSS ile
-`api/catalog.php` ve guest `api/order.php` sözleşmelerini kullanır. Referans
-sitenin menüsünde mağaza bağlantısı bulunur. Yeni backend sipariş modeli yoktur.
-
-Sepet bir browser taslağıdır. Görüntüleme snapshot'ı ve miktarlar, kurulum path'i
-ile namespace edilmiş `ya:storefront:<path>:cart:v1` localStorage kaydında tutulur.
-Katalog yenilendiğinde fiyat/birim snapshot'ı güncellenir; yayınından kaldırılan
-ürün açıkça işaretlenir ve yeni checkout engellenir. Adet/paket/kutu tam sayı,
-diğer birimler dört ondalığa kadar kabul eder. Farklı para birimleri ayrı ara
-toplamlar gösterir. POST yalnız ürün kimliği, miktar, guest iletişim bilgileri,
-teslimat tercihi/adres snapshot’ı, isteğe bağlı not ve idempotency key taşır; fiyat ve toplam göndermez.
-
-Belirsiz ağ/5xx sonucunda gönderilmiş payload bellekte sabitlenir; sepet ve
-iletişim/teslimat alanları kilitlenir, aynı key/payload ile tekrar denenir. Sekmeye özel
-sessionStorage yalnız version/key/method taşır; ad, telefon, e-posta, adres ve not hiçbir
-browser storage'a yazılmaz. Sayfa yenilenirse aynı iletişim/teslimat bilgileri yeniden
-girilerek aynı key denenir; farklı içerik 409 ile güvenli biçimde durur. Belirsiz
-sipariş için otomatik yeni key üretme/iptal yolu yoktur. Kullanıcı sonucu
-netleştirmek için aynı gönderimi tekrar denemeli veya işletmeyle iletişime
-geçmelidir. Başarı sepeti, formu ve key'i temizler. Kesin validation/publication
-reddi taslağı düzenlemeye açar. 429 Retry-After süresi boyunca tekrar gönderim
-engellenir. Katalog kapalı olsa bile belirsiz gönderimin receipt replay'i
-mevcut API üzerinden yapılabilir.
-
-`npm run verify:check -- web-storefront` izole PHP kurulumunda gerçek API akışını,
-browser davranışlarını ve desktop/dar viewport'u kontrol eder. Paketleme mağaza
-PHP/JS/CSS dosyalarını zorunlu sayar; deploy sağlık kontrolü mağaza için 200,
-katalog JSON sözleşmesi ve order GET için 405 bekler.
+Public catalog/order API'lerini kullanan demo mağaza `test-site/landing/magaza/`
+altındadır. Şablon `inc/storefront.php`, renderer ve CSS site asset'leridir.
+Sepet, retry, teslimat ve checkout davranışı `web-storefront` ile sınanır.
+Backend paketi hazır mağaza sayfası veya JS/CSS içermez.
 
 ## Sipariş teslimatı (B1)
 
@@ -508,7 +469,7 @@ kullanır. Desktop Siparişler detayında teslimat bilgileri read-only gösteril
 
 ### Dealer portal (C1 / D-033)
 
-`/bayi/` is a minimal dealer identity shell. Wholesale + the Desktop Services setting
+The site-owned sibling `/bayi/` page supplies the dealer identity shell. Wholesale + the Desktop Services setting
 “Bayi Web Erişimi” enable invitations from the canonical Customer Workspace. Manually
 share the one-time HTTPS fragment link; the invitation expires in 72 hours. The link is
 shown only at creation and must not be entered into analytics or request-body logging.
@@ -537,19 +498,11 @@ without putting them in `business.json` or publications. The isolated status inb
 pulled/acknowledged by desktop with the existing sync credential; no inbound conversation
 storage exists. See [Business Messaging deployment](../../docs/architecture/business-messaging.md).
 
-### D4 Website pazarlama yüzeyi
+### Website pazarlama verisi
 
-Desktop Pazarlama > İçerik Stüdyosu > Website ile yayınlanan içerikler
-`duyurular/` genel public sayfasında görünür. Herhangi bir işletme sitesinin
-ana sayfasına aynı responsive blok eklenebilir (modül yolunu kurulumunuza göre değiştirin):
-
-```html
-<link rel="stylesheet" href="/yardimci-asistan/duyurular/marketing.css">
-<section data-marketing-surface hidden aria-label="Duyurular / Kampanyalar"></section>
-<script src="/yardimci-asistan/duyurular/marketing.js" defer></script>
-```
-
-Boş/yayından kaldırılmış içerik görünmez. Public API yalnız yayın projection'ını
-okur; provider sırları, yerel dosya yolları, Content/AI metadata yayınlanmaz.
-Desktop intent revision ve kalıcı sync outbox ile yayınlar; tekrarlar idempotenttir.
-Görseller ortak asset kütüphanesinde kalır, publication içinde binary bulunmaz.
+Desktop Pazarlama Website yayını `api/marketing.php` üzerinden okunur.
+Sıralı görseller mevcut `media/marketing/` yollarında kalır. Site kendi şablon ve
+renderer'ını sağlar; demo sahibi `test-site/landing/assets/js/marketing.js` dosyasıdır.
+Boş/yayından kaldırılmış içerik görünmez. Public API provider sırları, yerel dosya
+yolları ve Content/AI metadata yayınlamaz. Desktop intent revision ve kalıcı sync
+outbox ile yayınlar; tekrarlar idempotenttir. Publication binary medya içermez.

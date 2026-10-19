@@ -35,7 +35,7 @@ final class MenuEntryPresentationDialog {
     LinearLayout fields = UiKit.column(activity);
     fields.setPadding(UiKit.dp(activity, 18), UiKit.dp(activity, 12), UiKit.dp(activity, 18), 0);
     CheckBox newProduct = new CheckBox(activity);
-    newProduct.setText("Yeni ortak ürün oluştur"); newProduct.setChecked(true);
+    newProduct.setText(R.string.menu_create_shared_product); newProduct.setChecked(true);
     Spinner product = new Spinner(activity);
     ArrayList<String> productNames = new ArrayList<>();
     for (JSONObject candidate : data.menuProductCandidates) productNames.add(candidate.optString("name"));
@@ -48,7 +48,7 @@ final class MenuEntryPresentationDialog {
     CatalogProductCreateFields.unit(productFields, "piece", value -> { newUnit[0] = value; updateConsumptionUnit[0].run(); });
     CatalogProductCreateFields.salePrice(productFields, "", value -> newPrice[0] = value);
     CheckBox trackInventory = new CheckBox(activity);
-    trackInventory.setText("Stok takibi"); trackInventory.setEnabled(data.hasBusinessCapability("commerce.inventory"));
+    trackInventory.setText(R.string.inventory_tracking); trackInventory.setEnabled(data.hasBusinessCapability("commerce.inventory"));
     productFields.addView(trackInventory);
     if (creating) {
       fields.addView(newProduct); fields.addView(product); fields.addView(productFields);
@@ -70,17 +70,17 @@ final class MenuEntryPresentationDialog {
     price.setText(item.priceOverride == null ? "" : String.valueOf(item.priceOverride));
     fields.addView(price);
     CheckBox available = new CheckBox(activity);
-    available.setText("Menüde mevcut"); available.setChecked(item.available); fields.addView(available);
+    available.setText(R.string.menu_available); available.setChecked(item.available); fields.addView(available);
     CheckBox featured = new CheckBox(activity);
-    featured.setText("Öne çıkan"); featured.setChecked(item.featured); fields.addView(featured);
+    featured.setText(R.string.menu_featured); featured.setChecked(item.featured); fields.addView(featured);
     EditText allergens = UiKit.input(activity, "Alerjenler · virgülle ayırın");
     allergens.setText(commaText(item.allergens)); fields.addView(allergens);
     EditText tags = UiKit.input(activity, "Etiketler · virgülle ayırın");
     tags.setText(commaText(item.tags)); fields.addView(tags);
-    TextView consumptionLabel = UiKit.text(activity, "Satış başına stok tüketimi · " + item.stockUnit, 12, UiKit.SECONDARY, android.graphics.Typeface.NORMAL);
+    TextView consumptionLabel = UiKit.text(activity, activity.getString(R.string.menu_stock_consumption, item.stockUnit), 12, UiKit.SECONDARY, android.graphics.Typeface.NORMAL);
     fields.addView(consumptionLabel);
     EditText consumption = new EditText(activity);
-    consumption.setHint("Satış başına stok tüketimi · " + item.stockUnit);
+    consumption.setHint(activity.getString(R.string.menu_stock_consumption, item.stockUnit));
     consumption.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     consumption.setText(String.valueOf(item.stockConsumptionQuantity));
     consumption.setEnabled(data.hasBusinessCapability("commerce.inventory")); fields.addView(consumption);
@@ -88,8 +88,8 @@ final class MenuEntryPresentationDialog {
       Runnable updateUnit = () -> {
         String unit = newProduct.isChecked() || product.getSelectedItemPosition() < 0 ? newUnit[0]
             : data.menuProductCandidates.get(product.getSelectedItemPosition()).optString("unit", "piece");
-        consumption.setHint("Satış başına stok tüketimi · " + unit);
-        consumptionLabel.setText("Satış başına stok tüketimi · " + unit);
+        consumption.setHint(activity.getString(R.string.menu_stock_consumption, unit));
+        consumptionLabel.setText(activity.getString(R.string.menu_stock_consumption, unit));
       };
       updateConsumptionUnit[0] = updateUnit;
       product.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -101,7 +101,7 @@ final class MenuEntryPresentationDialog {
       });
     }
     CheckBox hide = new CheckBox(activity);
-    hide.setText("Stokta yokken QR menüden gizle"); hide.setChecked(item.hideWhenOutOfStock);
+    hide.setText(R.string.menu_hide_out_of_stock); hide.setChecked(item.hideWhenOutOfStock);
     hide.setEnabled(data.hasBusinessCapability("commerce.inventory") && data.hasBusinessCapability("channel.qr_menu")); fields.addView(hide);
     ScrollView scroll = new ScrollView(activity); scroll.addView(fields);
     AlertDialog dialog = new AlertDialog.Builder(activity).setTitle(creating ? "Yeni menü ürünü" : item.name + " · Menü sunumu").setView(scroll)

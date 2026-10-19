@@ -4,8 +4,10 @@ import process from "node:process";
 
 function sitePhpFiles(directory) { return readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? sitePhpFiles(`${directory}/${entry.name}`) : entry.name.endsWith(".php") ? [`${directory}/${entry.name}`] : []); }
 const phpFiles = [
+  "firm-template/web-module/lib/public-localization.php",
   "infrastructure/hosting/instagram-staging-log-filter.php",
   ...sitePhpFiles("test-site/landing"),
+  ...sitePhpFiles("test-site/market-pilot"),
   "firm-template/web-module/lib/business-map.php",
   "firm-template/web-module/lib/business-ai-policy.php",
   "firm-template/web-module/lib/cloudflare-ai.php",
@@ -15,11 +17,9 @@ const phpFiles = [
   "firm-template/web-module/api/marketing-media.php",
   "firm-template/web-module/api/instagram-media.php",
   "firm-template/web-module/lib/instagram-staging.php",
-  "firm-template/web-module/duyurular/index.php",
   "firm-template/web-module/api/whatsapp-webhook.php",
   "firm-template/web-module/api/business-messaging-status.php",
   "firm-template/web-module/lib/business-messaging.php",
-  "firm-template/web-module/bayi/index.php",
   "firm-template/web-module/api/dealer/claim.php",
   "firm-template/web-module/api/dealer/session.php",
   "firm-template/web-module/api/dealer/logout.php",
@@ -27,8 +27,6 @@ const phpFiles = [
   "firm-template/web-module/lib/dealer-order.php",
   "firm-template/web-module/api/dealer/catalog.php",
   "firm-template/web-module/api/dealer/order.php",
-  "firm-template/web-module/magaza/index.php",
-  "firm-template/web-module/magaza/storefront.php",
   "firm-template/web-module/api/request.php",
   "firm-template/web-module/api/order.php",
   "firm-template/web-module/api/catalog.php",

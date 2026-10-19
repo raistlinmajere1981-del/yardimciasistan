@@ -28,7 +28,17 @@ const cases = [
   { capabilities: [C.CALENDAR, C.TASKS], requestType: "general_info", text: "Randevu almak istiyorum" },
   { capabilities: [], requestType: "general_info", text: "Kart geçiyor mu?" },
   { capabilities: [C.CATALOG], requestType: "general_info", text: "Pepsi var mı?", matchedCatalogSources: ["catalog"] },
-  { capabilities: [], requestType: "general_info", text: "Pepsi var mı?", matchedCatalogSources: ["catalog"] }
+  { capabilities: [], requestType: "general_info", text: "Pepsi var mı?", matchedCatalogSources: ["catalog"] },
+  { capabilities: [C.ACCOMMODATION_ROOMS], requestType: "general_info", text: "Room availability", responseLanguage: "en" },
+  { capabilities: [C.ACCOMMODATION_ROOMS], requestType: "general_info", text: "Room prices", responseLanguage: "en" },
+  { capabilities: [], requestType: "general_info", text: "Room availability", responseLanguage: "en" },
+  { capabilities: [C.ACCOMMODATION_ROOMS], requestType: "general_info", text: "Do you serve breakfast?", responseLanguage: "en" },
+  { capabilities: [C.FOOD_TABLES], requestType: "general_info", text: "Is a table available?", responseLanguage: "en" },
+  { capabilities: [C.FOOD_MENU], requestType: "general_info", text: "Menu information", responseLanguage: "en" },
+  { capabilities: [C.CATALOG], requestType: "general_info", text: "Room spray in stock?", responseLanguage: "en" },
+  { capabilities: [], requestType: "general_info", text: "What is your address?", responseLanguage: "en" },
+  { capabilities: [], requestType: "general_info", text: "Quantum healing service?", responseLanguage: "en" },
+  { capabilities: [], requestType: "general_info", text: "Book an appointment", responseLanguage: "en" }
 ];
 // Evaluate the real PHP policy and chat functions, without endpoint bootstrap/storage side effects.
 const php = spawnSync("php", ["-r", `
@@ -41,7 +51,7 @@ foreach ($cases as $case) {
   $context = ['capability_ids' => $case['capabilities'], 'profile_id' => 'pension_restaurant', 'profile_label' => 'Otel Restoran', 'description' => 'Kuantum terapi, konaklama ve randevu sunarız.', 'offeredServices' => ['konaklama'], 'tenantVerticals' => ['hotel'], 'verifiedDomains' => ['accommodation']];
   $decision = ya_business_ai_evaluate($case['capabilities'], $case['requestType'], $case['text'], $case['matchedCatalogSources'] ?? []);
   $catalog = array_map(static fn ($source) => ['source' => $source], $case['matchedCatalogSources'] ?? []);
-  $reply = ya_chat_generate_reply(['profile_id' => 'pension_restaurant'], ['enabled' => false], ['request_type' => $case['requestType']], $case['text'], [], $context, $catalog);
+  $reply = ya_chat_generate_reply(['profile_id' => 'pension_restaurant'], ['enabled' => false], ['request_type' => $case['requestType'], 'response_language' => $case['responseLanguage'] ?? 'tr'], $case['text'], [], $context, $catalog);
   $results[] = ['decision' => $decision, 'reply' => $reply];
 }
 echo json_encode($results, JSON_UNESCAPED_UNICODE);
@@ -55,7 +65,13 @@ for (const [index, input] of cases.entries()) {
     assert.equal(results[index].reply.error.code, expected.kind === "unsupported" ? "unsupported_business_domain" : "unrecognized_business_intent");
     assert.equal(results[index].reply.fallback, true);
   } else assert.equal(results[index].reply.error.code, "ai_disabled");
+  if (input.responseLanguage === "en") {
+    assert.doesNotMatch(results[index].reply.answer, /(?:işletmemiz|mesajınızı|hizmeti etkin değil|yanıtı)/i, "English fallback must not leak Turkish boilerplate");
+    assert.match(results[index].reply.answer, /business|service|contact/i, "English fallback responds in the visitor language");
+  }
 }
+const roomSpray = cases.findIndex(input => input.text === "Room spray in stock?");
+assert.deepEqual(results[roomSpray].decision.domains, ["commerce"], "room spray must not accidentally activate accommodation capability");
 
 const { createOwnerReplySuggestionForRequest, rewriteOwnerReplySuggestionForRequest } = require("../apps/desktop-app/dist-electron/business-ai-service.js");
 // Any access beyond request/capability/save would reach provider configuration and fail this test.

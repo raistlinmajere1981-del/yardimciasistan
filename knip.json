@@ -60,12 +60,9 @@
         "**/*.ts"
       ]
     },
-    "packages/web-widget": {
-      "entry": [
-        "src/index.ts"
-      ],
+    "test-site/landing": {
       "project": [
-        "src/**/*.ts"
+        "assistant/**/*.ts"
       ]
     }
   }

@@ -1117,6 +1117,9 @@ function ya_sync_publish_menu(array $payload): void
         'updated_at' => $now
     ];
 
+    $publishedMenu['localization'] = ya_public_localization($menu['localization'] ?? null, [
+        'menu_category' => ya_localization_records(array_filter($categories, fn($c) => $c['is_active']), 'id', ['name','description']),
+        'menu_product' => ya_localization_records($items, 'id', ['name','description'])]);
     $publication = ya_sync_apply_publication($payload, 'menu', $publishedMenu, $menu, $now,
         static function(PDO $db) use ($now): void {
             ya_sync_update_state(['last_menu_publish_at' => $now]);
@@ -1324,6 +1327,7 @@ function ya_sync_publish_room_catalog(array $payload): void
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'rooms' => $rooms
     ];
+    $catalog['localization'] = ya_public_localization($candidate['localization'] ?? null, ['room' => ya_localization_records($catalog['enabled'] ? $rooms : [], 'id', ['name', 'bed_info', 'description', 'price_note'])]);
     $publication = ya_sync_apply_publication($payload, 'room_catalog', $catalog, $candidate, $now);
     if (!$publication['deduplicated'] && ($catalog['enabled'] ?? true) === true) {
         ya_sync_prune_room_media($rooms);
@@ -1464,6 +1468,7 @@ function ya_sync_publish_table_catalog(array $payload): void
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'tables' => $tables
     ];
+    $catalog['localization'] = ya_public_localization($candidate['localization'] ?? null, ['table' => ya_localization_records($catalog['enabled'] ? $tables : [], 'id', ['name', 'area', 'description'])]);
     $publication = ya_sync_apply_publication($payload, 'table_catalog', $catalog, $candidate, $now);
     if (!$publication['deduplicated'] && ($catalog['enabled'] ?? false) === true) {
         ya_sync_prune_table_media($tables);
@@ -1616,6 +1621,12 @@ function ya_sync_publish_business_context(array $payload): void
         'updated_at' => $now
     ];
 
+    $businessIds = array_keys(is_array($candidate['localization']['translations']['business'] ?? null) ? $candidate['localization']['translations']['business'] : []);
+    $businessRecords = [];
+    // A deployment has a single public business; no private source fields are accepted.
+    if (count($businessIds) === 1) $businessRecords[$businessIds[0]] = ['description','about_text','directions_note','policy_note','payment_note'];
+    $publishedContext['localization'] = ya_public_localization($candidate['localization'] ?? null, [
+        'business' => $businessRecords, 'gallery' => ya_localization_records($gallery, 'id', ['title'])]);
     $publication = ya_sync_apply_publication($payload, 'business_context', $publishedContext, $candidate, $now);
 
     ya_sync_response(200, [

@@ -80,6 +80,18 @@
   color: var(--color-text);
 }
 
+/* Reusable softly highlighted action, distinct from a primary commit button. */
+.action-button-accent {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+.action-button-accent:hover:not(:disabled),
+.action-button-accent[aria-expanded="true"] {
+  background: var(--color-interactive-hover);
+  border-color: var(--color-accent);
+}
+
 .action-button-ghost {
   background: transparent;
   color: var(--color-text-muted);
@@ -127,4 +139,17 @@
 
 .action-button-full {
   width: 100%;
+}
+
+/* Text actions open details without a second feature-owned button appearance. */
+.action-button-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+}
+.action-button-link:hover:not(:disabled),
+.action-button-link:active:not(:disabled) {
+  background: transparent;
+  color: var(--color-accent);
 }

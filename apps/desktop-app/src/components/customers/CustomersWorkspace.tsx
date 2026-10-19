@@ -2,7 +2,7 @@ import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useMemo, useState } from "react";
 import { BedDouble, CalendarClock, IdCard, Plus, Trash2, Users } from "lucide-react";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, SaveCustomerInput } from "../../../electron/database";
-import { formatShortDate } from "../../app/record-formatters";
+import { formatCustomerLastContactDate } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListItem } from "../ui/DataList";
 import { ChoiceChips } from "../ui/ChoiceChips";
@@ -47,7 +47,6 @@ export function CustomersWorkspace({
   const [searchText, setSearchText] = usePageViewState("customers.search", "");
   const [filter, setFilter] = usePageViewState<CustomerFilter>("customers.filter", "all");
   const [createOpen, setCreateOpen] = useState(false);
-  const [pendingCustomerId, setPendingCustomerId] = useState("");
   const hasDealerCustomers = wholesaleEnabled && customers.some((customer) => Boolean(customer.commercialProfile));
   const hasStayCustomers = staysEnabled && stays.length > 0;
   const hasReservationCustomers = reservationsEnabled && reservations.length > 0;
@@ -111,13 +110,6 @@ export function CustomersWorkspace({
     if ((filter === "kbs_pending" || filter === "kbs_failed") && !kbsOverview.enabled) setFilter("all");
   }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled, setFilter]);
 
-  useEffect(() => {
-    if (createOpen || !pendingCustomerId) return;
-    if (navigation.openWorkspace({ entityType: "customer", entityId: pendingCustomerId, mode: "main", returnContext: { page: "customerWork", entityId: pendingCustomerId } })) {
-      setPendingCustomerId("");
-    }
-  }, [createOpen, navigation, pendingCustomerId]);
-
   const pageScroll = usePageViewScroll(`customers.scroll`, rows.length);
   return <section className="panel customers-workspace" aria-label="Müşteri yönetimi">
     <div className="card__header">
@@ -161,6 +153,7 @@ export function CustomersWorkspace({
     <DataList ref={pageScroll} className="customers-workspace__items">
       {rows.length === 0 ? <div className="empty-state"><Users size={24} aria-hidden="true" /><strong>Müşteri bulunamadı.</strong><p>Arama veya filtreyi değiştirin.</p></div> : rows.map((row) => {
         const customer = row.customer;
+        const activityDate = customer.lastContactAt || customer.updatedAt;
         const openCustomer = () => navigation.openWorkspace({
           entityType: "customer",
           entityId: customer.id,
@@ -172,7 +165,7 @@ export function CustomersWorkspace({
           key={customer.id}
           onClick={(event) => {
             const target = event.target as HTMLElement;
-            if (target.closest(".list-row__actions, .customer-record-row__open")) return;
+            if (target.closest("button, a, input, select, textarea, [role=button]")) return;
             openCustomer();
           }}
           leading={<span className={"status-dot " + (row.activeStay ? "tone-success" : row.activeReservations.length > 0 ? "tone-warning" : "tone-neutral")} aria-hidden="true" />}
@@ -190,10 +183,10 @@ export function CustomersWorkspace({
             {kbsOverview.enabled && row.activeStay && <StatusBadge tone={kbsTone(row.kbsState)}>{kbsLabel(row.kbsState)}</StatusBadge>}
           </>}
           actions={<>
-            {formatShortDate(customer.lastContactAt || customer.updatedAt) && (
+            {activityDate && (
               <span className="customer-record-row__date">
-                <small>{customer.lastContactAt ? "Son temas" : "Güncellendi"}</small>
-                <time dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time>
+                <small>{customer.lastContactAt ? "Son temas" : "Son güncelleme"}</small>
+                <time dateTime={activityDate}>{formatCustomerLastContactDate(activityDate)}</time>
               </span>
             )}
             {kbsOverview.enabled && row.activeStay && row.kbsState !== "sent" && row.arrivalNotification && (
@@ -227,7 +220,6 @@ export function CustomersWorkspace({
       onClose={() => setCreateOpen(false)}
       onSave={onSave}
       onAnalyzeIdentity={onAnalyzeIdentity}
-      onCreated={setPendingCustomerId}
     />
   </section>;
 }

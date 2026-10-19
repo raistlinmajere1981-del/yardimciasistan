@@ -17,8 +17,7 @@
 
 .status-badge[data-tone="info"],
 .status-chip[aria-pressed="true"][data-tone="info"],
-.status-badge.info,
-.status-badge.tone-info {
+.status-badge.info {
   --status-tone: var(--color-info);
   --status-soft: var(--color-info-soft);
   --status-border: var(--color-info-border);
@@ -27,7 +26,6 @@
 .status-badge[data-tone="success"],
 .status-chip[aria-pressed="true"][data-tone="success"],
 .status-badge.success,
-.status-badge.is-success,
 .password-status.is-enabled,
 .backup-kind.is-manual {
   --status-tone: var(--color-success);
@@ -46,8 +44,7 @@
 
 .status-badge[data-tone="danger"],
 .status-chip[aria-pressed="true"][data-tone="danger"],
-.status-badge.danger,
-.status-badge.tone-error {
+.status-badge.danger {
   --status-tone: var(--color-danger);
   --status-soft: var(--color-danger-soft);
   --status-border: var(--color-danger-border);

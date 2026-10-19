@@ -227,6 +227,9 @@ final class ConnectionSettings {
         .apply();
   }
 
+  // Must reach disk before the caller can send another action or the process exits:
+  // the barrier keeps later operations on Hosting until its queue has drained.
+  @android.annotation.SuppressLint("ApplySharedPref")
   static void markHostingActionBarrier(SharedPreferences preferences, String targetKey) {
     String normalized = targetKey == null ? "" : targetKey.trim();
     if (!normalized.isEmpty()) {
@@ -240,6 +243,8 @@ final class ConnectionSettings {
         && normalized.equals(storedValue(preferences, KEY_HOSTING_ACTION_BARRIER_TARGET));
   }
 
+  // Persist the confirmed Hosting drain before allowing the local transport again.
+  @android.annotation.SuppressLint("ApplySharedPref")
   static void clearHostingActionBarrier(SharedPreferences preferences, String targetKey) {
     if (hasHostingActionBarrier(preferences, targetKey)) {
       preferences.edit().remove(KEY_HOSTING_ACTION_BARRIER_TARGET).commit();

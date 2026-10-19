@@ -75,9 +75,6 @@
   font-size: var(--text-sm);
 }
 
-.picker-icon-button,
-.picker-text-button,
-.date-picker-presets button,
 .date-picker-grid button,
 .time-picker-list button {
   min-height: max(var(--interaction-target-min), var(--control-height-sm));
@@ -89,20 +86,6 @@
   cursor: pointer;
 }
 
-.picker-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: max(var(--interaction-target-min), var(--control-height-sm));
-  padding: 0;
-  color: var(--color-text-muted);
-  background: var(--color-bg-surface);
-  border-color: var(--color-border);
-}
-
-.picker-icon-button:hover:not(:disabled),
-.picker-text-button:hover:not(:disabled),
-.date-picker-presets button:hover:not(:disabled),
 .date-picker-grid button:hover:not(:disabled),
 .time-picker-list button:hover:not(:disabled) {
   color: var(--color-text);
@@ -110,46 +93,20 @@
   border-color: var(--color-border-strong);
 }
 
-.picker-icon-button:focus-visible,
-.picker-text-button:focus-visible,
-.date-picker-presets button:focus-visible,
 .date-picker-grid button:focus-visible,
 .time-picker-list button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }
 
-.picker-close-button {
-  margin-left: var(--space-1);
-}
-
-.picker-text-button {
-  padding-inline: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-.picker-text-button:disabled,
-.date-picker-presets button:disabled,
-.date-picker-grid button:disabled {
-  opacity: .4;
-  cursor: default;
-}
+.picker-close-button { margin-left: var(--space-1); }
+.date-picker-grid button:disabled { opacity: .4; cursor: default; }
 
 .date-picker-presets {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-3) 0;
-}
-
-.date-picker-presets button {
-  min-height: max(var(--interaction-target-min), var(--control-height-sm));
-  padding-inline: var(--space-3);
-  color: var(--color-text-muted);
-  background: var(--color-bg-surface);
-  border-color: var(--color-border);
-  font-size: var(--text-xs);
 }
 
 .date-picker-weekdays,
@@ -349,21 +306,7 @@
 }
 
 .search-select-clear {
-  min-height: max(var(--interaction-target-min), var(--control-height-sm));
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  text-align: left;
-  cursor: pointer;
-}
-
-.search-select-clear:hover {
-  color: var(--color-text);
-  background: var(--color-bg-hover);
+  justify-content: flex-start;
 }
 
 .search-select-options {
@@ -442,8 +385,7 @@
   cursor: not-allowed;
 }
 
-.form-field > .search-select,
-.market-field > .search-select {
+.form-field > .search-select {
   width: min(100%, var(--field-width));
 }
 

@@ -1610,3 +1610,51 @@ receipt arriving before its order snapshot blocks a further decision on the unch
 expected tuple without inventing an optimistic order status. Missing retained transport
 results are shown honestly. Fulfillment, Sale, payment, stock and finance operations stay
 outside this mobile decision flow.
+
+
+## D-050 — Web services and customer-site presentation have separate owners
+
+**Status:** ACCEPTED, implementing the explicit API-only Web decision.
+
+`firm-template/web-module` owns data, media, publication and operation services only.
+It supplies no HTML/CSS renderer, widget, page, navigation or automatic site injection.
+The packaged backend preserves existing endpoint URLs, response fields, visibility,
+media paths, session/abuse gates, idempotency and publication v3 acknowledgement rules.
+Catalog visibility and order acceptance remain independent under D-047.
+
+`test-site/landing` is the sole demo presentation source. Its assistant, request and
+availability forms, shop, announcements, dealer portal and map renderer belong to
+that site. QR menu, room and table designs remain site-owned. Demo builds produce
+ignored site assets separately from the PHP API package; no shared widget workspace
+or tracked widget snapshot exists. No theme/editor/framework or compatibility route
+is introduced. Dealer invitations resolve to the site-owned sibling `bayi/` route,
+with the token still confined to the fragment; dealer API cookie scope is unchanged.
+
+See [Web data service contract v1](WEB_DATA_SERVICE_CONTRACT_V1.md).
+
+## D-051 — Public translations are independent publication data
+
+**Status:** ACCEPTED, implementing the explicit multilingual service decision.
+
+The persisted, sector-independent translation service owns source Turkish and target
+publication languages separately from the public profile's spoken languages. SQLite
+owns per-business/record/field/language translations, source snapshots/hashes, origin,
+status and timestamps. Canonical public text is never rewritten. Effective stale
+status is derived against the current allowlisted public source; retained manual
+translations always require user review rather than automatic AI replacement.
+
+Only public business descriptions, room/table copy, menu/catalog products/categories,
+gallery captions and Website marketing publications are eligible. Internal business
+data, identifiers, amounts, stock, dates, media paths and feature IDs are excluded.
+Existing ai-core and the selected configured text model prepare bounded background
+work without delaying normal publication or requiring new credentials. Session,
+service, language, source hash and manual ownership are checked across async work.
+
+Translation writes invalidate the existing durable publication outbox atomically.
+They do not create a second publisher, revision allocator or receipt lifecycle.
+Current translations are additive `localization` data; missing/stale/unavailable
+translations use the original Turkish fields. Sites own language choice and all
+presentation. OFF retains translations and withdraws language metadata through the
+same ordered publication lifecycle. Current schema only; no historical upgrade path.
+
+See [Web data service contract v1](WEB_DATA_SERVICE_CONTRACT_V1.md#çok-dilli-public-veri).

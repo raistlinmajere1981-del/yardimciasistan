@@ -1,3 +1,5 @@
+import { IconButton } from "./IconButton";
+import { ActionButton } from "./ActionButton";
 import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
@@ -99,9 +101,9 @@ export function SearchSelect({ value, options, onChange, ariaLabel, placeholder 
       <div className="search-select-search"><Search size={16} aria-hidden="true" />
         <input ref={searchRef} role="combobox" aria-label={`${ariaLabel} ara`} aria-expanded="true" aria-autocomplete="list" aria-controls={listId}
           aria-activedescendant={active ? optionId(active) : undefined} value={query} onChange={event => { setQuery(event.target.value); setActiveId(""); }} onKeyDown={navigate} placeholder={searchPlaceholder} />
-        {query && <button type="button" className="picker-icon-button" aria-label="Aramayı temizle" onClick={() => { setQuery(""); setActiveId(value); searchRef.current?.focus(); }}><X size={15} aria-hidden="true" /></button>}
+        {query && <IconButton size="sm" variant="quiet" aria-label="Aramayı temizle" onClick={() => { setQuery(""); setActiveId(value); searchRef.current?.focus(); }}><X size={15} aria-hidden="true" /></IconButton>}
       </div>
-      {clearable && value && <button type="button" className="search-select-clear" onClick={() => choose("")}>Seçimi temizle</button>}
+      {clearable && value && <ActionButton size="sm" variant="ghost" fullWidth className="search-select-clear" onClick={() => choose("")}>Seçimi temizle</ActionButton>}
       <div id={listId} className="search-select-options" role="listbox" aria-label={ariaLabel}>
         {!filtered.length && <p role="status">{emptyMessage}</p>}
         {filtered.map(option => <button key={option.id} id={optionId(option)} type="button" role="option" data-value={option.id} aria-selected={option.id === value} tabIndex={-1}

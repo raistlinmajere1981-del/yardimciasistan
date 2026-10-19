@@ -360,12 +360,12 @@ try {
   await page.getByRole('dialog').getByLabel('Ad soyad', { exact: true }).fill('Migration Misafiri');
   await page.getByRole('dialog').getByLabel('Telefon', { exact: true }).fill('05321234567');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
-  const createdCustomerWorkspace = page.getByRole('dialog', { name: 'Migration Misafiri' });
-  await expect(createdCustomerWorkspace).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.customers-workspace__items')).toContainText('Migration Misafiri');
   const customerCall = await page.evaluate(() => window.__designCalls.find(call => call.kind === 'customer'));
   expect(customerCall.input.fullName).toBe('Migration Misafiri');
   expect(customerCall.input.phone).toBe('05321234567');
-  await createdCustomerWorkspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
+
   await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Rezervasyon', exact: true }).click();
   await chooseDate(page.getByRole('dialog'), 'Giriş tarihi', '2026-10-01');
@@ -387,7 +387,7 @@ try {
   }
   await page.evaluate(() => localStorage.removeItem('stage2a.empty-tasks'));
   await page.reload();
-  for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable']]) {
+  for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable'],['dark','comfortable']]) {
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
     await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
@@ -397,6 +397,7 @@ try {
     await page.keyboard.press('Escape');
     for (const name of ['Müşteri İşleri', 'Pansiyon']) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
       await capture(`${name}-${scheme}-${density}`);
     }
   }

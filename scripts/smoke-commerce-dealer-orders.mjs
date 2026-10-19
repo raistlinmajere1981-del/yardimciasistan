@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { installDemoSite } from "./test-helpers/demo-site.mjs";
 import { createRequire } from "node:module";
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import http from "node:http";
@@ -19,8 +20,7 @@ const { saveRuntimeCatalogProduct, listRuntimeOrders } = require("../apps/deskto
 const desktop = createTemporaryDesktopDatabase("ya-c2-desktop-");
 const { database } = desktop;
 const root = mkdtempSync(join(tmpdir(), "ya-c2-web-"));
-const hosting = join(root, "web-module");
-cpSync("firm-template/web-module", hosting, { recursive: true });
+const hosting = installDemoSite(root);
 for (const suffix of ["", "-wal", "-shm"]) rmSync(join(hosting, "data", "yardimci-asistan.sqlite" + suffix), { force: true });
 const secret = "dealer-c2-test-secret";
 const config = join(hosting, "config/business.json");
@@ -29,8 +29,9 @@ const port = await new Promise((resolve, reject) => {
   const probe = http.createServer(); probe.once("error", reject);
   probe.listen(0, "127.0.0.1", () => { const port = probe.address().port; probe.close(() => resolve(port)); });
 });
-const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", hosting], { stdio: ["ignore", "pipe", "pipe"] });
+const siteUrl = `http://127.0.0.1:${port}`;
+const baseUrl = `${siteUrl}/yardimci-asistan`;
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", root], { stdio: ["ignore", "pipe", "pipe"] });
 let logs = "", browser, raw;
 for (const stream of [server.stdout, server.stderr]) stream.on("data", chunk => { logs += chunk; });
 const transport = new PhpHostingSyncTransport({ baseUrl, syncSecret: secret, clientId: "c2-read-test" });
@@ -94,7 +95,7 @@ try {
   await sync();
   assert.equal((await catalog()).status, 401);
   assert.equal((await fetch(`${baseUrl}/api/dealer/order.php`)).status, 405);
-  assert.equal((await fetch(`${baseUrl}/bayi/`)).status, 200);
+  assert.equal((await fetch(`${siteUrl}/bayi/`)).status, 200);
   for (const dealer of dealers) {
     const claimed = await post("claim", { invite_token: dealer.token }); assert.equal(claimed.status, 200); dealer.cookie = claimed.cookie.split(";")[0];
   }
@@ -181,7 +182,7 @@ try {
   const context = await browser.newContext({ locale: "tr-TR", viewport: { width: 375, height: 812 } });
   const page = await context.newPage(); const errors = []; page.on("pageerror", error => errors.push(error.message));
   const replacement = database.changeDealerWebAccess(a.customerId, "invite"); const uiToken = new URL(replacement.inviteUrl).hash.slice(8); tokens.push(uiToken);
-  await sync(); await page.goto(`${baseUrl}/bayi/#invite=${uiToken}`);
+  await sync(); await page.goto(`${siteUrl}/bayi/#invite=${uiToken}`);
   await page.getByRole("button", { name: "Daveti kullan" }).click();
   await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "C2 Bayi Ürünü", exact: true })).toBeVisible();

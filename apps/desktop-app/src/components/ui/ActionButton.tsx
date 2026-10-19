@@ -1,10 +1,11 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 
-type ActionButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
+type ActionButtonVariant = "primary" | "secondary" | "accent" | "ghost" | "danger" | "quiet" | "link";
 type ActionButtonSize = "sm" | "md" | "lg";
 type ActionButtonResult = "success" | "error";
 
 interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  ref?: Ref<HTMLButtonElement>;
   variant?: ActionButtonVariant;
   size?: ActionButtonSize;
   fullWidth?: boolean;

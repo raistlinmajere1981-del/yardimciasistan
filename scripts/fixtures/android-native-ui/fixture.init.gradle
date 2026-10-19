@@ -1,0 +1,25 @@
+// A disposable device fixture: no production application, credentials or build outputs are replaced.
+beforeProject { project ->
+  project.layout.buildDirectory.set(new File(System.getProperty('yardimci.uiFamilyBuild')))
+  project.afterEvaluate {
+    project.android.defaultConfig.applicationId = 'com.yardimciasistan.android.uifamily'
+    def fixture = new File(project.rootDir, '../../scripts/fixtures/android-native-ui')
+    project.android.sourceSets.debug.java.srcDir(fixture)
+    project.android.sourceSets.debug.manifest.srcFile(new File(fixture, 'AndroidManifest.xml'))
+    project.tasks.named('generateConnectionDefaults').configure { enabled = false }
+    def defaults = project.tasks.register('generateUiFamilyDefaults') {
+      doLast {
+        def output = new File(project.layout.buildDirectory.get().asFile,
+          'generated/source/connection/com/yardimciasistan/android/ConnectionDefaults.java')
+        output.parentFile.mkdirs()
+        output.text = '''package com.yardimciasistan.android;
+final class ConnectionDefaults {
+  static final String WEB_MODULE_URL = "http://127.0.0.1:1";
+  static final String SYNC_SECRET = "ui-family-fixture-only";
+  static final boolean LOCK_EMBEDDED_CONNECTION = false;
+}'''
+      }
+    }
+    project.tasks.matching { it.name == 'preDebugBuild' }.configureEach { dependsOn(defaults) }
+  }
+}

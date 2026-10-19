@@ -54,6 +54,73 @@ tahsilat veya stok hareketi üretmez.
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
 
+## Ortak native UI ailesi
+
+`UiKit.workspaceHeader` başlık, alt açıklama ve isteğe bağlı hızlı eylemin;
+`UiKit.recordHeader` kayıt kimliği ile domainin sağladığı durum göstergesinin
+ortak yerleşim sahibidir. `UiKit.filterBar` yatay chip kaydırmasını ve seçili
+öğenin görünmesini yönetir; yetkili seçenekler ve seçim callback'i ekranda kalır.
+Chip ve kart eylemleri en az 48dp yüksekliğindedir, büyük yazıda büyüyebilir.
+
+`NativeSearchList.attachTo` yalnız önceden yetkilendirilmiş satırları yerel olarak
+süzer. Aramayı temizleme odağı alanda tutar; `showNoMatchesIn` boş sorguyu boş
+kayıt listesiyle karıştırmaz. Ağ, capability, kalıcı seçim veya mutation sahibi
+değildir. Boş/yetkisiz veri yüzeyleri `UiKit.emptyCard`; etiketli form alanları
+`UiKit.labeledInput` kullanır. Alan türü, doğrulama ve taslak ekranın sorumluluğudur.
+
+Manuel cihaz kontrolü: `npm run verify:check -- android-native-ui-family --include-manual`.
+Bu kontrol gerçek native görünümleri 360/393/840dp ve %100/%150 yazı matrisinde ölçer;
+geçici debug fixture'ını ayrı `com.yardimciasistan.android.uifamily` kimliğiyle
+kurup kaldırır. Müşteri uygulamasını başlatmaz/değiştirmez, gerçek bağlantı anahtarı
+kullanmaz ve hosting'e bağlanmaz. Geniş pencere ölçümü ayrı fiziksel tablet,
+TalkBack, sistem geri hareketi veya gerçek IME kullanım testinin yerine geçmez.
+API29+ cihazda aynı fixture Market sayım/mal kabul/sepet/ürün/satış/tahsilat
+formlarının gerçek kontrollerini, reddedilen gönderimde taslak korunmasını,
+izin sonucu ve tarama callback sırasını da sınar. Kamera izni kontrollü registry
+sonucuyla sınanır; gerçek kamera uygulaması veya hosting açılmaz.
+
+## Native ekran ve akış sahipliği
+
+`MainActivity` uygulama bileşimi, Android yaşam döngüsü ve controller callback'lerinin
+bağlandığı köktür. Senkronizasyon `AndroidOperationsSyncController`, gönderim
+`AndroidActionDispatcher`, gezinme `AndroidNavigationState` ve harici kamera Activity
+sonuçları `AndroidImageCaptureController` tarafından yönetilir. Ekran ayrıştırması
+bu sahipleri veya kayıt/senkronizasyon hattını çoğaltmaz.
+
+Market'in geçici ekran durumu aşağıdaki sınırlarda tutulur:
+
+| Sahip | Sorumluluk |
+| --- | --- |
+| `MarketWorkspace` | Tek güncel snapshot, ekran seçimi/geri dönüşü, yetkiyle route düzeltme, giriş ve barkod sonucu bileşimi |
+| `MarketBarcodeFlow` | Kamera izni launcher'ı, bekleyen tarama amacı, manuel/kamera girişi ve kasa barkod geri bildirimi |
+| `MarketProductEditor` | Ürün oluşturma taslağı, isteğe bağlı lookup sonucu ve kaynak bilgisi |
+| `MarketCatalogBrowser` | Yetkili snapshot'tan ürün seçimi, lazy önizleme cache'i |
+| `MarketInventoryFlow` | Fiziksel sayım formu ve tek `ReceivingDraft` |
+| `MarketCheckoutFlow` | Sepet ile satış ekranlarının paylaştığı tek `CartDraft`, ödeme formu |
+| `MarketCreditFlow` | Cari hesap seçimi ve tahsilat formu; borç snapshot'tan okunur |
+| `MarketSubmissionFeedback` | Yerel/outbox bekleme durumu, form hatası ve Desktop acknowledgement sunumu |
+| `MarketFormUi` | Market form çizimi/biçimlendirmesi; domain state veya transport içermez |
+
+Akışlar snapshot kopyası saklamaz; workspace'in güncel verisini okur. Payload
+kuralları ve taslak modelleri `MarketUiRules`, kalıcı gönderim mevcut Listener →
+`AndroidActionDispatcher` → outbox hattında kalır. Formlar yalnız kabul edilen
+gönderimde temizlenir; sayım, satış ve tahsilat snapshot'taki stok/borcu değiştirmez.
+Ürün lookup'u yalnız aynı barkodun boş alanlarını doldurur; başka barkodun sonucu
+aktif formu bitirmez. Ürün oluşturma başka bir Market action'ı bekliyor diye kilitlenmez.
+Market düğmelerinin mevcut yükseklikleri minimum olarak korunur; büyük yazıda
+metin sığmadığında içerik yüksekliğine büyürler. Renk ve etkileşim `UiKit` ailesindedir.
+
+Barkod izin launcher'ı workspace oluşturulurken, Activity STARTED olmadan önce
+kaydedilir. İzin sonucu bekleyen amacı alıp temizler; ret durumunda aynı amaçla
+manuel giriş açılır. Manuel giriş ve ürün seçici yönlendirmeden önce kapanır;
+mal kabul satırı da mevcut kapatma/render sırasını korur. Satış ve tahsilat onayı,
+onay düğmesine basıldığında güncel bekleyen işlem durumunu tekrar denetler.
+
+`AndroidOperationCards` yetkili projection'ları eylem callback'leriyle birleştirir;
+oda, konaklama ve masa kartlarının domain sahipleri ayrıdır. `UiKit` native kontrol
+çizim ailesidir. Bu iki sınıf kalıcı mutation, ağ veya bağımsız form taslağı sahibi
+olmadığından yalnız boyutları için ikinci bir katmana bölünmez.
+
 ## Market Companion (M7.2)
 
 Market için ürün rolü şöyledir:

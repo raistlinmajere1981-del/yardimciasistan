@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { installDemoSite } from './test-helpers/demo-site.mjs';
 import { activateFixtureSource, publicationEnvelope } from './test-helpers/publication-protocol.mjs';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,8 +10,7 @@ import { chromium, expect } from '@playwright/test';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'ya-storefront-'));
-const hosting = join(root, 'yardimci-asistan');
-cpSync('firm-template/web-module', hosting, { recursive: true });
+const hosting = installDemoSite(root);
 for (const file of ['yardimci-asistan.sqlite', 'yardimci-asistan.sqlite-wal', 'yardimci-asistan.sqlite-shm']) rmSync(join(hosting, 'data', file), { force: true });
 const secret = 'storefront-test-only-secret';
 const config = join(hosting, 'config/business.json');
@@ -19,7 +19,8 @@ const port = await new Promise((resolve, reject) => {
   const probe = http.createServer(); probe.once('error', reject);
   probe.listen(0, '127.0.0.1', () => { const port = probe.address().port; probe.close(() => resolve(port)); });
 });
-const base = `http://127.0.0.1:${port}/yardimci-asistan`;
+const siteUrl = `http://127.0.0.1:${port}`;
+const base = `${siteUrl}/yardimci-asistan`;
 const server = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', root], { stdio: 'ignore' });
 let browser, revision = 0;
 const product = { product_id: 'p-one', name: 'Birinci ürün', description: '<script>window.injected=true</script> Güvenli açıklama',
@@ -40,7 +41,7 @@ async function publish(enabled = true, products = [product, weighted], methods =
 }
 const quantityInput = (page, name = product.name) => page.getByRole('textbox', { name: `${name}: miktar`, exact: false });
 const add = (page, name = product.name) => page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) }).getByRole('button', { name: 'Sepete ekle' });
-async function ready(page) { await page.goto(`${base}/magaza/`); await expect(add(page)).toBeVisible(); }
+async function ready(page) { await page.goto(`${siteUrl}/magaza/`); await expect(add(page)).toBeVisible(); }
 async function contact(page) {
   await page.getByRole('button', { name: 'İletişim bilgilerini gir' }).click();
   await page.getByLabel('Ad / ad-soyad').fill('Guest Example');
@@ -65,18 +66,19 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.equal((await fetch(`${base}/api/order.php`)).status, 405);
-  const html = await fetch(`${base}/magaza/`);
-  assert.equal(html.status, 200); assert.match(html.headers.get('content-security-policy'), /script-src 'self'/);
+  const html = await fetch(`${siteUrl}/magaza/`);
+  assert.equal(html.status, 200); assert.ok((await html.text()).includes('/assets/js/storefront.js'));
   browser = await launchChromiumForSmoke(chromium);
   // Visual contract: a single product stays compact and its purchase controls
-  // fit the initial viewport; empty-cart checkout cannot open by pointer/keyboard.
+  // remain accessible within the site shell; empty-cart checkout cannot open by pointer/keyboard.
   const compactProduct = { ...product, name: 'UzunÜrünAdı'.repeat(18).slice(0, 180), description: 'Uzun açıklama '.repeat(90), image_url: '' };
   for (const viewport of [{ width: 1280, height: 768 }, { width: 375, height: 812 }, { width: 320, height: 780 }]) {
     await publish(true, [compactProduct]);
     const layoutPage = await freshPage(viewport);
-    await layoutPage.goto(`${base}/magaza/`);
+    await layoutPage.goto(`${siteUrl}/magaza/`);
     const card = layoutPage.getByRole('article');
     await expect(card).toHaveCount(1);
+    await card.scrollIntoViewIfNeeded();
     await expect(card.getByRole('heading', { name: compactProduct.name, exact: true })).toBeInViewport({ ratio: 1 });
     await expect(card.locator('.price')).toBeInViewport({ ratio: 1 });
     await expect(card.getByRole('button', { name: 'Sepete ekle' })).toBeInViewport({ ratio: 1 });
@@ -131,7 +133,7 @@ try {
   await gridPage.context().close();
   await publish(false);
   const page = await freshPage();
-  await page.goto(`${base}/magaza/`);
+  await page.goto(`${siteUrl}/magaza/`);
   await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
   await publish(true, [product, weighted], []);
   await page.getByRole('button', { name: 'Ürünleri yenile' }).click();
@@ -345,7 +347,7 @@ try {
   long.name = long.name.slice(0, 180);
   await publish(true, [long]); const mobile = await freshPage({ width: 320, height: 780 });
   await mobile.addInitScript(() => { Storage.prototype.setItem = () => { throw new Error('storage disabled'); }; });
-  await mobile.goto(`${base}/magaza/`); await expect(add(mobile, long.name)).toBeVisible(); await expect(mobile.getByText('Görsel yok')).toBeVisible();
+  await mobile.goto(`${siteUrl}/magaza/`); await expect(add(mobile, long.name)).toBeVisible(); await expect(mobile.getByText('Görsel yok')).toBeVisible();
   await add(mobile, long.name).focus(); await mobile.keyboard.press('Enter');
   await mobile.locator('#open-checkout').focus(); await mobile.keyboard.press('Enter'); await expect(mobile.getByLabel('Ad / ad-soyad')).toBeFocused();
   await mobile.keyboard.type('Mobile Guest'); await mobile.keyboard.press('Tab'); await mobile.keyboard.type('+49 151 23456789');

@@ -5,17 +5,18 @@
   "description": "Küçük işletmeler için local-first Yardımcı Asistan monorepo iskeleti.",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "test-site/landing"
   ],
   "scripts": {
     "build": "npm run build:packages && npm run build:apps",
     "build:apps": "npm run build -w @yardimci-asistan/desktop-app && npm run build -w @yardimci-asistan/android-app",
-    "build:packages": "npm run build -w @yardimci-asistan/shared && npm run build -w @yardimci-asistan/whatsapp-bridge && npm run build -w @yardimci-asistan/ai-core && npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/web-widget",
+    "build:packages": "npm run build -w @yardimci-asistan/shared && npm run build -w @yardimci-asistan/whatsapp-bridge && npm run build -w @yardimci-asistan/ai-core && npm run build -w @yardimci-asistan/sync-core",
     "architecture:audit": "node scripts/architecture-audit.mjs",
     "design:audit": "node scripts/design-system-audit.mjs",
     "design:audit:baseline": "node scripts/design-system-audit.mjs --write-baseline",
     "design:audit:strict": "node --test scripts/test-desktop-style-audit.mjs && node scripts/design-system-audit.mjs --strict",
-    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\" \"firm-template/web-module/**/*.js\"",
+    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\" \"test-site/landing/**/*.{js,ts}\"",
     "lint:strict": "npm run lint -- --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "knip": "knip --config knip.json",
@@ -65,16 +66,15 @@
     "smoke:stock-image-analysis": "node scripts/smoke-stock-image-analysis.mjs",
     "smoke:local-lab": "node scripts/local-dev-lab.mjs --once",
     "smoke:web-form-api": "node scripts/smoke-web-form-api.mjs",
-    "smoke:web-widget-branding": "npm run build -w @yardimci-asistan/web-widget && node scripts/smoke-web-widget-branding.mjs",
-    "smoke:web-widget-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/smoke-web-widget-module.mjs",
+    "smoke:web-widget-branding": "npm run build:demo && node scripts/smoke-web-widget-branding.mjs",
+    "smoke:web-widget-module": "npm run build:demo && node scripts/smoke-web-widget-module.mjs",
     "smoke:web-module": "node scripts/smoke-web-module-menu.mjs",
     "pack:desktop:dir": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:dir -w @yardimci-asistan/desktop-app",
     "pack:desktop:win": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app",
     "pack:desktop:win32": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app",
     "pack:desktop:windows": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app",
     "pack:desktop:linux": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform linux && npm run build -w @yardimci-asistan/desktop-app && npm run pack:linux -w @yardimci-asistan/desktop-app",
-    "pack:web-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/package-web-module.mjs",
-    "sync:web-widget-template": "npm run sync:template -w @yardimci-asistan/web-widget",
+    "pack:web-module": "node scripts/package-web-module.mjs",
     "sync:business-ai-policy": "node scripts/sync-business-ai-policy.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:electron": "tsc -p apps/desktop-app/tsconfig.electron.json --noEmit",
@@ -126,7 +126,8 @@
     "installations:check": "node scripts/installation-config.mjs check",
     "version:web:set": "node scripts/product-version.mjs web-set",
     "version:web:bump": "node scripts/product-version.mjs web-bump",
-    "deploy:market-pilot": "bash scripts/deploy-market-pilot.sh"
+    "deploy:market-pilot": "bash scripts/deploy-market-pilot.sh",
+    "build:demo": "npm run build -w @yardimci-asistan/demo-site"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

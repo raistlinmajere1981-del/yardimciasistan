@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
@@ -204,7 +203,7 @@ final class AndroidImageCaptureController {
     );
   }
 
-  private static final class VisibleCameraTakePicture extends ActivityResultContracts.TakePicture {
+  static final class VisibleCameraTakePicture extends ActivityResultContracts.TakePicture {
     @Override
     public Intent createIntent(Context context, Uri input) {
       Intent intent = super.createIntent(context, input);
@@ -213,15 +212,12 @@ final class AndroidImageCaptureController {
         return intent;
       }
 
-      // Android 11+ can hide compatible camera handlers from an implicit query.
-      for (ApplicationInfo application : packageManager.getInstalledApplications(PackageManager.MATCH_ALL)) {
-        Intent packageIntent = new Intent(intent).setPackage(application.packageName);
-        List<ResolveInfo> handlers = packageManager.queryIntentActivities(
-            packageIntent,
-            PackageManager.MATCH_DEFAULT_ONLY
-        );
-        if (handlers.isEmpty()) continue;
-        ResolveInfo handler = handlers.get(0);
+      // The manifest declares this IMAGE_CAPTURE intent in <queries>, including
+      // on Android 11+. Enumerating installed apps cannot bypass visibility.
+      // Keep the explicit-handler fallback, scoped to compatible camera apps.
+      List<ResolveInfo> handlers = packageManager.queryIntentActivities(
+          intent, PackageManager.MATCH_DEFAULT_ONLY);
+      for (ResolveInfo handler : handlers) {
         if (handler.activityInfo == null || !handler.activityInfo.enabled || !handler.activityInfo.exported) {
           continue;
         }

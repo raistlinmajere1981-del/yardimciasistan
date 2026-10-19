@@ -2,23 +2,16 @@ import { chromium, expect } from "@playwright/test";
 import { activateFixtureSource, publicationFixtureFetch } from "./test-helpers/publication-protocol.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
-import { nexaRuntimePaths } from "./nexa-assets.mjs";
+import { installDemoSite } from "./test-helpers/demo-site.mjs";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
-const webModuleRoot = join(tempRoot, "web-module");
-const widgetBundlePath = join(process.cwd(), "packages", "web-widget", "dist", "widget.js");
-cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
-cpSync(widgetBundlePath, join(webModuleRoot, "widget.js"));
-for (const path of nexaRuntimePaths("web")) {
-  const destination = join(webModuleRoot, path);
-  mkdirSync(join(destination, ".."), { recursive: true });
-  cpSync(join(process.cwd(), "packages/web-widget/dist", path), destination);
-}
+const webModuleRoot = installDemoSite(tempRoot);
+writeFileSync(join(tempRoot, "assistant-test.php"), "<!doctype html><html lang=\"tr\"><body><main>Firma sitesi</main></body></html>");
 const syncSecret = "pilot-web-smoke-secret";
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
@@ -34,8 +27,9 @@ for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-w
 writeFileSync(conversationsFile, "[]\n");
 writeFileSync(join(webModuleRoot, "config", "ai.local.php"), "<?php return ['enabled' => false];\n");
 const port = await getFreePort();
-const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
+const siteUrl = `http://127.0.0.1:${port}`;
+const baseUrl = `${siteUrl}/yardimci-asistan`;
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", tempRoot], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"]
 });
@@ -50,7 +44,7 @@ server.stderr.on("data", (chunk) => {
 });
 
 try {
-  await waitForUrl(`${baseUrl}/widget.js`);
+  await waitForUrl(`${siteUrl}/assets/assistant/widget.js`);
   await activateFixtureSource(baseUrl, syncSecret, "desktop-widget-module-smoke");
 
   const publicBusinessBeforeSyncResponse = await fetch(`${baseUrl}/api/business.php`);
@@ -97,7 +91,7 @@ try {
   browser = await launchChromiumForSmoke(chromium);
 
   const fixedLauncherPage = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-  await fixedLauncherPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await fixedLauncherPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(fixedLauncherPage, baseUrl, { profileId: "pension", connectApi: false });
   await fixedLauncherPage.evaluate(() => {
     document.body.style.minHeight = "1800px";
@@ -115,7 +109,7 @@ try {
   await fixedLauncherPage.close();
 
   const pensionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await pensionPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await pensionPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(pensionPage, baseUrl, { profileId: "pension", connectApi: false });
   await pensionPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(pensionPage.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
@@ -152,7 +146,7 @@ try {
   await pensionPage.close();
 
   const contextPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await contextPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await contextPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(contextPage, baseUrl, { profileId: "pension", connectApi: false });
   await contextPage.evaluate(() => {
     const reserve = document.createElement("button");
@@ -190,7 +184,7 @@ try {
   await contextPage.close();
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(page, baseUrl);
 
   await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
@@ -198,7 +192,7 @@ try {
   await expect(page.locator('[data-nexa-role="launcher"] svg[data-nexa-rig]')).toHaveAttribute("data-motion-active", "false");
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
-  await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
+  await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${siteUrl}/assets/yardimci-asistan-symbol.png`);
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
   await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
@@ -355,7 +349,7 @@ try {
   expect(aiDisabledBusiness.business.requests_enabled).toBe(true);
 
   const aiDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await aiDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await aiDisabledPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(aiDisabledPage, baseUrl);
   await aiDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(aiDisabledPage.locator('[data-ya-view="info"]')).toHaveCount(0);
@@ -398,7 +392,7 @@ try {
   expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await requestsDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await requestsDisabledPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
   await injectWidget(requestsDisabledPage, baseUrl);
   await requestsDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(requestsDisabledPage.locator('[data-ya-request-type="pension_reservation"]')).toHaveCount(0);
@@ -428,7 +422,7 @@ try {
   expect(requestsDisabledFormResponse.status).toBe(403);
   expect((await requestsDisabledFormResponse.json()).code).toBe("requests_disabled");
 
-  console.log(`web-widget-module-smoke-ok: ${baseUrl}/widget.js`);
+  console.log(`demo-assistant-api-smoke-ok: ${siteUrl}/assets/assistant/widget.js`);
 } catch (error) {
   if (serverOutput.trim()) {
     console.error(serverOutput.trim());
@@ -460,12 +454,12 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
     document.body.innerHTML = "<main>Firma sitesi</main>";
 
     const script = document.createElement("script");
-    script.src = `${url}/widget.js`;
+    script.src = new URL("/assets/assistant/widget.js", url).href;
     script.dataset.businessName = "Deniz Çiçeği Pansiyon & Kafe";
     script.dataset.whatsappPhone = "+90 531 696 9334";
     if (connectApi) script.dataset.apiBaseUrl = url;
     script.dataset.profileId = profileId;
-    script.dataset.logoUrl = `${url}/assets/yardimci-asistan-symbol.png`;
+    script.dataset.logoUrl = new URL("/assets/yardimci-asistan-symbol.png", url).href;
     script.dataset.primaryColor = "#2F6F5E";
     script.dataset.accentColor = "#E47863";
 

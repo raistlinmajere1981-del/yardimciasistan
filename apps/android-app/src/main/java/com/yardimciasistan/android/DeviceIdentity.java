@@ -56,6 +56,10 @@ final class DeviceIdentity {
     }
   }
 
+  // ANDROID_ID is app-signing-key/user/device scoped on our API 26+ baseline.
+  // Only its namespaced hash is persisted; replacing it would create duplicate
+  // Desktop device registrations after reinstall. Existing stored IDs always win.
+  @android.annotation.SuppressLint("HardwareIds")
   private static String resolveStableDeviceId(Context context) {
     try {
       String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);

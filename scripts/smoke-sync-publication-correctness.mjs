@@ -160,6 +160,46 @@ test("manual menu uses coordinator withdrawal lifecycle even with QR OFF", async
   assert.deepEqual(stored("menu").categories, []);
 });
 
+test("maintenance drains concurrent manual menu and snapshot publications and fences later sends", async t => {
+  const { database, coordinator, allJobs } = await fixture(t);
+  assert.equal((await coordinator.runNow()).ok, true);
+  const writes = new Set();
+  let entered, release;
+  const sending = new Promise(resolve => { entered = resolve; });
+  const barrier = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  globalThis.fetch = async (url, init) => {
+    const body = init?.body ? JSON.parse(init.body) : {};
+    if (["publish_menu", "publish_android_snapshot"].includes(body.action)) {
+      writes.add(body.action);
+      if (writes.size === 2) entered();
+      await barrier;
+    }
+    return nativeFetch(url, init);
+  };
+  const menu = coordinator.publishMenuNow();
+  const snapshot = coordinator.publishAndroidSnapshotNow();
+  await sending;
+  let drained = false;
+  const maintenance = coordinator.suspendAndDrain().then(() => { drained = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(drained, false, "restore must wait for manual publications outside the automatic cycle");
+  release();
+  assert.equal((await menu).ok, true);
+  assert.equal((await snapshot).ok, true);
+  await maintenance;
+  assert.equal(allJobs().some(job => ["menu_publish", "android_snapshot"].includes(job.jobType)), false);
+
+  let laterSends = 0;
+  globalThis.fetch = (...args) => { laterSends++; return nativeFetch(...args); };
+  database.queueSyncJob("menu_publish");
+  assert.equal((await coordinator.publishMenuNow()).ok, false);
+  assert.equal((await coordinator.publishAndroidSnapshotNow()).ok, false);
+  assert.equal(laterSends, 0, "suspended manual entry points must retain durable intent without sending");
+  assert.ok(allJobs().some(job => job.jobType === "menu_publish"));
+  assert.ok(allJobs().some(job => job.jobType === "android_snapshot"));
+});
+
 test("snapshot lost response survives process restart and retries the same revision/body/key idempotently", async t => {
   const f = await fixture(t);
   assert.equal((await f.coordinator.runNow()).ok, true);

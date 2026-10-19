@@ -23,8 +23,8 @@
 .record-picker__search input:focus-visible { outline: none; }
 .record-picker__search > svg { flex: none; color: var(--color-text-muted); }
 .record-picker__search button, .record-picker__header button { display: grid; place-items: center; padding: var(--space-2); border-color: transparent; }
-.record-picker__filters, .record-picker__letters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-5); }
-.record-picker__filters { border-bottom: 1px solid var(--color-border); }
+.record-picker__filters, .record-picker__letters { display: flex; align-items: center; flex-wrap: wrap; padding: var(--space-2) var(--space-5); }
+.record-picker__filters { gap: var(--space-2); border-bottom: 1px solid var(--color-border); }
 .record-picker__count { margin-right: auto; }
 .record-picker__controls { display: flex; align-items: center; gap: var(--space-1); }
 .record-picker__controls button { display: grid; place-items: center; padding: var(--space-2); }

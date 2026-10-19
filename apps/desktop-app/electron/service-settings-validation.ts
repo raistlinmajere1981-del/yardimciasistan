@@ -30,3 +30,11 @@ export function recordServiceVerification(db: DatabaseSync, service: TestedSetti
     ON CONFLICT(service) DO UPDATE SET fingerprint=excluded.fingerprint, tested_at=excluded.tested_at`)
     .run(service, fingerprint, new Date().toISOString());
 }
+
+export function readServiceVerificationTime(db: DatabaseSync, service: TestedSettingsService): string {
+  return String(db.prepare("SELECT tested_at FROM service_settings_verifications WHERE service = ?").get(service)?.tested_at ?? "");
+}
+
+export function clearServiceVerification(db: DatabaseSync, service: TestedSettingsService): void {
+  db.prepare("DELETE FROM service_settings_verifications WHERE service = ?").run(service);
+}

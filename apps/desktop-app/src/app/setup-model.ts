@@ -15,7 +15,7 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
-export interface AiServiceFormDraft {
+interface AiServiceFormDraft {
   projectName: string;
   googleCurl: string;
   baseUrl: string;
@@ -86,7 +86,7 @@ export const aiServicePresets = [
   baseUrl: string;
 }>;
 
-export function normalizeAiService(service: string): DesktopAiService {
+function normalizeAiService(service: string): DesktopAiService {
   return aiServicePresets.some((preset) => preset.id === service)
     ? service as DesktopAiService
     : "openai";
@@ -171,7 +171,7 @@ function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<
   }));
 }
 
-export function createDefaultAiServiceDraft(service: DesktopAiService): AiServiceFormDraft {
+function createDefaultAiServiceDraft(service: DesktopAiService): AiServiceFormDraft {
   const preset = aiServicePresets.find((candidate) => candidate.id === service);
   return {
     projectName: service === "gemini" ? "Google AI Studio" : "",
@@ -189,7 +189,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
   };
 }
 
-export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
+function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
   return {
     projectName: form.aiProjectName,
     googleCurl: form.aiGoogleCurl,

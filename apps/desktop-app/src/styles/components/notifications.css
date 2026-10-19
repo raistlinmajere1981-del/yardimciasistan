@@ -156,10 +156,6 @@
   -webkit-line-clamp: 2;
 }
 
-.notification-item-copy > time {
-  color: var(--color-text-muted);
-}
-
 .notification-item > button {
   display: inline-flex;
   align-items: center;

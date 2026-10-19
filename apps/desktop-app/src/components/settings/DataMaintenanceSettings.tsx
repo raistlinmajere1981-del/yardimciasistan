@@ -1,3 +1,4 @@
+import { ActionButton } from "../ui/ActionButton";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { FolderOpen, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -186,18 +187,18 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
       </div>
       <div className="settings-panel-body">
       <div className="form-actions backup-manager-toolbar">
-        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy || !initialized}>
+        <ActionButton variant="secondary" type="button" onClick={() => void createBackup()} disabled={busy || !initialized}>
           <Save size={16} aria-hidden="true" />
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
-        </button>
-        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy || !initialized}>
+        </ActionButton>
+        <ActionButton variant="secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy || !initialized}>
           <FolderOpen size={16} aria-hidden="true" />
           {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
-        </button>
-        <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={() => void resetLocalData()} disabled={busy}>
+        </ActionButton>
+        <ActionButton variant="danger" className="password-remove-button" type="button" onClick={() => void resetLocalData()} disabled={busy}>
           <Trash2 size={16} aria-hidden="true" />
           {action === "reset" ? "Sıfırlanıyor" : "Tüm Verileri Sıfırla"}
-        </button>
+        </ActionButton>
       </div>
 
 
@@ -224,18 +225,18 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
                 </div>
               </div>
               <div className="form-actions backup-row-actions">
-                <button className="action-button action-button-ghost action-button-sm" type="button" onClick={() => void openBackupItem(backup.id)} disabled={busy}>
+                <ActionButton variant="ghost" size="sm" type="button" onClick={() => void openBackupItem(backup.id)} disabled={busy}>
                   <FolderOpen size={15} aria-hidden="true" />
                   {rowBusy && action === "open-item" ? "Açılıyor" : "Klasörü Aç"}
-                </button>
-                <button className="action-button action-button-secondary action-button-sm backup-restore-button" type="button" onClick={() => void restoreBackup(backup.id)} disabled={busy}>
+                </ActionButton>
+                <ActionButton variant="secondary" size="sm" className="backup-restore-button" type="button" onClick={() => void restoreBackup(backup.id)} disabled={busy}>
                   <RotateCcw size={15} aria-hidden="true" />
                   {rowBusy && action === "restore" ? "Hazırlanıyor" : "Geri Yükle"}
-                </button>
-                <button className="action-button action-button-danger action-button-sm backup-delete-button" type="button" onClick={() => void deleteBackup(backup.id)} disabled={busy} aria-label={`${formatBackupDate(backup.createdAt)} yedeğini sil`}>
+                </ActionButton>
+                <ActionButton variant="danger" size="sm" className="backup-delete-button" type="button" onClick={() => void deleteBackup(backup.id)} disabled={busy} aria-label={`${formatBackupDate(backup.createdAt)} yedeğini sil`}>
                   <Trash2 size={15} aria-hidden="true" />
                   {rowBusy && action === "delete" ? "Siliniyor" : "Sil"}
-                </button>
+                </ActionButton>
               </div>
             </div>
           );

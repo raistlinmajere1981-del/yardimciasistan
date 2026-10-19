@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/storage.php';
+require_once __DIR__ . '/public-localization.php';
 
 /** Whitelist projection; web never stores canonical content, private metadata or local paths. */
 function ya_marketing_projection(array $candidate): array
@@ -42,7 +43,8 @@ function ya_marketing_projection(array $candidate): array
         $items[] = ['id' => $item['id'], 'channel' => 'website', 'placement' => 'homepage_feature', 'revision' => $item['revision'],
             'published' => $item['published'], 'title' => $title, 'text' => $text, 'images' => $item['published'] ? $images : []];
     }
-    return ['version' => 1, 'enabled' => $candidate['enabled'], 'publications' => $items];
+    return ['version' => 1, 'enabled' => $candidate['enabled'], 'publications' => $items,
+        'localization' => ya_public_localization($candidate['localization'] ?? null, ['marketing' => ya_localization_records($candidate['enabled'] ? array_filter($items, fn($p) => $p['published']) : [], 'id', ['title','text'])])];
 }
 function ya_marketing_text(mixed $value, int $max): string
 {

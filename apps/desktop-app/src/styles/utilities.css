@@ -1,9 +1,0 @@
-@keyframes ya-health-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.is-spinning {
-  animation: ya-health-spin var(--motion-slow) linear infinite;
-}

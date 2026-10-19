@@ -6,7 +6,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -306,6 +305,8 @@ final class AndroidSettingsWorkspace {
     copy.addView(UiKit.text(activity, detail, 11, UiKit.SECONDARY, Typeface.NORMAL));
     row.addView(copy);
 
+    // API 26+ native control, styled by UiKit; no compatibility widget is needed.
+    @android.annotation.SuppressLint("UseSwitchCompatOrMaterialCode")
     Switch toggle = new Switch(activity);
     UiKit.styleSwitch(toggle);
     toggle.setChecked(NotificationPreferences.isEnabled(preferences, category));

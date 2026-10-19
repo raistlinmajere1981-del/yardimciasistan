@@ -14,7 +14,7 @@ const empty: InstagramConfiguration = {
 };
 const state = {
   configuration: {...empty}, stage: "idle", beginCount: 0, pollCount: 0,
-  disconnectCount: 0, testCount: 0, saveCount: 0, hasPassedTest: false,
+  disconnectCount: 0, cancelCount: 0, testCount: 0, saveCount: 0, hasPassedTest: false,
   draftEnabled: false, savedEnabled: false, error: ""
 };
 (window as unknown as {__igSettingsState: typeof state}).__igSettingsState = state;
@@ -37,6 +37,10 @@ Object.defineProperty(window, "yardimciDesktop", {
         return {status:"connected",username:"ornek_hesap"};
       }
       return {status:"failed",message:"Giriş tamamlanamadı."};
+    },
+    cancelInstagramOAuth: async () => {
+      state.cancelCount++;state.stage="idle";
+      return {ok:true,message:"Instagram giriş işlemi iptal edildi."};
     },
     disconnectInstagramOAuth: async () => {
       state.disconnectCount++;state.hasPassedTest=false;state.savedEnabled=false;

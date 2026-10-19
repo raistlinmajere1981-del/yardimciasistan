@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 /** @compiledSmoke scripts/smoke-menu-reorder-contract.mjs (transpiled source VM) */
 export function moveRecordId(ids: string[], sourceId: string, targetId: string, position: "before" | "after"): string[] | null {
@@ -49,23 +49,6 @@ export function useRecordReorder<K extends string>({ getIds, canDrag, onReorder 
     reset(); suppressRowClickRef.current = true;
     window.setTimeout(() => { suppressRowClickRef.current = false; }, 0);
   }
-  function handleDragStart(event: DragEvent<HTMLElement>, kind: K, id: string) {
-    if (!start(kind, id)) { event.preventDefault(); return; }
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-yardimci-record-sort", JSON.stringify({ kind, id }));
-    event.dataTransfer.setData("text/plain", id);
-    const record = event.currentTarget.closest(".menu-sortable-record");
-    if (record) { const rect = record.getBoundingClientRect(); event.dataTransfer.setDragImage(record, Math.max(0, Math.min(rect.width, event.clientX - rect.left)), Math.max(0, Math.min(rect.height, event.clientY - rect.top))); }
-  }
-  function handleDragOver(event: DragEvent<HTMLElement>, kind: K, id: string) {
-    if (target(kind, id, event.clientY, event.currentTarget)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
-  }
-  async function handleDrop(event: DragEvent<HTMLElement>, kind: K, id: string) {
-    event.preventDefault(); event.stopPropagation();
-    const active = draggingRef.current, selected = targetRef.current;
-    reset();
-    if (active?.kind === kind) await persist(kind, active.id, id, selected?.id === id ? selected.position : "before");
-  }
   function handleKeyDown(event: KeyboardEvent<HTMLElement>, kind: K, id: string) {
     if (!["ArrowUp", "ArrowDown"].includes(event.key) || !canDrag(kind, id)) return;
     event.preventDefault(); event.stopPropagation();
@@ -73,34 +56,41 @@ export function useRecordReorder<K extends string>({ getIds, canDrag, onReorder 
     if (nextId) void persist(kind, id, nextId, event.key === "ArrowUp" ? "before" : "after");
   }
   function handlePointerDown(event: PointerEvent<HTMLElement>, kind: K, id: string) {
-    if (event.pointerType === "mouse" || !start(kind, id)) return;
+    if (event.button !== 0 || !start(kind, id)) return;
     pointerOrigin.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
-  function handlePointerMove(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" || !pointerOrigin.current || !draggingRef.current) return;
-    if (Math.hypot(event.clientX - pointerOrigin.current.x, event.clientY - pointerOrigin.current.y) < 8) return;
-    event.preventDefault();
-    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-sort-id]");
-    if (element?.dataset.sortKind && element.dataset.sortId) target(element.dataset.sortKind as K, element.dataset.sortId, event.clientY, element);
+  function pointerTarget(x: number, y: number) {
+    const element = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-sort-id]");
+    const active = draggingRef.current;
+    if (active && element?.dataset.sortKind === active.kind && element.dataset.sortId)
+      target(active.kind, element.dataset.sortId, y, element);
     else { targetRef.current = null; setDropTarget(null); }
   }
+  function handlePointerMove(event: PointerEvent<HTMLElement>) {
+    if (!pointerOrigin.current || !draggingRef.current) return;
+    if (Math.hypot(event.clientX - pointerOrigin.current.x, event.clientY - pointerOrigin.current.y) < 6) return;
+    event.preventDefault();
+    pointerTarget(event.clientX, event.clientY);
+  }
   function handlePointerUp(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "mouse" || !pointerOrigin.current) return;
-    const active = draggingRef.current, selected = targetRef.current;
-    pointerOrigin.current = null; finishDrag();
+    if (!pointerOrigin.current) return;
+    const active = draggingRef.current;
+    const moved = Math.hypot(event.clientX - pointerOrigin.current.x, event.clientY - pointerOrigin.current.y) >= 6;
+    if (moved) pointerTarget(event.clientX, event.clientY);
+    const selected = moved ? targetRef.current : null;
+    pointerOrigin.current = null;
+    finishDrag();
     if (active && selected) void persist(active.kind, active.id, selected.id, selected.position);
   }
+  function handlePointerCancel() { pointerOrigin.current = null; reset(); }
   const handleProps = (kind: K, id: string) => ({
-    draggable: !reorderBusy && canDrag(kind, id),
     disabled: reorderBusy || !canDrag(kind, id),
-    onDragStart: (event: DragEvent<HTMLElement>) => handleDragStart(event, kind, id),
-    onDragEnd: finishDrag,
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => handleKeyDown(event, kind, id),
     onPointerDown: (event: PointerEvent<HTMLElement>) => handlePointerDown(event, kind, id),
-    onPointerMove: handlePointerMove, onPointerUp: handlePointerUp, onPointerCancel: () => { pointerOrigin.current = null; finishDrag(); },
+    onPointerMove: handlePointerMove, onPointerUp: handlePointerUp, onPointerCancel: handlePointerCancel,
     onClick: (event: { stopPropagation: () => void }) => event.stopPropagation()
   });
-  return { dragging, dropTarget, reorderBusy, suppressRowClickRef, handleProps, handleDragStart, handleDragOver, handleDrop, finishDrag,
-    handleKeyDown, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel: () => { pointerOrigin.current = null; finishDrag(); } };
+  return { dragging, dropTarget, reorderBusy, suppressRowClickRef, handleProps, handleKeyDown,
+    handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel };
 }

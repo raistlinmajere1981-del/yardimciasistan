@@ -238,3 +238,44 @@
   }
 }
 
+
+
+/* Header update control follows the shared IconButton size and focus behavior. */
+.header-update-trigger.icon-button {
+  position: relative;
+  min-width: var(--control-height-lg);
+  min-height: var(--control-height-lg);
+}
+.header-update-trigger[aria-expanded="true"] {
+  color: var(--color-accent);
+  background: var(--color-selected-soft);
+}
+.header-update-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.header-update-indicator--available::after,
+.header-update-indicator--error::after,
+.header-update-indicator--progress::after {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--space-1));
+  right: calc(-1 * var(--space-1));
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+.header-update-indicator--error::after { background: var(--color-danger); }
+.header-update-indicator--progress::after { background: var(--color-accent); }
+.header-update-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

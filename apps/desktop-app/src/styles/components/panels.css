@@ -1,5 +1,4 @@
-.surface,
-.setup-section {
+.surface {
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
@@ -17,8 +16,7 @@
   margin-bottom: var(--space-4);
 }
 
-.panel-heading h2,
-.setup-section-title h2 {
+.panel-heading h2 {
   margin: 0;
   color: var(--color-shell-ink);
   font-size: var(--panel-title-size);
@@ -41,8 +39,6 @@
 .panel-heading.compact {
   margin-bottom: var(--space-3);
 }
-
-.setup-section { padding: var(--panel-padding); }
 
 .panel {
   --panel-role-bg: var(--color-role-neutral-bg);
@@ -94,4 +90,56 @@
   font-weight: var(--weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* Shared Settings section surface, used by business, resources and utility panels. */
+.settings-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-shell-edge);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  min-width: 0;
+  padding: var(--panel-header-padding);
+  border-inline-start: 3px solid var(--color-accent-border);
+  background: linear-gradient(105deg, var(--color-role-integration-bg), var(--color-role-operation-bg));
+  border-bottom: 1px solid var(--color-shell-edge);
+}
+
+.settings-panel-header > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.settings-panel-header h2,
+.settings-panel-header h3,
+.settings-panel-header strong {
+  margin: 0;
+  color: var(--color-shell-ink);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
+}
+
+.settings-panel-header p,
+.settings-panel-header small,
+.settings-panel-header > span {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.settings-panel-body {
+  min-width: 0;
+  padding: var(--panel-padding);
+}
+
+.settings-panel-body > * + * {
+  margin-top: var(--space-4);
 }

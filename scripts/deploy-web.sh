@@ -23,7 +23,7 @@ Ortam değişkenleri:
   YARDIMCI_ASISTAN_PUBLIC_URL           Canlı web modülü adresi
 
 Normal yayında script canlı data/, config/business.json, config/*.local.*,
-knowledge/, assets/, media/ ve kökteki .env* dosyalarını korur. --fresh kullanıldığında
+knowledge/, media/ ve kökteki .env* dosyalarını korur. --fresh kullanıldığında
 bu veriler yeni sürüme taşınmaz; eski kurulum yine sunucudaki yedek dizinine alınır.
 EOF
 }
@@ -109,7 +109,6 @@ if [[ "$fresh_install" == false ]]; then
     '--exclude=/config/*.local.php'
     '--exclude=/config/*.local.json'
     '--exclude=/knowledge/***'
-    '--exclude=/assets/***'
     '--exclude=/media/***'
     '--exclude=/.env'
     '--exclude=/.env.*'
@@ -124,25 +123,10 @@ cd -- "$project_root"
 
 if [[ "$skip_pack" == false ]]; then
   printf 'Web modülü paketi hazırlanıyor...\n'
-  (
-    template_widget="$project_root/firm-template/web-module/widget.js"
-    widget_snapshot_dir="$(mktemp -d)"
-    cp -p "$template_widget" "$widget_snapshot_dir/widget.js"
-
-    restore_template_widget() {
-      cp -p "$widget_snapshot_dir/widget.js" "$template_widget"
-      find "$widget_snapshot_dir" -depth -delete
-    }
-    trap restore_template_widget EXIT
-
-    npm run pack:web-module
-  )
+  npm run pack:web-module
 fi
 
 required_package_files=(
-  bayi/index.php
-  bayi/portal.js
-  bayi/portal.css
   api/dealer/claim.php
   api/dealer/session.php
   api/dealer/logout.php
@@ -150,10 +134,6 @@ required_package_files=(
   api/dealer/catalog.php
   api/dealer/order.php
   lib/dealer-order.php
-  magaza/index.php
-  magaza/storefront.js
-  magaza/storefront.css
-  widget.js
   api/business.php
   api/chat.php
   api/menu.php
@@ -222,7 +202,7 @@ printf '\nHedef: %s:%s\n' "$deploy_host" "$remote_root"
 if [[ "$fresh_install" == true ]]; then
   printf 'Mod: temiz kurulum; eski runtime/config yeni sürüme taşınmayacak.\n\n'
 else
-  printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, media/, .env*\n\n'
+  printf 'Korunan: data/, firma ve yerel config, knowledge/, media/, .env*\n\n'
 fi
 
 show_dry_run() {
@@ -231,12 +211,6 @@ show_dry_run() {
     "${protected_paths[@]}" \
     -e "$rsync_ssh" \
     "$package_dir/" "$deploy_host:$remote_root/" \
-    | filter_rsync_changes
-
-  printf '\nCanlıda yoksa eklenecek asset dosyaları:\n'
-  rsync -aznci --ignore-existing --omit-dir-times --itemize-changes \
-    -e "$rsync_ssh" \
-    "$package_dir/assets/" "$deploy_host:$remote_root/assets/" \
     | filter_rsync_changes
 
   printf '\nCanlıda yoksa eklenecek knowledge dosyaları:\n'
@@ -379,12 +353,6 @@ if [[ -d "$remote_backup/knowledge" ]]; then
   rsync -a --exclude='/.htaccess' \
     "$remote_backup/knowledge/" "$remote_stage/knowledge/"
 fi
-if [[ -d "$remote_backup/assets" ]]; then
-  mkdir -p "$remote_stage/assets"
-  # The bundled brand symbol belongs to the module release, not tenant media.
-  # Preserve tenant assets without overwriting the updated packaged logo.
-  rsync -a --exclude='/yardimci-asistan-symbol.png' "$remote_backup/assets/" "$remote_stage/assets/"
-fi
 if [[ -d "$remote_backup/media" ]]; then
   mkdir -p "$remote_stage/media"
   rsync -a --exclude='/.htaccess' \
@@ -448,8 +416,6 @@ if command -v curl >/dev/null 2>&1; then
     "${public_url%/}/api/menu.php" || true)"
   if [[ "$menu_status" != "200" && "$menu_status" != "404" ]] \
     || ! curl --fail --silent --show-error --max-time 20 \
-      "${public_url%/}/widget.js" >/dev/null \
-    || ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/api/business.php" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/api/rooms.php" >/dev/null \
@@ -461,22 +427,19 @@ if command -v curl >/dev/null 2>&1; then
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
   fi
-  dealer_shell_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/bayi/" || true)"
   dealer_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/session.php" || true)"
   dealer_claim_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/claim.php" || true)"
   dealer_logout_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/logout.php" || true)"
   dealer_catalog_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/catalog.php" || true)"
   dealer_order_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/order.php" || true)"
-  if [[ "$dealer_shell_status" != "200" || "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" || "$dealer_catalog_status" != "401" || "$dealer_order_status" != "405" ]]; then
-    printf 'Yayın uygulandı ancak bayi portalı/oturum sağlık kontrolü başarısız oldu.\n' >&2
+  if [[ "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" || "$dealer_catalog_status" != "401" || "$dealer_order_status" != "405" ]]; then
+    printf 'Yayın uygulandı ancak bayi API/oturum sağlık kontrolü başarısız oldu.\n' >&2
     exit 1
   fi
-  storefront_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
-    "${public_url%/}/magaza/" || true)"
   order_get_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
     "${public_url%/}/api/order.php" || true)"
-  if [[ "$storefront_status" != "200" || "$order_get_status" != "405" ]]; then
-    printf 'Yayın uygulandı ancak mağaza/order GET sağlık kontrolü başarısız oldu: mağaza=%s order=%s\n' "$storefront_status" "$order_get_status" >&2
+  if [[ "$order_get_status" != "405" ]]; then
+    printf 'Yayın uygulandı ancak order GET sağlık kontrolü başarısız oldu: order=%s\n' "$order_get_status" >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
   fi
@@ -502,5 +465,5 @@ printf 'Önceki sürüm ve veri yedeği: %s\n' "$remote_backup"
 if [[ "$fresh_install" == true ]]; then
   printf 'Temiz kurulum tamamlandı; eski runtime/config yalnız yedekte tutuluyor.\n'
 else
-  printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları, assetler ve medya korundu.\n'
+  printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları ve medya korundu.\n'
 fi

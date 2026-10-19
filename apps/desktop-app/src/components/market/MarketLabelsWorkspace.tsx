@@ -4,6 +4,7 @@ import { Download, FileImage, FileText, Printer, Tags } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogCategory, CatalogProduct } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { StatusBadge } from "../ui/StatusBadge";
 import {
   LABEL_PRINTER_CATALOG,
   LABEL_SIZE_PRESETS,
@@ -137,13 +138,13 @@ export function MarketLabelsWorkspace({
           <p>Donanım gerekmeden önizleyin; PNG veya etiket ölçüsünde PDF üretin.</p>
         </header>
 
-        <div className="market-form-grid">
-          <label className="market-field market-field-wide">
+        <div className="form-grid form-grid--compact">
+          <label className="form-field form-field--fluid form-field--span">
             Ürün
             <MarketCatalogPicker ariaLabel="Ürün" value={productId} products={activeProducts} disabled={disabled} clearable={false} inventoryOnly={false}
               onChange={setProductId} onProductSelected={selected => { if (selected) onProductSelected(selected); }} />
           </label>
-          <label className="market-field">
+          <label className="form-field form-field--fluid">
             Etiket ölçüsü
             <select value={sizeId} onChange={(event) => setSizeId(event.target.value as LabelSizePreset["id"])} disabled={disabled}>
               {LABEL_SIZE_PRESETS.map((preset) => (
@@ -151,7 +152,7 @@ export function MarketLabelsWorkspace({
               ))}
             </select>
           </label>
-          <label className="market-field">
+          <label className="form-field form-field--fluid">
             PDF kopya sayısı
             <input
               type="number"
@@ -166,9 +167,9 @@ export function MarketLabelsWorkspace({
         </div>
 
         <div className="market-label-options">
-          <label className="market-check"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} disabled={disabled} /> Fiyatı göster</label>
-          <label className="market-check"><input type="checkbox" checked={showSku} onChange={(event) => setShowSku(event.target.checked)} disabled={disabled} /> SKU göster</label>
-          <label className="market-check"><input type="checkbox" checked={showBarcode} onChange={(event) => setShowBarcode(event.target.checked)} disabled={disabled} /> Barkodu göster</label>
+          <label className="form-check"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} disabled={disabled} /> Fiyatı göster</label>
+          <label className="form-check"><input type="checkbox" checked={showSku} onChange={(event) => setShowSku(event.target.checked)} disabled={disabled} /> SKU göster</label>
+          <label className="form-check"><input type="checkbox" checked={showBarcode} onChange={(event) => setShowBarcode(event.target.checked)} disabled={disabled} /> Barkodu göster</label>
         </div>
 
         {product && (
@@ -218,9 +219,9 @@ export function MarketLabelsWorkspace({
           </div>
           <div className="market-label-adapter-list">
             {LABEL_PRINTER_CATALOG.map((adapter) => (
-              <span className={adapter.availability === "available" ? "market-badge" : "market-badge is-muted"} key={adapter.id}>
+              <StatusBadge tone={adapter.availability === "available" ? "success" : "muted"} key={adapter.id}>
                 {adapter.label} · {adapter.availability === "available" ? "hazır" : "planlı"}
-              </span>
+              </StatusBadge>
             ))}
           </div>
           <small>ZPL, TSPL ve sistem yazıcısı seçenekleri saha donanımı belli olduğunda etkinleştirilecek.</small>

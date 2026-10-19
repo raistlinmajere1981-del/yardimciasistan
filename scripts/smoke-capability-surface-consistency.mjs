@@ -140,8 +140,8 @@ assert.match(
 );
 assert.match(
   menuManagerSource,
-  /menu-drag-handle-hitbox[\s\S]{0,220}draggable=\{!reorderBusy\}[\s\S]{0,220}onDragStart/,
-  "menu reordering must start from the drag handle instead of stealing normal row clicks"
+  /menu-drag-handle-hitbox[\s\S]{0,330}handlePointerDown\(event, "category", category\.id\)/,
+  "menu reorder must start on the handle using shared pointer events, not steal normal row clicks"
 );
 assert.match(
   menuManagerSource,

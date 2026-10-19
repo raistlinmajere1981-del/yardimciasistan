@@ -21,24 +21,9 @@ final class PensionStayCard {
       Listener listener
   ) {
     LinearLayout card = UiKit.card(activity);
-    LinearLayout top = UiKit.row(activity);
-    LinearLayout identity = UiKit.column(activity);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(activity, stay.customerName, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(
-        activity,
+    card.addView(UiKit.recordHeader(activity, stay.customerName, 15,
         stay.roomName + (stay.roomNumber.isEmpty() ? "" : " · " + stay.roomNumber),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(UiKit.badge(
-        activity,
-        formatCustomerRoomStayStatus(stay.status),
-        customerRoomStayTone(stay.status)
-    ));
-    card.addView(top);
+        UiKit.badge(activity, formatCustomerRoomStayStatus(stay.status), customerRoomStayTone(stay.status))));
 
     card.addView(UiKit.text(
         activity,
@@ -64,10 +49,7 @@ final class PensionStayCard {
           "Durumu Yönet",
           view -> listener.onManageStay(stay)
       );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 44));
-      params.setMargins(0, UiKit.dp(activity, 8), 0, 0);
-      manage.setLayoutParams(params);
-      card.addView(manage);
+      UiKit.addCardAction(card, manage, activity);
     }
 
     return card;

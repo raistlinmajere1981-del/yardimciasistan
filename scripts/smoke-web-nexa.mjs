@@ -12,13 +12,13 @@ const assetFor = (key) => {
   const rule = manifest.runtime.web[key];
   return manifest.assets.find((e) => e.usage === rule.usage && (rule.width === undefined || e.dimensions.width === rule.width) && (rule.state === undefined || e.state === rule.state)).assetPath;
 };
-const bundle = readFileSync("packages/web-widget/dist/widget.js", "utf8");
+const bundle = readFileSync("test-site/landing/assets/assistant/widget.js", "utf8");
 assert.ok(!bundle.includes("data:image/webp"), "Runtime images must remain external, not embedded in launcher JS");
 const server = createServer((req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
   if (path === "/module/widget.js") { res.setHeader("content-type", "text/javascript; charset=utf-8"); res.end(bundle); return; }
   if (path.startsWith("/module/") && paths.includes(path.slice(8))) {
-    res.setHeader("content-type", "image/webp"); res.end(readFileSync(resolve("packages/web-widget/dist", path.slice(8)))); return;
+    res.setHeader("content-type", "image/webp"); res.end(readFileSync(resolve("test-site/landing/assets/assistant", path.slice(8)))); return;
   }
   if (path.endsWith("/api/business.php")) { res.setHeader("content-type", "application/json"); res.end('{"ok":false}'); return; }
   res.setHeader("content-type", "text/html; charset=utf-8");
