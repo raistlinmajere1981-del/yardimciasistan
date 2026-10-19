@@ -83,6 +83,26 @@ try {
   const centered = await dialog.boundingBox();
   expect(centered.width).toBeLessThan(1440);
   expect(centered.x).toBeGreaterThan(0);
+  const topBar = page.locator('.page-header');
+  const topBarBounds = await topBar.boundingBox();
+  expect(centered.y, 'Centered workspace must leave topbar feedback visible').toBeGreaterThanOrEqual(topBarBounds.y + topBarBounds.height - 1);
+  expect(centered.y + centered.height).toBeLessThanOrEqual(901);
+  const backdropClip = await dialog.evaluate(el => getComputedStyle(el, "::backdrop").clipPath);
+  expect(backdropClip).toContain("inset(");
+  const clipTop = Number(backdropClip.match(/inset\(([0-9.]+)px/)?.[1]);
+  expect(clipTop, "Backdrop must begin below the measured topbar").toBeGreaterThanOrEqual(topBarBounds.y + topBarBounds.height - 1);
+  // The canvas is measured through ResizeObserver; a taller shell header must
+  // shift and constrain an already-open workspace without remounting it.
+  await topBar.evaluate(el => el.style.minHeight = '140px');
+  await expect.poll(async () => {
+    const [updated, header] = await Promise.all([dialog.boundingBox(), topBar.boundingBox()]);
+    return updated.y >= header.y + header.height - 1 && updated.y + updated.height <= 901;
+  }).toBe(true);
+  await topBar.evaluate(el => el.style.minHeight = '');
+  await expect.poll(async () => {
+    const restored = await dialog.boundingBox();
+    return Math.abs(restored.y - centered.y) < 1 && Math.abs(restored.height - centered.height) < 1;
+  }).toBe(true);
   const header = dialog.locator('header');
   const body = dialog.locator(':scope > div').filter({ has: page.getByLabel('Draft') });
   const footer = dialog.locator('footer');

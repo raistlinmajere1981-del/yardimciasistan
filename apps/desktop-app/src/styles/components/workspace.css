@@ -20,6 +20,10 @@
   background: var(--color-backdrop);
   clip-path: inset(var(--header-height) 0 0 0);
 }
+/* Workspace canvases know the true topbar height, including zoom and wrapping. */
+.workspace-frame::backdrop {
+  clip-path: inset(var(--workspace-canvas-top, var(--header-height)) 0 0 0);
+}
 .workspace-frame[open] { display: flex; flex-direction: column; }
 .workspace-page-frame {
   position: relative;
@@ -35,8 +39,16 @@
   border-radius: var(--radius-panel);
 }
 .workspace-frame--centered {
+  /* Center within the canvas *below* the shell header, not the whole viewport.
+     The shared WorkspaceFrame measures the actual header (including UI zoom). */
+  inset: var(--workspace-canvas-top, var(--header-height)) 0 0;
+  margin: auto;
   width: min(var(--dialog-width-lg), calc(100vw / var(--ui-scale) - var(--space-4)));
-  height: calc(100dvh / var(--ui-scale) - var(--space-10));
+  height: min(
+    calc(100dvh / var(--ui-scale) - var(--space-10)),
+    max(0px, calc(var(--workspace-canvas-height, 100dvh) - var(--space-4)))
+  );
+  max-height: max(0px, calc(var(--workspace-canvas-height, 100dvh) - var(--space-4)));
   animation: workspace-enter var(--motion-surface) var(--ease-standard);
 }
 .workspace-frame--full-canvas {
