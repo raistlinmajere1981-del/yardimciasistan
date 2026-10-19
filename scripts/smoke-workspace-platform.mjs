@@ -228,6 +228,31 @@ try {
   await page.evaluate(() => window.appearance({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'green', font: 'system', motion: 'reduced' }));
 
   await page.getByRole('button', { name: 'Open form' }).click();
+  const formDialog = page.getByRole('dialog', { name: 'Bounded task' });
+  await expect(formDialog).toBeVisible();
+  // Replicate tall Menu product and Requests task forms with fixed header/footer.
+  await formDialog.locator('.workspace-frame__body').evaluate(body => {
+    for (let i = 0; i < 60; i++) {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = 'Tall form row ' + i;
+      body.append(paragraph);
+    }
+  });
+  const formBounds = () => Promise.all([formDialog.boundingBox(), page.locator('.page-header').boundingBox()]);
+  await expect.poll(async () => {
+    const [form, shell] = await formBounds();
+    return form.y >= shell.y + shell.height - 1 && form.y + form.height <= 901;
+  }).toBe(true);
+  const dialogClip = await formDialog.evaluate(el => getComputedStyle(el, '::backdrop').clipPath);
+  const measuredClip = Number(dialogClip.match(/inset\(([0-9.]+)px/)?.[1]);
+  const [, shell] = await formBounds();
+  expect(measuredClip).toBeGreaterThanOrEqual(shell.y + shell.height - 1);
+  await page.locator('.page-header').evaluate(el => el.style.minHeight = '150px');
+  await expect.poll(async () => {
+    const [form, header] = await formBounds();
+    return form.y >= header.y + header.height - 1 && form.y + form.height <= 901;
+  }).toBe(true);
+  await page.locator('.page-header').evaluate(el => el.style.minHeight = '');
   await page.getByLabel('Task name').fill('task');
   await page.getByRole('button', { name: 'Save task' }).click();
   await expect(page.getByRole('button', { name: 'Open form' })).toBeFocused();

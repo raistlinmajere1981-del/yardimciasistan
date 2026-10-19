@@ -137,7 +137,21 @@
 .icon-button[aria-busy="true"] { opacity: .82; cursor: progress; }
 .icon-button[aria-invalid="true"] { border-color: var(--color-danger); }
 .form-dialog { width: var(--dialog-width-md); }
-.form-dialog form { display: flex; flex-direction: column; max-height: calc(100dvh / var(--ui-scale) - var(--space-4)); }
+/* Task/create forms share the measured shell canvas with entity workspaces.
+   Small forms stay centered; tall forms scroll below the message bar. */
+.form-dialog.modal-surface {
+  inset: var(--form-canvas-top, var(--header-height)) 0 0;
+  margin: auto;
+  max-height: max(0px, calc(var(--form-canvas-height, 100dvh) - var(--space-4)));
+}
+.form-dialog::backdrop {
+  clip-path: inset(var(--form-canvas-top, var(--header-height)) 0 0 0);
+}
+.form-dialog form {
+  display: flex;
+  flex-direction: column;
+  max-height: max(0px, calc(var(--form-canvas-height, 100dvh) - var(--space-4)));
+}
 .form-dialog .workspace-frame__body { padding: var(--space-4); }
 
 .workspace-form-overlay {

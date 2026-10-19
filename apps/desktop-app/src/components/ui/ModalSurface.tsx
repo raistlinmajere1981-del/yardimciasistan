@@ -29,6 +29,34 @@ export function ModalSurface(props: ModalSurfaceProps) {
 function ModalSurfaceContent({ children, labelledBy, describedBy, className = "", role = "dialog", onClose,
   closeBlocked = false, dismissOnBackdrop = false, initialFocusRef, returnFocusRef }: ModalSurfaceProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Bounded forms are also native dialogs, but are not WorkspaceFrames.
+  // Measure the real shell header so tall create forms leave the topbar
+  // feedback visible at any density, zoom or responsive header height.
+  useLayoutEffect(() => {
+    if (!className.split(/\s+/).includes("form-dialog")) return;
+    const dialog = ref.current;
+    const content = document.querySelector<HTMLElement>(".desktop-shell > .content");
+    const header = content?.querySelector<HTMLElement>(":scope > .page-header");
+    if (!dialog || !content || !header) return;
+    const update = () => {
+      const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+      const bounds = content.getBoundingClientRect();
+      const top = Math.min(window.innerHeight, Math.max(bounds.top, header.getBoundingClientRect().bottom));
+      dialog.style.setProperty("--form-canvas-top", `${top / zoom}px`);
+      dialog.style.setProperty("--form-canvas-height", `${Math.max(0, Math.min(window.innerHeight, bounds.bottom) - top) / zoom}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(content);
+    observer.observe(header);
+    window.addEventListener("resize", update);
+    content.addEventListener("scroll", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      content.removeEventListener("scroll", update);
+    };
+  }, [className]);
   // Capture once per open lifetime, not per geometry/mode change.
   useLayoutEffect(() => {
     const dialog = ref.current!;
