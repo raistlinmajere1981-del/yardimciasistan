@@ -145,7 +145,7 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
               <ListChecks size={18} aria-hidden="true"/>
               <h3>Yayın İçerikleri</h3>
             </div>
-            <StatusBadge className="language-workspace__count">{listError ? "Kayıt sayısı alınamadı" : hasLoaded ? `${page.total} kayıt` : "Yükleniyor…"}</StatusBadge>
+            {(listError || hasLoaded) && <StatusBadge className="language-workspace__count">{listError ? "Kayıt sayısı alınamadı" : `${page.total} kayıt`}</StatusBadge>}
           </div>
           <div className="language-workspace__filter-group">
             <div className="language-workspace__chip-row" role="group" aria-label="İçerik kategorileri">
@@ -171,7 +171,6 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
               <ActionButton className="language-workspace__mobile" size="sm" variant="secondary" onClick={() => setStage("editor")}>İşlem Paneli</ActionButton>
             </div>
           </div>
-          {loading && <p role="status" className="language-workspace__list-message">Kayıtlar yükleniyor…</p>}
           {listError && <p role="alert" className="language-workspace__list-message">Kayıtlar alınamadı: {listError} Yenile ile yeniden deneyin. Önceki sonuçlar güncel olmayabilir.</p>}
           <div className="language-workspace__records" aria-busy={loading}>
             <DataList className="language-workspace__rows">{page.records.map(r => <div key={keyOf(r)} className={`language-workspace__record${selected.has(keyOf(r))?" is-selected":""}`}>

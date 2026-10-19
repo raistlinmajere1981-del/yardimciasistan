@@ -44,6 +44,17 @@ final class OperationCache {
     }
   }
 
+  /** A source revision can advance without changing this device's visible projection. */
+  boolean hasSamePresentation(JSONObject payload) {
+    try {
+      String serialized = preferences.getString(KEY_CACHE, "");
+      return serialized != null && !serialized.isEmpty()
+          && AndroidSnapshotPresentation.same(new JSONObject(serialized), KbsUiRules.redactSnapshotForCache(payload, deviceId));
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   long revision(String sourceKey) {
     String normalizedSourceKey = sourceKey == null ? "" : sourceKey.trim();
     if (normalizedSourceKey.isEmpty()) {

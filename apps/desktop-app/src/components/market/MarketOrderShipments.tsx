@@ -14,10 +14,9 @@ export function MarketOrderShipments({ session, orderStatus, busy }: {
   const { shippingProvider, shipments, loadingShipments, mutatingShipment, shipmentError, mutateShipment, reloadShipments } = session;
   const disabled = busy || loadingShipments || mutatingShipment;
   return (
-    <section className="market-order-buyer" aria-label="Gönderim">
+    <section className="market-order-buyer" aria-label="Gönderim" aria-busy={loadingShipments}>
       <strong>Kargo / Gönderim</strong>
       {shippingProvider.enabled && !shippingProvider.configured && <p className="market-muted">{ARAS_SHIPPING_PROVIDER.name} yapılandırılmamış. Sağlayıcı işlemleri için Servisler ayarlarını tamamlayın.</p>}
-      {loadingShipments && <p role="status">Gönderiler yükleniyor…</p>}
       {shipmentError && <p role="alert">{shipmentError}</p>}
       {shipmentError && <ActionButton variant="secondary" size="sm" onClick={() => void reloadShipments()} disabled={disabled}>Yenile</ActionButton>}
       {!loadingShipments && !shipmentError && shipments.length === 0 && (

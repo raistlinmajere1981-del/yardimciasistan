@@ -580,6 +580,9 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
+  listCustomers(query: import("./database/customer-store").CustomerListQuery = {}) { return listStoredCustomersPage(this.db, query); }
+  getCustomer(id: string) { return getStoredCustomer(this.db, id); }
+
   saveCustomer(input: SaveCustomerInput): DesktopCustomerMutationResult {
     const result = saveStoredCustomer(this.db, input);
     if (!result.ok) {
@@ -1394,6 +1397,8 @@ import { deleteCustomerInTransaction as deleteStoredCustomerInTransaction } from
 
 import {
   saveCustomer as saveStoredCustomer,
+  listCustomersPage as listStoredCustomersPage,
+  getCustomer as getStoredCustomer,
 } from "./database/customer-store.js";
 
 import {

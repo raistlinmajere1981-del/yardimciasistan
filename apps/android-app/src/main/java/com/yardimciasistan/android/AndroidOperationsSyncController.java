@@ -128,6 +128,9 @@ final class AndroidOperationsSyncController {
             : "Bekleyen işlemler yeniden gönderiliyor"
     );
 
+    // not_modified still carries action receipts, pending counts and voice availability.
+    // Capture the currently displayed state before the worker mutates its cache copy.
+    final String previousStatus = presentationStatus(fallbackData);
     final OperationData previousData = operationCache.load();
     executor.execute(() -> {
       try {
@@ -167,6 +170,7 @@ final class AndroidOperationsSyncController {
         final String fetchedSourceKey = fetched.sourceKey.isEmpty()
             ? preferredSourceKey
             : fetched.sourceKey;
+        final boolean snapshotChanged = !fetched.notModified && !operationCache.hasSamePresentation(fetched.payload);
         final OperationData nextData;
         if (!fetched.notModified && fetched.data != null) {
           operationCache.save(fetched.payload, fetchedSourceKey, fetched.serverRevision);
@@ -202,7 +206,7 @@ final class AndroidOperationsSyncController {
             retryingOnlyMarketActions && !pendingToRetry.isEmpty() ? pendingToRetry.get(pendingToRetry.size() - 1).id : "",
             fetchedSourceKey.startsWith("local:"),
             fetched.payload.optBoolean("local_network_enabled", true),
-            !fetched.notModified || !pendingToRetry.isEmpty(),
+            shouldRender(snapshotChanged, !pendingToRetry.isEmpty(), previousStatus, nextData),
             fetchedSourceKey.startsWith("local:") ? "Yerel ağ bağlı" : "Web bağlantısı hazır"
         );
         activity.runOnUiThread(() -> listener.onSuccess(result));
@@ -232,6 +236,21 @@ final class AndroidOperationsSyncController {
         ));
       }
     });
+  }
+
+  static boolean shouldRender(boolean snapshotChanged, boolean retriedActions, String previousStatus, OperationData next) {
+    return snapshotChanged || retriedActions || !previousStatus.equals(presentationStatus(next));
+  }
+
+  static String presentationStatus(OperationData data) {
+    org.json.JSONArray actions = new org.json.JSONArray();
+    for (OperationData.ActionRecord action : data.actions) {
+      actions.put(new org.json.JSONArray().put(action.id).put(action.type).put(action.status)
+          .put(action.errorMessage).put(action.createdAt).put(action.processedAt)
+          .put(action.orderId).put(action.expectedStatus).put(action.expectedUpdatedAt)
+          .put(action.notificationId).put(action.taskType));
+    }
+    return new org.json.JSONArray().put(data.pendingActions).put(data.sttAvailable).put(actions).toString();
   }
 
   private static boolean containsOnlyMarketActions(List<ActionOutbox.PendingAction> pendingActions) {

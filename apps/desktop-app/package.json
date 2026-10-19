@@ -17,14 +17,20 @@
   },
   "dependencies": {
     "@fontsource-variable/ibm-plex-sans": "^5.3.0",
+    "@napi-rs/image": "^1.15.0",
     "@xmldom/xmldom": "0.9.12",
     "@yardimci-asistan/ai-core": "0.1.0",
     "@yardimci-asistan/shared": "0.1.0",
     "@yardimci-asistan/sync-core": "0.1.0",
     "@yardimci-asistan/whatsapp-bridge": "0.1.0",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.55.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "read-excel-file": "^9.3.12",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

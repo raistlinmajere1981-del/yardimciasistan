@@ -49,3 +49,7 @@ config/credentials.local.json
 
 # Demo-owned generated assistant bundle and its image assets.
 test-site/landing/assets/assistant/
+
+# Independent dealer pilot build output and local configuration
+apps/dealer-android-app/build/
+apps/dealer-android-app/local.properties

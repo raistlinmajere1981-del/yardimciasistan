@@ -452,6 +452,8 @@ export interface SaveCommerceProductPublicationInput {
 /** Public allowlist: no barcode, cost, dealer price or private product metadata. */
 export interface PublishedCommerceProduct {
   categoryId?: string;
+  /** Optional for compatibility with older public-catalog projections. */
+  brand?: string;
   productId: string;
   name: string;
   description: string;

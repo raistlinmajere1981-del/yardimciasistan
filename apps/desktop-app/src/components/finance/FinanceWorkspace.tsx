@@ -153,7 +153,7 @@ export function FinanceWorkspace({
   }
 
   return (
-    <section className="finance-workspace" aria-label="Kasa">
+    <section className="finance-workspace" aria-label="Kasa" aria-busy={loading}>
       <div className="finance-summary-grid">
         <MetricCard compact title="Bugün Gelen" value={formatMinorCurrency(data.todayIncomeMinor)} detail="Kasaya giren" tone="success" icon={Banknote} />
         <MetricCard compact title="Bugün Çıkan" value={formatMinorCurrency(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="warning" icon={WalletCards} />
@@ -171,7 +171,6 @@ export function FinanceWorkspace({
               <p>Otomatik ve elle eklenen kasa kayıtları</p>
             </div>
             <div className="finance-section-actions action-row">
-              {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
               <ActionButton variant="primary" onClick={() => openEntry("income")} disabled={saving || loading}>
                 <Plus size={16} aria-hidden="true" /> Gelir Ekle
               </ActionButton>
@@ -181,7 +180,7 @@ export function FinanceWorkspace({
             </div>
           </div>
           {data.recentEntries.length === 0 ? (
-            <p className="empty-state">Henüz kasa hareketi yok.</p>
+            !loading && <p className="empty-state">Henüz kasa hareketi yok.</p>
           ) : (
             <>
               <div className="finance-entry-list">

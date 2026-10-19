@@ -31,7 +31,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     if (deliveryEnabled && Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
     if (deliveryEnabled && !deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
     const rows = db.prepare(`
-      SELECT p.id, p.category_id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
+      SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
              p.updated_at AS product_updated_at, publication.title_override,
              publication.description_override, publication.sort_order, publication.updated_at
       FROM commerce_product_publications publication
@@ -43,7 +43,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     const products = rows.map((row) => {
       const price = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id) }, false);
       return {
-        categoryId: String(row.category_id), productId: String(row.id), name: String(row.title_override || row.name),
+        categoryId: String(row.category_id), brand: String(row.brand ?? ""), productId: String(row.id), name: String(row.title_override || row.name),
         description: String(row.description_override || row.description), sku: String(row.sku),
         unit: String(row.unit) as CommerceUnit, price: price.unitPrice, currency: price.currency,
         taxRate: Number(row.tax_rate), imageUrl: publicImageUrl(row.image_source_url),

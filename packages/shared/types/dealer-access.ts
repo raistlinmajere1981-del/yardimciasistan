@@ -28,6 +28,8 @@ export interface DealerAccessProjection {
     invite_hash: string;
     invite_expires_at: number;
   }>;
+  /** Read-only canonical order snapshots, carried by the same private durable publication. */
+  order_history?: DealerOrderHistoryProjection[];
   /** Private per-access catalogs. Never exposed through the public online catalog. */
   catalogs?: DealerCatalogProjection[];
 }
@@ -39,7 +41,22 @@ export interface DealerCatalogProjection {
   delivery_methods: import("./commerce").CommerceOrderDeliveryMethod[];
   products: Array<{
     product_id: string; name: string; description: string; sku: string;
+    category_id?: string; category_name?: string; brand?: string;
     unit: import("./commerce").CommerceUnit; price: number; currency: string;
     tax_rate: number; image_url: string; availability: "available";
+  }>;
+}
+
+/** Transport states are separate from the canonical CommerceOrderStatus lifecycle. */
+export interface DealerOrderHistoryProjection {
+  access_id: string;
+  orders: Array<{
+    order_id: string;
+    status: import("./commerce").CommerceOrderStatus | "rejected";
+    created_at: string;
+    updated_at: string;
+    total: number | null;
+    currency: string;
+    items: Array<{ product_id: string; name: string; quantity: number }>;
   }>;
 }

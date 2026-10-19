@@ -83,7 +83,6 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
       <ActionButton variant="secondary" disabled={busy} onClick={() => setRefreshVersion(v => v + 1)}>Sonuçları yenile</ActionButton>
     </div>
     {message && <p role="alert">{message}</p>}
-    {!data && !message && <p role="status">Sonuçlar yükleniyor…</p>}
     {data && <>
       <p className="muted marketing-analytics-period">{date(data.range.startDate)} – {date(data.range.endDate)} · {data.range.timezone} · Bu aralıkta hazırlanan gönderimler ve oluşturulan yayınlar</p>
       <div className="marketing-analytics-summary" aria-label="Analitik genel özet">

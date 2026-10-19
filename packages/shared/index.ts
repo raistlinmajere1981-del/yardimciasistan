@@ -57,3 +57,5 @@ export * from "./utils/nexa-rig";
 export * from "./utils/cloudflare-ai";
 
 export * from "./types/public-translations";
+
+export * from "./types/data-transfer";

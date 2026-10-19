@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { History, Save } from "lucide-react";
 import type {
   CatalogCategory,
@@ -66,7 +66,9 @@ export function ProductWorkspace({
 }) {
   const navigation = useWorkspaceNavigation();
   const bridge = window.yardimciDesktop?.commerce;
-  const product = products.find((item) => item.id === intent.entityId) ?? null;
+  const [savedProduct, setSavedProduct] = useState<CatalogProduct | null>(null);
+  const product = savedProduct ?? products.find((item) => item.id === intent.entityId) ?? null;
+  const creating = intent.mode === "create" && !product;
   const productId = product?.id ?? "";
   const [form, setForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [baseline, setBaseline] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
@@ -76,16 +78,21 @@ export function ProductWorkspace({
   const [balance, setBalance] = useState<InventoryBalance | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [loadedProductId, setLoadedProductId] = useState("");
-  const [resourceState, setResourceState] = useState<WorkspaceState>("idle");
+  const [resourceState, setResourceState] = useState<WorkspaceState>(intent.mode === "create" ? "success" : "idle");
   const [saveState, setSaveState] = useState<WorkspaceState>("idle");
   const [saveMessage, setSaveMessage] = useState("");
   const [countedQuantity, setCountedQuantity] = useState("");
   const [countNote, setCountNote] = useState("");
+  const [fieldsBusy, setFieldsBusy] = useState(false);
   const [stockBusy, setStockBusy] = useState(false);
+  const stockLock = useRef(false);
+  const saveLock = useRef(false);
+  const [stockOperation, setStockOperation] = useState<"add" | "remove" | "count">("add");
+  const [stockConfirm, setStockConfirm] = useState(false);
   const [stockMessage, setStockMessage] = useState("");
   const [historyError, setHistoryError] = useState("");
   const beginStockRequest = useRequestGeneration();
-  const [isPublished, setIsPublished] = useState(false);
+  const [isPublished, setIsPublished] = useState(onlineSalesEnabled);
   const [publicationBusy, setPublicationBusy] = useState(false);
   const [publicationLoaded, setPublicationLoaded] = useState(false);
   const [publicationMessage, setPublicationMessage] = useState("");
@@ -100,9 +107,10 @@ export function ProductWorkspace({
   const [menuMessage, setMenuMessage] = useState("");
   const [removeMenuConfirm, setRemoveMenuConfirm] = useState(false);
   const menuDirty = JSON.stringify(menuForm) !== JSON.stringify(menuBaseline);
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep";
-  const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim());
-  const mutationBusy = busy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
+  const [createPublished, setCreatePublished] = useState(onlineSalesEnabled);
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || (creating && createPublished !== onlineSalesEnabled);
+  const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockConfirm);
+  const mutationBusy = busy || fieldsBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"
     ? manualImageDataUrl
     : imageDraftMode === "keep"
@@ -243,7 +251,8 @@ export function ProductWorkspace({
   }, [loadProductResources, loadedProductId, product]);
 
   async function saveProduct() {
-    if (!bridge || !product || mutationBusy || stockDraftDirty || resourceState !== "success") return;
+    if (!bridge || (!product && !creating) || saveLock.current || mutationBusy || stockDraftDirty || resourceState !== "success") return;
+    if (!form.name.trim()) { setSaveMessage("Ürün adı girin."); setSaveState("error"); return; }
     const priceError = validateProductFormPrices(form);
     if (priceError) {
       setSaveState("error");
@@ -251,6 +260,7 @@ export function ProductWorkspace({
       return;
     }
     const isCurrent = beginSaveRequest();
+    saveLock.current = true;
     setSaveState("loading");
     setSaveMessage("");
     let saved: CatalogProduct;
@@ -259,6 +269,7 @@ export function ProductWorkspace({
       saved = await bridge.saveProduct({
         ...productFields,
         ...(productId ? { id: productId } : {}),
+        ...(creating && onlineSalesEnabled ? { onlineSalesPublished: createPublished } : {}),
         ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
         ...(imageDraftMode === "clear" ? { clearImage: true } : {})
       });
@@ -267,7 +278,8 @@ export function ProductWorkspace({
       if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
       setSaveState("error");
-      setSaveMessage("");
+      setSaveMessage(message);
+      saveLock.current = false;
       onStateChange("error", message);
       return;
     }
@@ -282,6 +294,8 @@ export function ProductWorkspace({
     }
 
     if (!isCurrent()) return;
+    setSavedProduct(saved);
+    setLoadedProductId(saved.id);
     onProductSaved(saved);
     let catalogReloadFailed = false;
     try {
@@ -321,8 +335,9 @@ export function ProductWorkspace({
 
     if (!isCurrent()) return;
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
+    saveLock.current = false;
     setSaveState("success");
-    setSaveMessage("");
+    setSaveMessage(message);
     onStateChange("success", message);
   }
 
@@ -330,7 +345,7 @@ export function ProductWorkspace({
   const presentation = navigation.current?.presentation ?? "centered";
 
   async function refreshStockHistory() {
-    if (!bridge || !product || stockBusy) return;
+    if (!bridge || !product || stockLock.current || mutationBusy) return;
     const isCurrent = beginStockRequest();
     setStockBusy(true);
     try {
@@ -340,32 +355,59 @@ export function ProductWorkspace({
     finally { if (isCurrent()) setStockBusy(false); }
   }
 
+  const stockQuantity = Number(countedQuantity.trim().replace(",", "."));
+  const stockPreview = !countedQuantity.trim() || !Number.isFinite(stockQuantity) || !balance ? null
+    : stockOperation === "count" ? stockQuantity : balance.quantity + (stockOperation === "remove" ? -stockQuantity : stockQuantity);
+  const stockValidation = !countedQuantity.trim() || !Number.isFinite(stockQuantity) || stockQuantity <= 0
+    ? "Sıfırdan büyük, geçerli bir miktar girin."
+    : stockPreview !== null && stockPreview < 0 ? "Stok miktarı negatif olamaz." : "";
+
   async function updateStock() {
-    if (!bridge || !product || !balance || dirty || mutationBusy) return;
-    const quantity = Number(countedQuantity.trim().replace(",", "."));
-    if (!countedQuantity.trim() || !Number.isFinite(quantity) || quantity < 0) { setStockMessage("Geçerli, negatif olmayan bir stok miktarı girin."); return; }
+    if (!bridge || !product || !product.trackInventory || !form.trackInventory || !inventoryEnabled || !balance || dirty || menuDirty || mutationBusy || stockLock.current || stockValidation) return;
     const isCurrent = beginStockRequest();
+    stockLock.current = true;
     setStockBusy(true); setStockMessage("");
+    let committed = false;
     try {
-      const result = await bridge.setInventoryCount({ productId: product.id, locationId: balance.locationId,
-        countedQuantity: quantity, expectedUpdatedAt: balance.updatedAt, note: countNote,
-        referenceType: "product_workspace_count", referenceId: product.id, actorSource: "desktop-product-workspace" });
+      if (stockOperation === "count") {
+        const result = await bridge.setInventoryCount({ productId: product.id, locationId: balance.locationId,
+          countedQuantity: stockQuantity, expectedUpdatedAt: balance.updatedAt, note: countNote,
+          referenceType: "product_workspace_count", referenceId: product.id, actorSource: "desktop-product-workspace" });
+        committed = true;
+        if (!isCurrent()) return;
+        setBalance(result.balance);
+        if (result.movement) setMovements(current => [result.movement!, ...current]);
+        setStockMessage(result.movement ? "Fiziksel sayım kaydedildi." : "Stok miktarı değişmedi.");
+      } else {
+        const movement = await bridge.applyInventoryMovement({ productId: product.id, locationId: balance.locationId,
+          type: "adjust", quantityDelta: stockOperation === "remove" ? -stockQuantity : stockQuantity,
+          note: countNote, referenceType: "product_workspace_adjust", referenceId: product.id, actorSource: "desktop-product-workspace" });
+        committed = true;
+        if (!isCurrent()) return;
+        setBalance(current => current ? { ...current, quantity: movement.quantityAfter, updatedAt: movement.createdAt } : current);
+        setMovements(current => [movement, ...current]);
+        setStockMessage("Stok hareketi kaydedildi.");
+      }
+      setCountedQuantity(""); setCountNote(""); setStockConfirm(false);
+      const [balanceResult, historyResult, reloadResult] = await Promise.allSettled([
+        bridge.getInventoryBalance(product.id), bridge.listInventoryMovements({ productId: product.id, limit: 20 }), onReload()
+      ]);
       if (!isCurrent()) return;
-      setBalance(result.balance);
-      if (result.movement) setMovements(current => [result.movement!, ...current]);
-      setCountedQuantity(""); setCountNote("");
-      setStockMessage(result.movement ? "Stok güncellendi." : "Stok miktarı değişmedi.");
-      try { await onReload(); } catch { if (isCurrent()) setStockMessage("Stok güncellendi ancak katalog görünümü yenilenemedi."); }
+      if (balanceResult.status === "fulfilled") setBalance(balanceResult.value);
+      else { setBalance(null); setStockMessage("Stok kaydedildi; güncel miktar okunamadı. Kartı yeniden açın."); }
+      if (historyResult.status === "fulfilled") { setMovements(historyResult.value); setHistoryError(""); }
+      else setHistoryError("Stok kaydedildi; hareket listesi yenilenemedi.");
+      if (reloadResult.status === "rejected") setStockMessage("Stok kaydedildi; katalog görünümü yenilenemedi.");
     } catch (error) {
       if (!isCurrent()) return;
-      setStockMessage(error instanceof Error ? error.message : "Stok güncellenemedi.");
-      // Keep the user's count draft, but show the current balance before an explicit retry.
-      try { const current = await bridge.getInventoryBalance(product.id); if (isCurrent()) setBalance(current); } catch { /* Preserve the original operation error. */ }
-    }
-    finally { if (isCurrent()) setStockBusy(false); }
+      setStockConfirm(false);
+      setStockMessage(committed ? "Stok kaydedildi; görünüm yenilenemedi." : error instanceof Error ? error.message : "Stok güncellenemedi.");
+      try { const current = await bridge.getInventoryBalance(product.id); if (isCurrent()) setBalance(current); }
+      catch { if (isCurrent()) setBalance(null); }
+    } finally { stockLock.current = false; if (isCurrent()) setStockBusy(false); }
   }
 
-  if (!product) {
+  if (!product && !creating) {
     return <WorkspaceFrame
       title="Ürün bulunamadı"
       context="Katalog yenilenmiş veya ürün artık kullanılamıyor olabilir."
@@ -384,14 +426,29 @@ export function ProductWorkspace({
     </WorkspaceFrame>;
   }
 
-  const stockPanel = inventoryEnabled && product.trackInventory && <DetailSectionCard title="Stok güncelleme" className="market-product-stock-update">
-    <strong>Mevcut stok: {balance?.quantity ?? "—"} {product.unit}</strong>
-    <label className="form-field form-field--fluid">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
-    <label className="form-field form-field--fluid">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
-    <ActionButton variant="secondary" disabled={dirty || mutationBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
-    <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); }}>Sayım taslağını temizle</ActionButton>
-    {dirty && <small>Stok güncellemeden önce ürün değişikliklerini kaydedin veya geri alın.</small>}
+  const stockDisabled = dirty || menuDirty || mutationBusy || !balance || stockConfirm;
+  const stockPanel = inventoryEnabled && form.trackInventory && <DetailSectionCard title="Stok" className="market-product-stock-update">
+    <strong>Mevcut stok: {balance?.quantity ?? "—"} {form.unit}</strong>
+    <label className="form-field form-field--fluid form-field--span">Minimum stok<input type="number" min="0" step="0.0001" value={form.minimumQuantity} disabled={mutationBusy || stockDraftDirty} onChange={event => setForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
+    {product?.trackInventory ? <>
+      <label className="form-field form-field--fluid form-field--span">İşlem<select aria-label="Stok işlemi" value={stockOperation} disabled={stockDisabled} onChange={event => setStockOperation(event.target.value as typeof stockOperation)}>
+        <option value="add">Ekle</option><option value="remove">Çıkar</option><option value="count">Fiziksel Sayım</option>
+      </select></label>
+      <label className="form-field form-field--fluid">Miktar<input inputMode="decimal" aria-label="Stok işlem miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={stockDisabled} /></label>
+      <label className="form-field form-field--fluid">Kısa not<input maxLength={240} value={countNote} onChange={event => setCountNote(event.target.value)} disabled={stockDisabled} /></label>
+      {stockPreview !== null && <p role="status">İşlem sonrası: {stockPreview} {form.unit}</p>}
+      {countedQuantity && stockValidation && <p role="alert">{stockValidation}</p>}
+      <ActionButton variant="secondary" disabled={stockDisabled || Boolean(stockValidation)} onClick={() => setStockConfirm(true)}>Stok İşlemini Onayla</ActionButton>
+      <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); setStockConfirm(false); }}>Stok taslağını temizle</ActionButton>
+      {stockConfirm && <ConfirmDialog embedded title="Stok işlemini kaydet" description={`Yeni toplam ${stockPreview} ${form.unit}. Hareket stok geçmişine kaydedilecek.`} confirmLabel="Stok Hareketini Kaydet" busy={stockBusy} onCancel={() => setStockConfirm(false)} onConfirm={() => void updateStock()} />}
+      <ActionButton variant="secondary" disabled={dirty || menuDirty || stockDraftDirty || mutationBusy || resourceState !== "success"} onClick={() => {
+        navigation.updateWorkspaceMode({ entityType: "product", mode: "history" });
+        void refreshStockHistory();
+      }}><History size={16} aria-hidden="true" />Stok Hareketleri</ActionButton>
+      {(dirty || menuDirty) && <small>Stok işleminden önce kart değişikliklerini kaydedin veya geri alın.</small>}
+    </> : <small>Stok işlemleri için önce ürünü stok takibi açık olarak kaydedin.</small>}
     {stockMessage && <p role="status">{stockMessage}</p>}
+    {historyError && <p role="alert">{historyError}</p>}
   </DetailSectionCard>;
 
   const menuPanel = menuEntry && menuData && <section className="form-stack">
@@ -411,12 +468,11 @@ export function ProductWorkspace({
   return <WorkspaceFrame
       className="product-workspace-frame detail-workspace-frame"
       bodyScroll={history ? "body" : "panes"}
-      title={product.name}
-      context={[product.brand, product.sku || product.barcode].filter(Boolean).join(" · ") || "Katalog ürünü"}
-      actions={inventoryEnabled && <ActionButton variant="secondary" disabled={dirty || menuDirty || stockDraftDirty || mutationBusy || resourceState !== "success"} onClick={() => {
-        navigation.updateWorkspaceMode({ entityType: "product", mode: history ? "details" : "history" });
-        if (!history) void refreshStockHistory();
-      }}><History size={16} aria-hidden="true" />{history ? "← Ürüne dön" : "Stok Hareketleri"}</ActionButton>}
+      title={product?.name ?? "Yeni ürün ekle"}
+      context={[product?.brand, product?.sku || product?.barcode].filter(Boolean).join(" · ") || "Katalog ürünü"}
+      actions={history && <ActionButton variant="secondary" disabled={mutationBusy} onClick={() =>
+        navigation.updateWorkspaceMode({ entityType: "product", mode: "details" })
+      }>← Ürüne dön</ActionButton>}
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
       onClose={() => navigation.closeWorkspace()}
@@ -432,8 +488,9 @@ export function ProductWorkspace({
             setManualImageDataUrl("");
             setSaveState("idle");
             setSaveMessage("");
+            setCreatePublished(onlineSalesEnabled);
           }}>Değişiklikleri Geri Al</ActionButton>
-          <ActionButton type="button" disabled={mutationBusy || stockDraftDirty || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
+          <ActionButton type="button" disabled={mutationBusy || stockDraftDirty || resourceState !== "success" || !dirty || !form.name.trim()} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
@@ -443,8 +500,10 @@ export function ProductWorkspace({
         {resourceState === "error" ? <DetailWorkspaceLayout railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={stockPanel}><div className="empty-state"><strong>Ürün kartı güvenli biçimde yüklenemedi.</strong><p>{saveMessage}</p><ActionButton variant="secondary" onClick={() => void loadProductResources()}>Tekrar Dene</ActionButton></div>{menuPanel}</DetailWorkspaceLayout> :
           <ProductFormFields
             renderSections={({ status, details, media }) => <DetailWorkspaceLayout
-              railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>{stockPanel}{status}{media}</>}
+              railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>{media}{status}{stockPanel}</>}
             >{details}{menuPanel}</DetailWorkspaceLayout>}
+            {...(creating && intent.lookupSeed ? { lookupSeed: intent.lookupSeed } : {})}
+            onBusyChange={setFieldsBusy}
             form={form}
             categories={categories}
             inventoryEnabled={inventoryEnabled}
@@ -455,7 +514,7 @@ export function ProductWorkspace({
             disabled={mutationBusy || stockDraftDirty || resourceState !== "success"}
             mode="all"
             statusFields={onlineSalesEnabled ? <>
-              <label className="form-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || !publicationLoaded} onChange={event => void savePublication(event.target.checked)} /> Web satışında yayınla</label>
+              <label className="form-check"><input type="checkbox" checked={creating ? createPublished : isPublished} disabled={mutationBusy || (!creating && !publicationLoaded)} onChange={event => { if (creating) setCreatePublished(event.target.checked); else void savePublication(event.target.checked); }} /> Web satışında yayınla</label>
               {publicationMessage && <p role="status">{publicationMessage}</p>}
             </> : null}
             localImageDataUrl={effectiveImageDataUrl}

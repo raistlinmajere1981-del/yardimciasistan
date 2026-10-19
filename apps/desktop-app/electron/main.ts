@@ -1,3 +1,4 @@
+import { registerDataTransferIpc } from "./ipc/data-transfer-ipc";
 import { PublicTranslationService } from "./public-translation-service";
 import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
 import { cleanupOrphanProductImages } from "./product-data-service";
@@ -556,6 +557,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerDataTransferIpc({ databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, onMutation: () => { syncCoordinator?.scheduleSoon(); } });
   registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => syncCoordinator?.scheduleSoon()});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });

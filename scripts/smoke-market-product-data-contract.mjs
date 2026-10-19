@@ -99,7 +99,9 @@ assert.match(productFields, /onManualImageSelected/);
 assert.match(productFields, /onImageClear/);
 assert.match(productWorkspace, /getProductImageDataUrl/);
 assert.match(products, /entityType: "product"/);
-assert.match(products, /lookupSeed=\{productLookupRequest\}/);
+// Product lookup seed now travels via workspace intent instead of a create-only form prop.
+assert.match(products, /lookupSeed: productLookupRequest/);
+assert.match(productWorkspace, /intent\.lookupSeed/);
 
 assert.match(dataPaths, /assets[^\n]*products|DESKTOP_PRODUCTS_DIR_NAME = "products"/);
 assert.match(maintenance, /copyDurableAssets/);

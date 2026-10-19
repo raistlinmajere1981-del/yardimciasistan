@@ -74,3 +74,5 @@ Yeni belge eklemeden önce şu filtreyi kullanın:
 
 Yanıt yalnız tarihsel kanıt ise yeni belge tutmayın; commit/PR/Git geçmişi arşivdir.
 Tamamlanan plan/audit belgelerini aktif docs ağacında bırakmayın.
+
+- [Desktop ürün ve müşteri veri aktarımı](architecture/DESKTOP_DATA_TRANSFER_V1.md)

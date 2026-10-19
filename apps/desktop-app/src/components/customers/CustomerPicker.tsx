@@ -39,7 +39,7 @@ function SelectedCustomerDebt({ customerId, compact, currency }: { customerId: s
   const { account, loading, error, reload } = useCustomerCreditAccount(customerId);
   return <div aria-busy={loading}>
     <small>Mevcut borç</small>
-    {loading ? <p role="status">Hesap yükleniyor…</p> : error ? <>
+    {loading ? null : error ? <>
       <p role="alert">{error}</p>
       <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>Hesabı Yenile</ActionButton>
     </> : account && (compact ? <strong>{new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format((account.balances.find(balance => balance.currency === currency)?.amountMinor ?? 0) / 100)}</strong> : <CustomerCreditBalances balances={account.balances} />)}

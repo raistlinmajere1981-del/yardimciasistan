@@ -1,7 +1,7 @@
 import { SearchSelect } from "../ui/SearchSelect";
 import { BusinessTemplateMessagePanel } from "./BusinessTemplateMessagePanel";
 import { CustomerMessagingPreferences } from "./CustomerMessagingPreferences";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { BedDouble, History, MessageCircle, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, DesktopStatusUpdateResult, SaveCustomerInput } from "../../../electron/database";
@@ -59,7 +59,31 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     onDelete
   } = props;
   const navigation = useWorkspaceNavigation();
-  const customer = data.customers.find((item) => item.id === intent.entityId) ?? null;
+  const [activeId, setActiveId] = useState(intent.mode === "create" ? "" : intent.entityId);
+  const creating = !activeId;
+  const [loadedCustomer, setLoadedCustomer] = useState<DesktopDashboardData["customers"][number] | null>(null);
+  const [customerLoadError, setCustomerLoadError] = useState("");
+  const [customerLoading, setCustomerLoading] = useState(Boolean(activeId && window.yardimciDesktop?.getCustomer));
+  const hydratedId = useRef("");
+  const [recordRevision, setRecordRevision] = useState(0);
+  useEffect(() => {
+    if (!activeId || !window.yardimciDesktop?.getCustomer) return;
+    let current = true;
+    setCustomerLoading(true); setCustomerLoadError("");
+    void window.yardimciDesktop.getCustomer(activeId).then(value => {
+      if (current) {
+        hydratedId.current = "";
+        setLoadedCustomer(value);
+        if (!value) setCustomerLoadError("Müşteri kaydı bulunamadı.");
+      }
+    }).catch(error => { if (current) setCustomerLoadError(error instanceof Error ? error.message : "Müşteri okunamadı."); })
+      .finally(() => { if (current) setCustomerLoading(false); });
+    return () => { current = false; };
+  }, [activeId, recordRevision]);
+  const customer = loadedCustomer?.id === activeId ? loadedCustomer : data.customers.find(item => item.id === activeId) ?? null;
+  const formId = useId();
+  const saveLock = useRef(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [formRevision, setFormRevision] = useState(0);
   const formGeneration = useRef(0);
@@ -67,19 +91,22 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [entryRoomId, setEntryRoomId] = useState(data.rooms.find((room) => room.isActive)?.id ?? "");
   const [messagingBusy, setMessagingBusy] = useState(false);
+  const [fieldsBusy, setFieldsBusy] = useState(false);
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
-  const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading" || messagingBusy, dirty });
-  const history = intent.mode === "history";
+  const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading" || messagingBusy || fieldsBusy || customerLoading, dirty });
+  const [history, setHistory] = useState(intent.mode === "history");
   const presentation = navigation.current?.presentation ?? "centered";
+  const closeWorkspace = () => navigation.closeWorkspace(undefined, intent.mode === "create" && activeId ? { createdEntityId: activeId } : undefined);
 
   useEffect(() => {
-    if (!customer || baseline.id === customer.id) return;
+    if (!customer || customerLoading || customerLoadError || hydratedId.current === customer.id || dirty) return;
+    hydratedId.current = customer.id;
     const next = toCustomerForm(customer);
     setFormRevision(++formGeneration.current);
     setForm(next);
     setBaseline(next);
     setSaveState("idle");
-  }, [baseline.id, customer]);
+  }, [customer, customerLoading, customerLoadError, dirty]);
 
   const selectedRequests = useMemo<SyncedCustomerRequest[]>(
     () => customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [],
@@ -101,33 +128,50 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const latestRequest = selectedRequests[0];
   const latestReservation = selectedReservations[0];
 
-  if (!customer) {
+  if (!customer && !creating) {
     return <WorkspaceFrame
       className="customer-workspace-frame"
-      title="Müşteri bulunamadı"
-      context="Kayıt yenilenmiş veya silinmiş olabilir."
+      title={customerLoading ? "Müşteri" : "Müşteri bulunamadı"}
+      context={customerLoading ? undefined : "Kayıt yenilenmiş veya silinmiş olabilir."}
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
-      onClose={() => navigation.closeWorkspace()}
+      onClose={closeWorkspace}
       closeBlocked={closeBlocked}
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop
     >
-      <div className="empty-state"><strong>Müşteri kaydı artık kullanılamıyor.</strong><p>Çalışma alanını kapatıp müşteri listesini yenileyin.</p></div>
+      <div aria-busy={customerLoading}>
+        {!customerLoading && <div className="empty-state"><strong>Müşteri kaydı artık kullanılamıyor.</strong><p role={customerLoadError ? "alert" : undefined}>{customerLoadError || "Kayıt yoksa listeyi yenileyin."}</p></div>}
+      </div>
     </WorkspaceFrame>;
   }
 
-  const customerId = customer.id;
+  const customerId = activeId;
 
-  async function saveCustomer() {
-    setSaveState("loading");
-    const result = await onSave(customerFormToInput(form, wholesaleEnabled));
-    if (!result.ok) {
-      setSaveState("error");
-      return;
-    }
-    setBaseline(form);
-    setSaveState("success");
+  async function saveCustomer(continueAdding = false) {
+    if (saveLock.current || fieldsBusy || customerLoading || customerLoadError || messagingBusy || !form.fullName.trim()) return;
+    saveLock.current = true;
+    setSaveState("loading"); setSaveMessage("");
+    try {
+      const result = await onSave(customerFormToInput(form, wholesaleEnabled));
+      if (!result.ok) { setSaveMessage(result.message); setSaveState("error"); return; }
+      const persistedForm = { ...form, id: result.savedId };
+      // Saving is already committed. A failed record refresh must never create a second customer on retry.
+      setFormRevision(++formGeneration.current);
+      if (continueAdding) {
+        const empty = toCustomerForm(null);
+        setForm(empty); setBaseline(empty); setActiveId(""); setLoadedCustomer(null); hydratedId.current = "";
+      } else {
+        setForm(persistedForm); setBaseline(persistedForm); setActiveId(result.savedId);
+        if (window.yardimciDesktop?.getCustomer) { setCustomerLoading(true); setRecordRevision(value => value + 1); }
+        else hydratedId.current = "";
+        const savedRecord = result.dashboardData.customers.find(item => item.id === result.savedId);
+        if (savedRecord) setLoadedCustomer(savedRecord);
+      }
+      setSaveMessage(result.message); setSaveState("success");
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : "Müşteri kaydedilemedi."); setSaveState("error");
+    } finally { saveLock.current = false; }
   }
 
   function leaveFor(action: () => void) {
@@ -147,43 +191,39 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   return <WorkspaceFrame
     className="customer-workspace-frame detail-workspace-frame"
     bodyScroll={history ? "body" : "panes"}
-    title={customer.fullName}
-    context={<span>{formatCustomerSource(customer.source)} · Son temas {formatCustomerLastContactDate(customer.lastContactAt || customer.updatedAt)}</span>}
-    actions={<ActionButton
+    title={customer?.fullName ?? "Yeni müşteri ekle"}
+    context={customer ? <span>{formatCustomerSource(customer.source)} · Son temas {formatCustomerLastContactDate(customer.lastContactAt || customer.updatedAt)}</span> : "Kaydedilmemiş"}
+    actions={customer && <ActionButton
       variant="ghost"
       size="sm"
       disabled={saveState === "loading" || messagingBusy || dirty}
       title={dirty ? "Geçmişe geçmeden önce değişiklikleri kaydedin veya geri alın." : undefined}
-      onClick={() => navigation.updateWorkspaceMode({ entityType: "customer", mode: history ? "main" : "history" })}
+      onClick={() => setHistory(current => !current)}
     >
       <History size={15} aria-hidden="true" />{history ? "← Müşteriye dön" : "Geçmiş"}
     </ActionButton>}
     presentation={presentation}
     onPresentationChange={navigation.updateWorkspacePresentation}
-    onClose={() => navigation.closeWorkspace()}
+    onClose={closeWorkspace}
     closeBlocked={closeBlocked}
     returnFocusRef={navigation.returnFocusRef}
     dismissOnBackdrop
     footer={!history ? <div className="customer-workspace-footer">
-      <ActionButton
-        variant="secondary"
-        type="button"
-        disabled={saveState === "loading" || !dirty}
-        onClick={() => {
-          setFormRevision(++formGeneration.current);
-          setForm(baseline);
-          setSaveState("idle");
-        }}
-      >
-        Değişiklikleri Geri Al
-      </ActionButton>
-      <ActionButton type="button" disabled={saveState === "loading" || !dirty} onClick={() => void saveCustomer()}>
+      {saveMessage && <p className={`form-status sync-${saveState}`} role={saveState === "error" ? "alert" : "status"}>{saveMessage}</p>}
+      <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || !dirty} onClick={() => {
+        setFormRevision(++formGeneration.current); setForm(baseline); setSaveState("idle"); setSaveMessage("");
+      }}>Değişiklikleri Geri Al</ActionButton>
+      {intent.mode === "create" && <ActionButton variant="secondary" type="submit" form={formId} name="saveMode" value="continue"
+        disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || Boolean(customerLoadError) || !form.fullName.trim()}>Kaydet ve Yeni Ekle</ActionButton>}
+      <ActionButton type="submit" form={formId} disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || Boolean(customerLoadError) || !dirty || !form.fullName.trim()}>
         <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}
       </ActionButton>
     </div> : undefined}
   >
-    {!history ? <DetailWorkspaceLayout className="customer-workspace-main"
+    {!history ? <DetailWorkspaceLayout
       railLabel="Müşteri işlemleri" contentLabel="Müşteri bilgileri" rail={<>
+        <DetailSectionCard title="Kayıt özeti"><strong>{customer?.fullName ?? "Kaydedilmemiş"}</strong><span>{customer?.phone || (creating ? "Önce müşteri kartını kaydedin." : "Telefon yok")}</span></DetailSectionCard>
+        {customer && <>
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
@@ -253,7 +293,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
         <DetailSectionCard className="customer-operation-card form-stack" title="Hızlı işlemler">
           <div className="action-row customer-workspace-quick-actions">
-            {whatsappEnabled && <ActionButton
+            {whatsappEnabled && onWhatsApp && <ActionButton
               
               size="sm"
               type="button"
@@ -262,7 +302,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             >
               <MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz
             </ActionButton>}
-            <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
+            {onDelete && <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
               try {
                 const result = await onDelete(customer);
                 if (result?.ok) navigation.closeWorkspace();
@@ -272,19 +312,26 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               }
             })()}>
               <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
-            </ActionButton>
+            </ActionButton>}
           </div>
         </DetailSectionCard>
+        </>}
       </>}
     >
-      <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
+      {customerLoadError && <p role="alert">{customerLoadError}</p>}
+      <form id={formId} className="customer-workspace-profile" aria-busy={customerLoading} inert={saveState === "loading" || messagingBusy || customerLoading || Boolean(customerLoadError)} onSubmit={(event) => {
+        event.preventDefault(); const submitter = event.nativeEvent.submitter;
+        void saveCustomer(submitter instanceof HTMLButtonElement && submitter.value === "continue");
+      }}>
         <CustomerFormFields
-          key={`${customer.id}:${formRevision}`}
+          key={formRevision}
           form={form}
           aiEnabled={aiEnabled}
           wholesaleEnabled={wholesaleEnabled}
+          identityExpanded={staysEnabled}
+          onBusyChange={setFieldsBusy}
           onChange={setForm}
-          isFormCurrent={() => formGeneration.current === formRevision && form.id === customer.id}
+          isFormCurrent={() => formGeneration.current === formRevision && form.id === activeId}
           onAnalyzeIdentity={onAnalyzeIdentity}
         />
       </form>

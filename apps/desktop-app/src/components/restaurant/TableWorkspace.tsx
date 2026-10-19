@@ -18,7 +18,6 @@ import { ChoiceChips } from "../ui/ChoiceChips";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualRestaurantReservationEditor } from "../operations/ManualRestaurantReservationEditor";
-import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
 import { TableAccountPanel, TableCancelOrderAction } from "./TableAccountPanel";
@@ -27,7 +26,7 @@ import { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
 
 export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inventoryEnabled = true, customersEnabled, reservationsEnabled,
-  roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: {
+  roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, onSaveCustomer, onSaveReservation }: {
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
   aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
@@ -48,7 +47,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const invalidateHistory = useCallback(() => { ++historyRead.current; }, []);
   const [historyError, setHistoryError] = useState("");
   const [historyFilter, setHistoryFilter] = useState<"all" | "paid" | "cancelled">("all");
-  const [quickAction, setQuickAction] = useState<"customer" | "reservation" | null>(null);
+  const [quickAction, setQuickAction] = useState<"reservation" | null>(null);
   const [quickCustomerId, setQuickCustomerId] = useState("");
   const [returnRequested, setReturnRequested] = useState(false);
   const [transferCommitted, setTransferCommitted] = useState(false);
@@ -132,7 +131,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
       reservationsEnabled={reservationsEnabled}
       roomFolioTransferEnabled={roomFolioTransferEnabled}
       quickCustomerId={quickCustomerId}
-      onCreateCustomer={() => setQuickAction("customer")}
+      onCreateCustomer={() => navigation.openWorkspace({ entityType: "customer", entityId: "new-customer", mode: "create", returnContext: { page: "restaurant", view: "floor", entityId: table.id } }, { onReturn: context => { if (context.createdEntityId) setQuickCustomerId(context.createdEntityId); } })}
       onCreateReservation={() => setQuickAction("reservation")}
       onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)}
     />
@@ -200,7 +199,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
         />}
       </>}
       status={null}>
-      {!ordersEnabled ? <span>Sipariş yönetimi etkin değil.</span> : controller.loading ? <span>Adisyon yükleniyor…</span> : !controller.loaded ? <span>Adisyon bilgisi alınamadı.</span>
+      {!ordersEnabled ? <span>Sipariş yönetimi etkin değil.</span> : controller.loading ? null : !controller.loaded ? <span>Adisyon bilgisi alınamadı.</span>
         : order ? <span>{order.itemCount} ürün · {duration} dk · {formatMoney(order.total, getOrderCurrency(order))}</span>
           : <span>Aktif adisyon yok.</span>}
     </ResourceWorkspaceSummary>}
@@ -215,15 +214,6 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
       })}>Görünümü Yenile</ActionButton>}
     </div>}
     overlay={!history && quickAction ? <>
-      {quickAction === "customer" && <CustomerCreateEditor
-        open
-        withinWorkspace
-        aiEnabled={aiEnabled}
-        onClose={() => setQuickAction(null)}
-        onSave={onSaveCustomer}
-        onAnalyzeIdentity={onAnalyzeIdentity}
-        onCreated={customerId => setQuickCustomerId(customerId)}
-      />}
       {quickAction === "reservation" && <ManualRestaurantReservationEditor
         open
         embedded

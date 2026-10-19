@@ -5,8 +5,19 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../electron/database";
+import { reconcileDashboardSnapshot } from "./use-dashboard-snapshot";
 
 const C = BUSINESS_CAPABILITIES;
+
+/** Per-mounted-app memo of the derived view only; capabilities are applied on every input. */
+export function createDesktopDashboardProjector() {
+  let previous: DesktopDashboardData | undefined;
+  return (source: DesktopDashboardData, capabilities: Iterable<BusinessCapability>) => {
+    const next = projectDesktopDashboardData(source, capabilities);
+    previous = previous ? reconcileDashboardSnapshot(previous, next) : next;
+    return previous;
+  };
+}
 
 /** Capability-safe renderer projection; raw dashboard data never drives a hidden domain surface. */
 export function projectDesktopDashboardData(

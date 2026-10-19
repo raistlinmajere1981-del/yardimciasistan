@@ -32,7 +32,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   const [paused, setPaused] = useState(false);
   const [selectedSequence, setSelectedSequence] = useState<number | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [message, setMessage] = useState("Log oturumları yükleniyor...");
+  const [message, setMessage] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
   const [supportReportOpen, setSupportReportOpen] = useState(false);
   const [refreshBusy, setRefreshBusy] = useState(false);
@@ -78,7 +78,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
 
     if (!quiet) {
       setState("loading");
-      setMessage("Log kayıtları yükleniyor...");
+      setMessage("");
     }
     try {
       const nextResult = await bridge.readDiagnosticSession({
@@ -272,7 +272,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
     <>
     <WorkspaceFrame
       title="Uygulama Logları"
-      context={<>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"} · {message}</>}
+      context={<>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"}{message && ` · ${message}`}</>}
       presentation={presentation}
       onPresentationChange={setPresentation}
       onClose={onClose}
@@ -371,11 +371,11 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       }
     >
       <div className="diagnostics-body">
-        <div className="diagnostics-event-list" ref={listRef} role="list" aria-label="Log kayıtları">
+        <div className="diagnostics-event-list" ref={listRef} role="list" aria-label="Log kayıtları" aria-busy={state === "loading"}>
           {state === "error" ? (
             <div className="diagnostics-empty">{message}</div>
           ) : visibleEvents.length === 0 ? (
-            <div className="diagnostics-empty">Bu filtrelerle eşleşen kayıt yok.</div>
+            state !== "loading" && <div className="diagnostics-empty">Bu filtrelerle eşleşen kayıt yok.</div>
           ) : visibleEvents.map((event) => (
             <button
               className={`diagnostics-event is-${event.level.toLowerCase()}${selectedSequence === event.sequence ? " is-selected" : ""}`}

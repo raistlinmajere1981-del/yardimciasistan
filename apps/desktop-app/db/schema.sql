@@ -159,6 +159,8 @@ CREATE TABLE catalog_products (
   track_inventory INTEGER NOT NULL DEFAULT 1 CHECK (track_inventory IN (0, 1)),
   minimum_quantity REAL NOT NULL DEFAULT 0 CHECK (minimum_quantity >= 0),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  -- Original import assets belong to the canonical product image archive; no separate gallery owner.
+  image_original_assets_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(image_original_assets_json)),
   image_asset_path TEXT NOT NULL DEFAULT '',
   image_source_url TEXT NOT NULL DEFAULT '',
   data_source TEXT NOT NULL DEFAULT '',
@@ -3104,3 +3106,112 @@ UNION ALL
 SELECT b.id AS business_id, 'catalog_category' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name) AS fields_json FROM business b JOIN catalog_categories r ON r.business_id=b.id WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.online_sales' AND c.is_enabled=1) AND EXISTS(SELECT 1 FROM catalog_products p JOIN commerce_product_publications x ON x.product_id=p.id AND x.business_id=b.id WHERE p.category_id=r.id AND p.deleted_at='' AND p.is_active=1 AND x.is_published=1 AND x.channel='online_sales')
 UNION ALL
 SELECT b.id AS business_id, 'marketing' AS record_type, r.id AS record_id, r.title AS label, json_object('title', r.title, 'text', r.text) AS fields_json FROM business b JOIN marketing_publications r ON r.business_id=b.id WHERE b.deleted_at='' AND r.channel='website' AND r.desired_published=1 AND r.status!='draft' AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='marketing.studio' AND c.is_enabled=1);
+
+-- Dealer read projections share the existing private durable publication.
+CREATE TRIGGER trg_dealer_history_commerce_orders_insert AFTER INSERT ON commerce_orders
+WHEN NEW.source = 'web-dealer' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_orders_update AFTER UPDATE ON commerce_orders
+WHEN NEW.source = 'web-dealer' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_orders_delete AFTER DELETE ON commerce_orders
+WHEN OLD.source = 'web-dealer' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = OLD.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_order_items_insert AFTER INSERT ON commerce_order_items
+WHEN EXISTS (SELECT 1 FROM commerce_orders o JOIN commerce_dealer_web_access a ON a.customer_id = o.customer_id AND a.business_id = o.business_id WHERE o.id = NEW.order_id AND o.source = 'web-dealer')
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_order_items_update AFTER UPDATE ON commerce_order_items
+WHEN EXISTS (SELECT 1 FROM commerce_orders o JOIN commerce_dealer_web_access a ON a.customer_id = o.customer_id AND a.business_id = o.business_id WHERE o.id = NEW.order_id AND o.source = 'web-dealer')
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_order_items_delete AFTER DELETE ON commerce_order_items
+WHEN EXISTS (SELECT 1 FROM commerce_orders o JOIN commerce_dealer_web_access a ON a.customer_id = o.customer_id AND a.business_id = o.business_id WHERE o.id = OLD.order_id AND o.source = 'web-dealer')
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_dealer_order_rejections_insert AFTER INSERT ON commerce_dealer_order_rejections
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE id = NEW.dealer_access_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_dealer_order_rejections_update AFTER UPDATE ON commerce_dealer_order_rejections
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE id = NEW.dealer_access_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_commerce_dealer_order_rejections_delete AFTER DELETE ON commerce_dealer_order_rejections
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE id = OLD.dealer_access_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_catalog_categories_insert AFTER INSERT ON catalog_categories
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_catalog_categories_update AFTER UPDATE ON catalog_categories
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_history_catalog_categories_delete AFTER DELETE ON catalog_categories
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = OLD.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;

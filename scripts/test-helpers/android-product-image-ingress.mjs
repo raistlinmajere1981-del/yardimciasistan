@@ -87,6 +87,13 @@ function fixture(mode, action = productAction()) {
         } };
         if (name === "./desktop-logger") return { desktopLog: { info: (event) => logs.push(event), warn: (event) => logs.push(event), error: (event) => logs.push(event) }, createDiagnosticOperationId: () => "fixture" };
         if (name === "@yardimci-asistan/sync-core") return { ...syncCore, pullAndroidActions: pull, markAndroidActionResult: complete };
+        // The production codec is covered by the native Electron media smoke. In this VM
+        // fixture, decode through the same deterministic fake nativeImage used before.
+        if (name === "./product-image-codec") return { decodeProductImageBytes: (bytes) => ({
+          isEmpty: () => !Buffer.from(bytes).equals(pixels),
+          getSize: () => ({ width: 1, height: 1 }),
+          toJPEG: () => jpeg
+        }) };
         if (name === "./product-data-service") return load("product-data-service");
         if (name === "./android-action-sync-service") return load("android-action-sync-service");
         return localRequire(name);

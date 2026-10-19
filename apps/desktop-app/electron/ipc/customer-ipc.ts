@@ -61,6 +61,23 @@ export function registerCustomerIpcHandlers(options: {
     return finalizeRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
   });
 
+  ipcMain.handle("customer:list", (_event, query: import("../database/customer-store").CustomerListQuery = {}) => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS);
+    if (query.filter === "dealers") assertCapability(BUSINESS_CAPABILITIES.WHOLESALE);
+    if (["staying", "kbs_pending", "kbs_failed"].includes(query.filter ?? "")) assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS);
+    if (query.filter === "reserved") {
+      const enabled=getDatabase().getEnabledBusinessCapabilities();
+      if(!enabled.includes(BUSINESS_CAPABILITIES.FOOD_RESERVATIONS)) assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
+    }
+    return getDatabase().listCustomers(query);
+  });
+  ipcMain.handle("customer:get", (_event, id: string) => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS);
+    return getDatabase().getCustomer(String(id));
+  });
+
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");

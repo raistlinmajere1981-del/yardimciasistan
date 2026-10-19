@@ -16,12 +16,12 @@ function intentContracts(intent: WorkspaceIntent) {
     return { action };
   }
   if (intent.entityType === "customer") {
-    const mode: "main" | "history" | undefined = intent.mode;
+    const mode: "create" | "main" | "history" | undefined = intent.mode;
     // @ts-expect-error Customer intent cannot acquire the Room-specific payload.
     const _customer = intent.customerId;
     return { mode };
   }
-  const mode: "details" | "history" | undefined = intent.mode;
+  const mode: "create" | "details" | "history" | undefined = intent.mode;
   const menuEntryId: string | undefined = intent.menuEntryId;
   // @ts-expect-error Product cannot acquire the Room-specific payload.
   const _customer = intent.customerId;

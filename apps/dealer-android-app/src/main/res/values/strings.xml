@@ -1,0 +1,3 @@
+<resources><string name="app_name">Yardımcı Asistan Bayi</string><string name="storage_failure">Cihazdaki kayıt açılamadı veya güvenle kaydedilemedi. Verileriniz silinmedi. Uygulamayı kapatıp yeniden açın; sorun sürerse destek alın.</string>
+<string name="favorites_only">Yalnız favorilerim</string>
+</resources>

@@ -22,7 +22,7 @@ export interface TableWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-type CustomerWorkspaceMode = "main" | "history";
+type CustomerWorkspaceMode = "create" | "main" | "history";
 
 export interface CustomerWorkspaceIntent {
   entityType: "customer";
@@ -32,12 +32,13 @@ export interface CustomerWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-type ProductWorkspaceMode = "details" | "history";
+type ProductWorkspaceMode = "create" | "details" | "history";
 
 export interface ProductWorkspaceIntent {
   entityType: "product";
   entityId: string;
   menuEntryId?: string;
+  lookupSeed?: { requestId: number; product: import("@yardimci-asistan/shared").ProductLookupCandidate };
   mode?: ProductWorkspaceMode;
   action?: undefined;
   returnContext?: WorkspaceReturnContext;
@@ -59,6 +60,6 @@ export type WorkspaceReturnContext = (
   | { page: "restaurant"; view?: RestaurantView }
   | { page: "market"; view?: MarketView }
   | { page?: Exclude<DesktopPage, "pension" | "restaurant" | "market">; view?: never }
-) & { entityId?: string };
+) & { entityId?: string; createdEntityId?: string };
 
 export type WorkspacePresentation = "centered" | "full-canvas";

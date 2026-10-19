@@ -135,7 +135,11 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 275, "all production invoke registrations must execute, including the eight translation operations");
+assert.equal(handlers.size, 286, "all production invoke registrations must execute, including customer pagination and data transfer");
+for (const action of ["pick", "upload", "preview", "apply", "rows", "summary", "export", "report", "release"]) {
+  assert.ok(handlers.has(`dataTransfer:${action}`), `dataTransfer:${action}: included in the production lock sweep`);
+}
+for (const action of ["list", "get"]) assert.ok(handlers.has(`customer:${action}`), `customer:${action}: included in the production lock sweep`);
 for (const action of ["settings", "saveSettings", "get", "list", "save", "start", "job", "cancel"]) {
   assert.ok(handlers.has(`translation:${action}`), `translation:${action}: included in the production lock sweep`);
 }

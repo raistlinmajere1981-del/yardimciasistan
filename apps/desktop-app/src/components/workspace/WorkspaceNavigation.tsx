@@ -24,7 +24,7 @@ interface WorkspaceNavigation {
   hospitalitySessions: Record<HospitalityPage, WorkspaceState | null>;
   returnFocusRef: RefObject<HTMLElement | null>;
   openWorkspace: (intent: WorkspaceIntent, options?: OpenWorkspaceOptions) => boolean;
-  closeWorkspace: (scope?: CloseGuardScope) => boolean;
+  closeWorkspace: (scope?: CloseGuardScope, result?: Pick<WorkspaceReturnContext, "createdEntityId">) => boolean;
   updateWorkspacePresentation: (presentation: WorkspacePresentation) => void;
   updateWorkspaceMode: (update: WorkspaceModeUpdate) => void;
   registerCloseGuard: (guard: () => boolean, scope?: CloseGuardScope) => () => void;
@@ -166,7 +166,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
       });
       return true;
     },
-    closeWorkspace(scope) {
+    closeWorkspace(scope, result) {
       if (scope) {
         const ownerPage = sessionPageFor(definitions, scope.entityType);
         if (ownerPage) {
@@ -195,7 +195,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
         const context = transient.intent.returnContext ?? {};
         setTransient(null);
         if (context.page && context.page !== page) onReturnPage?.(context.page);
-        transientOnReturn.current?.(context);
+        transientOnReturn.current?.({ ...context, ...result });
         transientOnReturn.current = undefined;
         writeRendererDiagnostic({
           level: "INFO",

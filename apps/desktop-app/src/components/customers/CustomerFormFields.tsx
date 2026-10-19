@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Camera, Sparkles } from "lucide-react";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
 import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
@@ -29,6 +29,8 @@ interface CustomerFormFieldsProps {
   form: CustomerFormState;
   aiEnabled: boolean;
   wholesaleEnabled?: boolean;
+  identityExpanded?: boolean;
+  onBusyChange?: (busy: boolean) => void;
   onChange: Dispatch<SetStateAction<CustomerFormState>>;
   isFormCurrent: () => boolean;
   onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
@@ -38,16 +40,20 @@ export function CustomerFormFields({
   form,
   aiEnabled,
   wholesaleEnabled = false,
+  identityExpanded = true,
+  onBusyChange,
   onChange,
   isFormCurrent,
   onAnalyzeIdentity
 }: CustomerFormFieldsProps) {
+  const [identityOpen, setIdentityOpen] = useState(identityExpanded);
   const identityFileRef = useRef<HTMLInputElement>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisMessage, setAnalysisMessage] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanBackSide, setScanBackSide] = useState(false);
   const beginAnalysis = useRequestGeneration();
+  useEffect(() => { onBusyChange?.(analysisState === "loading" || cameraOpen); }, [analysisState, cameraOpen, onBusyChange]);
   const mounted = useRef(false);
   const fieldEdits = useRef<Partial<Record<keyof CustomerFormState, number>>>({});
   useLayoutEffect(() => {
@@ -151,7 +157,7 @@ export function CustomerFormFields({
   return (
     <>
       <DetailSectionCard title="Temel bilgiler">
-        <div className="form-grid">
+        <div className="form-grid form-grid--compact">
           <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
@@ -160,7 +166,7 @@ export function CustomerFormFields({
       </DetailSectionCard>
 
       <DetailSectionCard title="Notlar ve adres">
-        <div className="form-grid">
+        <div className="form-grid form-grid--compact">
           <label className="form-field form-field--fluid customer-note-field">Not<textarea aria-label="Not" rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
           <label className="form-field form-field--fluid customer-address-field">Adres<textarea aria-label="Adres" rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
@@ -170,6 +176,8 @@ export function CustomerFormFields({
         <CustomerCommercialProfileFields form={form} onChange={onChange} />
       )}
 
+      <details className="customer-identity-details" open={identityOpen} onToggle={event => setIdentityOpen(event.currentTarget.open)}>
+      <summary>Kimlik bilgileri</summary>
       <DetailSectionCard title="Kimlik kartı bilgileri" className="identity-form-section" actions={
           <div className="action-row identity-scan-actions">
             <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
@@ -192,7 +200,7 @@ export function CustomerFormFields({
             </ActionButton>
           </div>
       }>
-        <div className="form-grid">
+        <div className="form-grid form-grid--compact">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
             <option value="">Seçilmedi</option><option value="tc_identity_card">T.C. Kimlik Kartı</option><option value="passport">Pasaport</option><option value="other">Diğer</option>
           </select></label>
@@ -225,6 +233,8 @@ export function CustomerFormFields({
         </div>
         {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
       </DetailSectionCard>
+
+      </details>
 
       {cameraOpen && <IdentityCameraCapture
         captureBackSide={scanBackSide}

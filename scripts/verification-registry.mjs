@@ -1,4 +1,8 @@
 const SMOKE_FILES = [
+  "scripts/smoke-entity-single-card.mjs",
+  "scripts/smoke-data-transfer.mjs",
+  "scripts/smoke-data-transfer-ui.mjs",
+  "scripts/smoke-dealer-android-device.mjs",
   "scripts/smoke-market-pilot-web.mjs",
   "scripts/smoke-desktop-ui-family.mjs",
   "scripts/smoke-public-translations.mjs",
@@ -217,6 +221,7 @@ export const IGNORED_SMOKE_FILES = new Set([
 ]);
 
 const MANUAL_SMOKE_FILES = new Set([
+  "scripts/smoke-dealer-android-device.mjs",
   // Requires a real Android device/ADB.
   "scripts/smoke-android-device-ui.mjs",
   "scripts/smoke-android-native-ui-family.mjs",
@@ -252,6 +257,9 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("dealer-android-build", "Bayi Android birim testleri, APK ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "assembleDebug", "lintDebug"], {
+    phase: 27, presets: ["full"], domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
+  }),
   check("android-ui-parity-v16", "Yerel Android V16 tasarım eşitliği tarayıcı kontrolü", "node", [".superdesign/android-companion/redesign-pixco-stitch-v1/test-parity-v16.cjs"], {
     phase: 50, domains: ["android", "design"]
   }),
@@ -582,6 +590,8 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-entity-single-card.mjs") return ["build-desktop"];
+  if (file === "scripts/smoke-dealer-android-device.mjs") return [];
   // Own disposable native fixture build; does not consume the customer APK or Desktop.
   if (file === "scripts/smoke-android-native-ui-family.mjs") return [];
   if (file === "scripts/smoke-desktop-ui-family.mjs") return [];
@@ -618,6 +628,8 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-entity-single-card.mjs") return ["desktop", "commerce", "customers", "hospitality"];
+  if (file.startsWith("scripts/smoke-data-transfer")) return ["desktop", "customers", "commerce", "product-identity"];
   if (file.startsWith("scripts/smoke-public-translations")) return ["translations", "settings", "web", "desktop"];
   if (file === "scripts/smoke-android-auto-repair.mjs") return ["android", "desktop", "settings"];
   if (file === "scripts/smoke-android-kbs.mjs") return ["android", "hospitality", "desktop"];

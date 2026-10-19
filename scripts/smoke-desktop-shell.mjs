@@ -28,6 +28,23 @@ try {
     const enabledCapabilities = allCapabilities;
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'], socialLinks: [] };
     window.__designCalls = [];
+    window.__holdCustomerRead = false;
+    window.__failCustomerRead = false;
+    window.__customerReadCount = 0;
+    window.__customerPageOverride = '';
+    window.__syncOriginalCustomers = structuredClone(dashboard.customers);
+    let dashboardRevision = dashboard.revision;
+    const dashboardListeners = new Set();
+    window.__pushDashboard = changes => {
+      Object.assign(dashboard, changes, { revision: ++dashboardRevision });
+      for (const listener of dashboardListeners) listener(structuredClone(dashboard));
+    };
+    window.__pushStaleDashboard = () => {
+      const stale = structuredClone(dashboard);
+      stale.revision = dashboardRevision - 1;
+      stale.customers[0].fullName = 'Eski yanıt';
+      for (const listener of dashboardListeners) listener(stale);
+    };
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: {
@@ -42,7 +59,17 @@ try {
       getSetupData: async () => setup,
       getInstagramConfiguration: async () => ({ providerId: 'instagram_api', enabled: false, accountId: '', username: '',
         expiresAt: '', apiVersion: 'v25.0', hasSecret: false, configured: false }),
-      getDashboardData: async () => dashboard,
+      getDashboardData: async () => structuredClone({ ...dashboard, revision: ++dashboardRevision }),
+      onDashboardDataChanged: listener => { dashboardListeners.add(listener); return () => dashboardListeners.delete(listener); },
+      listCustomers: async ({ search }) => {
+        window.__customerReadCount += 1;
+        if (window.__holdCustomerRead) await new Promise(resolve => { window.__finishCustomerRead = resolve; });
+        if (window.__failCustomerRead) throw new Error('Müşteri okuma fixture hatası.');
+        const items = dashboard.customers.filter(customer => customer.fullName.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')))
+          .map((customer, index) => window.__customerPageOverride && index === 0 ? { ...customer, fullName: window.__customerPageOverride } : customer);
+        return { items, total: dashboard.customers.length, matched: items.length,
+          context: { stays: dashboard.customerRoomStays, reservations: dashboard.reservations, notifications: dashboard.hospitalityNotifications } };
+      },
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
@@ -151,7 +178,109 @@ try {
       openExternal: async () => true
     };
   }, { setup: { ...createSetupFixture(), setupRequired: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
-  await page.goto(baseUrl);
+  // Hold the initial lazy page module to make even a one-frame fallback observable.
+  let releaseDashboard;
+  const dashboardGate = new Promise(resolve => { releaseDashboard = resolve; });
+  let dashboardRequested = false;
+  await page.route('**/pages/DashboardPage.tsx', async route => {
+    dashboardRequested = true;
+    await dashboardGate;
+    await route.continue();
+  });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => dashboardRequested).toBe(true);
+  await expect(page.locator('.content')).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Sayfa açılıyor' })).toHaveCount(0);
+  releaseDashboard();
+  await expect(page.getByRole('heading', { name: 'Bugün ne var?', level: 1, exact: true })).toBeVisible();
+
+  // Page reads keep their busy guard and render neither loading text nor false empty states.
+  await page.evaluate(() => { window.__holdCustomerRead = true; });
+  await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
+  const customers = page.getByRole('region', { name: 'Müşteri yönetimi', exact: true });
+  const customerList = customers.locator('[aria-busy]');
+  const search = customers.getByRole('textbox', { name: 'Ara', exact: true });
+  await expect(customerList).toHaveAttribute('aria-busy', 'true');
+  await expect(customers.getByText(/yükleniyor|Müşteri bulunamadı/i)).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => typeof window.__finishCustomerRead)).toBe('function');
+  await page.evaluate(() => { window.__finishCustomerRead(); window.__finishCustomerRead = null; });
+  await expect(customerList).toHaveAttribute('aria-busy', 'false');
+  const firstCustomer = await customers.locator('.customer-record-row__open').first().textContent();
+  await search.fill('fixture-no-matching-customer');
+  await expect(customerList).toHaveAttribute('aria-busy', 'true');
+  await expect(customers.getByRole('button', { name: firstCustomer, exact: true })).toBeVisible();
+  await expect(customers.getByText(/yükleniyor|Müşteri bulunamadı/i)).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => typeof window.__finishCustomerRead)).toBe('function');
+  await page.evaluate(() => { window.__finishCustomerRead(); window.__finishCustomerRead = null; });
+  await expect(customerList).toHaveAttribute('aria-busy', 'false');
+  await expect(customers.getByText('Müşteri bulunamadı.', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.__failCustomerRead = true; });
+  await search.fill(firstCustomer);
+  await expect(customerList).toHaveAttribute('aria-busy', 'true');
+  await expect(customers.getByText(/yükleniyor|Müşteri bulunamadı/i)).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => typeof window.__finishCustomerRead)).toBe('function');
+  await page.evaluate(() => { window.__finishCustomerRead(); window.__finishCustomerRead = null; });
+  await expect(customers.getByRole('alert')).toHaveText('Müşteri okuma fixture hatası.');
+  await expect(customers.getByText('Müşteri bulunamadı.', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => { window.__holdCustomerRead = false; window.__failCustomerRead = false; });
+  await search.fill('');
+  await expect(customerList).toHaveAttribute('aria-busy', 'false');
+  await expect(customers.getByRole('alert')).toHaveCount(0);
+  console.log('desktop-loading-cleanup-ok: delayed lazy page, initial read, retained rows, confirmed empty result and read failure');
+  // Background invalidation reads must not replace focused DOM, reset scroll or toggle loading.
+  await search.focus();
+  await search.evaluate(element => { window.__focusedSearch = element; });
+  await customerList.evaluate(element => {
+    element.style.flex = 'none'; element.style.height = '40px'; element.style.overflow = 'auto';
+    element.scrollTop = 20; window.__customerScrollTop = element.scrollTop;
+    window.__customerBusyStarts = 0;
+    new MutationObserver(records => {
+      for (const record of records) if (record.oldValue === 'false') window.__customerBusyStarts += 1;
+    }).observe(element, { attributes: true, attributeFilter: ['aria-busy'], attributeOldValue: true });
+  });
+  const readsBeforeSync = await page.evaluate(() => window.__customerReadCount);
+  await page.evaluate(() => window.__pushDashboard({}));
+  await page.waitForTimeout(300); // Includes the customer's 150ms read debounce.
+  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
+  await page.getByRole('button', { name: /^Eşitleme durumu:/ }).click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
+  await search.focus();
+  await page.evaluate(() => window.__pushDashboard({ backupPath: '/fixture-unrelated-backup' }));
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 2);
+  expect(await page.evaluate(() => window.__customerBusyStarts)).toBe(0);
+  expect(await search.evaluate(element => document.activeElement === element && window.__focusedSearch === element)).toBe(true);
+  expect(await customerList.evaluate(element => element.scrollTop === window.__customerScrollTop)).toBe(true);
+  await page.evaluate(() => window.__pushDashboard({ customers: window.__syncOriginalCustomers.map((customer, index) =>
+    index === 0 ? { ...customer, fullName: 'Sync güncel müşteri' } : customer) }));
+  await expect(customers.getByRole('button', { name: 'Sync güncel müşteri', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 3);
+  await page.evaluate(() => window.__pushStaleDashboard());
+  await page.waitForTimeout(300);
+  await expect(customers.getByRole('button', { name: 'Sync güncel müşteri', exact: true })).toBeVisible();
+  await expect(customers.getByText('Eski yanıt', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 4);
+  await page.evaluate(() => window.__pushDashboard({ customers: window.__syncOriginalCustomers }));
+  await expect(customers.getByRole('button', { name: firstCustomer, exact: true })).toBeVisible();
+  await page.evaluate(() => { window.__customerPageOverride = 'Sayfalı müşteri güncellendi'; window.__pushDashboard({}); });
+  await expect(customers.getByRole('button', { name: 'Sayfalı müşteri güncellendi', exact: true })).toBeVisible();
+  await page.evaluate(() => { window.__customerPageOverride = ''; window.__pushDashboard({}); });
+  await expect(customers.getByRole('button', { name: firstCustomer, exact: true })).toBeVisible();
+  await customerList.evaluate(element => element.removeAttribute('style'));
+  expect(await page.evaluate(async () => {
+    const { createDesktopDashboardProjector } = await import('/src/app/capability-projection.ts');
+    const source = await window.yardimciDesktop.getDashboardData();
+    const snapshot = JSON.stringify(source);
+    const enabled = (await window.yardimciDesktop.getBusinessCapabilitySnapshot()).enabledCapabilities;
+    const project = createDesktopDashboardProjector();
+    const first = project(source, enabled);
+    const same = project(structuredClone({ ...source, revision: source.revision + 1 }), enabled);
+    const stable = first.customers === same.customers && first.rooms === same.rooms && same.revision > first.revision;
+    const denied = project(source, []);
+    return { stable, denied: denied.customers.length === 0 && denied.rooms.length === 0, intact: JSON.stringify(source) === snapshot };
+  })).toEqual({ stable: true, denied: true, intact: true });
+  console.log('desktop-sync-stability-ok: automatic/manual sync, unrelated changes, focus, scroll, real updates and stale-reply fence');
   const observations = [];
   const screens = [['Ana Ekran','Bugün ne var?'],['Müşteri İşleri','Müşteri İşleri'],['Takvim','Takvim'],['Pansiyon','Pansiyon'],['Restoran','Restoran'],['Menü','Menü'],['Kasa','Kasa'],['Satış','Satış'],['Ayarlar','Ayarlar']];
   for (const [width, height] of [[1440,1000],[1280,720],[1366,768],[1024,768],[900,768]]) {

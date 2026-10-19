@@ -1,0 +1,37 @@
+plugins {
+  id "com.android.application" version "9.4.1"
+}
+def productVersion = new groovy.json.JsonSlurper().parse(file("../../product-version.json"))
+android {
+  namespace = "com.yardimciasistan.dealer"
+  compileSdk = 37
+  defaultConfig {
+    applicationId = "com.yardimciasistan.dealer"
+    minSdk = 26
+    targetSdk = 36
+    versionCode = productVersion.androidVersionCode.toInteger()
+    versionName = productVersion.version
+  }
+  buildTypes {
+    debug { versionNameSuffix = "-pilot" }
+    release { minifyEnabled = false }
+  }
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+  }
+}
+androidComponents {
+  onVariants(selector().all()) { variant ->
+    variant.outputs.each { output -> output.outputFileName.set("yardimci-asistan-bayi-${variant.name}.apk") }
+  }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+  doFirst { throw new GradleException("Pilot debug APK kullanın. Dağıtım imzası ayrıca yapılandırılmalıdır.") }
+}
+dependencies {
+  implementation "androidx.activity:activity:1.13.0"
+  implementation "androidx.core:core:1.19.1"
+  testImplementation "junit:junit:4.13.2"
+  testImplementation "org.json:json:20240303"
+}

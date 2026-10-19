@@ -1,4 +1,7 @@
-/* Two canonical detail editors share pane and section presentation only. */
+/* Canonical create/detail cards share pane and section presentation only. */
+.detail-workspace-frame.workspace-frame--centered {
+  width: min(78rem, calc(100vw / var(--ui-scale) - var(--space-6)));
+}
 .detail-workspace-frame .workspace-frame__body--panes {
   padding: var(--space-3);
 }
@@ -81,6 +84,7 @@
     overflow: visible;
     scrollbar-gutter: auto;
   }
+  .detail-workspace-layout__content { order: -1; }
   .detail-section-card .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

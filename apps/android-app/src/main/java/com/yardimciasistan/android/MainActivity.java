@@ -1243,6 +1243,20 @@ public final class MainActivity extends ComponentActivity {
     ), message);
   }
 
+  private void updateSyncStatus() {
+    shell.updateSyncStatus(loading, hasConnectionSettings(), headerMetaText());
+    if (navigation.settingsOpen() && settingsWorkspace != null) {
+      settingsWorkspace.updateSyncStatus(data, connectionState, loading);
+    }
+  }
+
+  private void renderSyncUpdate() {
+    String webDraft = navigation.settingsOpen() ? settingsWorkspace.webModuleDraft() : null;
+    String secretDraft = navigation.settingsOpen() ? settingsWorkspace.syncSecretDraft() : null;
+    render();
+    if (navigation.settingsOpen()) settingsWorkspace.restoreDrafts(webDraft, secretDraft);
+  }
+
   private void syncOperations(boolean readSettingsInputs) {
     if (loading) {
       return;
@@ -1270,10 +1284,9 @@ public final class MainActivity extends ComponentActivity {
       public void onStarted(String nextConnectionState) {
         voiceSyncTicket = voiceController.syncStarted();
         loading = true;
-        operationsSyncFailed = false;
         connectionState = nextConnectionState;
         clearError();
-        if (companionViewVisible()) render();
+        updateSyncStatus();
       }
 
       @Override
@@ -1286,6 +1299,7 @@ public final class MainActivity extends ComponentActivity {
           }
         }
 
+        boolean recovered = operationsSyncFailed;
         data = result.data;
         voiceController.synced(voiceSyncTicket);
         loading = false;
@@ -1303,8 +1317,10 @@ public final class MainActivity extends ComponentActivity {
             );
           }
         }
-        if (result.shouldRender || companionViewVisible()) {
-          render();
+        if (result.shouldRender || (recovered && companionViewVisible())) {
+          renderSyncUpdate();
+        } else {
+          updateSyncStatus();
         }
       }
 
@@ -1325,6 +1341,7 @@ public final class MainActivity extends ComponentActivity {
           boolean retryingOnlyMarketActions,
           String retriedMarketActionType
       ) {
+        boolean firstFailure = !operationsSyncFailed;
         loading = false;
         operationsSyncFailed = true;
         voiceController.syncFailed();
@@ -1338,7 +1355,8 @@ public final class MainActivity extends ComponentActivity {
           render();
         } else {
           showError(message);
-          if (companionViewVisible()) render();
+          if (firstFailure && companionViewVisible()) render();
+          else updateSyncStatus();
         }
       }
     });

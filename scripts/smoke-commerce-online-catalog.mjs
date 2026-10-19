@@ -59,7 +59,7 @@ try {
   }).ok, true);
   raw = new DatabaseSync(database.databasePath);
   raw.exec("PRAGMA foreign_keys = ON");
-  const input = { name: "Catalog product", description: "Public description", salePrice: 25, purchasePrice: 9, dealerPriceA: 15, dealerPriceB: 12,
+  const input = { name: "Catalog product", brand: "Teknikel Marka", description: "Public description", salePrice: 25, purchasePrice: 9, dealerPriceA: 15, dealerPriceB: 12,
     unit: "piece", currency: "TRY", taxRate: 20, trackInventory: false, isActive: true, barcode: "8690000000115", sku: "PUBLIC-SKU" };
   const product = saveRuntimeCatalogProduct(database.databasePath, input);
   const inactive = saveRuntimeCatalogProduct(database.databasePath, { ...input, name: "Inactive product", barcode: "", sku: "", isActive: false });
@@ -99,7 +99,8 @@ try {
   const catalog = database.createCommerceOnlineCatalog();
   assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
-  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
+  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "brand", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
+  assert.equal(catalog.products[0].brand, "Teknikel Marka");
   assert.equal(catalog.products[0].price, 25, "resolved retail price, never dealer/cost");
   assert.equal(catalog.products[0].name, "Public title");
   assert.equal(catalog.products[0].description, "Public override");
@@ -119,6 +120,7 @@ try {
   assert.equal(published.enabled, true);
   assert.deepEqual(published.delivery_methods, ["pickup"]);
   assert.equal(published.products.length, 1);
+  assert.equal(published.products[0].brand, "Teknikel Marka");
   assert.equal(published.products[0].price, 25);
   assert.equal(published.products[0].product_id, product.id);
   const request = calls.find((call) => call.action === "publish_online_catalog");

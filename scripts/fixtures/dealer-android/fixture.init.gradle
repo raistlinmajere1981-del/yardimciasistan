@@ -1,0 +1,10 @@
+// Disposable native behavioral fixture; customer/Companion APKs and data are untouched.
+beforeProject { project ->
+  project.layout.buildDirectory.set(new File(System.getProperty('yardimci.dealerFixtureBuild')))
+  project.afterEvaluate {
+    project.android.defaultConfig.applicationId = 'com.yardimciasistan.dealer.fixture'
+    def fixture = new File(project.rootDir, '../../scripts/fixtures/dealer-android')
+    project.android.sourceSets.debug.java.srcDir(fixture)
+    project.android.sourceSets.debug.manifest.srcFile(new File(fixture, 'AndroidManifest.xml'))
+  }
+}

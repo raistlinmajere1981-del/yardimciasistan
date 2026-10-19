@@ -28,7 +28,6 @@ import { DesktopWorkspaceRouter } from "./DesktopWorkspaceRouter";
 
 interface DesktopAppViewProps {
   activePage: DesktopPage;
-  pageTransitionPending: boolean;
   requestPageChange: RequestPageChange;
   customerWorkTab: CustomerWorkTab;
   setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
@@ -50,7 +49,6 @@ interface DesktopAppViewProps {
 
 export function DesktopAppView({
   activePage,
-  pageTransitionPending,
   requestPageChange,
   customerWorkTab,
   setCustomerWorkTab,
@@ -110,7 +108,6 @@ export function DesktopAppView({
       uiPreferences={uiPreferences}
       onUiPreferencesChange={setUiPreferences}
       activePage={activePage}
-      pageTransitionPending={pageTransitionPending}
       requestPageChange={requestPageChange}
       setCustomerWorkTab={setCustomerWorkTab}
       surfaceData={surfaceData}

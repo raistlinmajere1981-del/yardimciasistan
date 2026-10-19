@@ -1,29 +1,18 @@
+import { DataTransferLauncher } from "../data-transfer/DataTransferOverlay";
 import { SearchSelect } from "../ui/SearchSelect";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { GripVertical, Plus, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  BUSINESS_CAPABILITIES,
   type CatalogCategory,
   type CatalogProduct,
   type ProductLookupCandidate
 } from "@yardimci-asistan/shared";
-import {
-  emptyProductForm,
-  productFormToSaveInput,
-  validateProductFormPrices,
-  type ProductFormState
-} from "../../app/product-model";
-import { runtimeHasCapability } from "../../app/capabilities";
-import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { ActionButton } from "../ui/ActionButton";
 import { DataListButton } from "../ui/DataList";
-import { FormDialog } from "../ui/FormDialog";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
-import { useRequestGeneration } from "../workspace/use-request-generation";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
-import { ProductFormFields } from "./ProductFormFields";
 import { useRecordReorder } from "../ui/use-record-reorder";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -70,29 +59,15 @@ export function MarketProductsWorkspace({
   products,
   categories,
   busy,
-  productDataEnabled = false,
   onReload,
-  onProductSaved,
   onStateChange,
   productLookupRequest = null,
   onProductLookupLoaded
 }: MarketProductsWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const navigation = useWorkspaceNavigation();
-  const { snapshot } = useBusinessCapabilityRuntime();
-  const inventoryEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.INVENTORY);
-  const onlineSalesEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.ONLINE_SALES);
-  const [onlineSalesPublished, setOnlineSalesPublished] = useState(onlineSalesEnabled);
-  const wholesaleEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.WHOLESALE);
   const [search, setSearch] = usePageViewState("market.products.search", "");
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [productForm, setProductForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
-  const [imageDraftMode, setImageDraftMode] = useState<"keep" | "manual" | "clear" | "external">("keep");
-  const [manualImageDataUrl, setManualImageDataUrl] = useState("");
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "error">("idle");
-  const [saveMessage, setSaveMessage] = useState("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
-  const beginCreateRequest = useRequestGeneration();
   const [listMode, setListMode] = usePageViewState<"products" | "quickAccess">("market.products.listMode", "products");
   const [mutationBusy, setMutationBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ kind: "products" | "categories"; id: string; name: string } | null>(null);
@@ -122,23 +97,15 @@ export function MarketProductsWorkspace({
 
   useEffect(() => {
     if (!productLookupRequest) return;
-    setProductForm(emptyProductForm(inventoryEnabled));
-    setImageDraftMode("keep");
-    setManualImageDataUrl("");
-    setSaveState("idle");
-    setSaveMessage("Bulunan ürün bilgilerini kontrol edip kaydedin.");
-    setOnlineSalesPublished(onlineSalesEnabled);
-    setCreateOpen(true);
-  }, [inventoryEnabled, onlineSalesEnabled, productLookupRequest]);
+    if (navigation.openWorkspace({
+      entityType: "product", entityId: `new-product-${productLookupRequest.requestId}`, mode: "create",
+      lookupSeed: productLookupRequest, returnContext: { page: "market", view: "products" }
+    })) onProductLookupLoaded?.(productLookupRequest.requestId);
+  }, [navigation, onProductLookupLoaded, productLookupRequest]);
 
   function openCreate() {
-    setProductForm(emptyProductForm(inventoryEnabled));
-    setImageDraftMode("keep");
-    setManualImageDataUrl("");
-    setSaveState("idle");
-    setSaveMessage("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
-    setOnlineSalesPublished(onlineSalesEnabled);
-    setCreateOpen(true);
+    navigation.openWorkspace({ entityType: "product", entityId: "new-product", mode: "create",
+      returnContext: { page: "market", view: "products" } });
   }
 
   function openProduct(product: CatalogProduct) {
@@ -192,54 +159,6 @@ export function MarketProductsWorkspace({
     }
   }
 
-  async function createProduct() {
-    if (!bridge || busy || saveState === "loading") return;
-    const priceError = validateProductFormPrices(productForm);
-    if (priceError) {
-      setSaveState("error");
-      setSaveMessage(priceError);
-      return;
-    }
-    const isCurrent = beginCreateRequest();
-    setSaveState("loading");
-    setSaveMessage("");
-    let saved: CatalogProduct;
-    try {
-      const productInput = productFormToSaveInput(productForm);
-      const { id: productId, ...productRest } = productInput;
-      saved = await bridge.saveProduct({
-        ...productRest,
-        ...(productId === undefined ? {} : { id: productId }),
-        ...(onlineSalesEnabled ? { onlineSalesPublished } : {}),
-        ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
-        ...(imageDraftMode === "clear" ? { clearImage: true } : {})
-      });
-      if (!isCurrent()) return;
-    } catch (error) {
-      if (!isCurrent()) return;
-      const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
-      setSaveState("error");
-      setSaveMessage("");
-      onStateChange("error", message);
-      return;
-    }
-
-    if (!isCurrent()) return;
-    onProductSaved(saved);
-    let catalogReloadFailed = false;
-    try {
-      await onReload();
-    } catch {
-      catalogReloadFailed = true;
-    }
-    if (!isCurrent()) return;
-    const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
-    onStateChange("success", message);
-    setImageDraftMode("keep");
-    setManualImageDataUrl("");
-    setCreateOpen(false);
-  }
-
   const pageScroll = usePageViewScroll(`market.products.scroll`, filteredProducts.length);
   return (
     <>
@@ -247,9 +166,9 @@ export function MarketProductsWorkspace({
         <section className="market-panel">
           <header className="market-panel-heading market-panel-heading-row">
             <div><span>Katalog</span><h2>Ürünler</h2><p>Ürün kartları satış ve stok tarafından ortak kullanılır.</p></div>
-            <ActionButton size="sm" type="button" onClick={openCreate}>
+            <div className="data-transfer-launch-actions"><ActionButton size="sm" type="button" onClick={openCreate}>
               <Plus size={16} aria-hidden="true" /> Ürün Ekle
-            </ActionButton>
+            </ActionButton><DataTransferLauncher entity="products" search={search} quickAccessOnly={listMode === "quickAccess"} onChanged={onReload} /></div>
           </header>
           <label className="market-search-field">
             <Search size={16} aria-hidden="true" />
@@ -272,7 +191,7 @@ export function MarketProductsWorkspace({
                 </div>
               </article>
             ))}
-            {filteredProducts.length === 0 && <p className="market-muted">Eşleşen ürün yok.</p>}
+            {!busy && filteredProducts.length === 0 && <p className="market-muted">Eşleşen ürün yok.</p>}
           </div>
         </section>
 
@@ -315,50 +234,7 @@ export function MarketProductsWorkspace({
         else if (bridge) void mutate(() => bridge.deleteProduct(record.id), "Ürün kaldırıldı.");
       }} />}
 
-      {createOpen && <FormDialog
-        title="Yeni ürün ekle"
-        onClose={() => { if (saveState !== "loading") setCreateOpen(false); }}
-        closeBlocked={saveState === "loading"}
-        dismissOnBackdrop
-        onSubmit={(event) => { event.preventDefault(); void createProduct(); }}
-        footer={<>
-          <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
-          <div className="action-row">
-            <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setCreateOpen(false)}>Vazgeç</ActionButton>
-            <ActionButton type="submit" disabled={busy || saveState === "loading" || !productForm.name.trim()}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}</ActionButton>
-          </div>
-        </>}
-      >
-        <div className="form-stack market-product-create-form">
-          <ProductFormFields
-            form={productForm}
-            categories={categories}
-            inventoryEnabled={inventoryEnabled}
-            productDataEnabled={productDataEnabled}
-            wholesaleEnabled={wholesaleEnabled}
-            statusFields={onlineSalesEnabled ? <label className="form-check"><input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"} onChange={event => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla</label> : null}
-            disabled={busy || saveState === "loading"}
-            mode="all"
-            localImageDataUrl={imageDraftMode === "manual" ? manualImageDataUrl : ""}
-            lookupSeed={productLookupRequest}
-            {...(onProductLookupLoaded === undefined ? {} : { onLookupSeedLoaded: onProductLookupLoaded })}
-            onManualImageSelected={(dataUrl) => {
-              setManualImageDataUrl(dataUrl);
-              setImageDraftMode("manual");
-            }}
-            onImageClear={() => {
-              setManualImageDataUrl("");
-              setImageDraftMode("clear");
-            }}
-            onExternalImageSelected={() => {
-              setManualImageDataUrl("");
-              setImageDraftMode("external");
-            }}
-            onChange={setProductForm}
-            onStateChange={onStateChange}
-          />
-        </div>
-      </FormDialog>}
+
     </>
   );
 }

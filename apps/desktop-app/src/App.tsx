@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
-import { projectDesktopDashboardData } from "./app/capability-projection";
+import { createDesktopDashboardProjector } from "./app/capability-projection";
 import { buildDesktopNotifications } from "./app/notifications";
 import type { DesktopPage, CustomerWorkTab } from "./app/navigation";
 import type { PageLeaveGuard } from "./app/page-navigation-guard";
@@ -20,7 +20,7 @@ import { writeRendererDiagnostic } from "./app/diagnostics-client";
 
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
-  const [pageTransitionPending, startPageTransition] = useTransition();
+  const [, startPageTransition] = useTransition();
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("customers");
@@ -98,12 +98,13 @@ function App() {
     dashboardData: desktopSyncController.dashboardData,
     setDashboardData: desktopSyncController.setDashboardData
   });
+  const [projectDashboard] = useState(createDesktopDashboardProjector);
   const surfaceData = useMemo(
-    () => projectDesktopDashboardData(
+    () => projectDashboard(
       desktopSyncController.dashboardData,
       desktopSyncController.businessCapabilities?.enabledCapabilities ?? []
     ),
-    [desktopSyncController.dashboardData, desktopSyncController.businessCapabilities]
+    [desktopSyncController.dashboardData, desktopSyncController.businessCapabilities, projectDashboard]
   );
   const messagingController = useMessagingController({
     surfaceData,
@@ -153,7 +154,6 @@ function App() {
       {messagingController.confirmDialog}
       <DesktopAppView
         activePage={activePage}
-        pageTransitionPending={pageTransitionPending}
         requestPageChange={requestPageChange}
         customerWorkTab={customerWorkTab}
         setCustomerWorkTab={setCustomerWorkTab}

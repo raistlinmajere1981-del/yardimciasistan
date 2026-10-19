@@ -41,6 +41,6 @@ export function MarketingDeliveryWorkspace({id, channels, onClose, onReload, onP
       {detail.errorCounts.length > 0 && <section aria-label="Gönderim sorunları"><h3>Gönderim sorunları</h3>{detail.errorCounts.map(e => <p key={e.category}>{deliveryIssues[e.category] || "Gönderim tamamlanamadı"}: {e.count}</p>)}</section>}
       <ActionButton variant="quiet" onClick={() => setAnalytics(!analytics)}>{analytics ? "Gönderim bilgilerine dön" : "Teslim ve okunma sonuçları"}</ActionButton>
       {analytics && <MarketingEntityAnalytics kind="campaign" id={id} revision={c.updatedAt}/>}
-    </section> : <p>Gönderim yükleniyor…</p>}
+    </section> : null}
   </WorkspaceFrame>;
 }

@@ -42,7 +42,6 @@ interface DesktopAppFrameProps {
   uiPreferences: UiPreferences;
   onUiPreferencesChange: (preferences: UiPreferences) => void;
   activePage: DesktopPage;
-  pageTransitionPending: boolean;
   requestPageChange: RequestPageChange;
   setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   surfaceData: DesktopDashboardData;
@@ -80,7 +79,6 @@ function DesktopAppFrameContent({
   uiPreferences,
   onUiPreferencesChange,
   activePage,
-  pageTransitionPending,
   requestPageChange,
   setCustomerWorkTab,
   surfaceData,
@@ -236,12 +234,6 @@ function DesktopAppFrameContent({
           ) : undefined}
           action={(
             <div className="page-header-tools">
-              {pageTransitionPending && (
-                <span className="page-transition-indicator" role="status">
-                  <span className="page-transition-indicator__dots" aria-hidden="true"><i /><i /><i /></span>
-                  Açılıyor
-                </span>
-              )}
               <HeaderUpdateStatus controller={updates} />
               <AppearanceSettingsSection preferences={uiPreferences} onPreferencesChange={onUiPreferencesChange} />
               <SyncStatusIndicator

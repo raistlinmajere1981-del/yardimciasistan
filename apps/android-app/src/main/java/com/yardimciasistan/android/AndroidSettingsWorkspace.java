@@ -192,6 +192,12 @@ final class AndroidSettingsWorkspace {
     }
   }
 
+  void updateSyncStatus(OperationData data, String state, boolean loading) {
+    if (connectionPanel != null) {
+      connectionPanel.updateSyncStatus(data, state, loading, listener.localPendingActionCount());
+    }
+  }
+
   private void appendNotificationPreferences(
       LinearLayout page,
       OperationData data,

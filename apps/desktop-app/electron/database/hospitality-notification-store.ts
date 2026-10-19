@@ -4,7 +4,7 @@ import type {
   DesktopKbsOverview
 } from "../database-types.js";
 
-export function getHospitalityNotifications(db: DatabaseSync): DesktopHospitalityNotification[] {
+export function getHospitalityNotifications(db: DatabaseSync, customerIds?: string[]): DesktopHospitalityNotification[] {
   return (db.prepare(`
     SELECT
       n.id,
@@ -36,12 +36,13 @@ export function getHospitalityNotifications(db: DatabaseSync): DesktopHospitalit
     JOIN customers c ON c.id = g.customer_id
     JOIN customer_room_stays s ON s.id = n.stay_id
     JOIN rooms r ON r.id = n.room_id
+    ${customerIds ? `WHERE g.customer_id IN (${customerIds.map(()=>"?").join(",") || "NULL"})` : ""}
     ORDER BY
       CASE n.status WHEN 'submission_unknown' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END,
       n.occurred_at DESC,
       n.created_at DESC
     LIMIT 500
-  `).all() as Array<Record<string, unknown>>).map((row) => ({
+  `).all(...(customerIds ?? [])) as Array<Record<string, unknown>>).map((row) => ({
     id: String(row.id ?? ""),
     guestId: String(row.guest_id ?? ""),
     stayId: String(row.stay_id ?? ""),

@@ -29,6 +29,19 @@ Masaüstü SQLite ◄── cursor/outbox ─┘
 - QR menü sayfası görünürken 15 saniyede bir ETag ile kontrol edilir. Sayfa yeniden
   görünür olduğunda veya pencere odaklandığında hemen kontrol edilir.
 
+Arka plan eşitlemesi aktif sayfayı yeniden açmaz. Masaüstünde aynı içerikli snapshot
+alanları referanslarını korur. Sayfalı müşteri listesinin canonical invalidation
+okuması arka planda devam eder; mevcut liste ve kontroller yükleme durumuna
+döndürülmez, aynı sonuç tekrar state'e yazılmaz. Revision sıralama koruması sürer.
+Android'de değişmeyen snapshot ekran gövdesini yeniden oluşturmaz; bağlantı düğmesi
+ve son eşitleme bilgisi kabukta güncellenir. Sunucu revision'ı veya okuma zamanları
+ilerlediğinde tam yanıtta da mevcut redakte cache içeriği karşılaştırılır;
+kalıcı cache/revision kaydı ve kaynak sıralama kontrolleri atlanmaz. `not_modified`
+yanıtındaki işlem sonucu, bekleyen işlem sayısı veya ses kullanılabilirliği
+değişirse ilgili görünüm yenilenir. Android bağlantı ayarlarının durum satırları
+yerinde güncellenir; gerçek veri değişimi nedeniyle ekran yeniden oluşturulursa
+açık bağlantı taslağı mevcut ayarlar sahibi üzerinden korunur.
+
 Otomatik eşitleme ilk kurulumda açıktır. `Ayarlar → Gelişmiş Ayarlar → Web Bağlantısı`
 alanından kapatılabilir. `Şimdi Eşitle` düğmesi, ayar kapalı olsa bile tek çevrim çalıştırır.
 

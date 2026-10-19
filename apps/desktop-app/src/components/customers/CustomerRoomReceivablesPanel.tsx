@@ -35,12 +35,12 @@ export function CustomerRoomReceivablesPanel({ customerId }: { customerId: strin
 
   if (!loading && folios.length === 0) return null;
 
-  return <section className="panel customer-operation-card customer-room-receivables form-stack" aria-label="Konaklama alacakları">
+  return <section className="panel customer-operation-card customer-room-receivables form-stack" aria-label="Konaklama alacakları" aria-busy={loading}>
     <div className="customer-operation-card__heading">
       <div><h3>Konaklama alacakları</h3><small>Çıkış sonrası açık kalan oda hesapları</small></div>
       {folios.length > 0 && <strong>{currencies.size === 1 ? minorMoney(total, folios[0]?.currency ?? "TRY") : `${folios.length} hesap`}</strong>}
     </div>
-    {loading ? <p className="loading-state" role="status">Alacaklar yükleniyor…</p>
+    {loading ? null
       : folios.length === 0 ? <p className="customer-operation-empty">Açık konaklama borcu yok.</p>
       : <div className="customer-room-receivable-list">
         {folios.map(folio => <article className="customer-room-receivable" key={folio.id}>

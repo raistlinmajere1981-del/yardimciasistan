@@ -287,7 +287,7 @@ export function ReportsPage({
         <FinanceWorkspace controller={financeController} topPanel={financeAiPanel} />
       )}
 
-      {reportsEnabled && (!financeEnabled || activeView === "reports") && <div ref={scroll} className="reports-detail-view">
+      {reportsEnabled && (!financeEnabled || activeView === "reports") && <div ref={scroll} className="reports-detail-view" aria-busy={loading}>
 
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
@@ -295,7 +295,6 @@ export function ReportsPage({
             <p className="panel-eyebrow">Rapor dönemi</p>
             <h2>{formatPeriodLabel(range.startDate, range.endDate)}</h2>
           </div>
-          {loading && <span className="report-loading loading-state" role="status">Rapor hazırlanıyor…</span>}
         </div>
         <div className="report-control-row">
           <div className="report-period-controls">

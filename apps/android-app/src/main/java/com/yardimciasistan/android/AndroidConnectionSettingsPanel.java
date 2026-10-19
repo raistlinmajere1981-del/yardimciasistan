@@ -6,6 +6,7 @@ import android.text.InputType;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
@@ -27,6 +28,10 @@ final class AndroidConnectionSettingsPanel {
 
   private EditText webModuleInput;
   private EditText syncSecretInput;
+  private Button refreshButton;
+  private TextView connectionStateValue;
+  private TextView lastSyncValue;
+  private TextView pendingActionValue;
 
   AndroidConnectionSettingsPanel(
       ComponentActivity activity,
@@ -108,17 +113,17 @@ final class AndroidConnectionSettingsPanel {
       syncSecretInput.setLayoutParams(secretParams);
       connection.addView(syncSecretInput);
 
-      Button refresh = UiKit.button(
+      refreshButton = UiKit.button(
           activity,
           loading ? "Bağlanıyor..." : "Canlı Veriyi Çek",
           UiKit.PRIMARY,
           view -> listener.onSyncRequested()
       );
-      refresh.setEnabled(!loading);
-      refresh.setLayoutParams(
+      refreshButton.setEnabled(!loading);
+      refreshButton.setLayoutParams(
           new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 48))
       );
-      connection.addView(refresh);
+      connection.addView(refreshButton);
       page.addView(connection);
     } else {
       LinearLayout readOnly = UiKit.card(activity);
@@ -169,7 +174,8 @@ final class AndroidConnectionSettingsPanel {
     state.addView(settingLine(
         "Bağlantı durumu",
         connectionState,
-        connectionTone(connectionState)
+        connectionTone(connectionState),
+        value -> connectionStateValue = value
     ));
     state.addView(UiKit.divider(activity));
 
@@ -198,7 +204,8 @@ final class AndroidConnectionSettingsPanel {
     state.addView(settingLine(
         "Son senkron",
         data.pulledAt.isEmpty() ? "Henüz yok" : shortTimestamp(data.pulledAt),
-        UiKit.INFO
+        UiKit.INFO,
+        value -> lastSyncValue = value
     ));
     state.addView(UiKit.divider(activity));
 
@@ -206,7 +213,8 @@ final class AndroidConnectionSettingsPanel {
     state.addView(settingLine(
         "Bekleyen işlem",
         String.valueOf(visiblePendingActions),
-        visiblePendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS
+        visiblePendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS,
+        value -> pendingActionValue = value
     ));
     page.addView(state);
 
@@ -254,10 +262,32 @@ final class AndroidConnectionSettingsPanel {
     input.setSelection(draft.length());
   }
 
+  void updateSyncStatus(OperationData current, String state, boolean busy, int localPendingCount) {
+    if (refreshButton != null) {
+      refreshButton.setEnabled(!busy);
+      refreshButton.setText(busy ? "Bağlanıyor..." : "Canlı Veriyi Çek");
+    }
+    if (connectionStateValue != null) {
+      connectionStateValue.setText(state);
+      connectionStateValue.setTextColor(connectionTone(state));
+    }
+    if (lastSyncValue != null) lastSyncValue.setText(current.pulledAt.isEmpty() ? "Henüz yok" : shortTimestamp(current.pulledAt));
+    if (pendingActionValue != null) {
+      int pending = current.pendingActions + localPendingCount;
+      pendingActionValue.setText(String.valueOf(pending));
+      pendingActionValue.setTextColor(pending > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+    }
+  }
+
+  private android.view.View settingLine(String label, String value, int tone) {
+    return settingLine(label, value, tone, ignored -> {});
+  }
+
   private android.view.View settingLine(
       String label,
       String value,
-      int tone
+      int tone,
+      java.util.function.Consumer<TextView> captureValue
   ) {
     LinearLayout row = UiKit.row(activity);
     android.widget.TextView title = UiKit.text(
@@ -280,6 +310,7 @@ final class AndroidConnectionSettingsPanel {
     detail.setGravity(android.view.Gravity.END);
     detail.setMaxWidth(UiKit.dp(activity, 190));
     row.addView(detail);
+    captureValue.accept(detail);
     return row;
   }
 

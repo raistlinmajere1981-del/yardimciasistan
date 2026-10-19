@@ -374,9 +374,7 @@ export function BusinessPublicProfileSection({
     <section ref={sectionRef} id="settings-public-details" tabIndex={-1} className="business-public-profile-section" aria-busy={loading || saving}>
       <fieldset className="settings-resource-fields" disabled={loading || saving || disabled}>
       {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
-      {loading ? (
-        <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
-      ) : (
+      {!loading && (
         <div className="business-public-profile-body">
           <div className="business-public-profile-map-point">
             <SegmentedControl<BusinessMapDisplayMode> ariaLabel="Harita yöntemi" value={draft.mapDisplayMode}

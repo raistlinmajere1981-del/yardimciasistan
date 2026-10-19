@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { randomUUID } from "node:crypto";
-import { app, nativeImage } from "electron";
+import { randomUUID, createHash } from "node:crypto";
+import { app } from "electron";
+import { decodeProductImageBytes } from "./product-image-codec";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import {
   normalizeBarcodeIdentity,
@@ -267,7 +268,7 @@ function normalizeProductImageBytes(bytes: Buffer): Buffer {
   if (bytes.length === 0 || bytes.length > IMAGE_MAX_BYTES) {
     throw new Error("Ürün görseli boş veya izin verilen boyuttan büyük.");
   }
-  const decoded = nativeImage.createFromBuffer(bytes);
+  const decoded = decodeProductImageBytes(bytes);
   if (decoded.isEmpty()) {
     throw new Error("Ürün görseli çözümlenemedi.");
   }
@@ -324,6 +325,20 @@ function writeProductImageAsset(databasePath: string, productId: string, encoded
   return relativePath;
 }
 
+/** Preserve original transfer bytes beside the primary normalized display asset. Metadata
+ * commits with CatalogProduct; existing originals are immutable and never overwritten. */
+export function prepareOriginalProductImageAssets(databasePath: string, productId: string, originals: Array<{bytes: Uint8Array; format: string}>) {
+  return originals.map(({bytes,format}) => {
+    const extension = format === "image/png" ? "png" : format === "image/webp" ? "webp" : "jpg";
+    normalizedManualProductImage(`data:${format};base64,${Buffer.from(bytes).toString("base64")}`);
+    const fileName = `original_${randomUUID()}.${extension}`;
+    const absolutePath = resolveProductAssetAbsolutePath(path.dirname(databasePath),productId,fileName);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive:true });
+    fs.writeFileSync(absolutePath,bytes,{flag:"wx",mode:0o600});
+    return {assetPath:resolveProductAssetRelativePath(productId,fileName),hash:createHash("sha256").update(bytes).digest("hex"),format};
+  });
+}
+
 /** Image acquisition is optional, as in the existing save contract. A failed prepare
  * keeps the current asset; product validation/commit still owns success or failure. */
 export async function prepareProductImageForSave(databasePath: string, input: SaveCatalogProductInput): Promise<CatalogProductImageMutation | undefined> {
@@ -364,13 +379,17 @@ export function cleanupOrphanProductImages(databasePath: string): void {
   const db = openDatabase(databasePath);
   try {
     db.exec("BEGIN IMMEDIATE");
-    const referenced = new Set(db.prepare("SELECT image_asset_path FROM catalog_products WHERE image_asset_path <> ''").all()
-      .map(row => String(row.image_asset_path)));
+    const referenced = new Set<string>();
+    for (const row of db.prepare("SELECT image_asset_path, image_original_assets_json FROM catalog_products").all()) {
+      if (row.image_asset_path) referenced.add(String(row.image_asset_path));
+      const originals = JSON.parse(String(row.image_original_assets_json)) as Array<{assetPath:string}>;
+      for (const item of originals) referenced.add(item.assetPath);
+    }
     const root = path.join(path.dirname(databasePath), "assets", "products");
     if (fs.existsSync(root)) for (const directory of fs.readdirSync(root, { withFileTypes: true })) {
       if (!directory.isDirectory() || !/^[A-Za-z0-9_-]{1,64}$/.test(directory.name)) continue;
       for (const file of fs.readdirSync(path.join(root, directory.name), { withFileTypes: true })) {
-        if (!file.isFile() || !/^image_[0-9a-f-]{36}\.jpg(?:\.tmp)?$/.test(file.name)) continue;
+        if (!file.isFile() || !/^(?:image_[0-9a-f-]{36}\.jpg|original_[0-9a-f-]{36}\.(?:jpg|png|webp))(?:\.tmp)?$/.test(file.name)) continue;
         const relative = `assets/products/${directory.name}/${file.name}`;
         if (!referenced.has(relative)) fs.unlinkSync(path.join(root, directory.name, file.name));
       }

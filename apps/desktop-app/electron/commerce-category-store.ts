@@ -154,69 +154,65 @@ export function getCatalogCategory(databasePath: string, categoryIdInput: string
   }
 }
 
-export function saveCatalogCategory(
-  databasePath: string,
-  input: SaveCatalogCategoryInput
-): CatalogCategory {
+export function saveCatalogCategoryInTransaction(database: DatabaseSync, input: SaveCatalogCategoryInput): CatalogCategory {
+  const businessId = activeBusinessId(database);
+  const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
+  if (!name) throw new Error("Kategori adı gerekli.");
+  if (name.length > 160) throw new Error("Kategori adı en fazla 160 karakter olabilir.");
+
+  const id = String(input.id ?? "").trim() || createId("cat_");
+  const parentId = String(input.parentId ?? "").trim();
+  const code = String(input.code ?? "").trim().slice(0, 80);
+  const isActive = input.isActive !== false;
+  const now = new Date().toISOString();
+
+    const existing = getCategoryRow(database, businessId, id);
+    if (input.id && !existing) throw new Error("Düzenlenecek kategori bulunamadı.");
+    const sortOrder = input.sortOrder === undefined
+      ? Number(existing?.sort_order ?? (database.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM catalog_categories WHERE business_id = ? AND deleted_at = ''").get(businessId) as { value: number }).value)
+      : normalizeSortOrder(input.sortOrder);
+    assertValidParentChain(database, businessId, id, parentId);
+
+    database.prepare(`
+      INSERT INTO catalog_categories (
+        id, business_id, parent_id, name, code, sort_order,
+        is_active, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ON CONFLICT(id) DO UPDATE SET
+        parent_id = excluded.parent_id,
+        name = excluded.name,
+        code = excluded.code,
+        sort_order = excluded.sort_order,
+        is_active = excluded.is_active,
+        updated_at = excluded.updated_at,
+        deleted_at = ''
+    `).run(
+      id,
+      businessId,
+      parentId,
+      name,
+      code,
+      sortOrder,
+      isActive ? 1 : 0,
+      String(existing?.created_at ?? now),
+      now
+    );
+
+  const saved = getCategoryRow(database, businessId, id);
+  if (!saved) throw new Error("Kategori kaydedildi ancak yeniden okunamadı.");
+  return mapCategory(saved);
+}
+
+export function saveCatalogCategory(databasePath: string, input: SaveCatalogCategoryInput): CatalogCategory {
   const database = openDatabase(databasePath);
   try {
-    const businessId = activeBusinessId(database);
-    const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
-    if (!name) throw new Error("Kategori adı gerekli.");
-    if (name.length > 160) throw new Error("Kategori adı en fazla 160 karakter olabilir.");
-
-    const id = String(input.id ?? "").trim() || createId("cat_");
-    const parentId = String(input.parentId ?? "").trim();
-    const code = String(input.code ?? "").trim().slice(0, 80);
-    const isActive = input.isActive !== false;
-    const now = new Date().toISOString();
-
     database.exec("BEGIN IMMEDIATE");
     try {
-      const existing = getCategoryRow(database, businessId, id);
-      if (input.id && !existing) throw new Error("Düzenlenecek kategori bulunamadı.");
-      const sortOrder = input.sortOrder === undefined
-        ? Number(existing?.sort_order ?? (database.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM catalog_categories WHERE business_id = ? AND deleted_at = ''").get(businessId) as { value: number }).value)
-        : normalizeSortOrder(input.sortOrder);
-      assertValidParentChain(database, businessId, id, parentId);
-
-      database.prepare(`
-        INSERT INTO catalog_categories (
-          id, business_id, parent_id, name, code, sort_order,
-          is_active, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
-        ON CONFLICT(id) DO UPDATE SET
-          parent_id = excluded.parent_id,
-          name = excluded.name,
-          code = excluded.code,
-          sort_order = excluded.sort_order,
-          is_active = excluded.is_active,
-          updated_at = excluded.updated_at,
-          deleted_at = ''
-      `).run(
-        id,
-        businessId,
-        parentId,
-        name,
-        code,
-        sortOrder,
-        isActive ? 1 : 0,
-        String(existing?.created_at ?? now),
-        now
-      );
-
+      const result = saveCatalogCategoryInTransaction(database, input);
       database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-
-    const saved = getCategoryRow(database, businessId, id);
-    if (!saved) throw new Error("Kategori kaydedildi ancak yeniden okunamadı.");
-    return mapCategory(saved);
-  } finally {
-    database.close();
-  }
+      return result;
+    } catch (error) { database.exec("ROLLBACK"); throw error; }
+  } finally { database.close(); }
 }
 
 export function deleteCatalogCategory(

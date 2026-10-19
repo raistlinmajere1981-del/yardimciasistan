@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation android:name="com.yardimciasistan.dealer.DealerDeviceFixture"
+        android:targetPackage="com.yardimciasistan.dealer.fixture" android:functionalTest="true" />
+</manifest>

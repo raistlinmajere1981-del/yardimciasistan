@@ -71,6 +71,7 @@ export interface CatalogProductImageMutation {
   assetPath: string;
   sourceUrl: string;
   license: string;
+  originalAssets?: Array<{ assetPath: string; hash: string; format: string }>;
 }
 
 export interface ApplyInventoryMovementInput {
@@ -610,7 +611,12 @@ export function saveCatalogProductInTransaction(
       String(existing?.created_at ?? now), now
     );
 
-    if (input.quickAccessEnabled !== undefined) {
+    if (image || input.clearImage) {
+      database.prepare("UPDATE catalog_products SET image_original_assets_json=? WHERE id=? AND business_id=?")
+        .run(JSON.stringify(input.clearImage ? [] : image?.originalAssets ?? []), id, businessId);
+    }
+
+  if (input.quickAccessEnabled !== undefined) {
       const nextOrder = Number((database.prepare("SELECT COALESCE(MAX(quick_access_order), -1) + 1 AS value FROM catalog_products WHERE business_id = ? AND quick_access_enabled = 1 AND deleted_at = ''").get(businessId) as { value: number }).value);
       database.prepare("UPDATE catalog_products SET quick_access_enabled = ?, quick_access_order = CASE WHEN quick_access_enabled = 0 AND ? = 1 THEN ? ELSE quick_access_order END WHERE id = ?")
         .run(input.quickAccessEnabled ? 1 : 0, input.quickAccessEnabled ? 1 : 0, nextOrder, id);

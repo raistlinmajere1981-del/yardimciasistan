@@ -19,14 +19,15 @@ const gradleVersion = "9.8.1";
 const gradleSha256 = "dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f";
 const distributionUrl = `https://services.gradle.org/distributions/gradle-${gradleVersion}-bin.zip`;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const appDir = join(repoRoot, "apps", "android-app");
+const dealerBuild = process.argv.includes("--dealer");
+const appDir = join(repoRoot, "apps", dealerBuild ? "dealer-android-app" : "android-app");
 const gradleUserHome = process.env.GRADLE_USER_HOME || join(homedir(), ".gradle");
 const wrapperCache = join(gradleUserHome, "yardimci-asistan-wrapper");
 const archivePath = join(wrapperCache, "downloads", `gradle-${gradleVersion}-bin.zip`);
 const installRoot = join(wrapperCache, "distributions", `gradle-${gradleVersion}`);
 const gradleHome = join(installRoot, `gradle-${gradleVersion}`);
 const gradleExecutable = join(gradleHome, "bin", process.platform === "win32" ? "gradle.bat" : "gradle");
-const gradleArguments = process.argv.slice(2);
+const gradleArguments = process.argv.slice(2).filter(argument => argument !== "--dealer");
 const buildEnvironment = { ...process.env };
 
 if (!buildEnvironment.ANDROID_HOME && !buildEnvironment.ANDROID_SDK_ROOT) {

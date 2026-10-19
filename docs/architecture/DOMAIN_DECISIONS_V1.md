@@ -748,6 +748,27 @@ D-031's explicit Shipment operation remains available after import. D-032 is unc
 without a buyer contact snapshot phone the first Aras adapter cannot register a shipment;
 no live Customer phone fallback is introduced by C2.
 
+The independent native Dealer Android client reuses this exact cookie/session, private
+catalog and order ingress contract. Category name/brand annotate the same canonical
+product projection. Optional `order_history` in the same private v3 publication contains
+only per-access `web-dealer` order snapshots (source reference, canonical status/amount,
+item identity/name/quantity) and fixed terminal rejection outcomes. It is a read projection,
+never a parallel order writer/database. Canonical order/item/rejection and category changes
+invalidate the existing `dealer_access` durable outbox. Hosting `orders.php` filters by
+current session access and unions retained own ingress facts as `awaiting_desktop`; this
+is a transport state, not a Commerce Order status. No automatic financial/stock effect exists.
+
+Hosting's order response adds a server-computed `quoted_total` from the authorized private
+catalog; Desktop still resolves the final canonical amount using current prices. The
+session-scoped POST `receipt.php` reads an existing receipt by the same per-access key,
+allowing Android to recover a lost response after session renewal without resubmission.
+It does not change submission fingerprint/revision checks. Android stores private device
+cache/drafts and immutable pending submission in an atomic Keystore-encrypted file, with
+no publication credentials. Offline data is labelled with last fetch time, 401 locks cached
+surfaces, and switching account/server clears the previous private cache. Unsent drafts
+remain encrypted and account/server-scoped for restoration only by the same identity. See
+[Dealer Android](../../apps/dealer-android-app/README.md) for build and device validation.
+
 Hosting fingerprints normalized dealer identity (including access revision), sorted items,
 delivery and note with its existing private keyed receipt secret. Receipt keys are scoped
 to dealer access, separate from guests. Same key + same semantic intent replays its

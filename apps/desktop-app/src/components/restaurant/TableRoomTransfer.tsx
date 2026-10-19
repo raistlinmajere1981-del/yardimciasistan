@@ -18,7 +18,7 @@ export function TableRoomTransfer({ order, busy, onTransfer, revision, customerI
 }) {
   const [data, setData] = useState<DesktopRoomFolioData | null>(null);
   const [folioId, setFolioId] = useState("");
-  const [message, setMessage] = useState("Oda hesapları yükleniyor...");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const begin = useRequestGeneration();
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -70,7 +70,7 @@ export function TableRoomTransfer({ order, busy, onTransfer, revision, customerI
     if (approved) onTransfer(selected.id);
   }
 
-  return <div className="table-relation-block table-room-transfer" aria-label="Odaya yazdırma">
+  return <div className="table-relation-block table-room-transfer" aria-label="Odaya yazdırma" aria-busy={loading}>
     <span className="table-relation-label">Oda hesabı</span>
     {folios.length > 1 && <SearchSelect
       ariaLabel="Oda hesabı"
@@ -91,7 +91,7 @@ export function TableRoomTransfer({ order, busy, onTransfer, revision, customerI
         <strong>{selected.roomNumber ? `Oda ${selected.roomNumber}` : selected.roomName}</strong>
         <small>{selected.customerName || "Misafir"} · açık hesap</small>
       </div> : <span className="table-relation-empty">
-        {message || (data && folios.length === 0 ? "Uygun açık oda hesabı yok." : "Oda hesabı seçin.")}
+        {!loading && (message || (data && folios.length === 0 ? "Uygun açık oda hesabı yok." : "Oda hesabı seçin."))}
       </span>}
       <ActionButton size="sm" onClick={() => void requestTransfer()} disabled={busy || loading || !selected}>Odaya Aktar</ActionButton>
     </div>

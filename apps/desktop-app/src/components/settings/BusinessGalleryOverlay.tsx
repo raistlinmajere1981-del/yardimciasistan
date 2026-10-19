@@ -87,8 +87,8 @@ export function BusinessGalleryOverlay({ onClose }: { onClose: () => void }) {
             <ImagePlus size={16} aria-hidden="true"/> Fotoğraf Ekle
           </ActionButton>
         </div>
-        <div className="settings-gallery-content">
-        {loading ? <p role="status">Galeri yükleniyor…</p> : ordered.length === 0 ?
+        <div className="settings-gallery-content" aria-busy={loading}>
+        {loading ? null : ordered.length === 0 ?
           <div className="settings-gallery-empty">Henüz fotoğraf yok.</div> :
           <div className="settings-gallery-grid" aria-label="Galeri fotoğrafları">
             {visible.map((item,pageIndex) => {

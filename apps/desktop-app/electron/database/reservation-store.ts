@@ -13,7 +13,7 @@ import {
   normalizeTimeInput
 } from "./request-utils.js";
 
-export function getReservations(db: DatabaseSync, scope: "recent" | "active" = "recent"): DesktopReservation[] {
+export function getReservations(db: DatabaseSync, scope: "recent" | "active" = "recent", customerIds?: string[]): DesktopReservation[] {
   const rows = db
     .prepare(`
         SELECT
@@ -40,11 +40,12 @@ export function getReservations(db: DatabaseSync, scope: "recent" | "active" = "
         FROM reservations
         LEFT JOIN customers ON customers.id = reservations.customer_id AND customers.deleted_at = ''
         WHERE reservations.deleted_at = ''
+        ${customerIds ? `AND reservations.customer_id IN (${customerIds.map(()=>"?").join(",") || "NULL"})` : ""}
         ${scope === "active" ? "AND reservations.status IN ('pending', 'approved')" : ""}
         ORDER BY reservations.start_date ASC, reservations.time ASC, reservations.created_at DESC
         ${scope === "recent" ? "LIMIT 80" : ""}
       `)
-    .all() as Array<Record<string, unknown>>;
+    .all(...(customerIds ?? [])) as Array<Record<string, unknown>>;
 
   return rows.map((row) => mapReservationRow(row));
 }

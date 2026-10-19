@@ -29,7 +29,6 @@
 @import "./components/navigation.css" layer(components.primitives);
 @import "./components/nexa.css" layer(components.primitives);
 @import "./components/header.css" layer(components.primitives);
-@import "./components/page-transition.css" layer(components.primitives);
 @import "./components/notifications.css" layer(components.primitives);
 @import "./components/appearance.css" layer(components.primitives);
 @import "./components/toolbars.css" layer(components.primitives);
@@ -73,3 +72,5 @@
 @import "../components/settings/business-location-map-picker.css" layer(pages);
 @import "./pages/menu-preview.css" layer(pages);
 @import "./pages/marketing.css" layer(pages);
+
+@import "./pages/data-transfer.css" layer(pages);

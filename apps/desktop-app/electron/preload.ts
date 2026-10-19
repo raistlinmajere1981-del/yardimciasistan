@@ -326,6 +326,9 @@ export interface DesktopBridge extends TranslationBridge, MarketingShareBridge, 
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
   getDealerWebAccess: (customerId: string) => Promise<import("@yardimci-asistan/shared").DealerWebAccess | null>;
   changeDealerWebAccess: (customerId: string, action: import("@yardimci-asistan/shared").DealerAccessAction) => Promise<import("@yardimci-asistan/shared").DealerAccessResult>;
+  listCustomers: (query: import("./database/customer-store").CustomerListQuery) => Promise<ReturnType<import("./database").DesktopDatabase["listCustomers"]>>;
+  getCustomer: (id: string) => Promise<import("./database-types").DesktopCustomer | null>;
+  dataTransfer: import("./data-transfer-contract").DataTransferBridge;
   saveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   prepareBirthdayWhatsApp: (customerId: string) => Promise<DesktopBirthdayPrepareResult>;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
@@ -676,6 +679,24 @@ const bridge: DesktopBridge = {
   getDealerWebAccess: (customerId) => invokeWhenUnlocked("dealer:access:get", customerId),
   changeDealerWebAccess: (customerId, action) => invokeWhenUnlocked("dealer:access:change", customerId, action),
   deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
+  dataTransfer: {
+    pick: (entity) => invokeWhenUnlocked("dataTransfer:pick", entity),
+    upload: (entity,name,bytes) => invokeWhenUnlocked("dataTransfer:upload", entity,name,bytes),
+    preview: (token,mapping,preferences) => invokeWhenUnlocked("dataTransfer:preview", token,mapping,preferences),
+    apply: (token,revision) => invokeWhenUnlocked("dataTransfer:apply", token,revision),
+    rows: (token,status,offset) => invokeWhenUnlocked("dataTransfer:rows", token,status,offset),
+    summary: (input) => invokeWhenUnlocked("dataTransfer:summary", input),
+    export: (input) => invokeWhenUnlocked("dataTransfer:export", input),
+    report: (token) => invokeWhenUnlocked("dataTransfer:report", token),
+    release: (token) => invokeWhenUnlocked("dataTransfer:release", token),
+    onProgress: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: import("./data-transfer-contract").TransferProgress) => { void ipcRenderer.invoke("appLock:getStatus").then((status: AppLockStatus) => { if (!status.locked) listener(progress); }).catch(() => {}); };
+      ipcRenderer.on("dataTransfer:progress", handler);
+      return () => { ipcRenderer.removeListener("dataTransfer:progress", handler); };
+    }
+  },
+  listCustomers: (query) => invokeWhenUnlocked("customer:list", query),
+  getCustomer: (id) => invokeWhenUnlocked("customer:get", id),
   saveCustomer: (input: SaveCustomerInput) => ipcRenderer.invoke("customer:save", input),
   prepareBirthdayWhatsApp: (customerId: string) => ipcRenderer.invoke("birthday:prepareWhatsApp", customerId),
   assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),

@@ -331,9 +331,6 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
-.customer-workspace-frame.workspace-frame--centered {
-  width: min(78rem, calc(100vw / var(--ui-scale) - var(--space-6)));
-}
 .customer-workspace-profile {
   display: grid;
   min-width: 0;
@@ -389,18 +386,18 @@
   width: 100%;
 }
 @container (max-width: 64rem) {
-  .customer-workspace-main {
-    display: flex;
-    flex-direction: column;
-    overflow: auto;
-  }
-  .customer-workspace-main > :is(.detail-workspace-layout__rail, .detail-workspace-layout__content) {
-    flex: none;
-    overflow: visible;
-    scrollbar-gutter: auto;
-  }
-  .customer-workspace-main > .detail-workspace-layout__content { order: -1; }
   .customer-workspace-profile .customer-birth-field { grid-column: 1 / -1; }
+}
+.customer-identity-details {
+  min-width: 0;
+}
+.customer-identity-details > summary {
+  cursor: pointer;
+  padding: var(--space-2);
+  font-weight: var(--weight-semibold);
+}
+.customer-identity-details[open] > summary {
+  margin-bottom: var(--space-2);
 }
 .customer-history-view {
   min-height: 0;

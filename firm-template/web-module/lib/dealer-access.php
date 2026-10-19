@@ -46,10 +46,15 @@ function ya_dealer_projection(array $input): array
         if (($catalog['delivery_methods'] ?? null) === []) throw new InvalidArgumentException('invalid_delivery_methods');
         $safe = ya_online_catalog_projection(['enabled' => true, 'delivery_methods' => $catalog['delivery_methods'] ?? null, 'products' => $catalog['products'] ?? null]);
         $catalogIds[$id] = true;
+        $rawProducts = array_column($catalog['products'], null, 'product_id');
         $catalogs[] = ['access_id' => $id, 'access_revision' => $owner['access_revision'], 'catalog_revision' => $catalog['catalog_revision'],
-            'delivery_methods' => $safe['delivery_methods'], 'products' => $safe['products']];
+            'delivery_methods' => $safe['delivery_methods'], 'products' => array_map(static function (array $product) use ($rawProducts): array {
+                $raw = $rawProducts[$product['product_id']];
+                foreach (['brand', 'category_name'] as $field) $product[$field] = mb_substr(is_string($raw[$field] ?? null) ? $raw[$field] : '', 0, 180);
+                return $product;
+            }, $safe['products'])];
     }
-    return ['version' => 1, 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs];
+    return ['version' => 1, 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs, 'order_history' => ya_dealer_history_projection($input['order_history'] ?? [], $owners)];
 }
 
 /** Called inside the existing versioned publication transaction, only for an accepted new revision. */
@@ -177,4 +182,39 @@ function ya_dealer_require_post(): void
         || in_array($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '', ['cross-site', 'same-site'], true)) {
         ya_dealer_response(403, ['ok' => false, 'message' => YA_DEALER_ERROR]);
     }
+}
+
+/** Private allowlist for a read projection; this never writes canonical order state. */
+function ya_dealer_history_projection(mixed $histories, array $owners): array
+{
+    if (!is_array($histories) || !array_is_list($histories)) throw new InvalidArgumentException('dealer_history_invalid');
+    $result = []; $seen = [];
+    foreach ($histories as $history) {
+        $id = $history['access_id'] ?? null;
+        if (!is_string($id) || !isset($owners[$id]) || !$owners[$id]['enabled'] || isset($seen[$id])
+            || !is_array($history['orders'] ?? null) || !array_is_list($history['orders'])) throw new InvalidArgumentException('dealer_history_invalid');
+        $seen[$id] = true; $orders = []; $orderIds = [];
+        foreach ($history['orders'] as $order) {
+            $orderId = $order['order_id'] ?? null; $total = $order['total'] ?? null;
+            if (!is_string($orderId) || strlen($orderId) > 180 || $orderId === '' || isset($orderIds[$orderId])
+                || !in_array($order['status'] ?? null, ['placed', 'confirmed', 'fulfilled', 'cancelled', 'rejected'], true)
+                || ($total !== null && ((!is_int($total) && !is_float($total)) || !is_finite((float)$total) || $total < 0))
+                || !is_string($order['currency'] ?? null) || preg_match('/^(?:[A-Z]{3})?$/D', $order['currency']) !== 1
+                || !is_array($order['items'] ?? null) || !array_is_list($order['items'])) throw new InvalidArgumentException('dealer_history_invalid');
+            foreach (['created_at', 'updated_at'] as $field) if (!is_string($order[$field] ?? null) || strlen($order[$field]) > 64 || strtotime($order[$field]) === false) throw new InvalidArgumentException('dealer_history_invalid');
+            $items = [];
+            foreach ($order['items'] as $item) {
+                if (!is_string($item['product_id'] ?? null) || strlen($item['product_id']) > 180
+                    || !is_string($item['name'] ?? null) || mb_strlen($item['name']) > 180
+                    || (!is_int($item['quantity'] ?? null) && !is_float($item['quantity'] ?? null))
+                    || !is_finite((float)$item['quantity']) || $item['quantity'] <= 0) throw new InvalidArgumentException('dealer_history_invalid');
+                $items[] = ['product_id' => $item['product_id'], 'name' => $item['name'], 'quantity' => $item['quantity']];
+            }
+            $orderIds[$orderId] = true;
+            $orders[] = ['order_id' => $orderId, 'status' => $order['status'], 'created_at' => $order['created_at'],
+                'updated_at' => $order['updated_at'], 'total' => $total, 'currency' => $order['currency'], 'items' => $items];
+        }
+        $result[] = ['access_id' => $id, 'orders' => $orders];
+    }
+    return $result;
 }

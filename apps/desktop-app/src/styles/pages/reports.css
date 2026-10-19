@@ -166,8 +166,7 @@
 }
 
 .report-section-title > span,
-.report-subheading span,
-.report-loading {
+.report-subheading span {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }

@@ -43,7 +43,8 @@ function ya_online_catalog_projection(array $candidate): array
                 || preg_match('/^[\d.:\[\]]+$/', $image['host'] ?? '') === 1
                 || preg_match('/\.(local|localhost|internal|test)$/', $image['host'] ?? '') === 1) $imageUrl = '';
             $products[$id] = [
-                'product_id' => $id, 'category_id' => mb_substr(is_string($raw['category_id'] ?? null) ? $raw['category_id'] : '', 0, 180), 'name' => $name,
+                'product_id' => $id, 'category_id' => mb_substr(is_string($raw['category_id'] ?? null) ? $raw['category_id'] : '', 0, 180),
+                'brand' => mb_substr(is_string($raw['brand'] ?? null) ? $raw['brand'] : '', 0, 160), 'name' => $name,
                 'description' => mb_substr(is_string($raw['description'] ?? null) ? $raw['description'] : '', 0, 2000),
                 'sku' => mb_substr(is_string($raw['sku'] ?? null) ? $raw['sku'] : '', 0, 80),
                 'unit' => $unit, 'price' => $price, 'currency' => $currency, 'tax_rate' => $taxRate,

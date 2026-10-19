@@ -1,3 +1,8 @@
+import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
+import { readEnabledBusinessCapabilities } from "../business-capability-store";
+import { getCustomerRoomStays } from "./customer-room-stay-store";
+import { getReservations } from "./reservation-store";
+import { getHospitalityNotifications } from "./hospitality-notification-store";
 import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import {
@@ -17,7 +22,55 @@ import {
 } from "./customer-utils.js";
 import { normalizeBoolean } from "./request-utils.js";
 
-export function getCustomers(db: DatabaseSync): DesktopCustomer[] {
+export interface CustomerListQuery {
+  search?: string;
+  filter?: "all" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
+  limit?: number;
+  offset?: number;
+  id?: string;
+}
+
+function customerPredicate(db: DatabaseSync, query: CustomerListQuery) {
+  db.function("customer_search_text", { deterministic: true }, (value) => String(value ?? "").toLocaleLowerCase("tr-TR"));
+  const conditions = ["customers.deleted_at = ''", "customers.business_id = (SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at LIMIT 1)"];
+  const args: string[] = [];
+  if (query.id) { conditions.push("customers.id = ?"); args.push(query.id); }
+  if (query.search?.trim()) {
+    conditions.push(`(instr(customer_search_text(customers.full_name || ' ' || customers.phone || ' ' || customers.email || ' ' || customers.identity_number || ' ' || customers.tags_json || ' ' || COALESCE(commercial.company_name,'') || ' ' || COALESCE(commercial.tax_number,'') || ' ' || COALESCE(commercial.tax_office,'') || ' ' || COALESCE(commercial.authorized_person,'')), ?) > 0
+      OR EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id JOIN rooms r ON r.id=cs.room_id WHERE sg.customer_id=customers.id AND cs.deleted_at='' AND instr(customer_search_text(r.name || ' ' || r.number), ?) > 0))`);
+    args.push(query.search.trim().toLocaleLowerCase("tr-TR"), query.search.trim().toLocaleLowerCase("tr-TR"));
+  }
+  if (query.filter === "dealers") conditions.push("commercial.customer_id IS NOT NULL");
+  if (query.filter === "staying") conditions.push("EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id WHERE sg.customer_id=customers.id AND sg.status='checked_in' AND cs.status='checked_in' AND cs.deleted_at='')");
+  if (query.filter === "reserved") conditions.push("(EXISTS (SELECT 1 FROM reservations r WHERE r.customer_id=customers.id AND r.deleted_at='' AND r.status IN ('pending','approved')) OR EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id WHERE sg.customer_id=customers.id AND sg.status='planned' AND cs.deleted_at=''))");
+  if (query.filter === "kbs_pending" || query.filter === "kbs_failed") {
+    conditions.push(`EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id WHERE sg.customer_id=customers.id AND sg.status='checked_in' AND cs.status='checked_in' AND cs.deleted_at='' AND ${query.filter === "kbs_failed" ? "EXISTS" : "NOT EXISTS"} (SELECT 1 FROM hospitality_notifications n WHERE n.guest_id=sg.id AND n.kind='arrival' AND n.status ${query.filter === "kbs_failed" ? "= 'failed'" : "IN ('sent','failed')"}))`);
+  }
+  return { where: conditions.join(" AND "), args };
+}
+
+export function listCustomersPage(db: DatabaseSync, query: CustomerListQuery = {}) {
+  const predicate = customerPredicate(db, query);
+  const total = Number(db.prepare("SELECT COUNT(*) n FROM customers WHERE deleted_at='' AND business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1)").get()!.n);
+  const matched = Number(db.prepare(`SELECT COUNT(*) n FROM customers LEFT JOIN customer_commercial_profiles commercial ON commercial.customer_id=customers.id WHERE ${predicate.where}`).get(...predicate.args)!.n);
+  const items=getCustomers(db,query), ids=items.map(customer=>customer.id), caps=new Set(readEnabledBusinessCapabilities(db));
+  const hasDealers=Boolean(db.prepare(`SELECT 1 FROM customers c JOIN customer_commercial_profiles p ON p.customer_id=c.id AND p.business_id=c.business_id
+    WHERE c.deleted_at='' AND c.business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1) LIMIT 1`).get());
+  return { items, total, matched, hasDealers, context: {
+    stays:caps.has(C.ACCOMMODATION_STAYS)?getCustomerRoomStays(db,"active",ids):[],
+    reservations:caps.has(C.ACCOMMODATION_RESERVATIONS)||caps.has(C.FOOD_RESERVATIONS)?getReservations(db,"active",ids):[],
+    notifications:caps.has(C.ACCOMMODATION_STAYS)?getHospitalityNotifications(db,ids):[]
+  }};
+}
+
+export function getCustomer(db: DatabaseSync, id: string): DesktopCustomer | null {
+  return getCustomers(db, { id, limit: 1 })[0] ?? null;
+}
+
+export function getCustomers(db: DatabaseSync, query?: CustomerListQuery): DesktopCustomer[] {
+  const predicate = query ? customerPredicate(db, query) : { where: "customers.deleted_at = ''", args: [] };
+  const limit = query ? Math.max(1, Math.min(200, Math.trunc(Number(query.limit) || 50))) : 500;
+  const offset = Math.max(0, Math.trunc(Number(query?.offset) || 0));
   const rows = db
     .prepare(`
         SELECT
@@ -64,14 +117,14 @@ export function getCustomers(db: DatabaseSync): DesktopCustomer[] {
         LEFT JOIN reservations ON reservations.customer_id = customers.id AND reservations.deleted_at = ''
         LEFT JOIN stay_guests ON stay_guests.customer_id = customers.id
         LEFT JOIN customer_room_stays ON customer_room_stays.id = stay_guests.stay_id AND customer_room_stays.deleted_at = ''
-        WHERE customers.deleted_at = ''
+        WHERE ${predicate.where}
         GROUP BY customers.id
         ORDER BY
           COALESCE(NULLIF(customers.last_contact_at, ''), customers.updated_at) DESC,
-          customers.full_name ASC
-        LIMIT 500
+          customers.full_name ASC, customers.id ASC
+        LIMIT ? OFFSET ?
       `)
-    .all() as Array<Record<string, unknown>>;
+    .all(...predicate.args, limit, offset) as Array<Record<string, unknown>>;
 
   return rows.map((row) => mapCustomerRow(row));
 }

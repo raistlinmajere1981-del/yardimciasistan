@@ -194,8 +194,7 @@ final class AndroidShellController {
   ) {
     if (refreshButton == null || settingsButton == null || bottomNavigation == null) return;
     refreshButton.setVisibility(inactiveDevice ? View.GONE : View.VISIBLE);
-    refreshButton.setEnabled(!loading && hasConnectionSettings);
-    refreshButton.setContentDescription(loading ? "Yenileniyor" : "Yenile");
+    updateSyncStatus(loading, hasConnectionSettings, null);
     settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
     styleHeaderAction(settingsButton, settingsOpen);
     bottomNavigation.setVisibility(
@@ -204,6 +203,15 @@ final class AndroidShellController {
         : View.VISIBLE
     );
     renderBottomNavigation(roots, selectedRoot);
+  }
+
+  /** Connection progress updates the shell without replacing the active form/list. */
+  void updateSyncStatus(boolean loading, boolean hasConnectionSettings, String meta) {
+    if (refreshButton != null) {
+      refreshButton.setEnabled(!loading && hasConnectionSettings);
+      refreshButton.setContentDescription(loading ? "Yenileniyor" : "Yenile");
+    }
+    if (meta != null && headerMeta != null) headerMeta.setText(meta);
   }
 
   void showScreen(String title, String meta, View screen, String screenKey) {

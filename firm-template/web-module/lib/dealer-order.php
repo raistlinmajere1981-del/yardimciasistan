@@ -48,13 +48,47 @@ function ya_dealer_order_submit(string $token, array $input): array
         foreach ($semantic['items'] as $item) if (!isset($ids[$item['productId']])) {
             throw new YaOnlineOrderRejection(422, 'product_unavailable', 'Siparişteki ürünlerden biri artık sunulmuyor.');
         }
+        // The private Desktop projection is the only quote source; client money is ignored.
+        $products = array_column($catalog['products'], null, 'product_id'); $total = 0; $currency = null;
+        foreach ($semantic['items'] as $item) {
+            $product = $products[$item['productId']];
+            if ($currency !== null && $currency !== $product['currency']) ya_online_order_invalid();
+            $currency = $product['currency'];
+            $total += round($product['price'] * $item['quantity'], 2);
+        }
         $now = date(DATE_ATOM); $id = 'web_dealer_order_' . bin2hex(random_bytes(16));
         $hint = $input['catalogRevision'] ?? $catalog['catalog_revision'];
         if (!is_string($hint) || preg_match('/^[a-f0-9]{64}$/D', $hint) !== 1) ya_online_order_invalid();
         ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'message' => 'Sipariş talebiniz alındı.'];
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => round($total, 2), 'currency' => $currency, 'message' => 'Sipariş talebiniz alındı.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $fingerprint, $response);
         $db->exec('COMMIT');
         return $response;
     } catch (Throwable $error) { $db->exec('ROLLBACK'); throw $error; }
+}
+
+/** Session-scoped union of canonical read snapshots and retained ingress facts.
+ * awaiting_desktop describes transport only, never an invented canonical order status.
+ */
+function ya_dealer_orders(string $token): array
+{
+    $access = ya_dealer_session_access($token);
+    if (!$access) throw new YaOnlineOrderRejection(401, 'dealer_access_required', 'Bayi erişimi gerekli.');
+    $publication = ya_storage_get_publication('dealer_access_private', []);
+    $orders = [];
+    foreach ($publication['order_history'] ?? [] as $history) if ($history['access_id'] === $access['access_id']) {
+        foreach ($history['orders'] as $order) $orders[$order['order_id']] = $order;
+    }
+    $query = ya_storage_open()->prepare("SELECT payload_json FROM web_orders WHERE json_extract(payload_json, '$.kind') = 'dealer' AND json_extract(payload_json, '$.dealerAccessId') = ? ORDER BY seq DESC");
+    $query->execute([$access['access_id']]);
+    foreach ($query as $row) {
+        $input = json_decode($row['payload_json'], true, 512, JSON_THROW_ON_ERROR);
+        if (isset($orders[$input['id']])) continue;
+        $orders[$input['id']] = ['order_id' => $input['id'], 'status' => 'awaiting_desktop',
+            'created_at' => $input['createdAt'], 'updated_at' => $input['createdAt'], 'total' => null, 'currency' => '',
+            'items' => array_map(static fn(array $item): array => ['product_id' => $item['productId'], 'quantity' => $item['quantity'], 'name' => ''], $input['items'])];
+    }
+    $orders = array_values($orders);
+    usort($orders, static fn(array $a, array $b): int => strcmp($b['created_at'], $a['created_at']) ?: strcmp($b['order_id'], $a['order_id']));
+    return ['orders' => $orders, 'updated_at' => $publication['_publication']['updated_at'] ?? ''];
 }

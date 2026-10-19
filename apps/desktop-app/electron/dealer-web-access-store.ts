@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type DealerAccessAction, type DealerAccessProjection, type DealerAccessResult, type DealerWebAccess } from "@yardimci-asistan/shared";
 import { desktopLog } from "./desktop-logger";
 import { readEnabledBusinessCapabilities } from "./business-capability-store";
+import { createDealerOrderHistory } from "./dealer-order-publication";
 import { createDealerCatalogs } from "./dealer-catalog-publication";
 
 function accessFromRow(row: Record<string, unknown>): DealerWebAccess {
@@ -73,6 +74,6 @@ export function createDealerAccessProjection(db: DatabaseSync): DealerAccessProj
         access_revision: Number(row.access_revision), enabled: eligible, invite_hash: eligible ? String(row.invite_hash) : "",
         invite_expires_at: eligible && row.invite_expires_at ? Math.floor(Date.parse(String(row.invite_expires_at)) / 1000) : 0 };
     }) };
-    return { ...projection, catalogs: createDealerCatalogs(db, projection) };
+    return { ...projection, catalogs: createDealerCatalogs(db, projection), order_history: createDealerOrderHistory(db, projection) };
   } finally { db.exec("RELEASE dealer_access_projection"); }
 }

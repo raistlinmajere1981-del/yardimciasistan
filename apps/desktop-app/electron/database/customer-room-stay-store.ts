@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { DesktopCustomerRoomStay } from "../database-types.js";
 
-export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active" = "recent"): DesktopCustomerRoomStay[] {
+export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active" = "recent", customerIds?: string[]): DesktopCustomerRoomStay[] {
   const rows = db
     .prepare(`
         SELECT
@@ -27,6 +27,7 @@ export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active
         JOIN customers ON customers.id = customer_room_stays.customer_id
         JOIN rooms ON rooms.id = customer_room_stays.room_id
         WHERE customer_room_stays.deleted_at = ''
+        ${customerIds ? `AND EXISTS (SELECT 1 FROM stay_guests sg WHERE sg.stay_id=customer_room_stays.id AND sg.customer_id IN (${customerIds.map(()=>"?").join(",") || "NULL"}))` : ""}
         ${scope === "active" ? "AND customer_room_stays.status IN ('planned', 'checked_in')" : ""}
         ORDER BY
           CASE customer_room_stays.status
@@ -39,11 +40,11 @@ export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active
           customer_room_stays.created_at DESC
         ${scope === "recent" ? "LIMIT 500" : ""}
       `)
-    .all() as Array<Record<string, unknown>>;
+    .all(...(customerIds ?? [])) as Array<Record<string, unknown>>;
 
   const guests = db.prepare(`SELECT g.*, c.full_name,
     (c.identity_type != '' AND (c.identity_number != '' OR c.document_serial_number != '') AND c.birth_date != '' AND c.nationality != '') AS identity_ready
-    FROM stay_guests g JOIN customers c ON c.id = g.customer_id`).all() as Array<Record<string, unknown>>;
+    FROM stay_guests g JOIN customers c ON c.id = g.customer_id ${customerIds ? `WHERE g.stay_id IN (${rows.map(()=>"?").join(",") || "NULL"})` : ""}`).all(...(customerIds ? rows.map(row=>String(row.id)) : [])) as Array<Record<string, unknown>>;
   const pending = db.prepare(`SELECT stay_id, COUNT(*) AS count FROM hospitality_notifications WHERE status != 'sent' GROUP BY stay_id`)
     .all() as Array<{ stay_id: string; count: number }>;
   return rows.map(row => ({ ...mapCustomerRoomStayRow(row),

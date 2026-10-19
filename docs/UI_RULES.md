@@ -141,6 +141,12 @@ Feedback en yakın doğru seviyede gösterilir:
 
 Finans, stok ve satış mutasyonlarında backend onayı gelmeden başarı gösterilmez.
 
+Sayfa ve kayıt okumalarında geçici “yükleniyor/açılıyor” metni, yükleme paneli veya
+iskelet görünümü gösterilmez. Yenilemede mevcut içerik korunur; ilk okumada veri
+gelene kadar ilgili içerik alanı boş kalır. Bekleyen okumalar `aria-busy` ile
+bildirilir; veri gelmeden boş sonuç veya bulunamadı durumu gösterilmez. İşlem
+düğmelerinin busy/kaydetme geri bildirimi, ölçülebilir işlem ilerlemesi ve hatalar korunur.
+
 ## Dashboard ve Calendar
 
 Dashboard hızlı karar projection'ıdır; rapor veya ikinci editör değildir.

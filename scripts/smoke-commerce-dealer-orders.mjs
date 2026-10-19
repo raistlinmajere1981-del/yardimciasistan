@@ -16,7 +16,8 @@ const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js")
 const { PhpHostingSyncTransport } = require("../packages/sync-core/dist/index.js");
 const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
 const { OnlineOrderIngressService } = require("../apps/desktop-app/dist-electron/online-order-ingress-service.js");
-const { saveRuntimeCatalogProduct, listRuntimeOrders } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { updateCommerceOrderStatus } = require("../apps/desktop-app/dist-electron/commerce-order-store.js");
+const { saveRuntimeCatalogProduct, saveRuntimeCatalogCategory, fulfillRuntimeOrder, listRuntimeOrders } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const desktop = createTemporaryDesktopDatabase("ya-c2-desktop-");
 const { database } = desktop;
 const root = mkdtempSync(join(tmpdir(), "ya-c2-web-"));
@@ -51,6 +52,10 @@ async function catalog(cookie = "", query = "") {
   const response = await fetch(`${baseUrl}/api/dealer/catalog.php${query}`, { headers: { Cookie: cookie } });
   return { status: response.status, body: await response.json(), headers: response.headers };
 }
+async function history(cookie = "", query = "") {
+  const response = await fetch(`${baseUrl}/api/dealer/orders.php${query}`, { headers: { Cookie: cookie } });
+  return { status: response.status, body: await response.json(), headers: response.headers };
+}
 async function sync() { const result = await coordinator.runNow(); assert.equal(result.ok, true, result.message); }
 const address = { recipientName: "C2 Teslimat", addressLine1: "Örnek Cadde 10", district: "Cide", city: "Kastamonu", countryCode: "tr", postalCode: "37600" };
 const tokens = [];
@@ -69,7 +74,8 @@ try {
     { mode: "replace", encryptedValue: "safe-storage:v1:fixture-ciphertext" }).ok, true);
   assert.equal(database.getEnabledBusinessCapabilities().includes(C.ONLINE_SALES), false, "dealer portal operates independently of Online Sales");
   raw = new DatabaseSync(database.databasePath);
-  const input = { name: "C2 Bayi Ürünü", sku: "C2-SKU", salePrice: 100, dealerPriceA: 80, dealerPriceB: 60,
+  const category = saveRuntimeCatalogCategory(database.databasePath, { name: "C2 Kategori", isActive: true });
+  const input = { categoryId: category.id, name: "C2 Bayi Ürünü", brand: "C2 Marka", sku: "C2-SKU", salePrice: 100, dealerPriceA: 80, dealerPriceB: 60,
     purchasePrice: 50, currency: "TRY", unit: "piece", taxRate: 20, trackInventory: false, isActive: true };
   const product = saveRuntimeCatalogProduct(database.databasePath, input);
   const fallback = saveRuntimeCatalogProduct(database.databasePath, { ...input, name: "C2 Fallback", sku: "C2-FALLBACK", salePrice: 25, dealerPriceA: null, dealerPriceB: null });
@@ -94,6 +100,8 @@ try {
   for (const sentinel of ["PRIVATE_C2_NOTES", "PRIVATE_C2_TAX", ...dealers.flatMap((dealer, i) => [dealer.customerId, `0555000100${i}`, `private${i}@example.test`]), ...tokens]) assert.equal(serialized.includes(sentinel), false);
   await sync();
   assert.equal((await catalog()).status, 401);
+  assert.equal((await history()).status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/dealer/orders.php`, { method: "POST" })).status, 405);
   assert.equal((await fetch(`${baseUrl}/api/dealer/order.php`)).status, 405);
   assert.equal((await fetch(`${siteUrl}/bayi/`)).status, 200);
   for (const dealer of dealers) {
@@ -111,8 +119,23 @@ try {
   for (const injected of [{ customerId: b.customerId }, { dealerAccessId: b.access.accessId }, { priceGroup: "dealer_b" }, { buyer: { name: "fake" } }]) {
     assert.equal((await post("order", { ...payload, ...injected }, a.cookie)).status, 422);
   }
+  const effects = () => ["commerce_sales", "inventory_movements", "finance_entries"].map(table => raw.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
+  const initialEffects = effects();
   const accepted = await post("order", { ...payload, total: 1, unitPrice: 1, items: [{ ...payload.items[0], unitPrice: 1 }] }, a.cookie);
   assert.equal(accepted.status, 201);
+  assert.deepEqual(effects(), initialEffects, "Android-compatible order acceptance has no sale/payment/stock effect");
+  assert.equal(accepted.body.quoted_total, 160, "server ignores tampered client total");
+  assert.equal(accepted.body.currency, "TRY");
+  assert.equal((await post("receipt", { idempotencyKey: payload.idempotencyKey })).status, 401);
+  assert.equal((await post("receipt", { idempotencyKey: payload.idempotencyKey }, b.cookie)).body.receipt, null);
+  assert.deepEqual((await post("receipt", { idempotencyKey: payload.idempotencyKey }, a.cookie)).body.receipt, accepted.body);
+  assert.equal((await catalog(a.cookie)).body.catalog.products.find(row => row.product_id === product.id).category_name, "C2 Kategori");
+  const waiting = await history(a.cookie, `?dealerAccessId=${b.access.accessId}`);
+  assert.match(waiting.headers.get("cache-control"), /no-store/);
+  assert.equal(waiting.body.orders[0].status, "awaiting_desktop");
+  assert.equal(waiting.body.orders[0].total, null);
+  assert.equal((await history(b.cookie)).body.orders.length, 0);
+  assert.equal((await catalog(a.cookie)).body.catalog.products.find(row => row.product_id === product.id).brand, "C2 Marka");
   assert.deepEqual((await post("order", payload, a.cookie)).body, accepted.body);
   assert.equal((await post("order", { ...payload, note: "Different" }, a.cookie)).status, 409);
   assert.equal((await post("order", { ...payload, delivery: { method: "shipping", address } }, a.cookie)).status, 409);
@@ -137,7 +160,23 @@ try {
   assert.equal(ingress.importOrder(envelope).order.id, canonical.order.id);
   await sync(); assert.equal((await transport.pullWebOrders({ afterSeq: 0 })).orders.length, 0);
   assert.equal((await catalog(a.cookie)).body.catalog.products.find(row => row.product_id === product.id).price, 75);
+  const ownHistory = await history(a.cookie, `?customerId=${b.customerId}`);
+  assert.equal(ownHistory.body.orders.length, 1);
+  assert.equal(ownHistory.body.orders[0].status, "placed");
+  assert.equal(ownHistory.body.orders[0].total, 150, "canonical Desktop amount replaces transport quote");
+  assert.equal(ownHistory.body.orders[0].items[0].quantity, 2);
+  assert.equal(JSON.stringify(ownHistory.body).includes(a.customerId), false);
+  assert.equal((await history(b.cookie)).body.orders.length, 0);
+  updateCommerceOrderStatus(database.databasePath, { orderId: canonical.order.id, status: "confirmed" });
+  assert.ok(database.getPendingSyncJobs().some(job => job.jobType === "dealer_access_publish"));
+  await sync(); assert.equal((await history(a.cookie)).body.orders[0].status, "confirmed");
+  updateCommerceOrderStatus(database.databasePath, { orderId: canonical.order.id, status: "cancelled" });
+  await sync(); assert.equal((await history(a.cookie)).body.orders[0].status, "cancelled");
   // Customer price-group changes invalidate without invalidating its login session.
+  const renamedCategory = saveRuntimeCatalogCategory(database.databasePath, { ...category, name: "C2 Yeni Kategori" });
+  assert.equal(renamedCategory.id, category.id); await sync();
+  assert.equal((await catalog(a.cookie)).body.catalog.products.find(row => row.product_id === product.id).category_name, "C2 Yeni Kategori");
+  assert.deepEqual(effects(), initialEffects, "canonical order import still has no financial/stock effect");
   const jobBefore = raw.prepare("SELECT source_revision FROM sync_outbox_revisions WHERE job_key = 'dealer_access'").get().source_revision;
   raw.prepare("UPDATE customer_commercial_profiles SET price_group = 'dealer_b' WHERE customer_id = ?").run(a.customerId);
   assert.ok(raw.prepare("SELECT source_revision FROM sync_outbox_revisions WHERE job_key = 'dealer_access'").get().source_revision > jobBefore);
@@ -162,8 +201,12 @@ try {
   const shippingOrder = listRuntimeOrders(database.databasePath).find(order => order.sourceReference === shipped.body.order_id);
   assert.equal(shippingOrder.deliverySnapshot.method, "shipping"); assert.equal(shippingOrder.deliverySnapshot.address.countryCode, "TR");
   assert.deepEqual(database.listShipmentsForOrder(shippingOrder.id), []);
+  updateCommerceOrderStatus(database.databasePath, { orderId: shippingOrder.id, status: "confirmed" });
+  fulfillRuntimeOrder(database.databasePath, { orderId: shippingOrder.id, operationKey: "dealer-history-fulfillment-01", settlement: { type: "paid", paymentMethod: "cash" } });
+  await sync();
+  assert.equal((await history(b.cookie)).body.orders.find(order => order.order_id === shipped.body.order_id).status, "fulfilled");
   const shipment = database.createShipmentForOrder(shippingOrder.id); assert.equal(shipment.status, "draft");
-  assert.equal(database.getCommerceOrder(shippingOrder.id).order.status, "placed");
+  assert.equal(database.getCommerceOrder(shippingOrder.id).order.status, "fulfilled");
   // Invalid current access is rechecked inside canonical creation, even after hosting acceptance.
   const blocked = await post("order", { ...payload, idempotencyKey: "dealer-order-revoked-03" }, b.cookie); assert.equal(blocked.status, 201);
   const blockedQueue = await transport.pullWebOrders({ afterSeq: database.getSyncRuntimeStatus().webOrderCursor });
@@ -176,7 +219,17 @@ try {
   assert.ok(listRuntimeOrders(database.databasePath).some(order => order.sourceReference === later.body.order_id), "terminal rejection does not block a later valid order");
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_dealer_order_rejections WHERE web_order_id = ?").get(blocked.body.order_id).n, 1);
   assert.equal((await transport.pullWebOrders({ afterSeq: 0 })).orders.length, 0);
-  assert.equal((await catalog(b.cookie)).status, 401); assert.equal((await post("order", payload, b.cookie)).status, 401);
+  assert.equal((await history(b.cookie)).status, 401); assert.equal((await catalog(b.cookie)).status, 401); assert.equal((await post("order", payload, b.cookie)).status, 401);
+  const reInvite = database.changeDealerWebAccess(b.customerId, "invite"); await sync();
+  const reClaim = await post("claim", { invite_token: new URL(reInvite.inviteUrl).hash.slice(8) });
+  const refreshedB = reClaim.cookie.split(";")[0];
+  const recovered = await post("receipt", { idempotencyKey: payload.idempotencyKey }, refreshedB);
+  assert.equal(recovered.body.receipt.order_id, shipped.body.order_id, "a renewed session recovers its original receipt without resubmission");
+  const bHistory = (await history(refreshedB)).body.orders;
+  assert.equal(bHistory.find(order => order.order_id === blocked.body.order_id).status, "rejected");
+  assert.equal(bHistory.some(order => order.order_id === accepted.body.order_id), false);
+  const ownBeforeLogout = await history(refreshedB); assert.equal(ownBeforeLogout.status, 200);
+  await post("logout", {}, refreshedB); assert.equal((await history(refreshedB)).status, 401);
   clearGuard();
   browser = await launchChromiumForSmoke(chromium);
   const context = await browser.newContext({ locale: "tr-TR", viewport: { width: 375, height: 812 } });
