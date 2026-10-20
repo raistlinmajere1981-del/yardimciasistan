@@ -16,6 +16,15 @@ test("installation registry canonical hedefleri ve credential referanslarını i
   assert.notEqual(market.deploy.remoteRoot, ya.deploy.remoteRoot);
   assert.notEqual(market.credentialRef, ya.credentialRef);
 
+  const teknikel = getInstallation("teknikel");
+  assert.equal(teknikel.webModuleUrl, "https://yardimciasistantoptanci.alwaysdata.net/yardimci-asistan");
+  assert.equal(teknikel.deploy.host, "yardimciasistantoptanci@ssh-yardimciasistantoptanci.alwaysdata.net");
+  assert.equal(teknikel.deploy.remoteRoot, "/home/yardimciasistantoptanci/www/yardimci-asistan");
+  assert.notEqual(teknikel.deploy.remoteRoot, market.deploy.remoteRoot);
+  assert.notEqual(teknikel.deploy.remoteRoot, ya.deploy.remoteRoot);
+  assert.notEqual(teknikel.credentialRef, market.credentialRef);
+  assert.notEqual(teknikel.credentialRef, ya.credentialRef);
+
   const landing = getInstallation("landing");
   assert.equal(landing.deploy.remoteRoot, "/home/yardimciasistan/www");
   assert.equal(
@@ -36,7 +45,7 @@ test("installation registry canonical hedefleri ve credential referanslarını i
 });
 
 test("committed installation registry gerçek credential değeri taşımaz", () => {
-  for (const id of ["ya", "support", "landing", "blacksea", "market-pilot"]) {
+  for (const id of ["ya", "support", "landing", "blacksea", "market-pilot", "teknikel"]) {
     const installation = getInstallation(id);
     const serialized = JSON.stringify(installation);
     assert.doesNotMatch(serialized, /"syncSecret"|"password"|"apiKey"|"token"/i);

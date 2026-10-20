@@ -36,6 +36,7 @@
     "dev:local": "node scripts/local-dev-lab.mjs",
     "dev:php-module": "php -S 127.0.0.1:8080 -t firm-template/web-module",
     "deploy:web": "bash scripts/deploy-web.sh",
+    "deploy:teknikel-web": "bash scripts/deploy-teknikel-web-module.sh",
     "deploy:landing": "node test-site/landing/scripts/deploy.mjs",
     "prepare:web-install": "node scripts/prepare-web-install.mjs",
     "doctor": "node scripts/dev-doctor.mjs",

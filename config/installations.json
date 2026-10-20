@@ -83,6 +83,22 @@
         "backupDir": "/home/yardimciasistantest/backups",
         "stageParent": "/home/yardimciasistantest"
       }
+    },
+    "teknikel": {
+      "id": "teknikel",
+      "title": "Teknikel Kombi · Bayi & Perakende",
+      "kind": "customer-site",
+      "siteUrl": "https://yardimciasistantoptanci.alwaysdata.net",
+      "webModuleUrl": "https://yardimciasistantoptanci.alwaysdata.net/yardimci-asistan",
+      "versionEndpoint": "https://yardimciasistantoptanci.alwaysdata.net/yardimci-asistan/api/version.php",
+      "credentialRef": "alwaysdata-teknikel",
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistantoptanci@ssh-yardimciasistantoptanci.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistantoptanci/www/yardimci-asistan",
+        "backupDir": "/home/yardimciasistantoptanci/backups",
+        "stageParent": "/home/yardimciasistantoptanci"
+      }
     }
   }
 }

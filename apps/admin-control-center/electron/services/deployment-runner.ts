@@ -138,6 +138,36 @@ const TARGETS: TargetDefinition[] = [
     })
   },
   {
+    id: "teknikel-web",
+    installationId: "teknikel",
+    title: "Teknikel Kombi · Web modülü",
+    description: "Teknikel Alwaysdata hesabında yalnız Yardımcı Asistan API/web modülünü günceller.",
+    confirmText: "Yalnız Teknikel web modülü kodu güncellenecek; mevcut SQLite, bağlantı anahtarı ve Teknikel sitesi korunacak.",
+    impact: [
+      "Ana demo, BlackSea, Market Pilot ve Teknikel web sitesi kök dizini değişmez.",
+      "Mevcut modülün data/, firma ayarları, knowledge/, media/ ve .env dosyaları korunur.",
+      "Ayrı sunucu yedeği alınır; PHP doğrulaması ve canlı HTTP kontrolleri çalışır."
+    ],
+    preflight: (repoRoot) => [{
+      label: "Teknikel web modülü SSH ve dosya farkı ön kontrolü",
+      command: npmCommand(),
+      args: ["run", "deploy:teknikel-web", "--", "--dry-run"],
+      cwd: repoRoot
+    }],
+    deploy: (repoRoot) => [{
+      label: "Teknikel web modülü güncellemesi",
+      command: npmCommand(),
+      args: ["run", "deploy:teknikel-web", "--", "--yes"],
+      cwd: repoRoot
+    }],
+    availability: (repoRoot) => ({
+      available: rootScriptExists(repoRoot, "scripts/deploy-teknikel-web-module.sh"),
+      note: rootScriptExists(repoRoot, "scripts/deploy-teknikel-web-module.sh")
+        ? "Teknikel'e özel korumalı deploy scripti hazır."
+        : "Teknikel deploy scripti bulunamadı."
+    })
+  },
+  {
     id: "support-endpoint",
     installationId: "support",
     title: "Merkezi Destek endpoint'i",
