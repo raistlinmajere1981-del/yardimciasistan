@@ -84,16 +84,35 @@ try{
   await assert.rejects(()=>parseTransferFile("big.csv",new Uint8Array(MAX_TRANSFER_BYTES+1),"products"));
   await assert.rejects(()=>parseTransferFile("evil.zip",zipSync({"../escape":strToU8("bad")}),"products"),/güvenli/);
   const oversized=zipSync({"oversized":new Uint8Array(129*1024*1024)},{level:1});assert.throws(()=>readTransferArchive(oversized),/boyut/);
+  // Teknikel demo import uses the exact external CSV shipped to the pilot operator.
+  let demoCsv;
+  try { demoCsv=readFileSync("/home/raistlin/teknikel_web/data-import/teknikel-demo-musteriler-30.csv"); }
+  catch (error) { if (error.code!=="ENOENT") throw error; }
+  if (demoCsv) {
+    const demoDb=database("teknikel-demo-customers");open.push(demoDb.db);
+    const demoDoc=await parseTransferFile("teknikel-demo-musteriler-30.csv",demoCsv,"customers");
+    const demoPlan=plan(demoDb,"customers",demoDoc);
+    assert.equal(demoPlan.preview.counts.new,30);
+    assert.equal(demoPlan.preview.counts.error,0,JSON.stringify(demoPlan.preview.rows.filter(r=>r.status==="error")));
+    const demoResult=await apply(demoDb,demoPlan);
+    assert.equal(demoResult.added,30);
+    assert.equal(demoDb.db.prepare("SELECT COUNT(*) n FROM customer_commercial_profiles WHERE dealer_status='active'").get().n,10);
+    assert.equal(demoDb.db.prepare("SELECT COUNT(*) n FROM customer_commercial_profiles WHERE dealer_status='inactive'").get().n,10);
+    assert.equal(demoDb.db.prepare("SELECT COUNT(*) n FROM customers c LEFT JOIN customer_commercial_profiles p ON p.customer_id=c.id WHERE p.customer_id IS NULL").get().n,10);
+    assert.equal(listCustomersPage(demoDb.db,{search:"test sipariş ve arama"}).matched,10);
+    assert.equal(plan(demoDb,"customers",demoDoc).preview.counts.skip,30);
+    console.log("teknikel-demo-customers: 30 created, 10 retail, 10 inactive dealers, 10 active dealers, notes searchable, reimport skipped");
+  }
   // Real pilot is optional on other machines, read-only when present.
   let pilot=null;try{pilot=JSON.parse(readFileSync("/home/raistlin/teknikel_catalog_prep/import-review-catalog.json","utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
   if(pilot){const pilotDb=database("pilot");open.push(pilotDb.db);const assets={},assetManifest=[];for(const item of JSON.parse(readFileSync("/home/raistlin/teknikel_catalog_prep/image-manifest.json","utf8")).images){const bytes=readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`);assert.equal(transferHash(bytes),item.sha256);const path=`assets/${item.archive_filename}`;assets[path]=bytes;assetManifest.push({path,hash:item.sha256,format:imageMime(bytes),productId:"",sku:item.associated_skus[0]});}assert.equal(Object.keys(assets).length,68);
     const pilotRecords=pilot.products.map(p=>({name:p.name,sku:p.sku,category:p.category,brand:p.brand??"",salePrice:p.sale_price_gross_try??"",taxRate:p.tax_rate??"",trackInventory:"",purchasePrice:p.purchase_price??"",sourceId:p.idempotent_external_key,sourceProductUrl:p.source_url,image:p.image_files[0]?`assets/${p.image_files[0]}`:""}));
     const archive=await encodeTransferFile("zip","products",Object.keys(pilotRecords[0]),pilotRecords,assets,assetManifest);const decoded=await parseTransferFile("teknikel.zip",archive,"products");assert.equal(Object.keys(decoded.assets).length,68);
     const pilotPlan=plan(pilotDb,"products",decoded);assert.equal(pilotPlan.preview.counts.new,179);assert.equal(pilotPlan.preview.counts.error,0,JSON.stringify(pilotPlan.preview.rows.filter(r=>r.status==="error")));assert.equal((await apply(pilotDb,pilotPlan)).added,179);
-    assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE is_active=0").get().n,179);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products p JOIN catalog_categories c ON c.id=p.category_id WHERE c.name='Diğer'").get().n,151);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_categories").get().n,25);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM commerce_product_publications WHERE is_published=1").get().n,0);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE image_asset_path<>''").get().n,35);
+    assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE is_active=0").get().n,179);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products p JOIN catalog_categories c ON c.id=p.category_id WHERE c.name='Diğer'").get().n,151);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_categories").get().n,25);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_categories WHERE is_active=1").get().n,25,"Imported categories including Diğer must be selectable immediately");assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM commerce_product_publications WHERE is_published=1").get().n,0);assert.equal(pilotDb.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE image_asset_path<>''").get().n,35);
     assert.equal(plan(pilotDb,"products",decoded).preview.counts.skip,179);
     const out=await createTransferExport(pilotDb.path,{entity:"products",format:"zip",scope:"all",includeImages:true,includeIdentity:false},images,()=>{},()=>{});assert.equal(out.records,179);assert.equal(out.images,68);const again=await parseTransferFile("roundtrip.zip",out.bytes,"products");assert.equal(again.records.length,179);assert.equal(plan(pilotDb,"products",again).preview.counts.skip,179);
-    console.log("teknikel-pilot: 179 drafts, 25 categories, 151 Other, 68 input image files, 35 primary images with all 68 original images preserved; no user DB touched");
+    console.log("teknikel-pilot: 179 drafts, 25 active categories, 151 Other, 68 input image files, 35 primary images with all 68 original images preserved; no user DB touched");
   }
   console.log("data-transfer-smoke-ok: 650 customers, full exports/roundtrips, matching, draft/publication gates, malformed files, archive limits");
 }finally{for(const db of open)db.close();rmSync(root,{recursive:true,force:true});}

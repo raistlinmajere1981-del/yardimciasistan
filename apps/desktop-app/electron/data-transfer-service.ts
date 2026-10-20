@@ -46,7 +46,10 @@ function category(db: DatabaseSync, path: string) {
   let parentId = "";
   for (const name of path.split(" > ").map(s=>s.trim()).filter(Boolean)) {
     const existing = db.prepare("SELECT id FROM catalog_categories WHERE business_id=? AND parent_id=? AND name=? AND deleted_at=''").get(business(db), parentId, name);
-    parentId = existing ? String(existing.id) : saveCatalogCategoryInTransaction(db, { name, parentId, isActive: false }).id;
+    // Imported category names are usable immediately in local sales and category pickers.
+    // This does not activate or publish imported products, and existing disabled
+    // categories retain the operator's explicit visibility choice.
+    parentId = existing ? String(existing.id) : saveCatalogCategoryInTransaction(db, { name, parentId, isActive: true }).id;
   }
   return parentId;
 }
