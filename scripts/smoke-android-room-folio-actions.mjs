@@ -80,9 +80,9 @@ try {
   const checkoutDate = shiftDate(today, 2);
   sqlite.prepare(`
     INSERT INTO customers (
-      id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+      id, full_name, phone, email, source, notes, last_contact_at,
       created_at, updated_at, deleted_at, sync_status
-    ) VALUES (?, ?, ?, '', 'manual', '', '[]', '', ?, ?, '', 'local_only')
+    ) VALUES (?, ?, ?, '', 'manual', '', '', ?, ?, '', 'local_only')
   `).run("android_folio_customer", "Android Oda Hesabı", "+905000000009", now, now);
   sqlite.prepare(`
     UPDATE rooms SET nightly_price_minor = 120000, price_currency = 'TRY', updated_at = ? WHERE id = ?

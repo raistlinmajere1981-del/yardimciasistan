@@ -29,7 +29,7 @@ try {
   const names = ["Ahmet", "Çetin", "Derya", "Ece", "Fatma", "Gül", "Hasan", "Işıl", "İpek", "Jale", "Kemal", "Leyla", "Mert", "Nalan", "Oya", "Ömer", "Pelin", "Rıza", "Seda", "Şule", "Tamer", "Umut", "Ümit", "Veli", "Yasemin", "Zeynep", "Ğ Test"];
   for (let i = 0; i < 181; i++) {
     const saved = database.saveCustomer({ fullName: `${names[i % names.length]} ${String(i).padStart(3, "0")}`, phone: `+90555${String(i).padStart(7, "0")}`,
-      commercialProfile: { companyName: `Firma ${i}`, dealerStatus: i < 3 ? "active" : i === 3 ? "inactive" : "candidate", priceGroup: "dealer_a" } });
+      commercialProfile: { companyName: `Firma ${i}`, dealerStatus: i < 3 ? "active" : "inactive", priceGroup: "dealer_a" } });
     assert.equal(saved.ok, true, saved.message);
   }
   raw = new DatabaseSync(database.databasePath);

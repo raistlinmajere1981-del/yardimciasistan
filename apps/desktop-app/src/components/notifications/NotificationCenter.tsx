@@ -40,7 +40,7 @@ export function NotificationCenter({ items, onOpen }: NotificationCenterProps) {
   return (
     <div className="notification-center" ref={rootRef}>
       <button
-        className={open ? "notification-bell is-open" : "notification-bell"}
+        className={open ? "notification-bell topbar-control is-open" : "notification-bell topbar-control"}
         type="button"
         aria-label={`Bildirimler, ${items.length} uyarı`}
         aria-haspopup="dialog"

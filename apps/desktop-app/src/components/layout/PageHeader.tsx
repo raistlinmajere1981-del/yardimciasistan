@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { CheckCircle2 } from "lucide-react";
 
 interface PageHeaderProps {
   title: string;
@@ -6,9 +7,10 @@ interface PageHeaderProps {
   description?: string;
   action?: ReactNode;
   notice?: ReactNode;
+  noticeLeading?: ReactNode;
 }
 
-export function PageHeader({ title, eyebrow, description, action, notice }: PageHeaderProps) {
+export function PageHeader({ title, eyebrow, description, action, notice, noticeLeading }: PageHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const header = headerRef.current;
@@ -31,10 +33,20 @@ export function PageHeader({ title, eyebrow, description, action, notice }: Page
           {description && <p className="page-header__subtitle">{description}</p>}
         </div>
         <div
-          className={`page-header__notice${notice ? " has-notice" : ""}`}
-          aria-hidden={notice ? undefined : true}
+          className={`page-header__notice${notice ? " has-notice" : ""}${noticeLeading ? " has-indicator" : ""}`}
+          aria-hidden={notice || noticeLeading ? undefined : true}
         >
-          {notice}
+          {(noticeLeading || notice) && (
+            <div className="page-header__message-frame">
+              {noticeLeading}
+              {notice ?? (
+                <span className="page-header__message-ready">
+                  <CheckCircle2 size={17} aria-hidden="true" />
+                  Hazır
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {action && <div className="page-header__actions">{action}</div>}
       </div>

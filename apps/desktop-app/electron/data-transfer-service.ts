@@ -211,7 +211,6 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
             const previous = old ? getCustomers(db,{id:row.existingId,limit:1})[0] : undefined;
             row.view.before = previous ? stringifyRecord({
               ...previous,
-              tags: previous.tags.join("|"),
               companyName: previous.commercialProfile?.companyName,
               taxOffice: previous.commercialProfile?.taxOffice,
               taxNumber: previous.commercialProfile?.taxNumber,
@@ -219,18 +218,17 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
               dealerStatus: previous.commercialProfile?.dealerStatus,
               priceGroup: previous.commercialProfile?.priceGroup,
               paymentTermDays: previous.commercialProfile?.paymentTermDays,
-              commercialNotes: previous.commercialProfile?.notes
             }) : {};
             if (row.view.status === "skip") row.view.reasons.push("Eşleşen müşteri korundu.");
             const commercial = previous?.commercialProfile;
             if (["companyName","dealerStatus","priceGroup","taxNumber","taxOffice"].some(k=>Boolean(values[k])) && !caps.has(C.WHOLESALE)) throw new Error("Bayi profili için Toptan Satış etkin olmalı.");
-            const input = { ...previous, ...(old ? {id:row.existingId} : {}), fullName:values.fullName || previous?.fullName || "", phone:values.phone ?? previous?.phone ?? "", email:values.email ?? previous?.email ?? "", address:values.address ?? previous?.address ?? "", notes:values.notes ?? previous?.notes ?? "", tags:values.tags === undefined ? previous?.tags ?? [] : splitTags(values.tags), birthdayMessageEnabled: previous?.birthdayMessageEnabled ?? false } as SaveCustomerInput;
+            const input = { ...previous, ...(old ? {id:row.existingId} : {}), fullName:values.fullName || previous?.fullName || "", phone:values.phone ?? previous?.phone ?? "", email:values.email ?? previous?.email ?? "", address:values.address ?? previous?.address ?? "", notes:values.notes ?? previous?.notes ?? "", birthdayMessageEnabled: previous?.birthdayMessageEnabled ?? false } as SaveCustomerInput;
             if (!old) delete input.id;
             for (const key of IDENTITY_TRANSFER_FIELDS) if (values[key] !== undefined) Object.assign(input,{[key]:values[key]});
             if (values.companyName || commercial) input.commercialProfile = {
               companyName: values.companyName || commercial?.companyName || "", taxOffice:values.taxOffice ?? commercial?.taxOffice ?? "", taxNumber:values.taxNumber ?? commercial?.taxNumber ?? "",
-              authorizedPerson:values.authorizedPerson ?? commercial?.authorizedPerson ?? "", dealerStatus:(values.dealerStatus || commercial?.dealerStatus || "candidate") as "candidate"|"active"|"inactive",
-              priceGroup:(values.priceGroup || commercial?.priceGroup || "retail") as "retail"|"dealer_a"|"dealer_b", paymentTermDays:transferNumber(values.paymentTermDays ?? "") ?? commercial?.paymentTermDays ?? 0, notes:values.commercialNotes ?? commercial?.notes ?? ""
+              authorizedPerson:values.authorizedPerson ?? commercial?.authorizedPerson ?? "", dealerStatus:(values.dealerStatus || commercial?.dealerStatus || "inactive") as "active"|"inactive",
+              priceGroup:(values.priceGroup || commercial?.priceGroup || "retail") as "retail"|"dealer_a"|"dealer_b", paymentTermDays:transferNumber(values.paymentTermDays ?? "") ?? commercial?.paymentTermDays ?? 0
             };
             else delete input.commercialProfile;
             const normalized = normalizeCustomerInput(input); if (!normalized.ok) throw new Error(normalized.message);
@@ -292,7 +290,7 @@ export function collectTransferExport(databasePath: string, options: TransferExp
     if (options.template) {
       let headers = Object.keys(options.entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS);
       if (!options.includeIdentity) headers = headers.filter(h=>!IDENTITY_TRANSFER_FIELDS.includes(h));
-      if (options.template === "basic") headers = options.entity === "products" ? ["name","category","sku","barcode","salePrice","currency","unit","taxRate","trackInventory"] : ["fullName","phone","email","address","notes","tags"];
+      if (options.template === "basic") headers = options.entity === "products" ? ["name","category","sku","barcode","salePrice","currency","unit","taxRate","trackInventory"] : ["fullName","phone","email","address","notes"];
       if (options.template === "ideasoft" && options.entity === "products") headers = ["Ürün Adı","Stok Kodu","Barkod","Kategori","Marka","Satış Fiyatı","KDV Oranı","Para Birimi","Birim","Stok Takibi","Görsel URL"];
       return { headers,records:[] as TransferRecord[],images:0 };
     }
@@ -301,10 +299,10 @@ export function collectTransferExport(databasePath: string, options: TransferExp
       for (let offset=0;;offset+=200) {
         const customers = getCustomers(db,{limit:200,offset,...(options.scope === "filtered" ? {search:options.search ?? "",filter:options.customerFilter ?? "all"} : {})});
         for (const c of customers) {
-          const record: TransferRecord = { id:c.id,fullName:c.fullName,phone:c.phone,email:c.email,address:c.address,notes:c.notes,tags:c.tags.join("|") };
+          const record: TransferRecord = { id:c.id,fullName:c.fullName,phone:c.phone,email:c.email,address:c.address,notes:c.notes };
           if (caps.has(C.WHOLESALE) && c.commercialProfile) {
             const p = c.commercialProfile;
-            Object.assign(record,{companyName:p.companyName,taxOffice:p.taxOffice,taxNumber:p.taxNumber,authorizedPerson:p.authorizedPerson,dealerStatus:p.dealerStatus,priceGroup:p.priceGroup,paymentTermDays:String(p.paymentTermDays),commercialNotes:p.notes});
+            Object.assign(record,{companyName:p.companyName,taxOffice:p.taxOffice,taxNumber:p.taxNumber,authorizedPerson:p.authorizedPerson,dealerStatus:p.dealerStatus,priceGroup:p.priceGroup,paymentTermDays:String(p.paymentTermDays)});
           }
           if (options.includeIdentity) for (const key of IDENTITY_TRANSFER_FIELDS) record[key] = String(c[key as keyof typeof c] ?? "");
           records.push(record);
@@ -340,7 +338,7 @@ export function collectTransferExport(databasePath: string, options: TransferExp
       }
     }
     const fields = options.entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS;
-    const headers = Object.keys(fields).filter(h=>(options.entity !== "customers" || options.includeIdentity || !IDENTITY_TRANSFER_FIELDS.includes(h)) && (caps.has(C.WHOLESALE) || !["dealerPriceA","dealerPriceB","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays","commercialNotes"].includes(h)));
+    const headers = Object.keys(fields).filter(h=>(options.entity !== "customers" || options.includeIdentity || !IDENTITY_TRANSFER_FIELDS.includes(h)) && (caps.has(C.WHOLESALE) || !["dealerPriceA","dealerPriceB","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays"].includes(h)));
     return { headers,records,images:records.reduce((sum,r)=>{const originals=JSON.parse(r._originalAssets || "[]") as unknown[];return sum+(originals.length || (r._assetPath || r.imageSourceUrl ? 1 : 0));},0) };
   } finally { db.close(); }
 }

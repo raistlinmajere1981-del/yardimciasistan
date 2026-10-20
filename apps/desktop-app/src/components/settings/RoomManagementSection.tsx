@@ -88,8 +88,7 @@ export function RoomManagementSection({ controller, onEditRoom }: { controller: 
             ) : (
               <>
                 <div className="room-management-list-head">
-                  <span aria-hidden="true" />
-                  <span>Oda</span>
+                  <span>Oda / Durum</span>
                   <span>Yatak</span>
                   <span>Fiyat</span>
                   <span>Kat</span>
@@ -116,18 +115,22 @@ export function RoomManagementSection({ controller, onEditRoom }: { controller: 
                         }
                       }}
                     >
-                      <input
-                        className="room-management-out-of-service"
-                        type="checkbox"
-                        checked={room.outOfService}
-                        aria-label={`${identity} hizmet dışı`}
-                        title="Hizmet dışı"
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => updateRoom(room.key, { outOfService: event.target.checked })}
-                      />
                       <div className="room-management-identity">
                         <strong>{identity}</strong>
-                        <span>{room.name}</span>
+                        {room.name !== identity && <span>{room.name}</span>}
+                        <label
+                          className="room-management-service-toggle"
+                          title="Odanın kullanım durumunu değiştirir. Kaydet ile uygulanır."
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!room.outOfService}
+                            aria-label={`${identity} hizmette`}
+                            onChange={(event) => updateRoom(room.key, { outOfService: !event.target.checked })}
+                          />
+                          <span>{room.outOfService ? "Hizmet dışı" : "Hizmette"}</span>
+                        </label>
                       </div>
                       <span className="room-management-summary">{roomBedSummary(room.bedInfo)}</span>
                       <span className="room-management-summary">{roomPriceSummary(room.price, room.currency)}</span>

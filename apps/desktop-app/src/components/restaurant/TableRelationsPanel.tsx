@@ -116,7 +116,7 @@ export function TableRelationsPanel({
           id: item.id,
           label: item.fullName,
           ...((item.phone || item.email) ? { description: item.phone || item.email } : {}),
-          keywords: [item.phone, item.email, ...(item.tags ?? [])].filter(Boolean).join(" ")
+          keywords: [item.phone, item.email, item.notes].filter(Boolean).join(" ")
         }))}
       />
     </div>}

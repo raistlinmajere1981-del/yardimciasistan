@@ -105,9 +105,9 @@ try {
   const checkout = shiftDate(today, 3);
   sqlite.prepare(`
     INSERT INTO customers (
-      id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+      id, full_name, phone, email, source, notes, last_contact_at,
       created_at, updated_at, deleted_at, sync_status
-    ) VALUES (?, ?, ?, '', 'manual', '', '[]', '', ?, ?, '', 'local_only')
+    ) VALUES (?, ?, ?, '', 'manual', '', '', ?, ?, '', 'local_only')
   `).run("room_folio_smoke_customer", "Oda Adisyon Smoke", "+905000000001", now, now);
 
   sqlite.prepare(`
@@ -174,9 +174,9 @@ try {
   debtDb.exec("PRAGMA foreign_keys = ON;");
   debtDb.prepare(`
     INSERT INTO customers (
-      id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+      id, full_name, phone, email, source, notes, last_contact_at,
       created_at, updated_at, deleted_at, sync_status
-    ) VALUES (?, ?, ?, '', 'manual', '', '[]', '', ?, ?, '', 'local_only')
+    ) VALUES (?, ?, ?, '', 'manual', '', '', ?, ?, '', 'local_only')
   `).run("room_folio_other_customer", "Başka Borçlu Misafir", "+905000000002", now, now);
   const priorCheckIn = shiftDate(today, -8);
   const priorCheckOut = shiftDate(today, -6);

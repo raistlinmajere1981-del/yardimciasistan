@@ -180,7 +180,7 @@ try {
       taxOffice: "Cide",
       taxNumber: "3333333333",
       authorizedPerson: "Bayi Fiyat Testi",
-      dealerStatus: "candidate",
+      dealerStatus: "inactive",
       priceGroup: "dealer_a",
       paymentTermDays: 30,
       notes: ""

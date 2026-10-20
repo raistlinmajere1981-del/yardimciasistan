@@ -43,22 +43,6 @@ export function normalizeTimeInput(value: string) {
   return /^\d{2}:\d{2}$/.test(time) ? time : "";
 }
 
-export function getCustomerTagsForSource(source: string) {
-  if (source === "manual") {
-    return ["manuel", "talep"];
-  }
-
-  if (source === "web_ai") {
-    return ["web", "ai", "talep"];
-  }
-
-  if (source === "whatsapp") {
-    return ["whatsapp", "talep"];
-  }
-
-  return ["web", "talep"];
-}
-
 export function buildManualRequestReply(customerName: string) {
   return `Merhaba ${customerName}, talebinizi aldık. Detayları kontrol edip size dönüş yapacağız.`;
 }

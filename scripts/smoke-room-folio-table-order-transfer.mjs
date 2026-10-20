@@ -82,9 +82,9 @@ try {
   const checkout = shiftDate(today, 2);
   sqlite.prepare(`
     INSERT INTO customers (
-      id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+      id, full_name, phone, email, source, notes, last_contact_at,
       created_at, updated_at, deleted_at, sync_status
-    ) VALUES (?, ?, ?, '', 'manual', '', '[]', '', ?, ?, '', 'local_only')
+    ) VALUES (?, ?, ?, '', 'manual', '', '', ?, ?, '', 'local_only')
   `).run("room_transfer_smoke_customer", "Odaya Yaz Smoke", "+905000000077", now, now);
   sqlite.prepare(`
     INSERT INTO customer_room_stays (

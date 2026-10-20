@@ -14,33 +14,9 @@ export function CustomerCommercialProfileFields({
     onChange({ ...form, [field]: value });
   };
 
-  const toggleProfile = (enabled: boolean) => {
-    onChange({
-      ...form,
-      commercialProfileEnabled: enabled,
-      commercialCompanyName: enabled && !form.commercialCompanyName
-        ? form.fullName
-        : form.commercialCompanyName,
-      commercialAuthorizedPerson: enabled && !form.commercialAuthorizedPerson
-        ? form.fullName
-        : form.commercialAuthorizedPerson
-    });
-  };
-
   return (
-    <DetailSectionCard title="Ticari bilgiler" className="customer-commercial-profile" actions={
-        <label className="form-check">
-          <input
-            type="checkbox"
-            checked={form.commercialProfileEnabled}
-            onChange={(event) => toggleProfile(event.target.checked)}
-          />
-          <strong>Ticari / bayi müşterisi</strong>
-        </label>
-      }>
-
-      {form.commercialProfileEnabled && (
-        <div className="form-grid">
+    <DetailSectionCard title="Ticari bilgiler" className="customer-commercial-profile">
+      <div className="form-grid">
           <label className="form-field form-field--medium">
             Firma / unvan
             <input
@@ -88,7 +64,6 @@ export function CustomerCommercialProfileFields({
                 event.target.value as CustomerFormState["commercialDealerStatus"]
               )}
             >
-              <option value="candidate">Aday</option>
               <option value="active">Aktif</option>
               <option value="inactive">Pasif</option>
             </select>
@@ -121,18 +96,8 @@ export function CustomerCommercialProfileFields({
               onChange={(event) => update("commercialPaymentTermDays", event.target.value)}
             />
           </label>
-          <label className="form-field form-field--fluid">
-            Ticari not
-            <textarea
-              aria-label="Ticari not"
-              rows={2}
-              maxLength={2000}
-              value={form.commercialNotes}
-              onChange={(event) => update("commercialNotes", event.target.value)}
-            />
-          </label>
-        </div>
-      )}
+
+      </div>
     </DetailSectionCard>
   );
 }

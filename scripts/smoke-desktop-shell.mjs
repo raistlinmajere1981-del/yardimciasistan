@@ -390,7 +390,85 @@ try {
   await expect(page.locator('.global-message-bar')).toHaveCount(0);
   await expect(page.locator('.page-header__notice')).toHaveCount(1);
   await expect(page.getByText('Şimdi Eşitle', { exact: true })).toHaveCount(0);
+  // Compare both endpoints at the same desktop viewport width.
+  await page.setViewportSize({ width: 1440, height: 900 });
   const headerHeightWithoutNotice = await page.locator('.page-header').evaluate((element) => element.getBoundingClientRect().height);
+  const messageFrame = page.locator('.page-header__message-frame');
+  await expect(messageFrame).toBeVisible();
+  await expect(messageFrame).toContainText('Hazır');
+  const headerGroupGeometry = async () => page.locator('.page-header').evaluate(header => {
+    const indicator = header.querySelector('.page-header__notice .sync-status-indicator');
+    const frame = header.querySelector('.page-header__message-frame');
+    const group = header.querySelector('.page-header__notice');
+    const i = indicator.getBoundingClientRect(), f = frame.getBoundingClientRect();
+    const g = group.getBoundingClientRect(), h = header.getBoundingClientRect();
+    return {
+      indicatorLeft: i.left,
+      frameLeft: f.left,
+      frameWidth: f.width,
+      indicatorInFrame: i.left >= f.left && i.right <= f.right && i.top >= f.top && i.bottom <= f.bottom,
+      symmetricSides: Math.abs((f.left - h.left) - (h.right - f.right)) < 9,
+      centerDelta: Math.abs((g.left + g.right) / 2 - (h.left + h.right) / 2),
+      borderColor: getComputedStyle(frame).borderTopColor,
+      noOverflow: frame.scrollWidth <= frame.clientWidth + 1
+    };
+  });
+  const idleGeometry = await headerGroupGeometry();
+  expect(idleGeometry.indicatorInFrame).toBe(true);
+  expect(idleGeometry.symmetricSides).toBe(true);
+  expect(idleGeometry.centerDelta).toBeLessThan(9);
+  // The right-hand tools keep one visual family; embedded sync uses the green frame palette.
+  // Measure the idle visual state, not a button left hovered by earlier interactions.
+  await page.mouse.move(1, 1);
+  const iconFamily = await page.locator('.page-header__actions button.topbar-control').evaluateAll(buttons =>
+    buttons.map(button => {
+      const css = getComputedStyle(button);
+      return {
+        label: button.getAttribute('aria-label'),
+        width: button.getBoundingClientRect().width,
+        height: button.getBoundingClientRect().height,
+        background: css.backgroundColor,
+        borderRadius: css.borderRadius,
+        borderWidth: css.borderTopWidth
+      };
+    })
+  );
+  expect(iconFamily.length).toBeGreaterThanOrEqual(4);
+  for (const button of iconFamily) {
+    expect(button.width).toBeCloseTo(44, 0);
+    expect(button.height).toBeCloseTo(44, 0);
+    expect(button.background).toBe(iconFamily[0].background);
+    expect(button.borderRadius).toBe(iconFamily[0].borderRadius);
+    expect(button.borderWidth).toBe(iconFamily[0].borderWidth);
+  }
+  const syncVisual = await page.locator('.page-header__message-frame .sync-status-indicator').evaluate(button => ({
+    width: button.getBoundingClientRect().width,
+    height: button.getBoundingClientRect().height,
+    background: getComputedStyle(button).backgroundColor,
+    color: getComputedStyle(button).color
+  }));
+  expect(syncVisual.width).toBeCloseTo(44, 0);
+  expect(syncVisual.height).toBeCloseTo(44, 0);
+  expect(syncVisual.background).not.toBe(iconFamily[0].background);
+  for (const width of [1650, 1440, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const geometry = await page.locator('.page-header').evaluate(header => {
+      const group = header.querySelector('.page-header__notice').getBoundingClientRect();
+      const tools = header.querySelector('.page-header__actions').getBoundingClientRect();
+      const bounds = header.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        overlaps: group.right > tools.left + 1,
+        centerDelta: Math.abs((group.left + group.right) / 2 - (bounds.left + bounds.right) / 2),
+        frameWidth: header.querySelector('.page-header__message-frame').getBoundingClientRect().width
+      };
+    });
+    expect(geometry.overlaps).toBe(false);
+    expect(geometry.centerDelta).toBeLessThan(9);
+    expect(geometry.height).toBeLessThan(95);
+    if (width === 1650) expect(geometry.frameWidth).toBeGreaterThan(760);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   const syncIndicator = page.getByRole('button', { name: /Eşitleme durumu:/ });
   await expect(syncIndicator).toBeVisible();
@@ -398,12 +476,74 @@ try {
   await expect(page.locator('.global-message-bar')).toHaveCount(0);
   await expect(page.getByText('Eşitleme tamamlandı.', { exact: true })).toHaveCount(0);
 
+  // Short/long feedback must update only the frame content, never its position.
+  for (const width of [1650, 1440, 900, 700]) {
+    await page.setViewportSize({ width, height: 900 });
+    const baseline = await headerGroupGeometry();
+    for (const message of ['Kısa bilgi.', 'Çok uzun işlem bildirimi: ' + 'detay '.repeat(35)]) {
+      await page.evaluate(text => {
+        window.dispatchEvent(new CustomEvent('yardimci-asistan:app-status', {
+          detail: { state: 'info', message: text }
+        }));
+      }, message);
+      await expect(messageFrame).toContainText(message);
+      const changed = await headerGroupGeometry();
+      expect(changed.indicatorLeft).toBeCloseTo(baseline.indicatorLeft, 1);
+      expect(changed.frameLeft).toBeCloseTo(baseline.frameLeft, 1);
+      expect(changed.frameWidth).toBeCloseTo(baseline.frameWidth, 1);
+      expect(changed.borderColor).toBe(baseline.borderColor);
+      expect(changed.noOverflow).toBe(true);
+      expect(changed.centerDelta).toBeLessThan(9);
+      if (message.length > 100) {
+        const wrap = await messageFrame.locator('.global-message-bar__message').evaluate(el => {
+          const css = getComputedStyle(el);
+          return {
+            lineClamp: css.webkitLineClamp,
+            height: el.getBoundingClientRect().height,
+            lineHeight: parseFloat(css.lineHeight),
+            title: el.title
+          };
+        });
+        expect(wrap.lineClamp).toBe('2');
+        expect(wrap.height).toBeGreaterThan(wrap.lineHeight + 1);
+        expect(wrap.height).toBeLessThanOrEqual(2 * wrap.lineHeight + 1);
+        expect(wrap.title).toBe(message.trim());
+      }
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('yardimci-asistan:app-status', {
       detail: { state: 'error', message: 'Smoke merkezi hata mesajı.' }
     }));
   });
   await expect(page.locator('.global-message-bar')).toContainText('Smoke merkezi hata mesajı.');
+  // Sync and feedback share a centered topbar group, not the right-hand tools.
+  const centerGeometry = await page.locator('.page-header').evaluate(header => {
+    const sync = header.querySelector('.page-header__notice .sync-status-indicator');
+    const message = header.querySelector('.global-message-bar');
+    if (!sync || !message) return null;
+    const a = header.getBoundingClientRect(), b = sync.getBoundingClientRect(), c = message.getBoundingClientRect();
+    return {
+      centerDelta: Math.abs((b.left + c.right) / 2 - (a.left + a.right) / 2),
+      indicatorBeforeMessage: b.right <= c.left,
+      fontSize: parseFloat(getComputedStyle(message).fontSize),
+      indicatorInActions: Boolean(header.querySelector('.page-header__actions .sync-status-indicator'))
+    };
+  });
+  expect(centerGeometry).not.toBeNull();
+  expect(centerGeometry.indicatorBeforeMessage).toBe(true);
+  expect(centerGeometry.indicatorInActions).toBe(false);
+  expect(centerGeometry.centerDelta).toBeLessThan(9);
+  expect(centerGeometry.fontSize).toBeGreaterThanOrEqual(15);
+  const errorGeometry = await headerGroupGeometry();
+  expect(errorGeometry.indicatorInFrame).toBe(true);
+  expect(errorGeometry.symmetricSides).toBe(true);
+  expect(errorGeometry.indicatorLeft).toBeCloseTo(idleGeometry.indicatorLeft, 1);
+  expect(errorGeometry.frameLeft).toBeCloseTo(idleGeometry.frameLeft, 1);
+  expect(errorGeometry.frameWidth).toBeCloseTo(idleGeometry.frameWidth, 1);
+  expect(errorGeometry.borderColor).toBe(idleGeometry.borderColor);
   const headerHeightWithNotice = await page.locator('.page-header').evaluate((element) => element.getBoundingClientRect().height);
   expect(Math.abs(headerHeightWithNotice - headerHeightWithoutNotice)).toBeLessThan(0.5);
 

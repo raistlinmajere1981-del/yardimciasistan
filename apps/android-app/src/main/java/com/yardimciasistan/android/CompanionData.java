@@ -87,7 +87,7 @@ final class CompanionData {
       result.customers.add(customer);
     }
     for (JSONObject r : rows(c, "customer_profiles", 100)) {
-      if (!validId(r, "customer_id") || !oneOf(r, "dealer_status", "candidate", "active", "inactive")
+      if (!validId(r, "customer_id") || !oneOf(r, "dealer_status", "active", "inactive")
           || !oneOf(r, "price_group", "retail", "dealer_a", "dealer_b")) continue;
       Profile p = new Profile(); p.customerId = r.optString("customer_id"); p.dealerStatus = r.optString("dealer_status");
       p.priceGroup = r.optString("price_group"); p.updatedAt = timestamp(r, "updated_at");

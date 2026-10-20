@@ -21,8 +21,8 @@ export const PRODUCT_TRANSFER_FIELDS: Record<string, string> = {
 };
 export const CUSTOMER_TRANSFER_FIELDS: Record<string, string> = {
   id: "Uygulama kimliği", fullName: "Müşteri adı", phone: "Telefon", email: "E-posta", companyName: "Firma", taxOffice: "Vergi dairesi", taxNumber: "Vergi numarası",
-  authorizedPerson: "Yetkili kişi", dealerStatus: "Bayi durumu", priceGroup: "Fiyat grubu", paymentTermDays: "Vade günü", commercialNotes: "Ticari not",
-  address: "Adres", notes: "Not", tags: "Etiketler", identityType: "Kimlik türü", identityNumber: "Kimlik numarası", birthDate: "Doğum tarihi", nationality: "Uyruk",
+  authorizedPerson: "Yetkili kişi", dealerStatus: "Bayi durumu", priceGroup: "Fiyat grubu", paymentTermDays: "Vade günü",
+  address: "Adres", notes: "Not", identityType: "Kimlik türü", identityNumber: "Kimlik numarası", birthDate: "Doğum tarihi", nationality: "Uyruk",
   gender: "Cinsiyet", documentSerialNumber: "Belge seri numarası", documentExpiryDate: "Belge geçerlilik tarihi", birthPlace: "Doğum yeri", motherName: "Anne adı", fatherName: "Baba adı", issuingAuthority: "Belgeyi veren makam"
 };
 export const IDENTITY_TRANSFER_FIELDS = ["identityType", "identityNumber", "birthDate", "nationality", "gender", "documentSerialNumber", "documentExpiryDate", "birthPlace", "motherName", "fatherName", "issuingAuthority"];

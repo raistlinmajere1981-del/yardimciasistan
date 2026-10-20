@@ -9,7 +9,6 @@ export interface Customer extends TimestampedRecord {
   email: string;
   source: RecordSource;
   notes: string;
-  tags: string[];
   last_contact_at: ISODateTimeString | "";
   identity_type: CustomerIdentityType;
   identity_number: string;

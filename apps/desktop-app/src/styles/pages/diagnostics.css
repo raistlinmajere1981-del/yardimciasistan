@@ -193,27 +193,6 @@
   text-align: right;
 }
 
-.diagnostics-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: var(--control-height-md);
-  height: var(--control-height-md);
-  padding: 0;
-  color: var(--color-text-muted);
-  background: var(--color-bg-hover);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-
-.diagnostics-trigger:hover,
-.diagnostics-trigger[aria-pressed="true"] {
-  color: var(--color-accent);
-  border-color: var(--color-border-strong);
-}
-
 @media (max-width: 1000px) {
   .diagnostics-toolbar {
     grid-template-columns: 1fr 1fr;

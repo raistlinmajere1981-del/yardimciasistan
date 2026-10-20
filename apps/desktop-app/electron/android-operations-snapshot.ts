@@ -130,7 +130,6 @@ export function createAndroidOperationsSnapshot(
       phone: customer.phone,
       email: customer.email,
       notes: customer.notes,
-      tags: customer.tags,
       identity_type: customer.identityType,
       identity_number: "",
       nationality: customer.nationality,

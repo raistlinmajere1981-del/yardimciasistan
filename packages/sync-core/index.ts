@@ -614,7 +614,6 @@ export interface AndroidSnapshotCustomer {
   phone: string;
   email: string;
   notes: string;
-  tags: string[];
   identity_type: string;
   identity_number: string;
   nationality: string;

@@ -59,7 +59,7 @@ export function SettingsActionPopover({ id, label, open, onOpenChange, children,
     {sidebar
       ? <button {...triggerProps} className="nav-item sidebar-update-trigger">{trigger ?? label}</button>
       : iconButton
-        ? <IconButton {...triggerProps} className="header-update-trigger">{trigger ?? label}</IconButton>
+        ? <IconButton {...triggerProps} className="header-update-trigger topbar-control">{trigger ?? label}</IconButton>
         : <ActionButton {...triggerProps} variant="secondary">{trigger ?? label}</ActionButton>}
     {open && createPortal(<section ref={panel} id={`${id}-panel`} role="dialog" aria-label={label} tabIndex={-1}
       className="settings-action-popover" style={position}>

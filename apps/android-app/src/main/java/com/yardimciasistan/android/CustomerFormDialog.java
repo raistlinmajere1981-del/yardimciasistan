@@ -15,11 +15,8 @@ import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.HashSet;
-import java.util.Locale;
 
 final class CustomerFormDialog {
   interface Listener {
@@ -37,7 +34,6 @@ final class CustomerFormDialog {
   private EditText fullName;
   private EditText phone;
   private EditText email;
-  private EditText tags;
   private EditText notes;
   private Spinner identityType;
   private EditText identityNumber;
@@ -149,8 +145,6 @@ final class CustomerFormDialog {
     phone.setInputType(InputType.TYPE_CLASS_PHONE);
     email = addInput(form, "E-posta", "ornek@eposta.com", value("email"), false);
     email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-    tags = addInput(form, "Etiketler", "VIP, kurumsal, düzenli misafir",
-        existing == null ? "" : String.join(", ", existing.tags), false);
     notes = addInput(form, "Müşteri notları", "Tercihler ve işletme notları", value("notes"), true);
 
     form.addView(sectionLabel("Kimlik kartı / pasaport"));
@@ -235,7 +229,6 @@ final class CustomerFormDialog {
       payload.put("phone", textValue(phone));
       payload.put("email", textValue(email));
       payload.put("notes", textValue(notes));
-      payload.put("tags", parseTags(textValue(tags)));
       payload.put("identity_type", selectedChoiceValue(identityType));
       payload.put("identity_number", textValue(identityNumber));
       payload.put("nationality", textValue(nationality));
@@ -361,19 +354,7 @@ final class CustomerFormDialog {
     return selected instanceof ChoiceItem ? ((ChoiceItem) selected).value : "";
   }
 
-  private static JSONArray parseTags(String source) {
-    JSONArray result = new JSONArray();
-    if (source == null || source.trim().isEmpty()) return result;
-    HashSet<String> seen = new HashSet<>();
-    for (String raw : source.split("[,;\\n]")) {
-      String tag = raw.trim();
-      String key = tag.toLowerCase(new Locale("tr", "TR"));
-      if (!tag.isEmpty() && tag.length() <= 40 && seen.add(key) && result.length() < 20) {
-        result.put(tag);
-      }
-    }
-    return result;
-  }
+
 
   private static void fillIfPresent(EditText field, String value) {
     String normalized = value == null ? "" : value.trim();

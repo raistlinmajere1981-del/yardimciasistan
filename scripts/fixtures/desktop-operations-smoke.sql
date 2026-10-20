@@ -2,7 +2,7 @@
 -- masaüstü veritabanı smoke testinin ihtiyaç duyduğu ilişkili kayıtları kurar.
 
 INSERT OR IGNORE INTO customers (
-  id, full_name, phone, email, source, notes, tags_json, last_contact_at, created_at, updated_at
+  id, full_name, phone, email, source, notes, last_contact_at, created_at, updated_at
 ) VALUES (
   'customer_smoke_001',
   'Smoke Misafir',
@@ -10,7 +10,6 @@ INSERT OR IGNORE INTO customers (
   '',
   'web_form',
   'Balkonlu oda sordu.',
-  '["pansiyon","smoke"]',
   '',
   '2026-07-10T14:30:00+03:00',
   '2026-07-10T14:30:00+03:00'

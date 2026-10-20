@@ -163,7 +163,7 @@ final class CompanionWorkspace {
   }
 
   private String dealerStatus(String status) {
-    return "active".equals(status) ? "Aktif" : "candidate".equals(status) ? "Aday" : "Pasif";
+    return "active".equals(status) ? "Aktif" : "Pasif";
   }
   private String priceGroup(String group) {
     return "dealer_a".equals(group) ? "Bayi A" : "dealer_b".equals(group) ? "Bayi B" : "Perakende";

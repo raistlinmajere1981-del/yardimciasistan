@@ -42,7 +42,7 @@ export function SyncStatusIndicator({
 
   return (
     <button
-      className={`sync-status-indicator is-${state}`}
+      className={`sync-status-indicator topbar-control is-${state}`}
       type="button"
       aria-label={`Eşitleme durumu: ${label}. Elle eşitlemek için tıklayın.`}
       title={`${label}. İsterseniz elle eşitleyebilirsiniz.`}

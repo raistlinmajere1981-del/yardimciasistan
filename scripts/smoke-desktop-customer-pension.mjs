@@ -262,8 +262,8 @@ try {
 
     const noteField = customerWorkspace.getByLabel('Not', { exact: true });
     const addressField = customerWorkspace.getByLabel('Adres', { exact: true });
-    await expect(noteField).toHaveAttribute('rows', '2');
-    await expect(addressField).toHaveAttribute('rows', '2');
+    await expect(noteField).toHaveAttribute('rows', '1');
+    await expect(addressField).toHaveAttribute('rows', '1');
     expect(await noteField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
     expect(await addressField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
     const birthdayToggle = customerWorkspace.getByRole('checkbox', { name: 'Mesaj gönder', exact: true });
@@ -359,7 +359,9 @@ try {
   await page.getByRole('button', { name: 'Yeni Müşteri', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Ad soyad', { exact: true }).fill('Migration Misafiri');
   await page.getByRole('dialog').getByLabel('Telefon', { exact: true }).fill('05321234567');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Müşteri Kartını Kaydet', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Migration Misafiri', exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.customers-workspace__items')).toContainText('Migration Misafiri');
   const customerCall = await page.evaluate(() => window.__designCalls.find(call => call.kind === 'customer'));

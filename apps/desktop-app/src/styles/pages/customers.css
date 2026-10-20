@@ -1,13 +1,15 @@
 /* Customer workflow composition; shared controls live in components/. */
 
-.customer-note-field textarea,
-.customer-address-field textarea {
-  min-height: calc(var(--control-height-md) * 2);
-  resize: vertical;
+/* The canonical customer create/detail card fits two medium-width field columns.
+   Other entity cards retain the shared wider workspace width. */
+.detail-workspace-frame.customer-workspace-frame.workspace-frame--centered {
+  width: min(66rem, calc(100vw / var(--ui-scale) - var(--space-6)));
 }
 
-.customer-birth-field {
-  --field-width: 100%;
+.customer-note-field textarea,
+.customer-address-field textarea {
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
+  resize: vertical;
 }
 
 .customer-birth-controls {
@@ -385,9 +387,6 @@
   gap: var(--space-2);
   width: 100%;
 }
-@container (max-width: 64rem) {
-  .customer-workspace-profile .customer-birth-field { grid-column: 1 / -1; }
-}
 .customer-identity-details {
   min-width: 0;
 }
@@ -440,13 +439,44 @@
   }
 }
 
-.identity-scan-actions {
-  align-items: center;
+.customer-identity-quick-actions {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
 }
-
+.customer-identity-quick-actions__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.customer-identity-quick-actions__row .identity-back-side-toggle {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+}
+.customer-identity-quick-actions__row .customer-identity-camera-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: var(--space-1);
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+.customer-identity-file-button { width: 100%; }
+.customer-identity-quick-actions__flags {
+  display: grid;
+  gap: var(--space-2);
+}
+.customer-identity-quick-actions__flags .form-check {
+  align-items: center;
+  min-height: var(--control-height-sm);
+  white-space: normal;
+}
+.customer-identity-quick-actions .form-status {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .identity-back-side-toggle {
   align-items: center;
-  max-width: 34rem;
   min-height: var(--control-height-sm);
   white-space: nowrap;
 }

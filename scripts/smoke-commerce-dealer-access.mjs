@@ -74,9 +74,9 @@ try {
   try {
     const create = (status) => database.saveCustomer(baseCustomer({ phone: "", email: "",
       commercialProfile: status ? { companyName: "Dealer Company", dealerStatus: status, priceGroup: "dealer_a" } : undefined }));
-    const ordinary = create(); const candidate = create("candidate"); const inactive = create("inactive"); const active = create("active");
-    for (const result of [ordinary, candidate, inactive, active]) assert.equal(result.ok, true, result.message);
-    for (const result of [ordinary, candidate, inactive]) assert.throws(() => database.changeDealerWebAccess(result.savedId, "enable"), /aktif bayi/);
+    const ordinary = create(); const inactive = create("inactive"); const active = create("active");
+    for (const result of [ordinary, inactive, active]) assert.equal(result.ok, true, result.message);
+    for (const result of [ordinary, inactive]) assert.throws(() => database.changeDealerWebAccess(result.savedId, "enable"), /aktif bayi/);
     const id = active.savedId;
     assert.equal(database.getSetupData().dealerPortalEnabled, true);
     assert.equal(database.getDealerWebAccess(id), null);

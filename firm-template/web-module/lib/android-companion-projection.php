@@ -195,7 +195,7 @@ function ya_companion_project(array $snapshot, array $permissions): array
     }
     if (isset($caps['commerce.orders'], $caps['commerce.wholesale'], $caps['core.customers']) && $can('dealer.view')) {
         $commerce['customer_profiles'] = array_values(array_filter(ya_companion_rows($c['customer_profiles'] ?? [], 100, [
-            'customer_id' => 'id', 'dealer_status' => ['candidate', 'active', 'inactive'],
+            'customer_id' => 'id', 'dealer_status' => ['active', 'inactive'],
             'price_group' => ['retail', 'dealer_a', 'dealer_b'], 'updated_at' => 'time',
             'company_name' => 'optional_text:200', 'authorized_person' => 'optional_text:200'
         ]), static fn(array $row): bool => isset($customerIds[$row['customer_id']])));

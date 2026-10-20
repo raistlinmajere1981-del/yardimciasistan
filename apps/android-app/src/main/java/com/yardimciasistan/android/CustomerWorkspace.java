@@ -91,7 +91,7 @@ final class CustomerWorkspace {
         page.addView(item);
         if (search != null) search.add(item,
             customer.fullName + " " + customer.phone + " " + customer.email + " "
-                + customer.notes + " " + String.join(" ", customer.tags));
+                + customer.notes);
       }
     } else {
       boolean waitingOnly = AndroidUiRules.CUSTOMER_WAITING.equals(visibleFilter);

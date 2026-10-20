@@ -16,7 +16,6 @@ import {
   buildManualRequestReply,
   buildReservationNotes,
   buildReservationTitle,
-  getCustomerTagsForSource,
   normalizeDateInput,
   normalizeInteger,
   normalizePriority,
@@ -56,18 +55,16 @@ function ensureCustomerForRequest(db: DatabaseSync, request: Record<string, unkn
           phone,
           source,
           notes,
-          tags_json,
           last_contact_at,
           created_at,
           updated_at,
           sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
         ON CONFLICT(id) DO UPDATE SET
           full_name = excluded.full_name,
           phone = excluded.phone,
           source = excluded.source,
           notes = excluded.notes,
-          tags_json = excluded.tags_json,
           last_contact_at = excluded.last_contact_at,
           updated_at = excluded.updated_at,
           deleted_at = '',
@@ -79,7 +76,6 @@ function ensureCustomerForRequest(db: DatabaseSync, request: Record<string, unkn
       phone,
       source,
       String(request.message ?? ""),
-      JSON.stringify(getCustomerTagsForSource(source)),
       now,
       now,
       now

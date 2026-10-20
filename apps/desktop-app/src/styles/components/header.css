@@ -33,6 +33,7 @@
 .page-header__actions {
   min-width: 0;
   max-width: 100%;
+  justify-self: end;
 }
 
 .page-header-tools {
@@ -72,11 +73,45 @@
 .page-header__notice {
   display: flex;
   align-items: center;
+  justify-self: center;
+  width: min(100%, 48rem);
   min-width: 0;
-  min-height: 30px;
+  min-height: var(--interaction-target-min);
   visibility: hidden;
 }
-.page-header__notice.has-notice {
+.page-header__message-frame {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 56px;
+  min-width: 0;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-success-border);
+  border-radius: var(--radius-control);
+  background: var(--color-success-soft);
+  overflow: hidden;
+}
+.page-header__message-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  color: var(--color-success);
+  font-size: var(--text-md);
+  white-space: nowrap;
+}
+.page-header__message-frame > .global-message-bar:is(.is-info, .is-success, .is-loading, .is-error) {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}
+.page-header__notice.has-notice,
+.page-header__notice.has-indicator {
   visibility: visible;
 }
 
@@ -84,14 +119,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   min-width: 0;
-  height: 30px;
+  min-height: 34px;
   padding: var(--space-1) var(--space-2);
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   line-height: var(--leading-tight);
 }
 .global-message-bar:has(button) { min-height: var(--interaction-target-min); }
@@ -100,11 +136,16 @@
   flex: 0 0 auto;
 }
 .global-message-bar__message {
+  display: -webkit-box;
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  line-height: 1.25;
 }
 .global-message-bar__action,
 .global-message-bar__dismiss {
@@ -278,4 +319,77 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* One icon-button contract for every desktop topbar control. */
+.page-header button.topbar-control {
+  display: inline-flex;
+  flex: 0 0 var(--interaction-target-min);
+  align-items: center;
+  justify-content: center;
+  width: var(--interaction-target-min);
+  height: var(--interaction-target-min);
+  min-width: var(--interaction-target-min);
+  min-height: var(--interaction-target-min);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-panel);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    background-color var(--motion-hover) var(--ease-standard);
+}
+.page-header button.topbar-control:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-hover);
+  color: var(--color-accent);
+}
+.page-header button.topbar-control:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.page-header button.topbar-control:disabled {
+  opacity: .75;
+  cursor: default;
+}
+.page-header button.topbar-control[aria-expanded="true"],
+.page-header button.topbar-control[aria-pressed="true"] {
+  border-color: var(--color-border-strong);
+  background: var(--color-selected-soft);
+  color: var(--color-accent);
+}
+.page-header button.topbar-control:is(.is-ready, .is-pending) {
+  color: var(--color-success);
+}
+.page-header button.topbar-control:is(.is-offline, .is-error) {
+  color: var(--color-warning);
+}
+
+/* Sync lives in the persistent green message frame; preserve meaningful alerts. */
+.page-header .page-header__message-frame > button.sync-status-indicator.topbar-control {
+  flex: 0 0 var(--interaction-target-min);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 25%, transparent);
+  background: color-mix(in srgb, var(--color-success) 8%, transparent);
+}
+.page-header .page-header__message-frame > button.sync-status-indicator.topbar-control:hover:not(:disabled) {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 48%, transparent);
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+}
+.page-header .page-header__message-frame > button.sync-status-indicator:is(.is-offline, .is-error).topbar-control {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 38%, transparent);
+}
+.page-header .page-header__message-frame > button.sync-status-indicator.is-error.topbar-control {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+.page-header .page-header__message-frame > button.sync-status-indicator.is-syncing.topbar-control {
+  color: var(--color-success);
+}
+.page-header .page-header__message-frame .sync-status-indicator__dot {
+  border-color: var(--color-success-soft);
 }

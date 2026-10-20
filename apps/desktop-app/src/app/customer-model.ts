@@ -6,7 +6,6 @@ export interface CustomerFormState {
   phone: string;
   email: string;
   notes: string;
-  tags: string;
   identityType: string;
   identityNumber: string;
   nationality: string;
@@ -25,10 +24,9 @@ export interface CustomerFormState {
   commercialTaxOffice: string;
   commercialTaxNumber: string;
   commercialAuthorizedPerson: string;
-  commercialDealerStatus: "candidate" | "active" | "inactive";
+  commercialDealerStatus: "active" | "inactive";
   commercialPriceGroup: "retail" | "dealer_a" | "dealer_b";
   commercialPaymentTermDays: string;
-  commercialNotes: string;
 }
 
 export interface RoomAssignmentFormState {
@@ -51,7 +49,6 @@ export function toCustomerForm(customer: CustomerRecord | null): CustomerFormSta
     phone: customer?.phone ?? "",
     email: customer?.email ?? "",
     notes: customer?.notes ?? "",
-    tags: customer?.tags.join(", ") ?? "",
     identityType: customer?.identityType ?? "",
     identityNumber: customer?.identityNumber ?? "",
     nationality: customer?.nationality ?? "",
@@ -70,10 +67,9 @@ export function toCustomerForm(customer: CustomerRecord | null): CustomerFormSta
     commercialTaxOffice: customer?.commercialProfile?.taxOffice ?? "",
     commercialTaxNumber: customer?.commercialProfile?.taxNumber ?? "",
     commercialAuthorizedPerson: customer?.commercialProfile?.authorizedPerson ?? "",
-    commercialDealerStatus: customer?.commercialProfile?.dealerStatus ?? "candidate",
+    commercialDealerStatus: customer?.commercialProfile?.dealerStatus ?? "inactive",
     commercialPriceGroup: customer?.commercialProfile?.priceGroup ?? "retail",
     commercialPaymentTermDays: String(customer?.commercialProfile?.paymentTermDays ?? 0),
-    commercialNotes: customer?.commercialProfile?.notes ?? ""
   };
 }
 
@@ -84,7 +80,6 @@ export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = 
     phone: form.phone,
     email: form.email,
     notes: form.notes,
-    tags: form.tags.split(/[,;\n]/).map((tag) => tag.trim()).filter(Boolean),
     identityType: form.identityType,
     identityNumber: form.identityNumber,
     nationality: form.nationality,
@@ -106,8 +101,7 @@ export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = 
         authorizedPerson: form.commercialAuthorizedPerson,
         dealerStatus: form.commercialDealerStatus,
         priceGroup: form.commercialPriceGroup,
-        paymentTermDays: Number(form.commercialPaymentTermDays),
-        notes: form.commercialNotes
+        paymentTermDays: Number(form.commercialPaymentTermDays)
       } : null
     } : {})
   };

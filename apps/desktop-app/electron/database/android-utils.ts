@@ -151,17 +151,6 @@ export function androidPayloadString(payload: Record<string, unknown>, field: st
   return typeof payload[field] === "string" ? payload[field].trim() : "";
 }
 
-export function androidPayloadStringArray(payload: Record<string, unknown>, field: string): string[] {
-  const value = payload[field];
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function getAndroidVersionConflict(
   payload: Record<string, unknown>,
   field: string,

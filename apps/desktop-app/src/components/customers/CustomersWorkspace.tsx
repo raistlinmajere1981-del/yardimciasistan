@@ -115,7 +115,7 @@ export function CustomersWorkspace({
       customer.phone,
       customer.email,
       customer.identityNumber,
-      customer.tags.join(" "),
+      customer.notes,
       ...(wholesaleEnabled && customer.commercialProfile ? [
         customer.commercialProfile.companyName,
         customer.commercialProfile.taxOffice,
@@ -158,10 +158,10 @@ export function CustomersWorkspace({
           value={searchText}
           onChange={(event) => {setSearchText(event.target.value);setOffset(0);}}
           placeholder={wholesaleEnabled
-            ? "Ad, telefon, firma, vergi no veya etiket"
+            ? "Ad, telefon, firma, vergi no veya not"
             : hasStayCustomers
-              ? "Ad, telefon, kimlik, etiket veya oda"
-              : "Ad, telefon, kimlik veya etiket"}
+              ? "Ad, telefon, kimlik, not veya oda"
+              : "Ad, telefon, kimlik veya not"}
         />
       </label>
       <ChoiceChips
@@ -281,7 +281,7 @@ function kbsTone(state: string): StatusTone {
 function dealerLabel(status: string) {
   if (status === "active") return "Aktif bayi";
   if (status === "inactive") return "Pasif bayi";
-  return "Bayi adayı";
+  return "Pasif bayi";
 }
 
 function dealerTone(status: string): StatusTone {

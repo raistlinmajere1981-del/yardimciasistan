@@ -74,19 +74,33 @@ try {
   assert.equal(enabled.has(C.CUSTOMERS), true);
   assert.equal(enabled.has(C.SALES), true, "Market's existing sales capability remains intact.");
 
+  const rawSchema = new DatabaseSync(database.databasePath);
+  try {
+    const customerColumns = rawSchema.prepare("PRAGMA table_info(customers)").all().map(row => row.name);
+    const dealerColumns = rawSchema.prepare("PRAGMA table_info(customer_commercial_profiles)").all();
+    assert.equal(customerColumns.includes("tags_json"), false);
+    assert.equal(dealerColumns.some(row=>row.name==="notes"), false);
+    assert.equal(dealerColumns.find(row=>row.name==="dealer_status")?.dflt_value, "'inactive'");
+    assert.ok(!String(dealerColumns.find(row=>row.name==="dealer_status")?.dflt_value).includes("candidate"));
+  } finally { rawSchema.close(); }
+
   const first = database.saveCustomer(baseCustomer({
     commercialProfile: {
       companyName: "Karadeniz Gıda Ltd. Şti.",
       taxOffice: "Cide",
       taxNumber: "1234567890",
       authorizedPerson: "Ticari Müşteri",
-      dealerStatus: "candidate",
+      dealerStatus: "inactive",
       priceGroup: "retail",
       paymentTermDays: 15,
-      notes: "İlk görüşme tamamlandı."
     }
   }));
   assert.equal(first.ok, true, first.ok ? "" : first.message);
+  const rejectedCandidate = database.saveCustomer(baseCustomer({
+    phone: "05550001991",
+    commercialProfile: {companyName: "Rejected Dealer", dealerStatus: "candidate", priceGroup: "dealer_a"}
+  }));
+  assert.equal(rejectedCandidate.ok, false, "candidate must not be a valid dealer state");
   const firstId = first.savedId;
 
   let firstCustomer = database.getDashboardData().customers.find((customer) => customer.id === firstId);
@@ -94,7 +108,7 @@ try {
   assert.equal(firstCustomer.commercialProfile?.companyName, "Karadeniz Gıda Ltd. Şti.");
   assert.equal(firstCustomer.commercialProfile?.taxOffice, "Cide");
   assert.equal(firstCustomer.commercialProfile?.taxNumber, "1234567890");
-  assert.equal(firstCustomer.commercialProfile?.dealerStatus, "candidate");
+  assert.equal(firstCustomer.commercialProfile?.dealerStatus, "inactive");
   assert.equal(firstCustomer.commercialProfile?.priceGroup, "retail");
   assert.equal(firstCustomer.commercialProfile?.paymentTermDays, 15);
 
@@ -108,7 +122,7 @@ try {
     assert.ok(stored?.business_id);
     assert.equal(stored.company_name, "Karadeniz Gıda Ltd. Şti.");
     assert.equal(stored.tax_number, "1234567890");
-    assert.equal(stored.dealer_status, "candidate");
+    assert.equal(stored.dealer_status, "inactive");
     assert.equal(Number(stored.payment_term_days), 15);
 
     const createdAt = String(stored.created_at);
@@ -123,7 +137,6 @@ try {
         dealerStatus: "active",
         priceGroup: "dealer_a",
         paymentTermDays: 30,
-        notes: "Bayi sözleşmesi hazır."
       }
     }));
     assert.equal(updated.ok, true, updated.ok ? "" : updated.message);
@@ -169,10 +182,9 @@ try {
       taxOffice: "Cide",
       taxNumber: "2222222222",
       authorizedPerson: "İkinci Yetkili",
-      dealerStatus: "candidate",
+      dealerStatus: "inactive",
       priceGroup: "retail",
       paymentTermDays: 0,
-      notes: ""
     }
   }));
   assert.equal(second.ok, true, second.ok ? "" : second.message);
@@ -190,7 +202,6 @@ try {
       dealerStatus: "active",
       priceGroup: "dealer_b",
       paymentTermDays: 10,
-      notes: ""
     }
   }));
   assert.equal(duplicateTax.ok, false);
@@ -223,7 +234,6 @@ try {
       dealerStatus: "active",
       priceGroup: "dealer_a",
       paymentTermDays: 30,
-      notes: ""
     }
   }));
   assert.equal(restored.ok, true, restored.ok ? "" : restored.message);
@@ -253,10 +263,9 @@ try {
       taxOffice: "Cide",
       taxNumber: "1234567890",
       authorizedPerson: "Yeni Yetkili",
-      dealerStatus: "candidate",
+      dealerStatus: "inactive",
       priceGroup: "dealer_b",
       paymentTermDays: 7,
-      notes: ""
     }
   }));
   assert.equal(reusedTax.ok, true, reusedTax.ok ? "" : reusedTax.message);

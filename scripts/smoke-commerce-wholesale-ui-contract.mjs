@@ -12,7 +12,6 @@ const fieldsSource = read("apps/desktop-app/src/components/customers/CustomerFor
 const commercialFieldsSource = read("apps/desktop-app/src/components/customers/CustomerCommercialProfileFields.tsx");
 const modelSource = read("apps/desktop-app/src/app/customer-model.ts");
 const workspaceSource = read("apps/desktop-app/src/components/customers/CustomerWorkspace.tsx");
-const createSource = read("apps/desktop-app/src/components/customers/CustomerCreateEditor.tsx");
 const listSource = read("apps/desktop-app/src/components/customers/CustomersWorkspace.tsx");
 const frameSource = read("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 const routeSource = read("apps/desktop-app/src/components/app/routes/CustomerWorkRoute.tsx");
@@ -25,14 +24,12 @@ assert.match(settingsSource, /\[C\.WHOLESALE\]:\s*"Bayi \/ Toptan Satış"/);
 
 assert.match(fieldsSource, /wholesaleEnabled\s*&&[\s\S]*CustomerCommercialProfileFields/);
 for (const label of [
-  "Ticari / bayi müşterisi",
   "Firma / unvan",
   "Yetkili kişi",
   "Vergi dairesi",
   "Vergi no",
   "Bayi durumu",
-  "Ödeme vadesi \\(gün\\)",
-  "Ticari not"
+  "Ödeme vadesi \\(gün\\)"
 ]) {
   assert.match(commercialFieldsSource, new RegExp(label));
 }
@@ -43,7 +40,9 @@ assert.match(modelSource, /commercialProfileEnabled:\s*boolean/);
 assert.match(modelSource, /customerFormToInput\(form: CustomerFormState, wholesaleEnabled = false\)/);
 assert.match(modelSource, /commercialProfile:\s*form\.commercialProfileEnabled/);
 assert.match(workspaceSource, /customerFormToInput\(form, wholesaleEnabled\)/);
-assert.match(createSource, /customerFormToInput\(form, wholesaleEnabled\)/);
+assert.match(fieldsSource, /Ticari \/ bayi müşterisi/);
+assert.match(commercialFieldsSource, /<option value="inactive">Pasif<\/option>/);
+assert.doesNotMatch(commercialFieldsSource, /value="candidate"|Ticari not/);
 assert.match(listSource, /customer\.commercialProfile\.companyName/);
 assert.match(listSource, /Aktif bayi/);
 assert.match(listSource, /label:\s*"Bayiler"/);

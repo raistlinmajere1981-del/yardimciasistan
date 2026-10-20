@@ -95,7 +95,7 @@ export function AppearanceSettingsSection({ preferences: uiPreferences, onPrefer
       <IconButton
         ref={triggerRef}
         type="button"
-        className="appearance-trigger"
+        className="appearance-trigger topbar-control"
         aria-label="Görünüm"
         title="Görünüm"
         aria-haspopup="dialog"

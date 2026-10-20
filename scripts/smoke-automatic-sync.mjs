@@ -1073,7 +1073,7 @@ function createSnapshot(databaseInstance) {
     })),
     customers: data.customers.map((customer) => ({
       id: customer.id, full_name: customer.fullName, phone: customer.phone, email: customer.email,
-      notes: customer.notes, tags: customer.tags, request_count: customer.requestCount,
+      notes: customer.notes, request_count: customer.requestCount,
       identity_type: customer.identityType, identity_number: customer.identityNumber,
       nationality: customer.nationality, birth_date: customer.birthDate, gender: customer.gender,
       document_serial_number: customer.documentSerialNumber,

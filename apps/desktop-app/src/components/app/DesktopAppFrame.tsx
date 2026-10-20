@@ -226,6 +226,10 @@ function DesktopAppFrameContent({
       header={(
         <PageHeader
           title={pageMeta.title}
+          noticeLeading={<SyncStatusIndicator
+            automaticSyncStatus={automaticSyncStatus}
+            onSync={() => void handlePullRequests()}
+          />}
           notice={centralNotice ? (
             <GlobalMessageBar
               tone={centralNotice.tone}
@@ -236,13 +240,9 @@ function DesktopAppFrameContent({
             <div className="page-header-tools">
               <HeaderUpdateStatus controller={updates} />
               <AppearanceSettingsSection preferences={uiPreferences} onPreferencesChange={onUiPreferencesChange} />
-              <SyncStatusIndicator
-                automaticSyncStatus={automaticSyncStatus}
-                onSync={() => void handlePullRequests()}
-              />
               {notificationsEnabled && <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />}
               <button
-                className="diagnostics-trigger"
+                className="diagnostics-trigger topbar-control"
                 type="button"
                 aria-label="Uygulama loglarını aç"
                 title="Uygulama logları"
@@ -252,7 +252,7 @@ function DesktopAppFrameContent({
                 <ScrollText size={18} aria-hidden="true" />
               </button>
               <button
-                className="app-lock-trigger"
+                className="app-lock-trigger topbar-control"
                 type="button"
                 aria-label="Uygulamayı kilitle"
                 title="Ekranı kilitle"

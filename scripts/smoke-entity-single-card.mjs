@@ -23,7 +23,7 @@ try {
   const product = runtime.saveRuntimeCatalogProduct(database.databasePath, { name: "Stoklu ürün", categoryId: category.id, salePrice: 20, trackInventory: true, minimumQuantity: 2 });
   runtime.setRuntimeInventoryCount(database.databasePath, { productId: product.id, countedQuantity: 10 });
   const existing = database.saveCustomer({ fullName: "Mevcut bayi", address: "Kayıtlı adres", identityNumber: "OLD123", birthDate: "1990-01-02", birthdayMessageEnabled: false,
-    commercialProfile: { companyName: "Kayıtlı firma", dealerStatus: "candidate", priceGroup: "dealer_a", paymentTermDays: 15 } });
+    commercialProfile: { companyName: "Kayıtlı firma", dealerStatus: "inactive", priceGroup: "dealer_a", paymentTermDays: 15 } });
   assert.equal(existing.ok, true, existing.message);
   const compact = createCompactUiFixture();
   let data = { ...database.getDashboardData(), rooms: [{ ...compact.rooms[0], isActive: true, status: "available", operationalCondition: "ready" }], tables: [{ ...compact.tables[0], isActive: true, status: "available", currentCustomerId: "", currentReservationId: "" }], roomOperations: [], tableOperations: [] };
@@ -117,13 +117,65 @@ try {
   await expect(dialog.getByLabel("Adres", { exact: true })).toHaveValue("Kayıtlı adres");
   await dialog.locator("summary").click();
   await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).not.toBeChecked();
+  await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).toBeEnabled();
   await expect(dialog.getByLabel("Kimlik / pasaport no", { exact: true })).toHaveValue("OLD123");
   await close();
   await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
-  await expect(dialog.getByRole("complementary", { name: "Müşteri işlemleri" })).toContainText("Kaydedilmemiş");
+  const rail = dialog.getByRole("complementary", { name: "Müşteri işlemleri" });
+  const quick = rail.getByRole("region", { name: "Hızlı işlemler" });
+  await expect(quick.getByRole("checkbox", { name: "Ön/arka", exact: true })).toHaveCount(1);
+  await expect(quick.getByRole("button", { name: "Kimliği kameradan tara", exact: true })).toBeDisabled();
+  await expect(quick.getByRole("button", { name: "Dosyadan AI ile Doldur", exact: true })).toBeDisabled();
+  await expect(quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true })).toHaveCount(1);
+  const birthday = quick.getByRole("checkbox", { name: "Mesaj gönder", exact: true });
+  await expect(birthday).toBeVisible();
+  await expect(birthday).toBeDisabled();
+  await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(0);
+  await quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true }).check();
+  await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toBeVisible();
+  await quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true }).uncheck();
+  await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(0);
+  const quickOrder = await quick.evaluate(el => {
+    const rail = el.closest(".detail-workspace-layout__rail");
+    const first = rail?.querySelector(".detail-section-card");
+    return first === el;
+  });
+  assert.equal(quickOrder, true, "Quick actions must be the topmost rail card");
+  await expect(quick.locator(".customer-identity-quick-actions__flags")).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Kimlik kartı bilgileri" }).getByRole("button", { name: "Kimliği kameradan tara" })).toHaveCount(0);
+  const railIdentityGeometry = await quick.locator(".customer-identity-quick-actions").evaluate(group => {
+    const row = group.querySelector(".customer-identity-quick-actions__row");
+    const check = row.querySelector("label").getBoundingClientRect();
+    const camera = row.querySelector("button").getBoundingClientRect();
+    const file = group.querySelector(".customer-identity-file-button").getBoundingClientRect();
+    return {
+      sameRow: Math.abs(check.top - camera.top) < 7,
+      fileBelow: file.top >= camera.bottom,
+      withinRail: row.scrollWidth <= row.clientWidth + 1
+    };
+  });
+  assert.deepEqual(railIdentityGeometry, { sameRow: true, fileBelow: true, withinRail: true });
+  await expect(dialog.getByRole("region", { name: "Kayıt özeti", exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Adres", { exact: true })).toHaveCount(1);
+  await expect(dialog.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Not", { exact: true })).toHaveCount(1);
+  const basicSection = dialog.getByRole("region", { name: "Temel bilgiler", exact: true });
+  const emailBounds = await basicSection.getByLabel("E-posta", { exact: true }).boundingBox();
+  const noteBounds = await basicSection.getByLabel("Not", { exact: true }).boundingBox();
+  const addressBounds = await basicSection.getByLabel("Adres", { exact: true }).boundingBox();
+  const gridBounds = await basicSection.locator(".form-grid").boundingBox();
+  assert.ok(emailBounds && noteBounds && addressBounds && gridBounds);
+  assert.ok(Math.abs(noteBounds.width - emailBounds.width) < 2, "Note and email share width");
+  assert.ok(Math.abs(addressBounds.x - gridBounds.x) < 2, "Address spans grid from the left");
+  assert.ok(Math.abs(addressBounds.x + addressBounds.width - gridBounds.x - gridBounds.width) < 2, "Address spans grid to the right");
+  assert.ok(Math.abs(noteBounds.x + noteBounds.width - gridBounds.x - gridBounds.width) < 18, "Right customer column ends close to the form edge");
   await dialog.getByLabel("Ad soyad", { exact: true }).fill("Yeni müşteri kartı");
   await dialog.getByLabel("Adres", { exact: true }).fill("Korunan adres");
-  await dialog.locator("summary").click(); await dialog.getByLabel("Kimlik / pasaport no", { exact: true }).fill("ABC-123");
+  await dialog.locator("summary").click();
+  const birthBounds = await dialog.getByRole("button", { name: "Doğum tarihi", exact: true }).boundingBox();
+  const expiryBounds = await dialog.getByRole("button", { name: "Son geçerlilik", exact: true }).boundingBox();
+  assert.ok(birthBounds && expiryBounds);
+  assert.ok(Math.abs(birthBounds.width - expiryBounds.width) < 2, "Birth and expiry dates share width");
+  await dialog.getByLabel("Kimlik / pasaport no", { exact: true }).fill("ABC-123");
   await button("Müşteri Kartını Kaydet").click();
   await expect(dialog.getByRole("heading", { name: "Yeni müşteri kartı", exact: true })).toBeVisible();
   await dialog.getByLabel("Not", { exact: true }).fill("Güncel kayıt notu"); await button("Müşteri Kartını Kaydet").click();

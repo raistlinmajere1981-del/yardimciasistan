@@ -3,7 +3,6 @@ import { readEnabledBusinessCapabilities } from "../business-capability-store";
 import { getCustomerRoomStays } from "./customer-room-stay-store";
 import { getReservations } from "./reservation-store";
 import { getHospitalityNotifications } from "./hospitality-notification-store";
-import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import {
   createId,
@@ -36,7 +35,7 @@ function customerPredicate(db: DatabaseSync, query: CustomerListQuery) {
   const args: string[] = [];
   if (query.id) { conditions.push("customers.id = ?"); args.push(query.id); }
   if (query.search?.trim()) {
-    conditions.push(`(instr(customer_search_text(customers.full_name || ' ' || customers.phone || ' ' || customers.email || ' ' || customers.identity_number || ' ' || customers.tags_json || ' ' || COALESCE(commercial.company_name,'') || ' ' || COALESCE(commercial.tax_number,'') || ' ' || COALESCE(commercial.tax_office,'') || ' ' || COALESCE(commercial.authorized_person,'')), ?) > 0
+    conditions.push(`(instr(customer_search_text(customers.full_name || ' ' || customers.phone || ' ' || customers.email || ' ' || customers.identity_number || ' ' || customers.notes || ' ' || COALESCE(commercial.company_name,'') || ' ' || COALESCE(commercial.tax_number,'') || ' ' || COALESCE(commercial.tax_office,'') || ' ' || COALESCE(commercial.authorized_person,'')), ?) > 0
       OR EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id JOIN rooms r ON r.id=cs.room_id WHERE sg.customer_id=customers.id AND cs.deleted_at='' AND instr(customer_search_text(r.name || ' ' || r.number), ?) > 0))`);
     args.push(query.search.trim().toLocaleLowerCase("tr-TR"), query.search.trim().toLocaleLowerCase("tr-TR"));
   }
@@ -80,7 +79,6 @@ export function getCustomers(db: DatabaseSync, query?: CustomerListQuery): Deskt
           customers.email,
           customers.source,
           customers.notes,
-          customers.tags_json,
           customers.last_contact_at,
           customers.identity_type,
           customers.identity_number,
@@ -105,7 +103,6 @@ export function getCustomers(db: DatabaseSync, query?: CustomerListQuery): Deskt
           commercial.dealer_status AS commercial_dealer_status,
           commercial.price_group AS commercial_price_group,
           commercial.payment_term_days AS commercial_payment_term_days,
-          commercial.notes AS commercial_notes,
           commercial.created_at AS commercial_created_at,
           commercial.updated_at AS commercial_updated_at,
           COUNT(DISTINCT requests.id) AS request_count,
@@ -137,7 +134,6 @@ function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
     email: String(row.email ?? ""),
     source: String(row.source ?? "manual"),
     notes: String(row.notes ?? ""),
-    tags: parseStoredStringArray(row.tags_json),
     lastContactAt: String(row.last_contact_at ?? ""),
     identityType: normalizeCustomerIdentityType(row.identity_type),
     identityNumber: String(row.identity_number ?? ""),
@@ -159,10 +155,9 @@ function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
       taxOffice: String(row.commercial_tax_office ?? ""),
       taxNumber: String(row.commercial_tax_number ?? ""),
       authorizedPerson: String(row.commercial_authorized_person ?? ""),
-      dealerStatus: String(row.commercial_dealer_status ?? "candidate") as CustomerDealerStatus,
+      dealerStatus: String(row.commercial_dealer_status ?? "inactive") as CustomerDealerStatus,
       priceGroup: String(row.commercial_price_group ?? "retail") as CommercePriceGroup,
       paymentTermDays: Number(row.commercial_payment_term_days ?? 0),
-      notes: String(row.commercial_notes ?? ""),
       createdAt: String(row.commercial_created_at ?? ""),
       updatedAt: String(row.commercial_updated_at ?? "")
     } : null,
@@ -173,7 +168,7 @@ function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
   };
 }
 
-const DEALER_STATUSES = new Set<CustomerDealerStatus>(["candidate", "active", "inactive"]);
+const DEALER_STATUSES = new Set<CustomerDealerStatus>(["active", "inactive"]);
 const PRICE_GROUPS = new Set<CommercePriceGroup>(["retail", "dealer_a", "dealer_b"]);
 
 function activeBusinessId(db: DatabaseSync): string {
@@ -196,10 +191,9 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
   const taxOffice = String(input.taxOffice ?? "").trim().replace(/\s+/g, " ");
   const taxNumber = String(input.taxNumber ?? "").trim().replace(/\s+/g, "");
   const authorizedPerson = String(input.authorizedPerson ?? "").trim().replace(/\s+/g, " ");
-  const dealerStatus = String(input.dealerStatus ?? "candidate") as CustomerDealerStatus;
+  const dealerStatus = String(input.dealerStatus ?? "inactive") as CustomerDealerStatus;
   const priceGroup = String(input.priceGroup ?? "retail") as CommercePriceGroup;
   const paymentTermDays = Number(input.paymentTermDays ?? 0);
-  const notes = String(input.notes ?? "").trim();
 
   if (!companyName) return { ok: false as const, message: "Ticari profil için firma / unvan gerekli." };
   if (companyName.length > 180) return { ok: false as const, message: "Firma / unvan en fazla 180 karakter olabilir." };
@@ -211,7 +205,6 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
   if (!Number.isInteger(paymentTermDays) || paymentTermDays < 0 || paymentTermDays > 3650) {
     return { ok: false as const, message: "Ödeme vadesi 0 ile 3650 gün arasında olmalı." };
   }
-  if (notes.length > 2000) return { ok: false as const, message: "Ticari not en fazla 2000 karakter olabilir." };
 
   return {
     ok: true as const,
@@ -223,7 +216,6 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
       dealerStatus,
       priceGroup,
       paymentTermDays,
-      notes
     }
   };
 }
@@ -295,14 +287,14 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
     db
       .prepare(`
           INSERT INTO customers (
-            id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+            id, full_name, phone, email, source, notes, last_contact_at,
             identity_type, identity_number, nationality, birth_date, gender,
             birthday_message_enabled,
             document_serial_number, document_expiry_date, birth_place, mother_name,
             father_name, issuing_authority, address, created_at, updated_at,
             deleted_at, sync_status
           ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, '',
+            ?, ?, ?, ?, ?, ?, '',
             ?, ?, ?, ?, ?,
             ?,
             ?, ?, ?, ?, ?,
@@ -314,7 +306,6 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
             phone = excluded.phone,
             email = excluded.email,
             notes = excluded.notes,
-            tags_json = excluded.tags_json,
             identity_type = excluded.identity_type,
             identity_number = excluded.identity_number,
             nationality = excluded.nationality,
@@ -339,7 +330,6 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
         customer.email,
         source,
         customer.notes,
-        JSON.stringify(customer.tags),
         customer.identityType,
         customer.identityNumber,
         customer.nationality,
@@ -366,9 +356,9 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
       db.prepare(`
         INSERT INTO customer_commercial_profiles (
           customer_id, business_id, company_name, tax_office, tax_number,
-          authorized_person, dealer_status, price_group, payment_term_days, notes,
+          authorized_person, dealer_status, price_group, payment_term_days,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(customer_id) DO UPDATE SET
           business_id = excluded.business_id,
           company_name = excluded.company_name,
@@ -378,7 +368,6 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
           dealer_status = excluded.dealer_status,
           price_group = excluded.price_group,
           payment_term_days = excluded.payment_term_days,
-          notes = excluded.notes,
           updated_at = excluded.updated_at
       `).run(
         id,
@@ -390,7 +379,6 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
         commercial.profile.dealerStatus,
         commercial.profile.priceGroup,
         commercial.profile.paymentTermDays,
-        commercial.profile.notes,
         commercialCreatedAt,
         now
       );

@@ -28,7 +28,7 @@ try{
   const xlsx=await writeXlsx([[{value:"Müşteri adı"},{value:"Telefon"},{value:"Doğum tarihi"},{value:"Vergi numarası"}],[{value:"Örnek Kişi"},{type:Number,value:905551112233},{type:Date,value:new Date("1990-02-03T00:00:00Z"),format:"yyyy-mm-dd"},{type:Number,value:1234567890}]]).toBuffer();
   const excel=await parseTransferFile("test.xlsx",xlsx,"customers");assert.equal(excel.records[0]["Doğum tarihi"],"1990-02-03");assert.equal(excel.records[0].Telefon,"905551112233");
   const fixture=database("customers");open.push(fixture.db);
-  const records=Array.from({length:650},(_,i)=>({fullName:`Müşteri ${String(i+1).padStart(3,"0")}`,phone:`+90555${String(i+1).padStart(7,"0")}`,email:`customer${i+1}@example.test`,companyName:i%2===0?`Firma ${i+1}`:"",dealerStatus:i%2===0?"active":"",priceGroup:i%2===0?"dealer_a":"",taxNumber:i%2===0?String(1000000000+i):"",notes:"=HYPERLINK(unsafe)",tags:"pilot|örnek"}));
+  const records=Array.from({length:650},(_,i)=>({fullName:`Müşteri ${String(i+1).padStart(3,"0")}`,phone:`+90555${String(i+1).padStart(7,"0")}`,email:`customer${i+1}@example.test`,companyName:i%2===0?`Firma ${i+1}`:"",dealerStatus:i%2===0?"active":"",priceGroup:i%2===0?"dealer_a":"",taxNumber:i%2===0?String(1000000000+i):"",notes:"=HYPERLINK(unsafe)"}));
   const document=source(Object.keys(records[0]),records),p=plan(fixture,"customers",document);
   assert.equal(p.preview.counts.new,650);assert.equal(p.preview.counts.error,0,JSON.stringify(p.preview.rows.filter(r=>r.status==="error")));
   assert.equal(fixture.db.prepare("SELECT COUNT(*) n FROM customers").get().n,0,"preview rolls back all writes");
@@ -36,22 +36,25 @@ try{
   const page=listCustomersPage(fixture.db,{limit:50});assert.equal(page.total,650);assert.equal(page.items.length,50);
   for(const n of [501,650]){const result=listCustomersPage(fixture.db,{search:`Müşteri ${n}`});assert.equal(result.matched,1);assert.equal(getCustomer(fixture.db,result.items[0].id).fullName,`Müşteri ${n}`);}
   assert.equal(listCustomersPage(fixture.db,{filter:"dealers"}).matched,325);
+  assert.equal(listCustomersPage(fixture.db,{search:"HYPERLINK"}).matched,650,"Customer notes must be searchable");
+  assert.equal(fixture.db.prepare("PRAGMA table_info(customers)").all().some(c=>c.name==="tags_json"),false,"Customer tag column must not exist");
+  assert.equal(fixture.db.prepare("PRAGMA table_info(customer_commercial_profiles)").all().some(c=>c.name==="notes"),false,"Separate commercial notes must not exist");
   assert.equal(plan(fixture,"customers",document).preview.counts.skip,650);
   // Existing dealer commercial profile fields must appear as *old values* in the row preview.
   const third=fixture.db.prepare("SELECT id FROM customers WHERE full_name='Müşteri 003'").get();
-  fixture.db.prepare("UPDATE customer_commercial_profiles SET tax_office='Eski Daire', authorized_person='Eski Yetkili', payment_term_days=30, notes='Eski ticari not' WHERE customer_id=?").run(third.id);
-  const edit=source(["phone","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays","commercialNotes"],[{
+  fixture.db.prepare("UPDATE customer_commercial_profiles SET tax_office='Eski Daire', authorized_person='Eski Yetkili', payment_term_days=30 WHERE customer_id=?").run(third.id);
+  const edit=source(["phone","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays"],[{
     phone:records[2].phone, companyName:"Firma 3 Yeni",taxOffice:"Yeni Daire",
     taxNumber:records[2].taxNumber,authorizedPerson:"Yeni Yetkili",dealerStatus:"active",
-    priceGroup:"dealer_b",paymentTermDays:"45",commercialNotes:"Yeni ticari not"
+    priceGroup:"dealer_b",paymentTermDays:"45"
   }]);
   const editPlan=plan(fixture,"customers",edit,{...P,conflicts:"update"});
   assert.equal(editPlan.preview.counts.update,1,JSON.stringify(editPlan.preview.rows));
-  assert.deepEqual(Object.fromEntries(["companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays","commercialNotes"]
+  assert.deepEqual(Object.fromEntries(["companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays"]
     .map(field=>[field,editPlan.preview.rows[0].before[field]])),{
       companyName:"Firma 3",taxOffice:"Eski Daire",taxNumber:records[2].taxNumber,
       authorizedPerson:"Eski Yetkili",dealerStatus:"active",priceGroup:"dealer_a",
-      paymentTermDays:"30",commercialNotes:"Eski ticari not"
+      paymentTermDays:"30"
     },"preview must show prior dealer data flattened under exported field keys");
   assert.equal(editPlan.preview.rows[0].after.companyName,"Firma 3 Yeni");
   assert.equal(fixture.db.prepare("SELECT company_name FROM customer_commercial_profiles WHERE customer_id=?").get(third.id).company_name,"Firma 3","preview must not update data");

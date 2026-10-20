@@ -970,7 +970,6 @@ final class OperationData {
     String phone = "";
     String email = "";
     String notes = "";
-    List<String> tags = new ArrayList<>();
     String identityType = "";
     String identityNumber = "";
     String nationality = "";
@@ -995,7 +994,6 @@ final class OperationData {
       record.phone = value(source, "phone", "");
       record.email = value(source, "email", "");
       record.notes = value(source, "notes", "");
-      record.tags = strings(source, "tags");
       record.identityType = value(source, "identity_type", "");
       record.identityNumber = "";
       record.nationality = value(source, "nationality", "");

@@ -71,10 +71,6 @@ final class CustomerDetailDialog {
       summary.addView(UiKit.divider(activity));
       summary.addView(detailLine("E-posta", customer.email));
     }
-    if (!customer.tags.isEmpty()) {
-      summary.addView(UiKit.divider(activity));
-      summary.addView(detailLine("Etiketler", String.join(", ", customer.tags)));
-    }
     page.addView(summary);
 
     if (hasCustomerIdentityDetails(customer)) {

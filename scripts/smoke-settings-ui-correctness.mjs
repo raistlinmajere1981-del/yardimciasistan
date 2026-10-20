@@ -81,6 +81,24 @@ try {
     await page.locator(kind === "rooms" ? "#settings-rooms-button" : "#settings-tables-button").click();
     const management = page.getByRole("dialog", { name: managementTitle, exact: true });
     await expect(management).toBeVisible();
+    if (kind === "rooms") {
+      const roomList = management.getByLabel("Oda özetleri");
+      const firstRoom = roomList.locator(".room-management-row").first();
+      const service = firstRoom.getByRole("checkbox", { name: "Oda 101 hizmette", exact: true });
+      await expect(roomList.getByText("Oda / Durum", { exact: true })).toBeVisible();
+      await expect(service).toBeChecked();
+      await expect(firstRoom.getByText("Hizmette", { exact: true })).toBeVisible();
+      await service.uncheck();
+      await expect(service).not.toBeChecked();
+      await expect(firstRoom.getByText("Hizmet dışı", { exact: true })).toBeVisible();
+      await expect(management.getByText("Kaydedilmemiş değişiklikler", { exact: true })).toBeVisible();
+      await expect(management.getByRole("button", { name: "Kaydet", exact: true })).toBeEnabled();
+      // Toggling service must not change the media selection or save immediately.
+      await expect(firstRoom).toHaveAttribute("aria-pressed", "true");
+      await service.check();
+      await expect(firstRoom.getByText("Hizmette", { exact: true })).toBeVisible();
+      await expect(management.getByRole("button", { name: "Kaydet", exact: true })).toBeDisabled();
+    }
     await verifySettingsAppearanceParity(page, `${kind}-management`);
     const managementBounds = await management.boundingBox();
     const shell = management.locator(".resource-management-shell");

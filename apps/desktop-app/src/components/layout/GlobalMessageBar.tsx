@@ -38,7 +38,7 @@ export function GlobalMessageBar({
       <span className="global-message-bar__icon" aria-hidden="true">
         <Icon size={17} />
       </span>
-      <span className="global-message-bar__message">{message}</span>
+      <span className="global-message-bar__message" title={message}>{message}</span>
       {(actionLabel && onAction) && (
         <button className="global-message-bar__action" type="button" onClick={onAction}>
           {actionLabel}

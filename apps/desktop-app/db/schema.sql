@@ -426,7 +426,6 @@ CREATE TABLE customers (
   email TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'manual',
   notes TEXT NOT NULL DEFAULT '',
-  tags_json TEXT NOT NULL DEFAULT '[]',
   last_contact_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -443,13 +442,12 @@ CREATE TABLE customer_commercial_profiles (
   tax_office TEXT NOT NULL DEFAULT '',
   tax_number TEXT NOT NULL DEFAULT '',
   authorized_person TEXT NOT NULL DEFAULT '',
-  dealer_status TEXT NOT NULL DEFAULT 'candidate'
-    CHECK (dealer_status IN ('candidate', 'active', 'inactive')),
+  dealer_status TEXT NOT NULL DEFAULT 'inactive'
+    CHECK (dealer_status IN ('active', 'inactive')),
   price_group TEXT NOT NULL DEFAULT 'retail'
     CHECK (price_group IN ('retail', 'dealer_a', 'dealer_b')),
   payment_term_days INTEGER NOT NULL DEFAULT 0
     CHECK (payment_term_days BETWEEN 0 AND 3650),
-  notes TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,

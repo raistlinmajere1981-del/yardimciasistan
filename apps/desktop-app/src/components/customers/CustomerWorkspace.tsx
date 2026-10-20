@@ -92,6 +92,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [entryRoomId, setEntryRoomId] = useState(data.rooms.find((room) => room.isActive)?.id ?? "");
   const [messagingBusy, setMessagingBusy] = useState(false);
   const [fieldsBusy, setFieldsBusy] = useState(false);
+  const [identityActionsTarget, setIdentityActionsTarget] = useState<HTMLDivElement | null>(null);
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading" || messagingBusy || fieldsBusy || customerLoading, dirty });
   const [history, setHistory] = useState(intent.mode === "history");
@@ -222,7 +223,31 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   >
     {!history ? <DetailWorkspaceLayout
       railLabel="Müşteri işlemleri" contentLabel="Müşteri bilgileri" rail={<>
-        <DetailSectionCard title="Kayıt özeti"><strong>{customer?.fullName ?? "Kaydedilmemiş"}</strong><span>{customer?.phone || (creating ? "Önce müşteri kartını kaydedin." : "Telefon yok")}</span></DetailSectionCard>
+        <DetailSectionCard className="customer-operation-card form-stack" title="Hızlı işlemler">
+          <div className="customer-workspace-identity-actions" ref={setIdentityActionsTarget} />
+          {customer && <div className="action-row customer-workspace-quick-actions">
+            {whatsappEnabled && onWhatsApp && <ActionButton
+
+              size="sm"
+              type="button"
+              onClick={() => leaveFor(() => onWhatsApp(customer))}
+              disabled={!customer.phone}
+            >
+              <MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz
+            </ActionButton>}
+            {onDelete && <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
+              try {
+                const result = await onDelete(customer);
+                if (result?.ok) navigation.closeWorkspace();
+                else if (result && !result.ok) reportAppStatus("error", result.message);
+              } catch (error) {
+                reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
+              }
+            })()}>
+              <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
+            </ActionButton>}
+          </div>}
+        </DetailSectionCard>
         {customer && <>
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
@@ -291,31 +316,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           {...(onPreparedCreditWhatsApp === undefined ? {} : { onPreparedWhatsApp: (message) => leaveFor(() => onPreparedCreditWhatsApp(message)) })}
         />}
 
-        <DetailSectionCard className="customer-operation-card form-stack" title="Hızlı işlemler">
-          <div className="action-row customer-workspace-quick-actions">
-            {whatsappEnabled && onWhatsApp && <ActionButton
-              
-              size="sm"
-              type="button"
-              onClick={() => leaveFor(() => onWhatsApp(customer))}
-              disabled={!customer.phone}
-            >
-              <MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz
-            </ActionButton>}
-            {onDelete && <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
-              try {
-                const result = await onDelete(customer);
-                if (result?.ok) navigation.closeWorkspace();
-                else if (result && !result.ok) reportAppStatus("error", result.message);
-              } catch (error) {
-                reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
-              }
-            })()}>
-              <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
-            </ActionButton>}
-          </div>
-        </DetailSectionCard>
         </>}
+
       </>}
     >
       {customerLoadError && <p role="alert">{customerLoadError}</p>}
@@ -329,6 +331,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           aiEnabled={aiEnabled}
           wholesaleEnabled={wholesaleEnabled}
           identityExpanded={staysEnabled}
+          identityActionsTarget={identityActionsTarget}
+          identityActionsDisabled={saveState === "loading" || messagingBusy || customerLoading || Boolean(customerLoadError)}
           onBusyChange={setFieldsBusy}
           onChange={setForm}
           isFormCurrent={() => formGeneration.current === formRevision && form.id === activeId}

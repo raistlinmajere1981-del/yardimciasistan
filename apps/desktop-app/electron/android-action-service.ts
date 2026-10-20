@@ -17,7 +17,7 @@ import { normalizeNullableStockNumber, normalizePositiveStockNumber, normalizeSi
 import { normalizeStatus } from "./database/request-utils.js";
 import {
   androidActionRelatedId, androidActionResolutionKey, androidActionTargetPage,
-  androidPayloadString, androidPayloadStringArray, createAndroidEntityId,
+  androidPayloadString, createAndroidEntityId,
   effectiveAndroidPermissions, friendlyDesktopActionFailure, getAndroidVersionConflict,
   isAndroidAdminOnlyAction, nextMutationTimestamp, normalizeAndroidDeviceRole,
   normalizeAndroidFailureTargetPage, parseEventPayload, type AndroidActionMutationResult
@@ -178,7 +178,7 @@ export function applyAndroidCustomerSave(db: DatabaseSync, action: AndroidSyncAc
   if (conflict) return conflict;
   const result = saveCustomer(db, {
     ...(updating ? { id: customerId } : {}), fullName: androidPayloadString(action.payload, "full_name"), phone: androidPayloadString(action.payload, "phone"),
-    email: androidPayloadString(action.payload, "email"), notes: androidPayloadString(action.payload, "notes"), tags: androidPayloadStringArray(action.payload, "tags"),
+    email: androidPayloadString(action.payload, "email"), notes: androidPayloadString(action.payload, "notes"),
     identityType: androidPayloadString(action.payload, "identity_type"), identityNumber: androidPayloadString(action.payload, "identity_number") || existing?.identity_number || "",
     nationality: androidPayloadString(action.payload, "nationality"), birthDate: androidPayloadString(action.payload, "birth_date"), gender: androidPayloadString(action.payload, "gender"),
     documentSerialNumber: androidPayloadString(action.payload, "document_serial_number") || existing?.document_serial_number || "", documentExpiryDate: androidPayloadString(action.payload, "document_expiry_date"),

@@ -360,7 +360,7 @@ try {
   assert.equal(manualCustomer.fullName, "Manuel Smoke Misafir");
   assert.equal(manualCustomer.phone, "+905553334455");
   assert.equal(manualCustomer.source, "manual");
-  assert.deepEqual(manualCustomer.tags, ["manuel", "talep"]);
+  assert.equal(manualCustomer.notes, manualRequest.message);
 
   const requestStatusResult = database.updateRequestStatus({
     requestId: "request_smoke_001",

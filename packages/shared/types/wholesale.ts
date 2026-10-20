@@ -1,4 +1,4 @@
-export type CustomerDealerStatus = "candidate" | "active" | "inactive";
+export type CustomerDealerStatus = "active" | "inactive";
 export type CommercePriceGroup = "retail" | "dealer_a" | "dealer_b";
 
 export interface CustomerCommercialProfile {
@@ -11,7 +11,6 @@ export interface CustomerCommercialProfile {
   dealerStatus: CustomerDealerStatus;
   priceGroup: CommercePriceGroup;
   paymentTermDays: number;
-  notes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,7 +23,6 @@ export interface SaveCustomerCommercialProfileInput {
   dealerStatus?: CustomerDealerStatus;
   priceGroup?: CommercePriceGroup;
   paymentTermDays?: number;
-  notes?: string;
 }
 
 

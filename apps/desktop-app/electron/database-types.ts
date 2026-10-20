@@ -124,7 +124,6 @@ export interface DesktopCustomer {
   email: string;
   source: string;
   notes: string;
-  tags: string[];
   lastContactAt: string;
   identityType: CustomerIdentityType;
   identityNumber: string;
@@ -716,7 +715,6 @@ export interface SaveCustomerInput {
   phone: string;
   email: string;
   notes: string;
-  tags: string[];
   identityType: string;
   identityNumber: string;
   nationality: string;

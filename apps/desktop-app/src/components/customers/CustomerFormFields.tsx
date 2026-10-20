@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Camera, Sparkles } from "lucide-react";
+import { createPortal } from "react-dom";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
 import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
 import { primeIdentityCameraFeedback } from "../../app/identity-camera-feedback";
@@ -30,6 +31,8 @@ interface CustomerFormFieldsProps {
   aiEnabled: boolean;
   wholesaleEnabled?: boolean;
   identityExpanded?: boolean;
+  identityActionsTarget: HTMLDivElement | null;
+  identityActionsDisabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
   onChange: Dispatch<SetStateAction<CustomerFormState>>;
   isFormCurrent: () => boolean;
@@ -41,6 +44,8 @@ export function CustomerFormFields({
   aiEnabled,
   wholesaleEnabled = false,
   identityExpanded = true,
+  identityActionsTarget,
+  identityActionsDisabled = false,
   onBusyChange,
   onChange,
   isFormCurrent,
@@ -64,6 +69,17 @@ export function CustomerFormFields({
   const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
     fieldEdits.current[field] = (fieldEdits.current[field] ?? 0) + 1;
     onChange(current => ({ ...current, [field]: value }));
+  };
+
+  const updateCommercialProfile = (enabled: boolean) => {
+    onChange(current => ({
+      ...current,
+      commercialProfileEnabled: enabled,
+      commercialCompanyName: enabled && !current.commercialCompanyName
+        ? current.fullName : current.commercialCompanyName,
+      commercialAuthorizedPerson: enabled && !current.commercialAuthorizedPerson
+        ? current.fullName : current.commercialAuthorizedPerson
+    }));
   };
 
   const updateBirthDate = (value: string) => {
@@ -161,65 +177,72 @@ export function CustomerFormFields({
           <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
-          <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
+          <label className="form-field form-field--medium customer-note-field">Not<textarea aria-label="Not" rows={1} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          <label className="form-field form-field--fluid form-field--span customer-address-field">Adres<textarea aria-label="Adres" rows={1} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
       </DetailSectionCard>
 
-      <DetailSectionCard title="Notlar ve adres">
-        <div className="form-grid form-grid--compact">
-          <label className="form-field form-field--fluid customer-note-field">Not<textarea aria-label="Not" rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
-          <label className="form-field form-field--fluid customer-address-field">Adres<textarea aria-label="Adres" rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
-        </div>
-      </DetailSectionCard>
-
-      {wholesaleEnabled && (
+      {wholesaleEnabled && form.commercialProfileEnabled && (
         <CustomerCommercialProfileFields form={form} onChange={onChange} />
       )}
 
-      <details className="customer-identity-details" open={identityOpen} onToggle={event => setIdentityOpen(event.currentTarget.open)}>
-      <summary>Kimlik bilgileri</summary>
-      <DetailSectionCard title="Kimlik kartı bilgileri" className="identity-form-section" actions={
-          <div className="action-row identity-scan-actions">
-            <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
+      <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
+      {identityActionsTarget && createPortal(
+        <div className="customer-identity-quick-actions">
+          <div className="customer-identity-quick-actions__row">
             <label className="form-check identity-back-side-toggle">
               <input
                 checked={scanBackSide}
-                disabled={!aiEnabled || analysisState === "loading"}
+                disabled={!aiEnabled || identityActionsDisabled || analysisState === "loading"}
                 onChange={(event) => setScanBackSide(event.target.checked)}
                 type="checkbox"
               />
               <strong>Ön/arka</strong>
             </label>
-            <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => { primeIdentityCameraFeedback(); setCameraOpen(true); }}>
-              <Camera size={15} aria-hidden="true" />
-              Kimliği kameradan tara
-            </ActionButton>
-            <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => identityFileRef.current?.click()}>
-              <Sparkles size={15} aria-hidden="true" />
-              {analysisState === "loading" ? "Okunuyor" : "Dosyadan AI ile Doldur"}
+            <ActionButton className="customer-identity-camera-button" aria-label="Kimliği kameradan tara" variant="secondary" size="sm" type="button" disabled={!aiEnabled || identityActionsDisabled || analysisState === "loading"} onClick={() => { primeIdentityCameraFeedback(); setCameraOpen(true); }}>
+              <Camera size={15} aria-hidden="true" />Kameradan tara
             </ActionButton>
           </div>
-      }>
+          <ActionButton className="customer-identity-file-button" variant="secondary" size="sm" type="button" disabled={!aiEnabled || identityActionsDisabled || analysisState === "loading"} onClick={() => identityFileRef.current?.click()}>
+            <Sparkles size={15} aria-hidden="true" />{analysisState === "loading" ? "Okunuyor" : "Dosyadan AI ile Doldur"}
+          </ActionButton>
+          <div className="customer-identity-quick-actions__flags">
+            {wholesaleEnabled && <label className="form-check">
+              <input
+                type="checkbox"
+                checked={form.commercialProfileEnabled}
+                disabled={identityActionsDisabled}
+                onChange={event => updateCommercialProfile(event.target.checked)}
+              />
+              <strong>Ticari / bayi müşterisi</strong>
+            </label>}
+            <label className="form-check customer-birthday-toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(form.birthDate) && form.birthdayMessageEnabled}
+                disabled={!form.birthDate || identityActionsDisabled}
+                onChange={event => update("birthdayMessageEnabled", event.target.checked)}
+              />
+              <strong>Mesaj gönder</strong>
+            </label>
+          </div>
+          {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
+        </div>,
+        identityActionsTarget
+      )}
+
+      <details className="customer-identity-details" open={identityOpen} onToggle={event => setIdentityOpen(event.currentTarget.open)}>
+      <summary>Kimlik bilgileri</summary>
+      <DetailSectionCard title="Kimlik kartı bilgileri" className="identity-form-section">
         <div className="form-grid form-grid--compact">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
             <option value="">Seçilmedi</option><option value="tc_identity_card">T.C. Kimlik Kartı</option><option value="passport">Pasaport</option><option value="other">Diğer</option>
           </select></label>
           <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
           <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-          <div className="form-field form-field--fluid customer-birth-field">
+          <div className="form-field form-field--short customer-birth-field">
             <span>Doğum tarihi</span>
-            <div className="customer-birth-controls">
-              <DatePicker ariaLabel="Doğum tarihi" value={form.birthDate} presets={[]} onChange={updateBirthDate} />
-              <label className="form-check customer-birthday-toggle">
-                <input
-                  checked={Boolean(form.birthDate) && form.birthdayMessageEnabled}
-                  disabled={!form.birthDate}
-                  onChange={(event) => update("birthdayMessageEnabled", event.target.checked)}
-                  type="checkbox"
-                />
-                <strong>Mesaj gönder</strong>
-              </label>
-            </div>
+            <DatePicker ariaLabel="Doğum tarihi" value={form.birthDate} presets={[]} onChange={updateBirthDate} />
           </div>
           <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
             <option value="">Seçilmedi</option><option value="female">Kadın</option><option value="male">Erkek</option><option value="unspecified">Belirtilmemiş</option>
@@ -231,7 +254,6 @@ export function CustomerFormFields({
           <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
           <label className="form-field form-field--medium">Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
         </div>
-        {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
       </DetailSectionCard>
 
       </details>

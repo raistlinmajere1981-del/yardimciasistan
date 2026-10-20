@@ -8,7 +8,6 @@ interface NormalizedCustomerInput {
   phone: string;
   email: string;
   notes: string;
-  tags: string[];
   identityType: CustomerIdentityType;
   identityNumber: string;
   nationality: string;
@@ -59,12 +58,6 @@ export function normalizeCustomerInput(
     return { ok: false, message: "Kimlik tarihleri geçerli gün/ay/yıl biçiminde olmalı." };
   }
 
-  const tags = [...new Set(
-    (Array.isArray(input?.tags) ? input.tags : [])
-      .map((tag) => normalizeCustomerSingleLine(tag, 40))
-      .filter(Boolean)
-  )].slice(0, 20);
-
   return {
     ok: true,
     customer: {
@@ -72,7 +65,6 @@ export function normalizeCustomerInput(
       phone: phoneResult?.ok ? phoneResult.e164 : "",
       email,
       notes: normalizeLimitedText(input?.notes, 4000),
-      tags,
       identityType,
       identityNumber,
       nationality: normalizeCustomerSingleLine(input?.nationality, 80),

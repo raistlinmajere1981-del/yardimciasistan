@@ -124,12 +124,21 @@ try {
   await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
   const createDialog = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
   await expect(createDialog).toBeVisible();
-  await expect(createDialog.getByText("Ticari bilgiler", { exact: true })).toBeVisible();
+  await expect(createDialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(0);
   await expect(createDialog.getByLabel("Firma / unvan", { exact: true })).toHaveCount(0);
+  const firstQuickActions = createDialog.getByRole("complementary", { name: "Müşteri işlemleri" })
+    .getByRole("region", { name: "Hızlı işlemler" });
+  await expect(firstQuickActions).toBeVisible();
+  await expect(firstQuickActions.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true })).toHaveCount(1);
+  const messageToggle = firstQuickActions.getByRole("checkbox", { name: "Mesaj gönder", exact: true });
+  await expect(messageToggle).toBeVisible();
+  await expect(messageToggle).toBeDisabled();
 
   await createDialog.getByLabel("Ad soyad", { exact: true }).fill("Ada Bayi");
   await createDialog.getByLabel("Telefon", { exact: true }).fill("05550002001");
   await createDialog.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true }).check();
+  await expect(createDialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toBeVisible();
+  await expect(firstQuickActions.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true })).toBeChecked();
 
   await expect(createDialog.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Ada Bayi");
   await expect(createDialog.getByLabel("Yetkili kişi", { exact: true })).toHaveValue("Ada Bayi");
@@ -141,20 +150,29 @@ try {
   await createDialog.getByLabel("Bayi durumu", { exact: true }).selectOption("active");
   await createDialog.getByLabel("Fiyat grubu", { exact: true }).selectOption("dealer_a");
   await createDialog.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("30");
-  await createDialog.getByLabel("Ticari not", { exact: true }).fill("İlk bayi profili.");
-  await createDialog.getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(createDialog).toHaveCount(0);
-
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.locator(".customer-record-row__open", {hasText:"Ada Bayi"}).click();
+  await createDialog.getByLabel("Not", { exact: true }).fill("İlk bayi profili.");
+  // Unified create/detail keeps the saved customer in the same workspace.
+  await createDialog.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   let workspace = page.locator("dialog.customer-workspace-frame");
+  await expect(workspace.getByRole("heading", { name: "Ada Bayi", exact: true })).toBeVisible();
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole("heading", { name: "Ada Bayi", exact: true })).toBeVisible();
   const profile = workspace.getByRole("region", { name: "Müşteri bilgileri", exact: true });
   await expect(profile.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Ad soyad", { exact: true })).toHaveValue("Ada Bayi");
-  await expect(profile.getByRole("region", { name: "Notlar ve adres", exact: true }).getByLabel("Adres", { exact: true })).toHaveCount(1);
+  await expect(profile.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Adres", { exact: true })).toHaveCount(1);
+  await expect(profile.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Not", { exact: true })).toHaveCount(1);
+  for (const label of ["Adres", "Not"]) {
+    const text = workspace.getByLabel(label, { exact: true });
+    await expect(text).toHaveAttribute("rows", "1");
+    const height = await text.evaluate(el => el.getBoundingClientRect().height);
+    assert.ok(height < 60, label + " should open one line tall");
+  }
+  await expect(workspace.getByRole("region", { name: "Kayıt özeti", exact: true })).toHaveCount(0);
+  await expect(workspace.getByRole("region", { name: "Notlar ve adres", exact: true })).toHaveCount(0);
   await expect(profile.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(1);
   const operations = workspace.getByRole("complementary", { name: "Müşteri işlemleri", exact: true });
+  // In wholesale profiles, identity fields are collapsed until explicitly needed.
+  await profile.locator("details.customer-identity-details > summary").click();
   await profile.getByRole("region", { name: "Kimlik kartı bilgileri", exact: true }).getByLabel("Veren makam", { exact: true }).scrollIntoViewIfNeeded();
   await expect(operations.getByRole("region", { name: "Web bayi erişimi", exact: true })).toBeInViewport();
   await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
@@ -190,8 +208,7 @@ try {
     authorizedPerson: "Ada Bayi",
     dealerStatus: "active",
     priceGroup: "dealer_a",
-    paymentTermDays: 30,
-    notes: "İlk bayi profili."
+    paymentTermDays: 30
   });
 
   const createdRow = raw.prepare(`
@@ -207,19 +224,19 @@ try {
   assert.equal(Number(createdRow.payment_term_days), 30);
 
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
-  await workspace.getByLabel("Ticari not", { exact: true }).fill("Vade güncellendi.");
+  await workspace.getByLabel("Not", { exact: true }).fill("Vade güncellendi.");
   await expect(workspace.getByRole("button", { name: "Geçmiş", exact: true })).toBeDisabled();
   await expect(accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" })).toBeDisabled();
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
 
   const updatedRow = raw.prepare(`
-    SELECT payment_term_days, notes
+    SELECT payment_term_days
     FROM customer_commercial_profiles
     WHERE customer_id = ?
   `).get(customerId);
   assert.equal(Number(updatedRow.payment_term_days), 45);
-  assert.equal(updatedRow.notes, "Vade güncellendi.");
+  assert.equal(raw.prepare("SELECT notes FROM customers WHERE id=?").get(customerId).notes, "Vade güncellendi.");
 
   await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(workspace).toHaveCount(0);
@@ -260,14 +277,14 @@ try {
   );
 
   const preserved = raw.prepare(`
-    SELECT company_name, dealer_status, payment_term_days, notes
+    SELECT company_name, dealer_status, payment_term_days
     FROM customer_commercial_profiles
     WHERE customer_id = ?
   `).get(customerId);
   assert.equal(preserved.company_name, "Ada Gıda Ltd. Şti.");
   assert.equal(preserved.dealer_status, "active");
   assert.equal(Number(preserved.payment_term_days), 45);
-  assert.equal(preserved.notes, "Vade güncellendi.");
+  assert.equal(raw.prepare("SELECT notes FROM customers WHERE id=?").get(customerId).notes, "Vade güncellendi.");
 
   await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(workspace).toHaveCount(0);
@@ -281,7 +298,7 @@ try {
   await expect(workspace).toBeVisible();
   await expect(workspace.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Ada Gıda Ltd. Şti.");
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
-  await expect(workspace.getByLabel("Ticari not", { exact: true })).toHaveValue("Vade güncellendi.");
+  await expect(workspace.getByLabel("Not", { exact: true })).toHaveValue("Vade güncellendi.");
 
   await page.setViewportSize({ width: 900, height: 1000 });
   await workspace.getByLabel("Veren makam", { exact: true }).scrollIntoViewIfNeeded();
@@ -299,11 +316,8 @@ try {
   await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
   const normalCreate = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
   await normalCreate.getByLabel("Ad soyad", { exact: true }).fill("Normal Müşteri");
-  await normalCreate.getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(normalCreate).toHaveCount(0);
-  await expect(page.locator("dialog.customer-workspace-frame")).toHaveCount(0);
-  await page.locator(".customer-record-row__open", {hasText:"Normal Müşteri"}).click();
-  await expect(page.locator("dialog.customer-workspace-frame")).toBeVisible();
+  await normalCreate.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
+  await expect(page.locator("dialog.customer-workspace-frame").getByRole("heading", { name: "Normal Müşteri", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-customer-ui-smoke-ok");

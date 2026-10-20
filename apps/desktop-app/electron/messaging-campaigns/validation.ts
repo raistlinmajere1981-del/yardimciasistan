@@ -23,7 +23,7 @@ export function validateSegmentFilter(value: unknown): MessagingSegmentFilter {
     const valid = rule.field === "phone"
       ? keys(rule, ["field", "operator"]) && ["present", "absent"].includes(String(rule.operator))
       : keys(rule, ["field", "operator", "value"]) && rule.operator === "eq" && typeof rule.value === "string" && (
-        rule.field === "dealerStatus" && ["candidate", "active", "inactive"].includes(rule.value)
+        rule.field === "dealerStatus" && ["active", "inactive"].includes(rule.value)
         || rule.field === "source" && ["web_form", "web_ai", "whatsapp", "manual", "phone", "android"].includes(rule.value));
     if (!valid) invalid("invalid_filter", "Segment alanı veya işleci desteklenmiyor.");
   }
