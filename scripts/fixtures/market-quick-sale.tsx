@@ -5,8 +5,8 @@ import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron
 import type { DesktopCustomer } from "../../apps/desktop-app/electron/database";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { useMarketController } from "../../apps/desktop-app/src/app/use-market-controller";
-import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
-import { WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
+import { productWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import "../../apps/desktop-app/src/styles/index.css";
 
@@ -65,6 +65,12 @@ function Harness() {
   }}>
     <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="market">
       <MarketPage customers={[customer]} controller={controller} activeView={marketView} onViewChange={setMarketView} />
+      <WorkspaceHost definition={productWorkspaceDefinition} context={{
+        products: controller.products, categories: controller.categories,
+        inventoryEnabled: true, productDataEnabled: true, busy: controller.dataState === "loading",
+        onReload: controller.reloadCatalog, onProductSaved: controller.upsertProduct,
+        onStateChange: controller.handleStateChange
+      }} />
     </WorkspaceNavigationProvider>
   </BusinessCapabilityRuntimeProvider>;
 }

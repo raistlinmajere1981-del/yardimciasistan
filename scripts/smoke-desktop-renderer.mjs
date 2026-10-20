@@ -814,7 +814,7 @@ try {
   await expect(productImagePreview).toHaveCSS("object-fit", "contain");
   await expect.poll(() => productImagePreview.evaluate(image => image.naturalWidth / image.naturalHeight)).toBe(2);
   await expect(menuItemWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
-  await expect(menuItemWorkspace.getByLabel("Stok güncelleme", { exact: true })).toBeVisible();
+  await expect(menuItemWorkspace.getByLabel("Stok işlemi", { exact: true })).toBeVisible();
   await menuItemWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true }).click();
   await expect(menuItemWorkspace.getByText(/Yalnız menü ilişkisi kaldırılır/)).toBeVisible();
   await menuItemWorkspace.getByRole("button", { name: "Vazgeç", exact: true }).click();
@@ -832,7 +832,7 @@ try {
   await expect(menuItemWorkspace.getByLabel("Ürün adı", { exact: true })).toBeDisabled();
   await expect(menuItemWorkspace.getByLabel("Menü fiyatı", { exact: true })).toBeDisabled();
   await expect(menuItemWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true })).toBeDisabled();
-  await expect(menuItemWorkspace.getByLabel("Yeni stok miktarı", { exact: true })).toBeDisabled();
+  await expect(menuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
   await page.evaluate(() => window.__releaseProductSave());
   const savedMenuItemWorkspace = page.getByRole("dialog", { name: "Canlı Serpme Kahvaltı" });
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
@@ -844,11 +844,13 @@ try {
   await expect(embeddedConfirm.locator(".action-button-danger")).toHaveText("Menüden kaldır");
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await embeddedConfirm.getByRole("button", { name: "Vazgeç" }).click();
-  await savedMenuItemWorkspace.getByLabel("Yeni stok miktarı", { exact: true }).fill("21");
+  await savedMenuItemWorkspace.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
+  await savedMenuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true }).fill("21");
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
-  await savedMenuItemWorkspace.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true }).click();
+  await savedMenuItemWorkspace.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
+  await savedMenuItemWorkspace.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
   await expect(savedMenuItemWorkspace.getByText("Stok miktarı değişmedi.", { exact: true })).toBeVisible();
-  await expect(savedMenuItemWorkspace.getByLabel("Yeni stok miktarı", { exact: true })).toHaveValue("");
+  await expect(savedMenuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true })).toHaveValue("");
   await savedMenuItemWorkspace.getByLabel("Menü fiyatı", { exact: true }).fill("600");
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
   await page.evaluate(() => {
@@ -862,7 +864,7 @@ try {
   await savedMenuItemWorkspace.getByRole("button", { name: "Menü Sunumunu Kaydet", exact: true }).click();
   await expect(savedMenuItemWorkspace.getByLabel("Ürün adı", { exact: true })).toBeDisabled();
   await expect(savedMenuItemWorkspace.getByLabel("Menü fiyatı", { exact: true })).toBeDisabled();
-  await expect(savedMenuItemWorkspace.getByLabel("Yeni stok miktarı", { exact: true })).toBeDisabled();
+  await expect(savedMenuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true })).toBeDisabled();
   await page.evaluate(() => window.__releaseMenuSave());
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Menü Sunumunu Kaydet", exact: true })).toBeDisabled();
@@ -1682,8 +1684,11 @@ try {
   await expect(customerEditor.getByRole("button", { name: "Doğum tarihi", exact: true })).toHaveAttribute("data-picker-value", "1991-04-23");
   await customerEditor.getByLabel("Telefon").fill("+905551112244");
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
-  await customerEditor.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(customerEditor).toHaveCount(0);
+  const savedCustomerWorkspace = conversionPage.getByRole("dialog", { name: "Kimlik Smoke", exact: true });
+  await expect(savedCustomerWorkspace).toBeVisible();
+  await savedCustomerWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(conversionPage.getByRole("dialog")).toHaveCount(0);
   const createdCustomerRow = conversionPage.locator(".customer-record-row").filter({ hasText: "Kimlik Smoke" });
   await expect(createdCustomerRow).toBeVisible();

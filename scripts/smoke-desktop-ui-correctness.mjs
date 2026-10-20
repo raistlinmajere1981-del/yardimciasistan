@@ -124,6 +124,7 @@ try {
     await rows.nth(0).focus(); await page.keyboard.press('Space');
     await expect(rows.nth(0)).toHaveClass(/is-media-selected/);
     // Native checkbox activation must update the checkbox but not select its row.
+    await rows.nth(1).getByRole('checkbox').uncheck();
     await rows.nth(1).getByRole('checkbox').focus(); await page.keyboard.press('Space');
     await expect(rows.nth(1).getByRole('checkbox')).toBeChecked();
     await expect(rows.nth(0)).toHaveClass(/is-media-selected/);

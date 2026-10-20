@@ -332,7 +332,8 @@ try {
   await expect(createDialog).toBeVisible({ timeout: 2500 });
   await expect(createDialog.getByLabel("Ürün adı")).toHaveValue("Open Food Ürünü");
   expect(await page.evaluate(() => window.__m8bStats.findCalls)).toBe(findBeforeBatch + 1);
-  await createDialog.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await createDialog.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
+  await createDialog.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
   await expect(quantity()).toHaveValue("2");
   await expect(discount()).toHaveValue("5");

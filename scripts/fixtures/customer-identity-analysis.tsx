@@ -1,4 +1,4 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { DesktopCustomer, DesktopIdentityImageAnalyzeInput, DesktopIdentityImageAnalyzeResult, SaveCustomerInput } from "../../apps/desktop-app/electron/database";
 import { defaultDashboardData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
@@ -6,8 +6,6 @@ import { toCustomerForm } from "../../apps/desktop-app/src/app/customer-model";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import type { SyncState } from "../../apps/desktop-app/src/app/runtime-state";
 import { customerWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
-import { CustomerCreateEditor } from "../../apps/desktop-app/src/components/customers/CustomerCreateEditor";
-import { WorkspaceFrame } from "../../apps/desktop-app/src/components/workspace/WorkspaceFrame";
 import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import "../../apps/desktop-app/src/styles/index.css";
 
@@ -43,9 +41,8 @@ async function save(input: SaveCustomerInput) {
   return { ok: true as const, message: "Kaydedildi.", savedId: input.id || "created", dashboardData: data };
 }
 
-function Harness() {
+function Harness({ initialId, reset, page }: { initialId: string; reset: (id?: string) => void; page: "pension" | "customerWork" }) {
   const navigation = useWorkspaceNavigation();
-  const [open, setOpen] = useState(false);
   const [dashboardData, setDashboardData] = useState(data);
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -54,27 +51,29 @@ function Harness() {
     dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId, setSelectedWhatsAppRequestId
   });
-  const mode = new URLSearchParams(location.search).get("mode");
-  const quickCreate = mode === "quick-create";
-  control.customerIdentity.closeEditor = () => setOpen(false);
-  control.customerIdentity.openCustomer = id => navigation.openWorkspace({
-    entityType: "customer", entityId: id, mode: "main", returnContext: { page: "customerWork" }
-  });
-  const editor = <CustomerCreateEditor open={open} aiEnabled withinWorkspace={quickCreate}
-    onClose={() => setOpen(false)} onSave={save} onCreated={() => {}} onAnalyzeIdentity={analyze} />;
+  const openCustomer = useCallback((id: string, mode: "main" | "create" = "main") => navigation.openWorkspace({
+    entityType: "customer", entityId: id, mode, returnContext: page === "pension" ? { page, view: "rooms" } : { page }
+  }), [navigation, page]);
+  useEffect(() => { if (initialId) openCustomer(initialId); }, [initialId, openCustomer]);
+  // Simulate an owner teardown or entity replacement, independently of the UI close guard.
+  control.customerIdentity.closeEditor = () => reset();
+  control.customerIdentity.openCustomer = id => { reset(id); return true; };
   return <main>
     <p data-testid="identity-global-status">{syncState}: {statusMessage}</p>
-    <button type="button" onClick={() => setOpen(true)}>Müşteri formunu aç</button>
-    {mode === "workspace" ? <WorkspaceHost definition={customerWorkspaceDefinition} context={{
-      data, aiEnabled: true, whatsappEnabled: false, reservationsEnabled: false, staysEnabled: false,
+    <button type="button" onClick={() => openCustomer("new-customer", "create")}>Müşteri formunu aç</button>
+    <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+      data: dashboardData, aiEnabled: true, whatsappEnabled: false, reservationsEnabled: false, staysEnabled: true,
       customerCreditEnabled: false, onWhatsApp: () => {}, onSave: save, onAnalyzeIdentity: analyze,
       onDelete: async () => undefined
-    }} /> : quickCreate && open ? <WorkspaceFrame title="Quick-create fixture" presentation="centered" onClose={() => setOpen(false)}>
-      {editor}
-    </WorkspaceFrame> : editor}
+    }} />
   </main>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode>
-  <WorkspaceNavigationProvider page="customerWork" definitions={workspaceDefinitions}><Harness /></WorkspaceNavigationProvider>
-</StrictMode>);
+function Fixture() {
+  const [session, setSession] = useState({ generation: 0, initialId: "" });
+  const page = new URLSearchParams(location.search).get("mode") === "quick-create" ? "pension" : "customerWork";
+  return <WorkspaceNavigationProvider key={session.generation} page={page} definitions={workspaceDefinitions}>
+    <Harness page={page} initialId={session.initialId} reset={(id = "") => setSession(previous => ({ generation: previous.generation + 1, initialId: id }))} />
+  </WorkspaceNavigationProvider>;
+}
+createRoot(document.getElementById("root")!).render(<StrictMode><Fixture /></StrictMode>);

@@ -126,7 +126,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   snapshot();
   window.fixturePatch = patch => { Object.assign(dashboard, copy(patch)); window.fixturePublishDashboard?.(snapshot()); };
   window.fixtureSetOrders = next => { orders = copy(next); window.fixturePublishDashboard?.(snapshot()); };
-  window.fixtureCapabilities = capabilities; window.fixtureDashboard = dashboard; window.fixtureCalls = calls;
+  window.fixtureCapabilities = capabilities; window.fixtureDashboard = copy(dashboard); window.fixtureCalls = calls;
   window.fixtureState = () => copy({ orders, dashboard, finance, transfers });
   const wait = kind => window[`fixtureDelay${kind}`] ? new Promise(resolve => { window[`fixtureResolve${kind}`] = resolve; }) : Promise.resolve();
   const orderFor = id => orders.find(order => order.id === id);

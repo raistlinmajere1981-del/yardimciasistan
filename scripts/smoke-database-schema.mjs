@@ -342,7 +342,8 @@ function assertCurrentDatabase(database, options = {}) {
     "dealer_status",
     "price_group",
     "payment_term_days",
-    "notes"
+    "created_at",
+    "updated_at"
   ]) {
     assert.equal(
       commercialProfileColumns.has(column),

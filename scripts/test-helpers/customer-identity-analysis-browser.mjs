@@ -55,7 +55,7 @@ export async function checkCustomerIdentityAnalysis(browser, server) {
     else await page.getByRole("button", { name: "Müşteri formunu aç" }).click();
     await expect(page.getByLabel("Telefon", { exact: true })).toBeVisible();
   };
-  const analysisStatus = page.locator(".identity-form-section .form-status");
+  const analysisStatus = page.locator(".customer-identity-quick-actions .form-status");
   const globalStatus = page.getByTestId("identity-global-status");
   try {
     await open();
@@ -76,7 +76,9 @@ export async function checkCustomerIdentityAnalysis(browser, server) {
 
     await open();
     request = await start("closed.jpg");
-    await page.getByRole("button", { name: "Vazgeç", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
+    // An external owner teardown still invalidates a pending response.
+    await page.evaluate(() => window.customerIdentity.closeEditor());
     await page.getByRole("button", { name: "Müşteri formunu aç" }).click();
     await page.getByLabel("Ad soyad", { exact: true }).fill("Yeni müşteri");
     await settle(request, success());
@@ -88,10 +90,11 @@ export async function checkCustomerIdentityAnalysis(browser, server) {
       await open(mode);
       await page.getByLabel("Ad soyad", { exact: true }).fill("Kaydedilen müşteri");
       request = await start(`${mode}-continue.jpg`);
+      await expect(page.getByRole("button", { name: "Kaydet ve Yeni Ekle", exact: true })).toBeDisabled();
+      await settle(request, success({ full_name: "Kaydedilen müşteri" }));
       await page.getByRole("button", { name: "Kaydet ve Yeni Ekle", exact: true }).click();
       await expect(page.getByLabel("Ad soyad", { exact: true })).toHaveValue("");
       const next = await start(`${mode}-next.jpg`);
-      await settle(request, success({ full_name: "Önceki müşteri" }));
       await expect(page.getByLabel("Ad soyad", { exact: true })).toHaveValue("");
       await expect(analysisStatus).toHaveClass(/sync-loading/);
       await expect(globalStatus).toHaveText(/^loading:/);
@@ -116,11 +119,9 @@ export async function checkCustomerIdentityAnalysis(browser, server) {
     await open("workspace");
     request = await start("discard.jpg");
     await page.getByLabel("Not", { exact: true }).fill("Geri alınacak not");
-    // Queue a response before a synchronous reset, before React can commit either.
-    await page.evaluate(({ index, result }) => {
-      window.customerIdentity.requests[index].resolve(result);
-      [...document.querySelectorAll("button")].find(button => button.textContent.trim() === "Değişiklikleri Geri Al").click();
-    }, { index: request, result: success() });
+    await expect(page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true })).toBeDisabled();
+    await settle(request, success());
+    await page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
     await flush();
     await expect(page.getByLabel("Ad soyad", { exact: true })).toHaveValue("customer-a");
     await expect(page.getByLabel("Not", { exact: true })).toHaveValue("");

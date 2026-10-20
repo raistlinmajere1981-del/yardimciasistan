@@ -62,3 +62,25 @@ test('feature CSS cannot redefine card/list/form primitive ownership', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('header owns scoped topbar controls while shell layout and feature overrides remain guarded', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'desktop-header-audit-'));
+  try {
+    const fixture = {
+      'styles/index.css': '@import "./components/header.css" layer(components); @import "./pages/feature.css" layer(pages);',
+      'styles/components/header.css': '.page-header button.topbar-control { color: var(--color-text); } .page-header .sync-status-indicator:hover { background: var(--color-bg-hover); } .sidebar { width: 100px; } .page-header { height: 100px; }',
+      'styles/pages/feature.css': '.page-header button.topbar-control { color: var(--color-danger); }'
+    };
+    const files = Object.entries(fixture).map(([name, source]) => {
+      const file = path.join(root, name);
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, source);
+      return file;
+    });
+    const issues = desktopStyleAudit(files).violations.filter(issue => issue.kind === 'shellOutsideLayout');
+    assert.deepEqual(issues.map(issue => issue.detail), ['.sidebar', '.page-header', '.page-header button.topbar-control']);
+    assert(issues.at(-1).file.endsWith('/pages/feature.css'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

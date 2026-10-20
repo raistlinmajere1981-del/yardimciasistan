@@ -46,9 +46,9 @@
   width: min(var(--dialog-width-lg), calc(100vw / var(--ui-scale) - var(--space-4)));
   height: min(
     calc(100dvh / var(--ui-scale) - var(--space-10)),
-    max(0px, calc(var(--workspace-canvas-height, 100dvh) - var(--space-4)))
+    max(0px, calc(var(--workspace-canvas-height, calc(100dvh / var(--ui-scale) - var(--workspace-canvas-top, var(--header-height)))) - var(--space-4)))
   );
-  max-height: max(0px, calc(var(--workspace-canvas-height, 100dvh) - var(--space-4)));
+  max-height: max(0px, calc(var(--workspace-canvas-height, calc(100dvh / var(--ui-scale) - var(--workspace-canvas-top, var(--header-height)))) - var(--space-4)));
   animation: workspace-enter var(--motion-surface) var(--ease-standard);
 }
 .workspace-frame--full-canvas {

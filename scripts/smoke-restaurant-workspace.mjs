@@ -270,7 +270,7 @@ try {
 
   // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
   await button('Bahçe 1 masasını aç').click();
-  await page.evaluate(() => { window.fixtureDelayCustomer = true; });
+  await page.evaluate(() => { window.fixtureDelayCustomer = true; delete window.fixtureResolveCustomer; });
   await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveCustomer)).toBe('function');
   await page.evaluate(() => {

@@ -86,7 +86,7 @@ export function desktopStyleAudit(files) {
         const key = `${rule.scope}:${selector}`;
         if (seen.has(key)) values.duplicateSelectors++;
         seen.add(key);
-        if (!file.includes('/styles/layout/') && /^(?:\.desktop-shell|\.content|\.sidebar|\.page-header|\.page-content)(?:[.:#\s]|$)/.test(selector) && !file.endsWith('/components/navigation.css')) add('shellOutsideLayout', file, selector, rule.line);
+        if (!file.includes('/styles/layout/') && /^(?:\.desktop-shell|\.content|\.sidebar|\.page-header|\.page-content)(?:[.:#\s]|$)/.test(selector) && !file.endsWith('/components/navigation.css') && !(file.endsWith('/components/header.css') && /^\.page-header\s+/.test(selector))) add('shellOutsideLayout', file, selector, rule.line);
         if (!file.includes('/styles/layout/') && file.endsWith('/components/navigation.css') && /^\.(?:desktop-shell|content|sidebar)(?:\.is-collapsed)?$/.test(selector)) add('shellOutsideLayout', file, selector, rule.line);
         if (/\/pages\/|\/components\/(?!navigation|header|notifications)/.test(file) && !file.includes('/styles/layout/') && /\.(?:sidebar(?:-[\w-]+)?|nav-item|topbar|page-header(?:__[\w-]+|-[\w-]+)?)(?![\w-])/.test(selector)) add('featureShellSelector', file, selector, rule.line);
         if (/\[data-(?:theme|mode)(?:[=\]])/i.test(selector)) add('legacyAppearanceSelector', file, selector, rule.line);

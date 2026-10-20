@@ -26,8 +26,8 @@ assert.match(productFields, /Bayi A fiyatı/);
 assert.match(productFields, /Bayi B fiyatı/);
 assert.match(productFields, /placeholder="Perakende fiyatı kullan"/);
 
-assert.match(marketProducts, /BUSINESS_CAPABILITIES\.WHOLESALE/);
-assert.match(marketProducts, /wholesaleEnabled=\{wholesaleEnabled\}/);
+assert.match(marketProducts, /navigation\.openWorkspace\(/);
+assert.match(marketProducts, /entityType: "product"/);
 assert.match(productWorkspace, /wholesaleEnabled=\{wholesaleEnabled\}/);
 assert.match(
   frame,

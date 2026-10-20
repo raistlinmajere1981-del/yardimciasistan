@@ -110,7 +110,9 @@ try {
     await expect(create).toHaveCount(0);
     const saved = createdProducts.at(-1);
     assert.equal(database.getCommerceProductPublication(saved.id).isPublished, !optOut);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const detail = page.getByRole("dialog", { name: saved.name, exact: true });
+    await expect(detail).toBeVisible();
+    await detail.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
     await page.locator('.market-catalog-record[data-sort-kind="products"]').filter({hasText: saved.name}).getByRole("button").filter({hasText:saved.name}).click();
     if (optOut) await expect(checkbox).not.toBeChecked();
     else await expect(checkbox).toBeChecked();
@@ -129,6 +131,7 @@ try {
   await expect(offlineCreate).toHaveCount(0);
   selectOnlineSales(true);
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
+  await page.getByRole("dialog", { name: "Created offline", exact: true }).getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Exercise the real detail editor against the same temporary database. Counting
@@ -172,13 +175,17 @@ try {
   await expect(detail.locator('.product-workspace-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeVisible();
   const fields = detail.getByRole("region", { name: "Ürün detayları", exact: true });
   const rail = detail.getByRole("complementary", { name: "Ürün işlemleri", exact: true });
-  for (const title of ["Ürün bilgileri", "Sınıflandırma", "Fiyatlandırma", "Stok kuralları", "Açıklama"]) {
+  for (const title of ["Ürün bilgileri", "Fiyatlandırma", "Açıklama"]) {
     await expect(fields.getByRole("heading", { name: title, exact: true })).toHaveCount(1);
   }
   await expect(fields.getByLabel("Ürün adı", { exact: true })).toHaveValue(stockProduct.name);
+  const railScroll = await rail.evaluate(element => element.scrollTop);
   await fields.getByRole("textbox", { name: "Açıklama", exact: true }).scrollIntoViewIfNeeded();
-  await expect(rail.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true })).toBeInViewport();
+  assert.equal(await rail.evaluate(element => element.scrollTop), railScroll, "Product fields scroll independently of operations.");
+  await rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).scrollIntoViewIfNeeded();
+  await expect(rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true })).toBeInViewport();
   for (const name of ["Aktif ürün", "Stok takibi", "Hızlı erişim", "Web satışında yayınla"]) {
+    await rail.getByRole("checkbox", { name, exact: true }).scrollIntoViewIfNeeded();
     await expect(rail.getByRole("checkbox", { name, exact: true })).toBeInViewport();
   }
   await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeInViewport();
@@ -195,16 +202,19 @@ try {
       return getComputedStyle(element).objectFit === "contain" && bounds.height <= frame.height && bounds.width <= frame.width;
     }), true, "Portrait and landscape previews must fit a bounded, non-cropping frame.");
   }
-  await rail.getByLabel("Yeni stok miktarı", { exact: true }).fill("12");
+  await rail.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
+  await rail.getByLabel("Stok işlem miktarı", { exact: true }).fill("12");
   await expect(fields.getByLabel("Ürün adı", { exact: true })).toBeDisabled();
   await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
   await expect(detail.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
-  await rail.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true }).click();
-  await expect(rail.getByRole("status").filter({ hasText: "Stok güncellendi." })).toBeVisible();
+  await rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
+  await expect(detailPage.getByRole("dialog")).toHaveCount(1);
+  await rail.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
+  await expect(rail.getByRole("status").filter({ hasText: "Fiziksel sayım kaydedildi." })).toBeVisible();
   assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
   assert.equal(detailCalls.filter(method => method === "save").length, 0);
   await fields.getByLabel("Ürün adı", { exact: true }).fill("Hybrid saved product");
-  await expect(rail.getByLabel("Yeni stok miktarı", { exact: true })).toBeDisabled();
+  await expect(rail.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
   await expect(detail.getByRole("button", { name: "Stok Hareketleri", exact: true })).toBeDisabled();
   await detail.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(detail.getByRole("heading", { name: "Hybrid saved product", exact: true })).toBeVisible();
