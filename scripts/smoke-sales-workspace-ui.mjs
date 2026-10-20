@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
@@ -15,6 +15,9 @@ const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js")
 const presentation = require("../apps/desktop-app/dist-electron/commerce-catalog-presentation-store.js");
 const { completeMarketSale } = require("../apps/desktop-app/dist-electron/market-sale-operation.js");
 const { readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { createTransferPlan, applyTransferPlan } = require("../apps/desktop-app/dist-electron/data-transfer-service.js");
+const { parseTransferFile, suggestTransferMapping } = require("../apps/desktop-app/dist-electron/data-transfer-format.js");
+const { DEFAULT_TRANSFER_PREFERENCES } = require("../apps/desktop-app/dist-electron/data-transfer-contract.js");
 const dir = mkdtempSync(join(tmpdir(), "sales-ui-"));
 const database = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir });
 let server, browser, page;
@@ -204,9 +207,11 @@ try {
   await workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
   assert.equal(runtime.listRuntimeCatalogProducts(path).find(item => item.id === kg.id).quickAccessEnabled, true);
-  await workspace.getByLabel("Yeni stok miktarı", { exact: true }).fill("12,5"); await workspace.getByLabel("Stok açıklaması", { exact: true }).fill("Canlı sayım");
-  await workspace.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true }).click();
-  await expect(workspace).toContainText("Stok güncellendi."); assert.equal(countCalls[0].actorSource, "desktop-product-workspace");
+  await workspace.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
+  await workspace.getByLabel("Stok işlem miktarı", { exact: true }).fill("12,5"); await workspace.getByLabel("Kısa not", { exact: true }).fill("Canlı sayım");
+  await workspace.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
+  await workspace.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
+  await expect(workspace).toContainText("Fiziksel sayım kaydedildi."); assert.equal(countCalls[0].actorSource, "desktop-product-workspace");
   assert.equal(runtime.getRuntimeInventoryBalance(path, kg.id).quantity, 12.5);
   await workspace.getByRole("button", { name: "Stok Hareketleri", exact: true }).click();
   await expect(workspace.getByRole("region", { name: "Stok hareketleri", exact: true })).toContainText("Canlı sayım");
@@ -219,7 +224,7 @@ try {
   await expect(categories.getByRole("button")).toHaveText(["Tümü", "Hızlı Erişim", "Gıda", "İçecek"]);
   await categories.getByRole("button", { name: "Hızlı Erişim", exact: true }).click();
   await expect(grid.locator(".market-sale-product > span > strong")).toHaveText(["Su", "Ekmek", "Elma kg"]);
-  // Creating a retail product saves to the list without launching its detail workspace.
+  // Creating a retail product continues in its canonical saved-product workspace.
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
   const createProduct = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
@@ -229,9 +234,103 @@ try {
   await createProduct.getByLabel("Alış fiyatı", { exact: true }).fill("0");
   await createProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(createProduct).toHaveCount(0);
+  const savedProduct = page.getByRole("dialog", { name: "Duman test ürünü", exact: true });
+  await expect(savedProduct).toBeVisible();
+  await savedProduct.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator('.market-catalog-record[data-sort-kind="products"]').filter({ hasText: "Duman test ürünü" })).toBeVisible();
   assert.equal(runtime.listRuntimeCatalogProducts(path).some(product => product.name === "Duman test ürünü"), true);
+
+  // Category filters share search, while counts describe the full catalog.
+  const filters = page.getByRole("group", { name: "Ürün listesi" });
+  const search = page.getByPlaceholder("Ad, marka, SKU veya barkod ara");
+  await expect(filters.getByRole("button")).toHaveText(["Tüm ürünler", "Hızlı Erişim", "Gıda · 2", "İçecek · 1"]);
+  await filters.getByRole("button", { name: "Gıda · 2", exact: true }).click();
+  await expect(productRows).toHaveCount(2);
+  await expect(elmaRow.getByRole("button", { name: "Elma kg sırasını değiştir" })).toBeDisabled();
+  await search.fill("Su"); await expect(productRows).toHaveCount(0);
+  await expect(filters.getByRole("button", { name: "Gıda · 2", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await filters.getByRole("button", { name: "Hızlı Erişim", exact: true }).click();
+  await expect(page.locator('.market-catalog-record[data-sort-kind="quickAccess"]')).toHaveCount(1);
+  await filters.getByRole("button", { name: "Tüm ürünler", exact: true }).click();
+  await expect(productRows).toHaveCount(1); await search.fill(""); await expect(productRows).toHaveCount(4);
+
+  // Only one inline editor; cancel and successful edits preserve the creation draft.
+  const newCategory = page.getByRole("form", { name: "Yeni kategori", exact: true });
+  const foodRow = page.locator(`[data-sort-id="${category1.id}"]`);
+  const drinkRow = page.locator(`[data-sort-id="${category2.id}"]`);
+  await newCategory.getByLabel("Kategori adı", { exact: true }).fill("Yeni grup");
+  await newCategory.getByLabel("Kod", { exact: true }).fill("YENI");
+  await foodRow.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await foodRow.getByLabel("Kategori adı", { exact: true }).fill("Kaydedilmeyen ad");
+  await drinkRow.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await expect(page.getByRole("form", { name: /kategorisini düzenle$/ })).toHaveCount(1);
+  await expect(drinkRow.getByLabel("Kategori adı", { exact: true })).toHaveValue("İçecek");
+  await drinkRow.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  assert.equal(runtime.listRuntimeCatalogCategories(path).find(category => category.id === category1.id).name, "Gıda");
+  await filters.getByRole("button", { name: "İçecek · 1", exact: true }).click();
+  await drinkRow.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await drinkRow.getByLabel("Aktif kategori", { exact: true }).uncheck();
+  await drinkRow.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expect(filters.getByRole("button", { name: "İçecek · 1", exact: true })).toHaveCount(0);
+  await expect(filters.getByRole("button", { name: "Tüm ürünler", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(productRows).toHaveCount(4);
+  assert.equal(runtime.listRuntimeCatalogCategories(path).find(category => category.id === category2.id).isActive, false);
+  await foodRow.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await foodRow.getByLabel("Kod", { exact: true }).fill("GIDA");
+  await chooseSearchSelect(foodRow, "Üst kategori", { value: category2.id });
+  await foodRow.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expect(foodRow.getByRole("button", { name: "Düzenle", exact: true })).toBeVisible();
+  const savedFood = runtime.listRuntimeCatalogCategories(path).find(category => category.id === category1.id);
+  assert.equal(savedFood.code, "GIDA"); assert.equal(savedFood.parentId, category2.id);
+  await expect(newCategory.getByLabel("Kategori adı", { exact: true })).toHaveValue("Yeni grup");
+  await newCategory.getByRole("button", { name: "Kategori Ekle", exact: true }).click();
+  await expect(filters.getByRole("button", { name: "Yeni grup · 0", exact: true })).toBeVisible();
+  await expect(newCategory.getByLabel("Kategori adı", { exact: true })).toHaveValue("");
+  const createdCategory = runtime.listRuntimeCatalogCategories(path).find(category => category.code === "YENI");
+  await filters.getByRole("button", { name: "Yeni grup · 0", exact: true }).click();
+  await expect(productRows).toHaveCount(0);
+  await page.locator(`[data-sort-id="${createdCategory.id}"]`).getByRole("button", { name: "Sil", exact: true }).click();
+  await page.getByRole("dialog", { name: "Kategoriyi sil", exact: true }).getByRole("button", { name: "Sil", exact: true }).click();
+  await expect(filters.getByRole("button", { name: "Yeni grup · 0", exact: true })).toHaveCount(0);
+  await expect(filters.getByRole("button", { name: "Tüm ürünler", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(productRows).toHaveCount(4);
+
+  // Real import into the disposable DB: named categories and Diğer are ordinary filters,
+  // including inactive imported products and zero-product categories in a long chip strip.
+  const imported = await parseTransferFile("categories.csv", Buffer.from("name;sku;salePrice;category\nPompa;POMPA;25;Sirkülasyon Pompa\nİthal ürün;ITHAL;10;\n"), "products");
+  const images = { validate() {}, async prepare() { throw new Error("Fixture has no images"); } };
+  const plan = createTransferPlan(path, "products", imported, suggestTransferMapping(imported.headers, "products"), DEFAULT_TRANSFER_PREFERENCES, images);
+  assert.equal((await applyTransferPlan(path, plan, images, () => {}, () => {})).added, 2);
+  for (let index = 0; index < 12; index++) runtime.saveRuntimeCatalogCategory(path, { name: `Ek kategori ${index}` });
+  await page.reload(); await tabs.getByRole("button", { name: /Ürünler/ }).click();
+  await filters.getByRole("button", { name: "Sirkülasyon Pompa · 1", exact: true }).click();
+  await expect(productRows).toHaveCount(1); await expect(productRows).toContainText("Pompa");
+  await filters.getByRole("button", { name: "Diğer · 1", exact: true }).click();
+  await expect(productRows).toHaveCount(1); await expect(productRows).toContainText("İthal ürün");
+  await expect(productRows).toContainText("Pasif");
+  await filters.getByRole("button", { name: "Ek kategori 11 · 0", exact: true }).click();
+  await expect(productRows).toHaveCount(0);
+  await filters.getByRole("button", { name: "Tüm ürünler", exact: true }).click();
+  await expect(productRows).toHaveCount(6);
+  assert.equal(await filters.evaluate(element => element.scrollWidth > element.clientWidth), true);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; document.documentElement.style.colorScheme = "dark"; });
+  mkdirSync("artifacts/screenshots/market-products", { recursive: true });
+  await page.screenshot({ path: "artifacts/screenshots/market-products/categories.png" });
+  await page.locator(`[data-sort-id="${category1.id}"]`).getByRole("button", { name: "Düzenle", exact: true }).click();
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 1120, height: 680 }]) {
+    await page.setViewportSize(viewport);
+    await expect(newCategory.getByRole("button", { name: "Kategori Ekle", exact: true })).toBeInViewport();
+    const inlineEditor = page.getByRole("form", { name: "Gıda kategorisini düzenle", exact: true });
+    await expect(inlineEditor).toBeVisible();
+    await inlineEditor.getByRole("button", { name: "Kaydet", exact: true }).scrollIntoViewIfNeeded();
+    await expect(inlineEditor.getByRole("button", { name: "Kaydet", exact: true })).toBeInViewport();
+    assert.equal(await inlineEditor.evaluate(element => element.scrollWidth <= element.clientWidth), true);
+    await newCategory.getByRole("button", { name: "Kategori Ekle", exact: true }).scrollIntoViewIfNeeded();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.screenshot({ path: `artifacts/screenshots/market-products/inline-edit-${viewport.width}.png` });
+  }
   assert.deepEqual(errors, []);
   // Canonical Settings save/read fencing is covered by smoke-profile-transition-ui.
   console.log("sales-workspace-ui-smoke-ok");
