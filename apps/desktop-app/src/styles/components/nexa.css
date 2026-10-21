@@ -1,30 +1,31 @@
 .nexa-habitat {
   --nexa-character-size: 112px;
+  --nexa-ground-space: var(--space-6);
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) var(--nexa-character-size);
+  grid-template-rows: minmax(0, 1fr) calc(var(--nexa-character-size) + var(--nexa-ground-space));
   flex: 0 0 auto;
-  height: calc(112px + 4.5rem);
+  height: calc(112px + var(--nexa-ground-space) + 4.5rem);
   min-width: 0;
   margin-top: auto;
   place-items: center;
   isolation: isolate;
   pointer-events: none;
 }
-.nexa-habitat--compact { --nexa-character-size: 64px; height: 72px; grid-template-rows: 1fr; }
-.nexa-habitat--micro { --nexa-character-size: 40px; height: 44px; grid-template-rows: 1fr; }
+.nexa-habitat--compact { --nexa-character-size: 64px; height: calc(64px + var(--nexa-ground-space) + var(--space-2)); grid-template-rows: 1fr; }
+.nexa-habitat--micro { --nexa-character-size: 40px; --nexa-ground-space: var(--space-4); height: calc(40px + var(--nexa-ground-space)); grid-template-rows: 1fr; }
 .nexa-habitat--hidden { height: 0; }
-.nexa-habitat-shadow { position: absolute; bottom: var(--space-2); inset-inline: 0; margin-inline: auto; width: 80%; height: var(--space-5); z-index: -1; }
+.nexa-habitat-shadow { position: absolute; top: calc(var(--nexa-character-size) + var(--space-1)); inset-inline: 0; margin-inline: auto; width: 80%; height: var(--space-5); z-index: -1; }
 .nexa-character-stage {
   position: relative;
   width: var(--nexa-character-size);
-  height: var(--nexa-character-size);
+  height: calc(var(--nexa-character-size) + var(--nexa-ground-space));
   justify-self: center;
   isolation: isolate;
 }
 .nexa-character { display: block; width: var(--nexa-character-size); height: var(--nexa-character-size); object-fit: contain; }
-.nexa-character-fallback { position: absolute; inset: 0; margin: auto; }
-.nexa-habitat--micro .nexa-habitat-shadow { height: var(--space-2); bottom: 0; width: 100%; }
+.nexa-character-fallback { position: absolute; top: 0; inset-inline: 0; margin-inline: auto; }
+.nexa-habitat--micro .nexa-habitat-shadow { height: var(--space-2); width: 100%; }
 .nexa-speech-slot { display: grid; place-items: center; width: 100%; min-width: 0; align-self: stretch; padding-bottom: var(--space-2); }
 .nexa-habitat-speech {
   position: relative;

@@ -88,7 +88,9 @@ süreli, gerçek bekleyen işlemin düşünme durumu süreklidir. Dikte yalnız 
 kayıt yaparken listening bildirir; izin, yükleme ve önizleme dinleme sayılmaz.
 AI düşünme durumu dinlemeye, gerçek işlem durumları doğal bekleme hareketlerine
 önceliklidir. Desktop avatarı dekoratiftir; hover/tıklama hedefi veya klavye odağı
-oluşturmaz. Avatar ve gölgesi aynı ortalanmış sahneyi paylaşır.
+oluşturmaz. Avatar ve gölgesi aynı ortalanmış sahneyi paylaşır; gölge avatar
+kutusunun altında ayrılmış zeminde kalır. Wide/compact/micro yükseklikleri bu
+zemin alanını da içerir; gölge animasyon sırasında kuyrukla örtüşmez.
 Paylaşılan rig'in `natural` seçeneği Desktop'ta etkindir; `nexa-behavior` yalnız
 mevcut animasyon saatiyle ilerler, durum mesajları `nexaStatusMessages` kaynağındadır.
 Görünmezlik, odak kaybı ve reduced motion hareketi durdurur; unmount kaynakları bırakır.

@@ -29,13 +29,22 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}nexa-desktop-test`);
   const habitat = page.locator(".nexa-habitat");
   const speech = habitat.locator(".nexa-habitat-speech");
+  async function assertGroundClear() {
+    const gap = await habitat.evaluate(el => {
+      const shadow = el.querySelector('.nexa-habitat-shadow').getBoundingClientRect();
+      const avatar = (el.querySelector('.nexa-character-fallback') ?? el.querySelector('.nexa-character')).getBoundingClientRect();
+      const artwork = el.querySelector('[data-part="presence"]')?.getBoundingClientRect() ?? avatar;
+      return shadow.top - Math.max(avatar.bottom, artwork.bottom);
+    });
+    expect(gap).toBeGreaterThan(0);
+  }
   async function assertContained() {
     await expect.poll(() => habitat.evaluate(el => {
       const sidebar = el.closest('.sidebar').getBoundingClientRect();
       const nav = document.querySelector('.sidebar-primary-nav').getBoundingClientRect();
       const footer = document.querySelector('.sidebar-footer-nav').getBoundingClientRect();
       const main = document.querySelector('main').getBoundingClientRect();
-      return [...el.querySelectorAll('.nexa-character-stage, .nexa-habitat-speech')].every(node => {
+      return [...el.querySelectorAll('.nexa-character-stage, .nexa-habitat-shadow, .nexa-habitat-speech')].every(node => {
         const rect = node.getBoundingClientRect();
         return rect.left >= sidebar.left && rect.right <= sidebar.right && rect.right <= main.left
           && rect.top >= nav.bottom && rect.bottom <= footer.top;
@@ -51,6 +60,7 @@ try {
         return Math.max(Math.abs(center(stage) - center(shadow)), Math.abs(center(stage) - center(avatar)), Math.abs(center(stage) - center(area)));
       });
       expect(alignment).toBeLessThan(1);
+      await assertGroundClear();
     }
     await expect(page.getByRole('button', { name: 'Ayarlar', exact: true })).toBeInViewport();
   }
@@ -72,20 +82,24 @@ try {
     const clip = rig.querySelector('[data-eye-clip="left"]');
     const pupil = rig.querySelector('[data-pupil="left"]');
     const shapes = new Set(), gazes = new Set();
-    let matched = true;
+    let matched = true, minimumGroundGap = Infinity;
+    const shadow = rig.closest('.nexa-character-stage').querySelector('.nexa-habitat-shadow');
+    const artwork = rig.querySelector('[data-part="presence"]');
     const start = performance.now();
     await new Promise((done) => {
       function sample(now) {
         shapes.add(eye.getAttribute("d")); gazes.add(pupil.getAttribute("transform"));
         matched &&= eye.getAttribute("d") === clip.getAttribute("d");
+        minimumGroundGap = Math.min(minimumGroundGap, shadow.getBoundingClientRect().top - artwork.getBoundingClientRect().bottom);
         if (now - start >= 6500) done(); else requestAnimationFrame(sample);
       }
       requestAnimationFrame(sample);
     });
-    return { shapes: shapes.size, gazes: gazes.size, matched,
+    return { shapes: shapes.size, gazes: gazes.size, matched, minimumGroundGap,
       rootTransform: getComputedStyle(rig).transform, bodyTransform: rig.querySelector('[data-part="body"]').getAttribute("transform") };
   });
   expect(eyeMotion.shapes).toBeGreaterThan(1); expect(eyeMotion.gazes).toBeGreaterThan(1);
+  expect(eyeMotion.minimumGroundGap).toBeGreaterThan(0);
   expect(eyeMotion.matched).toBe(true); expect(eyeMotion.rootTransform).toBe("none"); expect(eyeMotion.bodyTransform).toBeNull();
   await expect(svg.locator('[data-part="presence"]')).toHaveAttribute('transform', /scale/);
   // The avatar is decorative: no hover surface, click target or tab stop.
@@ -155,6 +169,7 @@ try {
   await page.evaluate(() => window.__nexaReply({ ok: true, content: "Gerçek AI yanıtı", fallback: false, message: "Hazır" }));
   await expect(habitat).toHaveAttribute("data-nexa-state", "speaking");
   await expect(svg).toHaveAttribute("data-expression", "speaking");
+  await assertGroundClear();
   await expect(svg.locator("[data-mouth]")).not.toHaveAttribute("d", "");
   // The brief response reaction remains visibly animated before settling.
   const openMouth = await svg.locator("[data-mouth]").getAttribute("d");
@@ -165,6 +180,7 @@ try {
   await page.getByRole("button", { name: "AI işlemini doğrula" }).click();
   await expect(habitat).toHaveAttribute("data-nexa-state", "pleased");
   await expect(svg).toHaveAttribute("data-expression", "success");
+  await assertGroundClear();
   const delightFin = await fin.getAttribute("transform");
   await expect.poll(() => fin.getAttribute("transform"), { intervals: [30], timeout: 700 }).not.toBe(delightFin);
   await expect(habitat).toHaveAttribute("data-nexa-state", "ready");
@@ -173,6 +189,7 @@ try {
   await expect(habitat).toHaveAttribute("data-nexa-state", "concerned");
   await expect(habitat).not.toContainText("AI başarısız");
   await expect(svg).toHaveAttribute("data-expression", "concerned");
+  await assertGroundClear();
   await expect(svg.locator('[data-brow="left"]')).not.toHaveAttribute("d", idleBrow);
   await expect(svg.locator("[data-mouth-line]")).not.toHaveAttribute("d", idleMouth);
   await expect(habitat).toHaveAttribute('data-nexa-state', 'ready');
@@ -189,6 +206,7 @@ try {
   await page.evaluate(() => window.__dictationMock.resolvePermission());
   await expect(habitat).toHaveAttribute('data-nexa-state', 'listening');
   await expect(svg).toHaveAttribute('data-expression', 'listening');
+  await assertGroundClear();
   await expect(speech).toHaveText('Dinliyorum…');
   const modalAboveAvatar = await dialog.evaluate(el => {
     const rect = el.getBoundingClientRect();
@@ -309,6 +327,7 @@ try {
   const fallback = habitat.locator("img.nexa-character-fallback");
   await expect.poll(() => fallback.evaluate(im => im.complete && im.naturalWidth > 0)).toBe(true);
   await expect(fallback).toHaveAttribute("src", /assets\/nexa\/.*\.webp$/);
+  await assertGroundClear();
   expect(errors).toEqual([]);
   console.log("desktop-nexa-smoke-ok");
 } finally { await browser?.close(); await server.close(); }

@@ -26,9 +26,13 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
       const free = sidebar!.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
         - brand.offsetHeight - navigation.scrollHeight - (footer?.offsetHeight ?? 0)
         - parseFloat(style.rowGap) * (footer ? 3 : 2);
-      // Match the CSS's reserved two-line speech area, including font scaling.
-      const wideHeight = 112 + parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.5;
-      setSize(collapsed ? free >= 44 ? "micro" : "hidden" : free >= wideHeight ? "wide" : free >= 80 ? "compact" : "hidden");
+      // Reserve the ground shadow below the artwork as well as the two-line
+      // speech area. Match CSS token sizes so neither can cover navigation.
+      const groundSpace = parseFloat(style.getPropertyValue("--space-6"));
+      const microHeight = 40 + parseFloat(style.getPropertyValue("--space-4"));
+      const compactHeight = 64 + groundSpace + parseFloat(style.getPropertyValue("--space-4"));
+      const wideHeight = 112 + groundSpace + parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.5;
+      setSize(collapsed ? free >= microHeight ? "micro" : "hidden" : free >= wideHeight ? "wide" : free >= compactHeight ? "compact" : "hidden");
     }
     const observer = new ResizeObserver(measure);
     for (const element of [sidebar, brand, navigation, footer]) if (element) observer.observe(element);
