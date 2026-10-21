@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { mountNexaRig, resolveNexaAsset, type NexaRigController } from "@yardimci-asistan/shared";
+import { mountNexaRig, nexaStatusMessages, resolveNexaAsset, type NexaRigController } from "@yardimci-asistan/shared";
 import manifest from "../../../../../assets/nexa/manifest.json";
 import { desktopNexa } from "../../app/nexa-activity";
+import { ActionButton } from "../ui/ActionButton";
 
 type HabitatSize = "wide" | "compact" | "micro" | "hidden";
 
@@ -26,7 +27,9 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
       const free = sidebar!.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
         - brand.offsetHeight - navigation.scrollHeight - (footer?.offsetHeight ?? 0)
         - parseFloat(style.rowGap) * (footer ? 3 : 2);
-      setSize(collapsed ? free >= 44 ? "micro" : "hidden" : free >= 154 ? "wide" : free >= 80 ? "compact" : "hidden");
+      // Match the CSS's reserved two-line speech area, including font scaling.
+      const wideHeight = 112 + parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.5;
+      setSize(collapsed ? free >= 44 ? "micro" : "hidden" : free >= wideHeight ? "wide" : free >= 80 ? "compact" : "hidden");
     }
     const observer = new ResizeObserver(measure);
     for (const element of [sidebar, brand, navigation, footer]) if (element) observer.observe(element);
@@ -68,7 +71,7 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
     if (!visible || !rigHost.current) return;
     setRigFailed(false);
     try {
-      rig.current = mountNexaRig(rigHost.current, { state: "ready", motion: false, size: 112 });
+      rig.current = mountNexaRig(rigHost.current, { state: "ready", motion: false, size: 112, natural: true });
     } catch {
       // Manifest-backed artwork remains usable when inline SVG is unavailable.
       setRigFailed(true);
@@ -76,7 +79,7 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
     return () => { rig.current?.unmount(); rig.current = null; };
   }, [visible]);
   useLayoutEffect(() => {
-    rig.current?.update({ state, motion: motionActive, size: size === "micro" ? 40 : size === "compact" ? 64 : 112 });
+    rig.current?.update({ state, motion: motionActive, size: size === "micro" ? 40 : size === "compact" ? 64 : 112, natural: true });
   }, [state, motionActive, size, visible]);
 
   const mode = size === "hidden" ? "micro" : size;
@@ -86,12 +89,20 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
   const shadow = resolveNexaAsset(manifest, { usage: mode === "micro" ? "micro-shadow" : "contact-shadow", theme });
   const url = (path: string) => `${import.meta.env.BASE_URL}${path}`;
   return (
-    <div ref={host} className={`nexa-habitat nexa-habitat--${size}`} data-nexa-state={state} data-motion-active={motionActive} aria-hidden="true">
+    <div ref={host} className={`nexa-habitat nexa-habitat--${size}`} data-nexa-state={state} data-motion-active={motionActive}>
       {size !== "hidden" && <>
         <img className="nexa-habitat-shadow" src={url(shadow.assetPath)} alt="" />
-        <span ref={rigHost} className="nexa-character" />
-        {rigFailed && <img className="nexa-character nexa-character-fallback" src={url(character.assetPath)} alt="" decoding="async" />}
-        {size === "wide" && state !== "ready" && <span className="nexa-habitat-speech">{state === "thinking" ? "Düşünüyorum…" : state === "speaking" ? "Yanıt hazır." : state === "pleased" ? "Tamamlandı." : "Bir sorun oldu."}</span>}
+        {size === "wide" && <div className="nexa-speech-slot">
+          {nexaStatusMessages[state] && <span className="nexa-habitat-speech" role="status" aria-atomic="true" aria-label={nexaStatusMessages[state]} key={state}>
+            {state === "thinking" ? <>Düşünüyorum<span className="nexa-speech-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></> : nexaStatusMessages[state]}
+          </span>}
+        </div>}
+        <ActionButton variant="ghost" className="nexa-character-control" aria-label="Yardımcı Asistan ile etkileş"
+          onPointerEnter={() => rig.current?.react("hover")} onFocus={() => rig.current?.react("hover")}
+          onClick={() => rig.current?.react("press")}>
+          <span ref={rigHost} className="nexa-character" aria-hidden="true" />
+          {rigFailed && <img className="nexa-character nexa-character-fallback" src={url(character.assetPath)} alt="" decoding="async" />}
+        </ActionButton>
       </>}
     </div>
   );

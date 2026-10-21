@@ -5,6 +5,7 @@ import { getDesktopTts } from "../../app/tts/desktop-tts";
 import { readTtsPreferences, TTS_PREFERENCES_CHANGED } from "../../tts-preferences";
 import { createDesktopDictationSession, supportedRecordingMime, type DictationSnapshot } from "../../app/desktop-dictation-session";
 import type { DesktopDictationStatus } from "../../../electron/desktop-dictation-contract";
+import { desktopNexa } from "../../app/nexa-activity";
 
 let playbackOwner: symbol | null = null;
 
@@ -59,6 +60,11 @@ export function SpeechTextField({ label, value, onChange, maxLength, rows, place
     transcribe: input => window.yardimciDesktop!.transcribeAudio(input),
     cancelRemote: id => window.yardimciDesktop!.cancelDictation(id), onChange: setCapture
   }));
+  useEffect(() => {
+    // Only an acquired, recording microphone is a listening signal. Permission,
+    // upload and transcript review do not pretend the microphone is still live.
+    if (capture.phase === "recording") return desktopNexa.beginListening();
+  }, [capture.phase]);
   useEffect(() => {
     let mounted = true, pending = false;
     async function refresh() {

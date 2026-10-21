@@ -4,7 +4,7 @@ import { createNexaPresence } from "@yardimci-asistan/shared";
 export const desktopNexa = createNexaPresence({
   schedule: (callback, delay) => window.setTimeout(callback, delay),
   cancel: (handle) => window.clearTimeout(handle as number),
-});
+}, { response: 2200, success: 1800, error: 3200 });
 
 /** Observe the existing promise without changing its result or failure contract. */
 export async function observeNexaAi<T extends { ok: boolean; fallback?: boolean }>(

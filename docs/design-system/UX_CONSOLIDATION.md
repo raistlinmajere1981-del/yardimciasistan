@@ -81,6 +81,17 @@ Nexa'nın navigation ve settings erişimine öncelik veren wide/compact/micro da
 korunur. 44px navigasyon geometrisi için testte compact habitat eşiği yeniden ölçülür;
 Nexa yeni error/status yüzeyi veya yeni theme sistemi edinmez.
 
+Desktop konuşma balonu mevcut AI durumlarının kısa bir sunumudur; hata ayrıntıları
+mevcut işlem yüzeyinde kalır. Balon wide habitat içinde avatarın üstündeki ayrılmış
+iki satırlık alanda kalır; compact/micro modlarında gizlenir. Sonuç/hata tepkileri
+süreli, gerçek bekleyen işlemin düşünme durumu süreklidir. Dikte yalnız gerçekten
+kayıt yaparken listening bildirir; izin, yükleme ve önizleme dinleme sayılmaz.
+AI düşünme durumu dinlemeye, gerçek işlem durumları doğal bekleme hareketlerine
+önceliklidir. Hover/tıklama yalnız görsel tepki verir, işlem veya başarı üretmez.
+Paylaşılan rig'in `natural` seçeneği Desktop'ta etkindir; `nexa-behavior` yalnız
+mevcut animasyon saatiyle ilerler, durum mesajları `nexaStatusMessages` kaynağındadır.
+Görünmezlik, odak kaybı ve reduced motion hareketi durdurur; unmount kaynakları bırakır.
+
 ## Migration baseline öncesi temizlenmesi gereken veri/schema kalıntıları
 
 Bu tur schema değiştirmez, migration veya compatibility field eklemez. Aşağıdaki

@@ -1,12 +1,13 @@
 import type { NexaState } from "./nexa";
+import { createNexaBehavior } from "./nexa-behavior";
 
 /** Locally authored aquatic artwork and presentation only. Presence owns all
  * semantic transitions; this controller never schedules a business reaction.
  * The V2 lab remains an executable design reference. No remote SVG is accepted. */
-export type NexaRigState = NexaState | "sleep" | "listening";
-type Expression = "idle" | "thinking" | "speaking" | "success" | "concerned";
+export type NexaRigState = NexaState | "sleep";
+type Expression = "idle" | "thinking" | "speaking" | "success" | "concerned" | "listening";
 const expressionTitles: Record<Expression, string> = {
-  idle: "Sakin", thinking: "Düşünen", speaking: "Konuşan", success: "Sevinen", concerned: "Dikkatli",
+  idle: "Sakin", thinking: "Düşünen", speaking: "Konuşan", success: "Sevinen", concerned: "Dikkatli", listening: "Dinleyen",
 };
 function expressionFor(state: NexaRigState): Expression {
   switch (state) {
@@ -14,16 +15,20 @@ function expressionFor(state: NexaRigState): Expression {
     case "speaking": return "speaking";
     case "pleased": return "success";
     case "concerned": return "concerned";
-    case "ready": case "sleep": case "listening": return "idle";
+    case "listening": return "listening";
+    case "ready": case "sleep": return "idle";
   }
 }
 export interface NexaRigOptions {
   state: NexaRigState;
   motion: boolean;
   size: number;
+  /** Opt-in until other surfaces explicitly adopt the Desktop behavior. */
+  natural?: boolean;
 }
 export interface NexaRigController {
   update(options: NexaRigOptions): void;
+  react(event: "hover" | "press"): void;
   unmount(): void;
 }
 type Part = "crown" | "side-fin" | "far-fin" | "tail" | "ribbon";
@@ -33,6 +38,7 @@ interface Rig {
   parts: Record<Part, SVGElement>; eyes: Eye[];
   mouth: SVGElement; mouthLine: SVGElement; mouthLight: SVGElement;
   lightOne: SVGElement; lightTwo: SVGElement; successLight: SVGElement;
+  presence: SVGElement; natural: boolean; behavior: ReturnType<typeof createNexaBehavior>;
 }
 let serial = 0;
 function markup(id: string) {
@@ -118,6 +124,15 @@ function pose(rig: Rig, staticPose = false) {
   set(rig.svg, "data-nexa-state", rig.state);
   set(rig.svg, "aria-label", `Nexa · ${expressionTitles[state]}`);
   const movement = staticPose ? 0 : 1;
+  const gesture = rig.natural && !staticPose && rig.state !== "sleep" ? rig.behavior.sample(rig.elapsed, rig.state) : null;
+  const settleNod = state === "success" && !staticPose && t < .9 ? Math.sin(t / .9 * Math.PI * 2) * 1.8 : 0;
+  if (rig.natural) {
+    const calm = state === "idle" || state === "listening";
+    const lift = movement * wave(t, 9.7, rig.phase) * (calm ? 1.4 : .5) + (gesture?.nod ?? 0) + settleNod;
+    const tilt = (gesture?.tilt ?? 0) + (state === "listening" ? 2 : 0);
+    const breath = 1 + movement * wave(t, 6.8, rig.phase + 1) * .003;
+    set(rig.presence, "transform", `translate(0 ${lift.toFixed(3)}) rotate(${tilt.toFixed(3)} 100 110) translate(100 110) scale(${breath.toFixed(4)}) translate(-100 -110)`);
+  } else rig.presence.removeAttribute("transform");
   const delight = state === "success" ? (staticPose ? .55 : t < .9 ? .55 + .45 * Math.sin(t / .9 * Math.PI) : .55) : 0;
   const focus = state === "thinking" ? 1 : 0;
   const talk = state === "speaking" ? 1 : 0;
@@ -130,7 +145,10 @@ function pose(rig: Rig, staticPose = false) {
   set(rig.parts.ribbon, "transform", `rotate(${(movement * wave(t, 6.8, rig.phase + 4) * 1.6 - delight * 2).toFixed(3)} 62 136)`);
   // Long eye contact, short deliberate glance. No fast scanning loop.
   let gazeX = focus ? -2.4 : talk ? 1 : 0, gazeY = focus ? -2.5 : 0;
-  if (!staticPose && state !== "success") {
+  if (rig.natural) {
+    gazeX += gesture?.gazeX ?? 0; gazeY += gesture?.gazeY ?? 0;
+    if (state === "listening") gazeX = 1.5;
+  } else if (!staticPose && state !== "success") {
     const cycle = (t + rig.phase) % 8.6;
     const glance = cycle > 3.1 && cycle < 4.8 ? Math.sin((cycle - 3.1) / 1.7 * Math.PI) : 0;
     gazeX += glance * (focus ? 3 : talk ? -2.8 : 2.4);
@@ -138,10 +156,11 @@ function pose(rig: Rig, staticPose = false) {
   }
   // The aperture path closes; iris is clipped by actual moving lids.
   const blinkTime = (t + rig.phase * .45) % 7.1;
-  const blink = !staticPose && state !== "success" && blinkTime > 5.9 && blinkTime < 6.12 ? Math.sin((blinkTime - 5.9) / .22 * Math.PI) : 0;
+  const blink = rig.natural ? gesture?.blink ?? 0 : !staticPose && state !== "success" && blinkTime > 5.9 && blinkTime < 6.12 ? Math.sin((blinkTime - 5.9) / .22 * Math.PI) : 0;
   rig.eyes.forEach((eye, i) => {
     const cx = i ? 114 : 77, cy = i ? 92 : 94, width = 13.5;
     let open = rig.state === "sleep" ? .15 : state === "concerned" ? 5.8 : state === "thinking" ? (i ? 4.4 : 5.7) : state === "speaking" ? (i ? 8.5 : 7.5) : state === "success" ? 3 : (i ? 7.2 : 7.7);
+    open += (gesture?.surprise ?? 0) * 2.2;
     open = Math.max(.15, open * (1 - blink));
     const happy = state === "success", upper = happy ? cy - 5.5 - open : cy - open * 1.5, lower = happy ? cy - 5.5 + open : cy + open * 1.55;
     const path = `M${cx - width} ${cy}Q${cx} ${upper.toFixed(3)} ${cx + width} ${cy}Q${cx} ${lower.toFixed(3)} ${cx - width} ${cy}Z`;
@@ -159,7 +178,7 @@ function pose(rig: Rig, staticPose = false) {
   });
   let mouth = "", mouthLine = "", mouthLight = "";
   if (state === "concerned") mouthLine = "M88 118Q96 110 105 118";
-  else if (state === "idle") mouthLine = "M88 113Q96 121 104 112";
+  else if (state === "idle" || state === "listening") mouthLine = `M88 113Q96 ${(121 + (gesture?.smile ?? 0) * 3).toFixed(3)} 104 112`;
   else if (state === "thinking") mouthLine = "M94 116Q100 113 107 114";
   else if (state === "success") { mouth = "M83 110Q96 117 109 108Q107 125 97 126Q87 127 83 110Z"; mouthLight = "M90 122Q98 118 105 120Q98 128 90 122Z"; }
   else {
@@ -196,6 +215,11 @@ export function mountNexaRig(host: HTMLElement, initial: NexaRigOptions): NexaRi
     return node;
   };
   const part = (name: Part) => find(`[data-part="${name}"]`);
+  // Transform the existing artwork together; paths, palette and proportions stay intact.
+  const presence = doc.createElementNS("http://www.w3.org/2000/svg", "g");
+  presence.dataset.part = "presence";
+  for (const child of [...svg.children]) if (child.tagName.toLowerCase() === "g") presence.append(child);
+  svg.append(presence);
   const rig: Rig = {
     svg, state: initial.state, elapsed: 0, phase: 0,
     parts: { crown: part("crown"), "side-fin": part("side-fin"), "far-fin": part("far-fin"), tail: part("tail"), ribbon: part("ribbon") },
@@ -205,15 +229,19 @@ export function mountNexaRig(host: HTMLElement, initial: NexaRigOptions): NexaRi
     })),
     mouth: find("[data-mouth]"), mouthLine: find("[data-mouth-line]"), mouthLight: find("[data-mouth-light]"),
     lightOne: find('[data-light="one"]'), lightTwo: find('[data-light="two"]'), successLight: find("[data-success-light]"),
+    presence, natural: initial.natural ?? false, behavior: createNexaBehavior(),
   };
   let options = initial, raf = 0, last = 0, disposed = false;
   const reduced = view.matchMedia("(prefers-reduced-motion: reduce)");
   let inView = false;
-  const active = () => !disposed && (rig.state !== "pleased" || rig.elapsed < 900) && options.motion && rig.state !== "sleep" && inView
+  const active = () => !disposed && (rig.state !== "pleased" || rig.elapsed < 900)
+    && (!rig.natural || rig.state !== "concerned" || rig.elapsed < 1200) && options.motion && rig.state !== "sleep" && inView
     && host.isConnected && doc.visibilityState === "visible" && doc.hasFocus() && !reduced.matches;
   function tick(now: number) {
     raf = 0;
     if (!active()) { reconcile(); return; }
+    // The small Desktop character needs at most 30 poses per second.
+    if (rig.natural && last && now - last < 32) { raf = view!.requestAnimationFrame(tick); return; }
     rig.elapsed += last ? Math.min(now - last, 80) : 0;
     last = now;
     pose(rig);
@@ -242,11 +270,16 @@ export function mountNexaRig(host: HTMLElement, initial: NexaRigOptions): NexaRi
   return {
     update(next) {
       if (disposed) return;
-      if (next.state !== rig.state) { rig.state = next.state; rig.elapsed = 0; }
+      if (next.state !== rig.state) { rig.state = next.state; rig.elapsed = 0; rig.behavior.reset(); }
       const changed = options.motion !== next.motion || options.size !== next.size
-        || svg.dataset.nexaState !== next.state;
+        || options.natural !== next.natural || svg.dataset.nexaState !== next.state;
+      rig.natural = next.natural ?? false;
       options = next;
       if (changed) reconcile();
+    },
+    react(event) {
+      if (!rig.natural || !active() || rig.state !== "ready") return;
+      rig.behavior.react(event, rig.elapsed, rig.state);
     },
     unmount() {
       if (disposed) return;

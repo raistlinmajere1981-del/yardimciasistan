@@ -2,7 +2,9 @@
 .desktop-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  height: 100dvh;
+  /* Electron keeps --ui-scale at 1 and uses native zoom. The browser fallback
+     uses CSS zoom, so its shell must reserve the same visible viewport. */
+  height: calc(100dvh / var(--ui-scale));
   min-width: 0;
   overflow: hidden;
   background: var(--color-shell-canvas);
