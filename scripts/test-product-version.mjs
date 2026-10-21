@@ -32,7 +32,7 @@ function fixture() {
     web_module_version: "0.1.0"
   });
   mkdirSync(join(root, "test-site", "landing", "assets"), { recursive: true });
-  writeJson(join(root, "test-site", "landing", "release.json"), { desktopVersion: "0.1.0", androidVersion: "0.1.0" });
+  writeJson(join(root, "test-site", "landing", "release.json"), { desktopVersion: "0.1.0", androidVersion: "0.1.0", dealerAndroidVersion: "0.1.0" });
   return root;
 }
 
@@ -48,7 +48,7 @@ test("sync canonical sürümü desktop/android metadata'ya yazar", () => {
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "desktop-app", "package.json"))).version, "0.1.7");
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "android-app", "package.json"))).version, "0.1.7");
     const landing = JSON.parse(readFileSync(join(root, "test-site", "landing", "release.json"), "utf8"));
-    assert.deepEqual(landing, { desktopVersion: "0.1.7", androidVersion: "0.1.7" });
+    assert.deepEqual(landing, { desktopVersion: "0.1.7", androidVersion: "0.1.7", dealerAndroidVersion: "0.1.7" });
     assert.deepEqual(
       JSON.parse(readFileSync(join(root, "firm-template", "web-module", "config", "version.json"), "utf8")),
       { product_version: "0.1.7", web_module_version: "0.1.5" }
@@ -64,7 +64,7 @@ test("check landing download sürümü geride kalırsa hata verir", () => {
   try {
     syncProductVersion(root);
     const landingPath = join(root, "test-site", "landing", "release.json");
-    writeJson(landingPath, { desktopVersion: "0.1.6", androidVersion: "0.1.7" });
+    writeJson(landingPath, { desktopVersion: "0.1.6", androidVersion: "0.1.7", dealerAndroidVersion: "0.1.7" });
     assert.throws(() => checkProductVersion(root), /landing download 1=0\.1\.6/);
   } finally {
     rmSync(root, { recursive: true, force: true });

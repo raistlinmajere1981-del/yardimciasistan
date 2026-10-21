@@ -149,22 +149,22 @@ try {
   });
 
   assert.deepEqual(
-    listCatalogProducts(databasePath, { categoryId: chilledCategory.id }).map((item) => item.id),
+    listCatalogProducts(databasePath, { categoryId: chilledCategory.id }).items.map((item) => item.id),
     [product.id],
     "Product category filter should use persisted category id."
   );
   assert.deepEqual(
-    listCatalogProducts(databasePath, { search: "SUT-1L" }).map((item) => item.id),
+    listCatalogProducts(databasePath, { search: "SUT-1L" }).items.map((item) => item.id),
     [product.id],
     "Product search should include SKU."
   );
   assert.deepEqual(
-    listCatalogProducts(databasePath, { search: "Smoke Dairy" }).map((item) => item.id),
+    listCatalogProducts(databasePath, { search: "Smoke Dairy" }).items.map((item) => item.id),
     [product.id],
     "Product search should include brand."
   );
   assert.deepEqual(
-    listCatalogProducts(databasePath, { search: "0000000012" }).map((item) => item.id),
+    listCatalogProducts(databasePath, { search: "0000000012" }).items.map((item) => item.id),
     [secondProduct.id],
     "Product search should include barcode fragments."
   );

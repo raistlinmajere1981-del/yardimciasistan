@@ -1,3 +1,4 @@
+import { catalogPageFixture } from "./test-helpers/catalog-page-fixture.ts";
 import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
@@ -27,6 +28,7 @@ try {
     await route.fulfill({ contentType: "text/html", body: html });
   });
 
+  await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await page.addInitScript(() => {
     const C = {
       CATALOG: "commerce.catalog",
@@ -110,7 +112,8 @@ try {
           C.RETAIL_BARCODE,
           C.CUSTOMERS,
           C.FINANCE,
-          C.CUSTOMER_CREDIT
+          C.CUSTOMER_CREDIT,
+          "commerce.orders"
         ]
       }
     };
@@ -174,7 +177,8 @@ try {
         }
         return { sale, draftReview, replayed: false };
       },
-      listProducts: async () => [product],
+      listOrders: async () => [],
+      listProducts: async options => window.__catalogPageFixture([product], options),
       listCategories: async () => [],
       getProductImageDataUrl: async () => "",
       previewExternalProductImage: async () => "",
@@ -288,19 +292,37 @@ try {
   const quick = () => page.locator(".market-quick-sale-layout");
   const productRow = () => quick().getByRole("button", { name: /Test Ürünü/ }).first();
   const quantity = () => quick().getByRole("spinbutton", { name: "Test Ürünü miktarı", exact: true });
-  const payment = () => quick().getByRole("group", { name: "Ödeme yöntemi", exact: true });
-  const discount = () => quick().getByLabel("İndirim");
+  const payment = () => quick().getByRole("group", { name: "İşlem ve ödeme seçimi", exact: true });
+  const discount = () => quick().getByRole("form", { name: "İndirim", exact: true });
+  const scanBarcode = barcode => page.evaluate(value => {
+    for (const key of value) document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  }, barcode);
 
-  await expect(quick()).toBeVisible();
+  await expect(quick()).toBeVisible({ timeout: 45000 });
   await expect(productRow()).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__m8bStats.modeCalls.at(-1))).toBe(true);
-  await expect(page.getByLabel("Telefon barkod kanalı")).toContainText("hazır");
+
+  // The USB reader remains a keyboard input, including while product search is focused.
+  const productSearch = quick().getByPlaceholder("Ürün adı, marka, SKU veya barkod ara");
+  await productSearch.focus();
+  await productSearch.fill("8690000000001");
+  // Keep scanner events in one browser task; host scheduling must not simulate slow typing.
+  await productSearch.evaluate(input => {
+    for (const key of "8690000000001") input.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  });
+  await expect(quantity()).toHaveValue("1");
+  await expect(productSearch).toHaveValue("");
 
   // Session state survives a Market mode change.
   await productRow().click();
   await quantity().fill("2");
-  await discount().fill("5");
+  await discount().getByRole("button", { name: "Düzenle", exact: true }).click();
+  await discount().getByRole("textbox", { name: "İndirim tutarı" }).fill("5");
+  await discount().getByRole("button", { name: "Kaydet", exact: true }).click();
   await payment().getByRole("button", { name: "Kart", exact: true }).click();
+  await quick().getByRole("textbox", { name: "Ödeme tutarı", exact: true }).fill("55");
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await expect(quick()).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__m8bStats.modeCalls.at(-1))).toBe(false);
@@ -315,9 +337,10 @@ try {
   expect(await page.evaluate(() => window.__m8bStats.consumeCalls)).toBe(inactiveConsumeCount);
   expect(await page.evaluate(() => window.__m8bStats.findCalls)).toBe(inactiveFindCount);
 
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quantity()).toHaveValue("2");
-  await expect(discount()).toHaveValue("5");
+  await expect(discount().locator("strong")).toHaveText("-₺5,00");
+  await expect(quick().getByRole("textbox", { name: "Ödeme tutarı", exact: true })).toHaveValue("55");
   await expect(payment().getByRole("button", { name: "Kart", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   // A phone batch stops after an unknown barcode handoff; later events never touch the hidden cart.
@@ -334,42 +357,39 @@ try {
   expect(await page.evaluate(() => window.__m8bStats.findCalls)).toBe(findBeforeBatch + 1);
   await createDialog.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
   await createDialog.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quantity()).toHaveValue("2");
-  await expect(discount()).toHaveValue("5");
+  await expect(discount().locator("strong")).toHaveText("-₺5,00");
+  await expect(quick().getByRole("textbox", { name: "Ödeme tutarı", exact: true })).toHaveValue("55");
   await expect(payment().getByRole("button", { name: "Kart", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   // A delayed local lookup cannot mutate the hidden cart after Quick Sale unmounts.
-  await quick().locator(".market-barcode-panel select").selectOption("simulator");
   await page.evaluate(() => { window.__m8bDeferFind = true; });
-  await quick().locator(".market-barcode-simulator input").fill("8690000000001");
-  await quick().getByRole("button", { name: "Barkodu Gönder" }).click();
+  await scanBarcode("8690000000001");
   await expect.poll(() => page.evaluate(() => window.__m8bStats.findWaits)).toBe(1);
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.evaluate(() => window.__m8bResolveFind?.());
   await page.waitForTimeout(100);
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quantity()).toHaveValue("2");
 
   // A delayed external lookup cannot reopen Product Create after unmount.
-  await quick().locator(".market-barcode-panel select").selectOption("simulator");
   await page.evaluate(() => { window.__m8bDeferExternal = true; });
-  await quick().locator(".market-barcode-simulator input").fill("888888");
-  await quick().getByRole("button", { name: "Barkodu Gönder" }).click();
+  await scanBarcode("888888");
   await expect.poll(() => page.evaluate(() => window.__m8bStats.externalWaits)).toBe(1);
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.evaluate(() => window.__m8bResolveExternal?.());
   await page.waitForTimeout(100);
   await expect(page.getByRole("dialog", { name: "Yeni ürün ekle" })).toHaveCount(0);
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quantity()).toHaveValue("2");
 
   // Sale lock survives an unmount/remount and the committed sale resets the session once.
   await page.evaluate(() => { window.__m8bDeferSale = true; });
-  await quick().getByRole("button", { name: "Ödemeyi Al ve Satışı Tamamla" }).click();
+  await quick().getByRole("button", { name: "Ödeme Al" }).click();
   await expect.poll(() => page.evaluate(() => window.__m8bStats.saleWaits)).toBe(1);
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quick().getByRole("button", { name: "Satış işleniyor…" })).toBeDisabled();
   expect((await page.evaluate(() => window.__m8bStats.saleCalls.length))).toBe(1);
   await page.evaluate(() => window.__m8bResolveSale?.());
@@ -382,26 +402,28 @@ try {
   await chooseSearchSelect(quick(), "Müşteri", {value:"customer-1"});
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.evaluate(() => window.__m8bToggleCredit(false));
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(payment().getByRole("button", { name: "Nakit", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(quick().getByLabel("Müşteri", { exact: true })).toBeVisible();
 
   // Draft source + recovery are persistent session state; retry never resubmits the sale.
   await tabs.getByRole("button", { name: /Telefon Sepetleri/ }).click();
   await expect(page.getByText("Session smoke")).toBeVisible();
-  await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
+  await page.getByRole("button", { name: "Yeni İşlem'e Yükle" }).click();
+  await expect(quick().getByRole("button", { name: "Sipariş", exact: true })).toBeDisabled();
+
   await expect(quick().locator('[aria-label="Telefon sepeti kaynağı"]')).toContainText("Test Telefonu");
   await expect(quantity()).toHaveValue("2");
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quick().locator('[aria-label="Telefon sepeti kaynağı"]')).toContainText("Session smoke");
 
   await page.evaluate(() => { window.__m8bFailReview = true; });
-  await quick().getByRole("button", { name: "Ödemeyi Al ve Satışı Tamamla" }).click();
+  await quick().getByRole("button", { name: "Ödeme Al" }).click();
   await expect(quick().locator(".market-sale-review-recovery")).toContainText("Satış tamamlandı");
   const saleCountBeforeRetry = await page.evaluate(() => window.__m8bStats.saleCalls.length);
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
-  await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
+  await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await expect(quick().locator(".market-sale-review-recovery")).toContainText("telefon sepeti kapatılamadı");
   await page.evaluate(() => {
     window.__m8bFailReview = false;
@@ -413,7 +435,7 @@ try {
 
   // While the old recovery retry is pending, another phone draft handoff is blocked.
   await tabs.getByRole("button", { name: /Telefon Sepetleri/ }).click();
-  await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
+  await page.getByRole("button", { name: "Yeni İşlem'e Yükle" }).click();
   await expect(quick().locator(".market-sale-review-recovery")).toContainText("telefon sepeti kapatılamadı");
   expect(await page.evaluate(() => window.__m8bStats.loadDraftCalls)).toBe(loadCallsBeforeRetry);
 

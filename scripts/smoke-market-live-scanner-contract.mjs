@@ -268,7 +268,6 @@ function assertSourceContracts() {
   assert.doesNotMatch(androidAction, /createRuntimePaidSale|createPaidCommerceSale|applyInventoryMovement|createMarketCartDraftInTransaction[\s\S]{0,120}applyBarcodeScan/);
   assert.match(quickSale, /consumePendingBarcodeScans/);
   assert.match(quickSale, /findProductByBarcode/);
-  assert.match(quickSale, /aria-label="Telefon barkod kanalı"/);
   assert.match(quickSale, /setBarcodeScanMode\(true\)/);
   assert.doesNotMatch(quickSale, /setPhoneBarcodeMode|Telefon Barkod Modunu Aç/);
   assert.match(androidRules, /market_barcode_scan/);

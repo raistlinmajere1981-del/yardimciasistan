@@ -1,3 +1,4 @@
+import { catalogPageFixture } from "./test-helpers/catalog-page-fixture.ts";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync,readFileSync,rmSync,mkdirSync } from "node:fs";
@@ -26,10 +27,11 @@ const server=await createServer({root:resolve("apps/desktop-app"),configFile:res
 let browser;
 try{
  browser=await launchChromiumForSmoke(chromium);const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on("pageerror",e=>errors.push(e.message));
- await page.addInitScript(initial=>{
+ await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
+  await page.addInitScript(initial=>{
   window.__transferInitial=initial;const listeners=new Set();
   const call=async(method,...args)=>{const response=await fetch(`/transfer-api/${method}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(args)});const payload=await response.json();if(!payload.ok)throw new Error(payload.message);return payload.value;};
-  window.yardimciDesktop={dataTransfer:{pick:entity=>call("pick",entity),upload:(...args)=>call("pick",args[0]),preview:(...args)=>call("preview",...args),apply:async(...args)=>{listeners.forEach(fn=>fn({stage:"Kayıtlar uygulanıyor",done:0,total:2}));return call("apply",...args);},rows:(...args)=>call("rows",...args),summary:(...args)=>call("summary",...args),export:(...args)=>call("export",...args),report:(...args)=>call("report",...args),release:()=>Promise.resolve(),onProgress:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}},listCustomers:query=>call("customers",query),getCustomer:id=>call("customer",id),getDashboardData:()=>Promise.resolve(initial.dashboard),getBusinessMessagingConfiguration:()=>Promise.resolve({sms:{enabled:false},whatsapp:{enabled:false}}),getBusinessMessagingStatus:()=>Promise.resolve({enabled:false}),getBusinessMessageConfiguration:()=>Promise.resolve({enabled:false}),commerce:{reorderCatalog:async()=>[],listProducts:async()=>[],listCategories:async()=>[]}};
+  window.yardimciDesktop={dataTransfer:{pick:entity=>call("pick",entity),upload:(...args)=>call("pick",args[0]),preview:(...args)=>call("preview",...args),apply:async(...args)=>{listeners.forEach(fn=>fn({stage:"Kayıtlar uygulanıyor",done:0,total:2}));return call("apply",...args);},rows:(...args)=>call("rows",...args),summary:(...args)=>call("summary",...args),export:(...args)=>call("export",...args),report:(...args)=>call("report",...args),release:()=>Promise.resolve(),onProgress:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}},listCustomers:query=>call("customers",query),getCustomer:id=>call("customer",id),getDashboardData:()=>Promise.resolve(initial.dashboard),getBusinessMessagingConfiguration:()=>Promise.resolve({sms:{enabled:false},whatsapp:{enabled:false}}),getBusinessMessagingStatus:()=>Promise.resolve({enabled:false}),getBusinessMessageConfiguration:()=>Promise.resolve({enabled:false}),commerce:{reorderCatalog:async()=>[],listProducts:async options=>window.__catalogPageFixture([], options),listCategories:async()=>[]}};
  },{dashboard,snapshot:readBusinessCapabilitySnapshot(path)});
  await page.route("**/transfer-api/*",async route=>{try{const method=new URL(route.request().url()).pathname.split("/").at(-1),args=route.request().postDataJSON();let value;
  if(locked)throw new Error("Uygulama kilitli");

@@ -245,7 +245,7 @@ try {
     await expect(workspace.getByRole("region", { name: "Veresiye hesabı", exact: true })).toBeVisible();
     return workspace;
   };
-  await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
+  await expect(page.locator(".market-quick-sale-layout")).toBeVisible();
   await expect(page.locator(".market-status")).toHaveCount(0);
   // Installed Electron bundles are local files. A Vite fixture instead serves lazy
   // workspace chunks over HTTP, so fetch them while online before simulating
@@ -255,8 +255,8 @@ try {
   });
   // Local UI remains functional after all browser networking is unavailable.
   await context.setOffline(true);
-  const quick = page.locator(".market-sale-cart");
-  const paymentChoices = quick.getByRole("group", { name: "Ödeme yöntemi", exact: true });
+  const quick = page.locator(".market-sale-sidebar");
+  const paymentChoices = quick.getByRole("group", { name: "İşlem ve ödeme seçimi", exact: true });
   const customerDialog = () => page.getByRole("dialog", { name: "Müşteri seçici", exact: true });
   const selectCustomer = async ({ value, search } = {}) => {
     await quick.getByRole("button", { name: "Müşteri", exact: true }).click();
@@ -274,7 +274,7 @@ try {
   };
   const addProduct = () => page.locator(".market-sale-product").filter({ hasText: product.name }).click();
   const creditCalls = () => calls.filter((call) => /CustomerCredit/.test(call.method));
-  assert.equal(creditCalls().length, 0, "Cash mode must not fetch hidden accounts.");
+  assert.equal(creditCalls().length, 0, "No account is fetched before selecting a customer.");
   await expect(paymentChoices.getByRole("button", { name: "Veresiye", exact: true })).toHaveCount(1);
   await addProduct();
   await paymentChoices.getByRole("button", { name: "Veresiye", exact: true }).click();
@@ -284,8 +284,13 @@ try {
   await expect(customerDialog().locator(`[role="option"][data-value="${deletedId}"]`)).toHaveCount(0);
   await customerDialog().getByRole("combobox", { name: "Müşteri ara" }).press("Escape");
   await chooseCustomer();
+  for (const label of ["Nakit", "Kart", "Havale / EFT", "Diğer"]) {
+    await paymentChoices.getByRole("button", { name: label, exact: true }).click();
+    await expect(quick.locator(".customer-credit-selected-debt")).toContainText("₺500,00");
+  }
+  await paymentChoices.getByRole("button", { name: "Veresiye", exact: true }).click();
   await expect(quick.getByText("€20,00", { exact: true })).toHaveCount(0); // Checkout shows debt only in the sale currency.
-  await quick.getByRole("button", { name: "Seçimi Temizle" }).click();
+  await quick.locator(".customer-credit-picker").getByRole("button", { name: "Temizle", exact: true }).click();
   await expect(quick.getByRole("button", { name: "Satışı Veresiye Kaydet" })).toBeDisabled();
   await selectCustomer({ value: customerId, search: "ahmet" });
   await expect(quick.getByText("₺500,00", { exact: true })).toBeVisible();
@@ -304,9 +309,11 @@ try {
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   assert.equal(balance(), 50000);
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
-  await expect(quick.locator(".market-sale-receipt")).toContainText("Veresiye satış kaydedildi.");
-  await expect(quick.locator(".market-sale-receipt")).toContainText("₺30,00 borç işlendi.");
-  await expect(quick.locator(".market-sale-receipt")).not.toContainText(/Ödendi|Ödeme alındı|Tahsil edildi/i);
+  await expect(topbarStatus).toContainText("Veresiye satış kaydedildi.");
+  await expect(topbarStatus).toContainText("₺30,00 borç işlendi.");
+  await expect(topbarStatus).toContainText("Ahmet Veresiye");
+  await expect(quick.locator(".market-sale-receipt")).toHaveCount(0);
+  await expect(topbarStatus).not.toContainText(/Ödendi|Ödeme alındı|Tahsil edildi/i);
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);
   await expect(paymentChoices.getByRole("button", { name: "Nakit", exact: true })).toHaveAttribute("aria-pressed", "true");
   assert.equal(balance(), 53000);
@@ -321,7 +328,7 @@ try {
   for (const method of ["cash", "card", "transfer", "other"]) {
     await addProduct();
     await paymentChoices.getByRole("button", { name: paymentLabels[method], exact: true }).click();
-    await quick.getByRole("button", { name: "Ödemeyi Al ve Satışı Tamamla" }).click();
+    await quick.getByRole("button", { name: "Ödeme Al" }).click();
     await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);
     assert.equal(calls.filter((call) => call.method === "completeMarketSale").at(-1).args[0].paymentMethod, method);
   }
@@ -493,9 +500,9 @@ try {
   await closeCustomerWorkspace();
   await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name: "Market", exact: true }).click();
   await page.getByRole("button", { name: /Telefon Sepetleri/ }).click();
-  await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
+  await page.getByRole("button", { name: "Yeni İşlem'e Yükle" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
-  await quick.getByRole("group", { name: "Ödeme yöntemi" }).getByRole("button", { name: "Veresiye", exact: true }).click();
+  await quick.getByRole("group", { name: "İşlem ve ödeme seçimi" }).getByRole("button", { name: "Veresiye", exact: true }).click();
   await selectCustomer({ value: other });
   failReview = true;
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
@@ -514,9 +521,8 @@ try {
   assert.ok(readBusinessCapabilitySnapshot(path).enabledCapabilities.includes("retail.barcode"), JSON.stringify(readBusinessCapabilitySnapshot(path)));
   // Hızlı Satış artık telefon barkod kanalını mount olur olmaz otomatik dinler;
   // kullanıcıdan ikinci bir masaüstü modu açması beklenmez.
-  await expect(page.getByLabel("Telefon barkod kanalı")).toContainText("hazır");
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
-  await quick.getByRole("group", { name: "Ödeme yöntemi" }).getByRole("button", { name: "Veresiye", exact: true }).click();
+  await quick.getByRole("group", { name: "İşlem ve ödeme seçimi" }).getByRole("button", { name: "Veresiye", exact: true }).click();
   await selectCustomer({ value: other });
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);

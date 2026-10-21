@@ -29,13 +29,13 @@ export function useMarketController({
   const quickSaleSession = useMarketQuickSaleSession({ customerCreditEnabled,
     customerSelectionEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     pricingContext: businessCapabilities?.enabledCapabilities.join("|") ?? "" });
-  const refreshSalePrices = quickSaleSession.refreshPrices;
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<MarketAsyncState>("idle");
   const enabledRef = useRef(enabled);
   const reloadGeneration = useRef(0);
-  const pinnedProducts = useRef(new Map<string, CatalogProduct>());
+  const [catalogRevision, setCatalogRevision] = useState(0);
+  const catalogVersion = useRef("");
   enabledRef.current = enabled;
 
   const handleStateChange = useCallback((state: Exclude<MarketAsyncState, "idle">, message: string) => {
@@ -50,10 +50,11 @@ export function useMarketController({
 
   const upsertProduct = useCallback((product: CatalogProduct) => {
     reloadGeneration.current += 1;
-    pinnedProducts.current.set(product.id, product);
+    setCatalogRevision(current => current + 1);
     setProducts((current) => {
       const existingIndex = current.findIndex((item) => item.id === product.id);
       if (existingIndex < 0) return [...current, product];
+      if (JSON.stringify(current[existingIndex]) === JSON.stringify(product)) return current;
       return current.map((item, index) => index === existingIndex ? product : item);
     });
   }, []);
@@ -67,19 +68,12 @@ export function useMarketController({
       return;
     }
     const request = ++reloadGeneration.current;
-    const [nextProducts, nextCategories] = await Promise.all([
-      bridge.listProducts({ limit: 500 }),
-      bridge.listCategories({ limit: 500 })
-    ]);
+    const [metadata, nextCategories] = await Promise.all([bridge.listProducts({ limit: 1 }), bridge.listCategories({ limit: 500 })]);
     if (!enabledRef.current || request !== reloadGeneration.current) return;
-
-    const nextIds = new Set(nextProducts.map((product) => product.id));
-    for (const product of nextProducts) pinnedProducts.current.delete(product.id);
-    const retainedProducts = [...pinnedProducts.current.values()].filter((product) => !nextIds.has(product.id));
-    setProducts([...nextProducts, ...retainedProducts]);
-    setCategories(nextCategories);
-    refreshSalePrices();
-  }, [bridge, catalogEnabled, refreshSalePrices]);
+    setCategories(current => JSON.stringify(current) === JSON.stringify(nextCategories) ? current : nextCategories);
+    const signature = JSON.stringify([metadata.revision, nextCategories]);
+    if (catalogVersion.current !== signature) { catalogVersion.current = signature; setCatalogRevision(current => current + 1); }
+  }, [bridge, catalogEnabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -88,7 +82,6 @@ export function useMarketController({
     }
     if (!catalogEnabled) {
       reloadGeneration.current += 1;
-      pinnedProducts.current.clear();
       setProducts([]);
       setCategories([]);
       setDataState("idle");
@@ -126,6 +119,7 @@ export function useMarketController({
 
   return {
     products,
+    catalogRevision,
     categories,
     dataState,
     productDataEnabled,

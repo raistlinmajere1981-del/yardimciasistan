@@ -10,11 +10,12 @@ function render_demo_installation(): void
     $config = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
     $secret = is_array($config) ? trim((string)($config['sync_secret'] ?? '')) : '';
     $release = json_decode((string)file_get_contents(dirname(__DIR__) . '/release.json'), true);
-    $desktop = (string)($release['desktopVersion'] ?? ''); $android = (string)($release['androidVersion'] ?? '');
+    $desktop = (string)($release['desktopVersion'] ?? ''); $android = (string)($release['androidVersion'] ?? ''); $dealer = (string)($release['dealerAndroidVersion'] ?? '');
     $downloads = [
         ['Windows x64', "YardimciAsistan-Setup-$desktop.exe", site_text('64 bit Windows')],
         ['Windows x86', "YardimciAsistan-Setup-$desktop-x86.exe", site_text('32 bit Windows')],
-        ['Android', "YardimciAsistan-Android-$android.apk", site_text('Android companion')]
+        ['Android', "YardimciAsistan-Android-$android.apk", site_text('Android companion')],
+        ['Bayi Android (Pilot)', "YardimciAsistan-Bayi-Android-$dealer-pilot.apk", site_text('Android 8.0+ · test sürümü; mağaza sürümü değil')]
     ];
     ?>
     <section class="section installation-section" id="kurulum"><div class="shell installation-panel"><div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('Kendi bilgisayarında dene')) ?></p><h2><?= site_e(site_text('Deneme kurulumu')) ?></h2><p><?= site_e(site_text('Uygulamaları indirin, demo bağlantısını ekleyin ve keşfetmeye başlayın.')) ?></p></div><a class="text-link" href="/kurulum/"><?= site_e(site_text('Kurulum adımları →')) ?></a></div><div class="download-grid">

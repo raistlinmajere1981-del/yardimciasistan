@@ -236,6 +236,7 @@ try {
   await page.addInitScript((initial) => {
     window.__woInitial = initial;
   }, {
+    view: "quickSale",
     customers: [savedCustomer],
     products: [product]
   });
@@ -243,74 +244,48 @@ try {
   const port = server.httpServer.address().port;
   await page.goto(`http://127.0.0.1:${port}/wholesale-orders-ui-smoke`, { timeout: 60000 });
 
-  const historyPane = page.locator(".market-order-history");
-  await expect(historyPane.locator(".market-order-draft")).toHaveCount(1);
-  await expect(page.locator(".market-order-compose .market-order-draft")).toHaveCount(0);
-  assert.equal(await historyPane.evaluate(section => {
-    const history = section.querySelector(".market-order-list");
-    const draft = section.querySelector(".market-order-draft");
-    return Boolean(history && draft && (history.compareDocumentPosition(draft) & Node.DOCUMENT_POSITION_FOLLOWING));
-  }), true, "New order draft must follow order history in the right column");
-
-  const dealerSelect = page.getByLabel("Sipariş müşterisi", { exact: true });
-  await expect(dealerSelect).toBeVisible();
-  await chooseSearchSelect(page, "Sipariş müşterisi", { value: customer.savedId });
-
-  await expect(page.getByText("Aktif bayi · Bayi A", { exact: true })).toBeVisible();
-
+  const newTransaction = () => page.getByRole("button", { name: "Yeni İşlem", exact: true });
+  await expect(newTransaction()).toBeVisible();
   const productButton = page.getByRole("button", { name: /Bayi Ürünü/ });
-  await expect(productButton).toBeVisible();
-  await expect(productButton).toContainText("₺80");
   await productButton.click();
-  await expect(dealerSelect).toBeDisabled();
-  await expect(dealerSelect).toBeEnabled();
-
-  const draftLines = page.locator(".market-order-lines");
-  await expect(draftLines).toContainText("Bayi Ürünü");
-  await expect(draftLines).toContainText("Bayi A");
-  await expect(draftLines).toContainText("₺80");
-
+  await chooseSearchSelect(page, "Müşteri", { value: customer.savedId });
   const quantityInput = page.getByLabel("Bayi Ürünü miktarı", { exact: true });
   await expect(quantityInput).toHaveValue("1");
   await page.getByRole("button", { name: "Bayi Ürünü miktarını artır", exact: true }).click();
+  await page.getByRole("button", { name: "Sipariş", exact: true }).click();
   await expect(quantityInput).toHaveValue("2");
-
+  await expect(page.getByLabel("Ödeme tutarı", { exact: true })).toHaveCount(0);
   await page.getByRole("textbox", { name: "Sipariş notu", exact: true }).fill("UI smoke bayi siparişi");
-  await page.getByPlaceholder("Ürün ara", { exact: true }).fill("Bayi");
-  const listsBeforeRemount = calls.filter((call) => call.method === "listOrders").length;
   await page.evaluate(() => window.__woSetVisible(false));
-  await expect(page.locator(".market-order-layout")).toHaveCount(0);
   await page.evaluate(() => window.__woSetVisible(true));
-  await expect(dealerSelect).toContainText(savedCustomer.commercialProfile.companyName);
   await expect(quantityInput).toHaveValue("2");
-  await expect(page.getByPlaceholder("Ürün ara", { exact: true })).toHaveValue("Bayi");
   await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("UI smoke bayi siparişi");
-  assert.equal(calls.filter((call) => call.method === "listOrders").length, listsBeforeRemount);
-  assert.equal(await page.evaluate(() => window.__woListenerCount()), 1, "StrictMode cleanup leaves one controller listener");
-  const orderTotal = page.locator(".market-sale-grand-total").filter({ hasText: "Sipariş toplamı" });
-  await expect(orderTotal).toContainText("₺160");
-
+  const orderTotal = page.locator(".market-sale-grand-total");
+  await expect(orderTotal).toContainText("160,00");
   const saveButton = page.getByRole("button", { name: "Siparişi Kaydet", exact: true });
+  await page.evaluate(() => { window.__woRejectNextCreate = true; });
   await saveButton.click();
-
   await expect(page.locator("body")).toHaveAttribute("data-last-state", "error");
-  assert.equal(
-    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop-wholesale'").get().count),
-    1,
-    "The first call committed even though its response was lost."
-  );
+  await expect(quantityInput).toBeEnabled();
+  await expect(page.getByLabel("Sipariş notu", { exact: true })).toBeEnabled();
+  assert.equal(Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders").get().count), 0);
 
+  await saveButton.click();
+  await expect(page.locator("body")).toHaveAttribute("data-last-state", "error");
+  assert.equal(Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop'").get().count), 1);
+  await expect(quantityInput).toHaveValue("2");
+  await expect(quantityInput).toBeDisabled();
+  raw.prepare("UPDATE catalog_products SET is_active = 0 WHERE id = ?").run(product.id);
+  await page.evaluate(() => window.__woRefreshPrices());
+  await expect(page.getByRole("alert").filter({ hasText: "Fiyatı çözümlenecek aktif ürün" })).toBeVisible();
+  await expect(saveButton).toBeEnabled();
   await page.evaluate(() => window.__woSetVisible(false));
-  await expect(page.locator(".market-order-layout")).toHaveCount(0);
   await page.evaluate(() => window.__woSetVisible(true));
   await saveButton.click();
-
   await expect(page.locator(".market-order-card")).toHaveCount(1);
-  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("");
-  await expect(page.locator(".market-order-lines")).not.toContainText("Bayi Ürünü");
+  raw.prepare("UPDATE catalog_products SET is_active = 1 WHERE id = ?").run(product.id);
+  await expect(page.locator(".market-order-compose, .market-order-draft")).toHaveCount(0);
   const detail = page.locator(".market-order-detail");
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText("Bayi Sipariş Testi");
   await expect(detail).toContainText("Bayi Ürünü");
   await expect(detail).toContainText("UI smoke bayi siparişi");
   await expect(detail.getByText("Yeni", { exact: true })).toBeVisible();
@@ -318,13 +293,13 @@ try {
   const orderRow = raw.prepare(`
     SELECT id, customer_id, status, source, subtotal, total
     FROM commerce_orders
-    WHERE source = 'desktop-wholesale'
+    WHERE source = 'desktop'
     LIMIT 1
   `).get();
   assert.ok(orderRow?.id);
   assert.equal(orderRow.customer_id, customer.savedId);
   assert.equal(orderRow.status, "placed");
-  assert.equal(orderRow.source, "desktop-wholesale");
+  assert.equal(orderRow.source, "desktop");
   assert.equal(Number(orderRow.subtotal), 160);
   assert.equal(Number(orderRow.total), 160);
 
@@ -346,14 +321,14 @@ try {
   );
 
   const resolveCalls = calls.filter((call) => call.method === "resolveProductPrice");
-  assert.equal(resolveCalls.length, 1);
-  assert.equal(resolveCalls[0].args[0].customerId, customer.savedId);
+  assert.ok(resolveCalls.length >= 1);
+  assert.ok(resolveCalls.some(call => call.args[0].customerId === customer.savedId));
   assert.equal(resolveCalls[0].args[0].productId, product.id);
 
   const createCalls = calls.filter((call) => call.method === "createOrder");
   assert.equal(createCalls.length, 2);
-  assert.equal(createCalls[0].args[0].source, "desktop-wholesale");
-  assert.match(createCalls[0].args[0].sourceReference, /^desktop-wholesale:/);
+  assert.equal(createCalls[0].args[0].source, "desktop");
+  assert.match(createCalls[0].args[0].sourceReference, /^desktop-order:/);
   assert.equal(
     createCalls[1].args[0].sourceReference,
     createCalls[0].args[0].sourceReference,
@@ -362,7 +337,7 @@ try {
   assert.deepEqual(createCalls[0].args[0].items, [{ productId: product.id, quantity: 2 }]);
   assert.deepEqual(createCalls[1].args[0].items, [{ productId: product.id, quantity: 2 }]);
   assert.equal(
-    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop-wholesale'").get().count),
+    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop'").get().count),
     1,
     "Retry must return the existing order instead of creating a duplicate."
   );
@@ -596,7 +571,7 @@ try {
   await card("Bayi Sipariş Testi").click();
   await expect(detail.getByRole("heading", { name: "Bayi Sipariş Testi", exact: true })).toBeVisible();
   await expect(buyer).toHaveCount(0);
-  await expect(card("Bayi Sipariş Testi")).toContainText("Manuel bayi");
+  await expect(card("Bayi Sipariş Testi")).toContainText("Manuel");
 
   await expect(card("Web Dealer Customer")).toContainText("Bayi web siparişi");
   await card("Web Dealer Customer").click();
@@ -604,16 +579,11 @@ try {
   await expect(buyer).toHaveCount(0);
   await card("Bayi Sipariş Testi").click();
 
-  // Controller session stays alive while the page/tab UI is absent; no polling.
-  await productButton.click();
-  await expect(quantityInput).toHaveValue("1");
-  await page.getByRole("textbox", { name: "Sipariş notu", exact: true }).fill("Retained manual draft");
+  // Management remains live while another workspace is visible.
   const retainedDetail = detail.getByRole("heading", { name: "Bayi Sipariş Testi", exact: true });
-  await expect(retainedDetail).toBeVisible();
   holdNextList = true;
   await page.evaluate(() => window.__woEmit());
   await expect.poll(() => typeof releaseList).toBe("function");
-  await expect(dealerSelect).toBeEnabled();
   const fresh = fixture("ui-live-web", { buyerSnapshot: { name: "New live web buyer", phone: "+1 (202) 555-0100" } });
   displayFixtures.unshift(fresh);
   raw.prepare("UPDATE commerce_orders SET note = ? WHERE id = ?").run("Live refreshed detail", orderRow.id);
@@ -621,11 +591,9 @@ try {
   await expect(card("New live web buyer")).toBeVisible();
   await expect(retainedDetail).toBeVisible();
   await expect(detail.locator(".market-order-note")).toHaveText("Live refreshed detail");
-  await expect(dealerSelect).toBeEnabled(); // quiet background reload never disables compose controls
   releaseList();
   await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
   await expect(card("New live web buyer")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("Retained manual draft");
   await page.evaluate(() => window.__woSetVisible(false));
   await expect(page.locator(".market-order-layout")).toHaveCount(0);
   displayFixtures.unshift(fixture("ui-hidden-web", { buyerSnapshot: { name: "While away web buyer", phone: "+44 7911 123456" } }));
@@ -635,9 +603,6 @@ try {
   await page.evaluate(() => window.__woSetVisible(true));
   await expect(card("While away web buyer")).toBeVisible();
   await expect(retainedDetail).toBeVisible();
-  await expect(quantityInput).toHaveValue("1");
-  await expect(page.getByPlaceholder("Ürün ara", { exact: true })).toHaveValue("Bayi");
-  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("Retained manual draft");
   const listsBeforeManual = calls.filter((call) => call.method === "listOrders").length;
   await page.getByRole("button", { name: "Yenile", exact: true }).click();
   await expect.poll(() => calls.filter((call) => call.method === "listOrders").length).toBe(listsBeforeManual + 1);
@@ -649,6 +614,28 @@ try {
   releaseDetail();
   await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
   await expect(detail.getByRole("heading", { name: "New live web buyer", exact: true })).toBeVisible();
+  const filters = page.getByRole("group", { name: "Sipariş durumu", exact: true });
+  await filters.getByRole("button", { name: "Tamamlanan", exact: true }).click();
+  await expect(page.locator(".market-order-card").first()).toContainText("Tamamlandı");
+  await filters.getByRole("button", { name: "Yeni", exact: true }).click();
+  await expect(page.locator(".market-order-card")).toHaveCount(0);
+  await filters.getByRole("button", { name: "Tümü", exact: true }).click();
+  await page.getByLabel("Sipariş ara", { exact: true }).fill("New live web buyer");
+  await expect(page.locator(".market-order-card")).toHaveCount(1);
+  await page.getByLabel("Sipariş ara", { exact: true }).fill("");
+  const cancelFromManagement = createRuntimeOrder(database.databasePath, {
+    source: "web-online-sales", sourceReference: "management-cancel-fixture",
+    buyerSnapshot: { name: "Yönetim İptal Testi", phone: "+905550001234" }, deliverySnapshot: { method: "pickup" },
+    items: [{ productId: product.id, quantity: 1 }]
+  });
+  const salesBeforeCancel = Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales").get().count);
+  await page.getByRole("button", { name: "Yenile", exact: true }).click();
+  await page.locator(".market-order-card").filter({ hasText: "Yönetim İptal Testi" }).click();
+  await detail.getByRole("button", { name: "Siparişi İptal Et", exact: true }).click();
+  await expect(detail.getByRole("status")).toContainText("iptal edildi");
+  assert.equal(raw.prepare("SELECT status FROM commerce_orders WHERE id = ?").get(cancelFromManagement.order.id).status, "cancelled");
+  assert.equal(Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales").get().count), salesBeforeCancel);
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 8);
   await page.evaluate(() => window.__woDispose());
   assert.equal(await page.evaluate(() => window.__woListenerCount()), 0, "controller disposal unsubscribes");
   assert.equal(await page.evaluate(() => window.__woShipmentListenerCount()), 0);

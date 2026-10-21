@@ -14,7 +14,7 @@ function Harness(){
   const [page,setPage]=useState("products");
   return <BusinessCapabilityRuntimeProvider value={{snapshot}}><WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
     <main style={{minWidth:0,padding:"var(--space-2)"}}><nav><button onClick={()=>setPage("products")}>Ürünler</button><button onClick={()=>setPage("customers")}>Müşteriler</button></nav>
-    {page==="products"?<MarketProductsWorkspace products={[]} categories={[]} busy={false} onReload={async()=>{}} onProductSaved={()=>{}} onStateChange={()=>{}}/>:<CustomersWorkspace customers={dashboard.customers} stays={[]} reservations={[]} notifications={[]} kbsOverview={dashboard.kbsOverview} aiEnabled={false} wholesaleEnabled onSave={async()=>({ok:false,message:"fixture"})} onAnalyzeIdentity={async()=>({ok:false,message:"fixture"})} onDelete={()=>{}} onSendKbs={()=>{}}/>}
+    {page==="products"?<MarketProductsWorkspace categories={[]} busy={false} onReload={async()=>{}} onStateChange={()=>{}}/>:<CustomersWorkspace customers={dashboard.customers} stays={[]} reservations={[]} notifications={[]} kbsOverview={dashboard.kbsOverview} aiEnabled={false} wholesaleEnabled onSave={async()=>({ok:false,message:"fixture"})} onAnalyzeIdentity={async()=>({ok:false,message:"fixture"})} onDelete={()=>{}} onSendKbs={()=>{}}/>}
     <WorkspaceHost definition={customerWorkspaceDefinition} context={{data:dashboard,aiEnabled:false,whatsappEnabled:false,reservationsEnabled:false,staysEnabled:false,customerCreditEnabled:false,wholesaleEnabled:false,onWhatsApp:()=>{},onSave:async()=>({ok:false,message:"fixture"}),onAnalyzeIdentity:async()=>({ok:false,message:"fixture"}),onDelete:()=>{}}}/>
     </main></WorkspaceNavigationProvider></BusinessCapabilityRuntimeProvider>;
 }

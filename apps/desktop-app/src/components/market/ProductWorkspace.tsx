@@ -66,6 +66,7 @@ export function ProductWorkspace({
 }) {
   const navigation = useWorkspaceNavigation();
   const bridge = window.yardimciDesktop?.commerce;
+  const [productReadAttempt, setProductReadAttempt] = useState(0);
   const [savedProduct, setSavedProduct] = useState<CatalogProduct | null>(null);
   const product = savedProduct ?? products.find((item) => item.id === intent.entityId) ?? null;
   const creating = intent.mode === "create" && !product;
@@ -186,6 +187,19 @@ export function ProductWorkspace({
     } catch { if (isCurrent()) setMenuMessage("Menü ilişkisi kaldırılamadı."); }
     finally { if (isCurrent()) setMenuBusy(false); }
   }
+
+  useEffect(() => {
+    if (creating || product || !bridge) return;
+    let current = true;
+    setResourceState("loading");
+    void bridge.listProducts({ productId: intent.entityId, limit: 1 }).then(page => {
+      if (!current) return;
+      const record = page.items[0];
+      if (!record) { setResourceState("error"); setSaveMessage("Ürün bulunamadı."); return; }
+      setSavedProduct(record);
+    }).catch(error => { if (current) { setResourceState("error"); setSaveMessage(error instanceof Error ? error.message : "Ürün okunamadı."); } });
+    return () => { current = false; };
+  }, [bridge, creating, intent.entityId, product, productReadAttempt]);
 
   const loadProductResources = useCallback(async () => {
     if (!product || !bridge) return;
@@ -409,8 +423,7 @@ export function ProductWorkspace({
 
   if (!product && !creating) {
     return <WorkspaceFrame
-      title="Ürün bulunamadı"
-      context="Katalog yenilenmiş veya ürün artık kullanılamıyor olabilir."
+      title={resourceState === "error" ? "Ürün okunamadı" : "Ürün yükleniyor…"}
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
       onClose={() => navigation.closeWorkspace()}
@@ -419,9 +432,10 @@ export function ProductWorkspace({
       dismissOnBackdrop
     >
       <div className="empty-state">
-        <strong>Ürün kaydı bulunamadı.</strong>
-        <p>Kataloğu yenileyip tekrar deneyin.</p>
-        <ActionButton variant="secondary" onClick={() => void onReload()}>Kataloğu Yenile</ActionButton>
+        {resourceState === "error" ? <>
+          <p role="alert">{saveMessage || "Ürün kaydı bulunamadı."}</p>
+          <ActionButton variant="secondary" onClick={() => setProductReadAttempt(current => current + 1)}>Yeniden dene</ActionButton>
+        </> : <p role="status">Ürün yükleniyor…</p>}
       </div>
     </WorkspaceFrame>;
   }

@@ -29,7 +29,24 @@ export interface ListCatalogProductsOptions {
   search?: string;
   categoryId?: string;
   activeOnly?: boolean;
+  inventoryOnly?: boolean;
+  quickAccessOnly?: boolean;
+  productId?: string;
+  currency?: string;
+  customerId?: string;
+  offset?: number;
   limit?: number;
+}
+
+export interface CatalogProductPage {
+  revision: string;
+  items: CatalogProduct[];
+  total: number;
+  offset: number;
+  limit: number;
+  nextOffset: number | null;
+  counts: { total: number; quickAccess: number; categories: Record<string, number> };
+  prices: Record<string, import("@yardimci-asistan/shared").CommerceResolvedUnitPrice>;
 }
 
 export interface SaveCatalogProductInput {
@@ -437,37 +454,57 @@ export function applyInventoryMovementInTransaction(
   };
 }
 
+/** One SQLite snapshot owns matching rows, totals and category facets. */
 export function listCatalogProducts(
   databasePath: string,
   options: ListCatalogProductsOptions = {}
-): CatalogProduct[] {
+): CatalogProductPage {
   const database = openDatabase(databasePath);
   try {
+    database.function("catalog_fold", { deterministic: true }, (value: unknown) => String(value ?? "").toLocaleLowerCase("tr-TR"));
+    database.exec("BEGIN");
     const businessId = activeBusinessId(database);
-    const conditions = ["business_id = ?", "deleted_at = ''"];
-    const params: Array<string | number> = [businessId];
-    const search = String(options.search ?? "").trim();
-    const categoryId = String(options.categoryId ?? "").trim();
-
-    if (options.activeOnly) conditions.push("is_active = 1");
-    if (categoryId) {
-      conditions.push("category_id = ?");
-      params.push(categoryId);
-    }
+    const base = ["business_id = ?", "deleted_at = ''"];
+    const baseParams: Array<string | number> = [businessId];
+    if (options.activeOnly) base.push("is_active = 1");
+    if (options.inventoryOnly) base.push("track_inventory = 1");
+    if (options.currency) { base.push("currency = ?"); baseParams.push(String(options.currency).trim().toUpperCase()); }
+    const conditions = [...base];
+    const params = [...baseParams];
+    const search = String(options.search ?? "").trim().toLocaleLowerCase("tr-TR");
+    if (options.categoryId) { conditions.push("category_id = ?"); params.push(String(options.categoryId)); }
+    if (options.quickAccessOnly) conditions.push("quick_access_enabled = 1");
+    if (options.productId) { conditions.push("id = ?"); params.push(String(options.productId)); }
     if (search) {
-      const pattern = `%${search}%`;
-      conditions.push("(name LIKE ? COLLATE NOCASE OR brand LIKE ? COLLATE NOCASE OR sku LIKE ? COLLATE NOCASE OR barcode LIKE ? COLLATE NOCASE)");
-      params.push(pattern, pattern, pattern, pattern);
+      conditions.push("instr(catalog_fold(name || char(0) || brand || char(0) || sku || char(0) || barcode), ?) > 0");
+      params.push(search);
     }
-    params.push(normalizeLimit(options.limit));
-
-    return (database.prepare(`
-      SELECT *
-      FROM catalog_products
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
-      LIMIT ?
-    `).all(...params) as Array<Record<string, unknown>>).map(mapProduct);
+    const total = Number(database.prepare(`SELECT COUNT(*) AS total FROM catalog_products WHERE ${conditions.join(" AND ")}`).get(...params)!.total);
+    const limit = normalizeLimit(options.limit, 60, 100);
+    const requestedOffset = Number(options.offset ?? 0);
+    const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.trunc(requestedOffset)) : 0;
+    const sort = options.quickAccessOnly ? "quick_access_order ASC, " : "";
+    const items = (database.prepare(`SELECT * FROM catalog_products WHERE ${conditions.join(" AND ")}
+      ORDER BY ${sort}sort_order ASC, name COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`)
+      .all(...params, limit, offset) as Array<Record<string, unknown>>).map(mapProduct);
+    const counts: CatalogProductPage["counts"] = { total: 0, quickAccess: 0, categories: {} };
+    for (const row of database.prepare(`SELECT category_id, COUNT(*) AS total, SUM(quick_access_enabled) AS quick_count
+      FROM catalog_products WHERE ${base.join(" AND ")} GROUP BY category_id`).all(...baseParams)) {
+      const count = Number(row.total);
+      counts.total += count;
+      counts.quickAccess += Number(row.quick_count);
+      counts.categories[String(row.category_id ?? "")] = count;
+    }
+    const version = database.prepare("SELECT COALESCE(MAX(updated_at), '') AS updated, COUNT(*) AS count FROM catalog_products WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
+    const revision = `${version.updated}:${version.count}`;
+    const prices: CatalogProductPage["prices"] = {};
+    if (options.customerId !== undefined) {
+      const wholesaleEnabled = readEnabledBusinessCapabilities(database).includes(BUSINESS_CAPABILITIES.WHOLESALE);
+      for (const product of items) if (product.isActive) prices[product.id] = resolveCommerceProductPriceInDatabase(
+        database, businessId, { productId: product.id, customerId: options.customerId }, wholesaleEnabled);
+    }
+    database.exec("COMMIT");
+    return { revision, items, total, offset, limit, nextOffset: offset + items.length < total ? offset + items.length : null, counts, prices };
   } finally {
     database.close();
   }
@@ -847,7 +884,7 @@ export function createPaidCommerceSale(databasePath: string, input: CreateCommer
 export function createCommerceSaleInTransaction(
   database: DatabaseSync,
   input: CreateCommerceSaleInput,
-  status: "paid" | "credit",
+  status: "paid" | "credit" | ((total: number, currency: string) => "paid" | "credit"),
   now: string
 ): CommerceSale {
   const businessId = activeBusinessId(database);
@@ -897,7 +934,9 @@ export function createCommerceSaleInTransaction(
   moneyToMinor(requestedDiscount);
   const discountTotal = Math.min(subtotal, roundMoney(requestedDiscount));
   const total = roundMoney(subtotal - discountTotal);
-  const paymentMethod = status === "credit" ? "" : String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
+  // Settlement policy sees the authoritative total without duplicating price/stock preparation.
+  const saleStatus = typeof status === "function" ? status(total, currency || "TRY") : status;
+  const paymentMethod = saleStatus === "credit" ? "" : String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
   const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
 
   database.prepare(`
@@ -906,7 +945,7 @@ export function createCommerceSaleInTransaction(
       payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
   `).run(
-    saleId, businessId, status, subtotal, discountTotal, total, currency || "TRY",
+    saleId, businessId, saleStatus, subtotal, discountTotal, total, currency || "TRY",
     paymentMethod, source, now, now, now, now
   );
 
@@ -943,11 +982,11 @@ export function createCommerceSaleInTransaction(
       }, now);
     }
   }
-  if (status === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
+  if (saleStatus === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
   return {
     id: saleId,
     businessId,
-    status,
+    status: saleStatus,
     subtotal,
     discountTotal,
     total,

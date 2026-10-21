@@ -6,6 +6,7 @@ import { resolve, join } from "node:path";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
+import { verifyPhoneInput } from "./test-helpers/phone-input.mjs";
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { createCompactUiFixture } from "./lib/desktop-renderer-fixtures.mjs";
 const require = createRequire(import.meta.url);
@@ -39,6 +40,7 @@ try {
   await page.exposeFunction("__cardCall", async (method, input) => {
     calls.push({ method, input });
     if (method === "saveProduct") { if (failProduct) throw new Error("Ürün kayıt fixture hatası"); return runtime.saveRuntimeCatalogProduct(database.databasePath, input); }
+    if (method === "products") return runtime.listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "balance") return runtime.getRuntimeInventoryBalance(database.databasePath, input);
     if (method === "movements") return runtime.listRuntimeInventoryMovements(database.databasePath, input);
     if (method === "adjust") return runtime.applyRuntimeInventoryMovement(database.databasePath, input);
@@ -57,7 +59,7 @@ try {
     window.__cards = initial;
     const call = (method, input) => window.__cardCall(method, input);
     window.yardimciDesktop = {
-      commerce: { saveProduct: input => call("saveProduct", input), getInventoryBalance: id => call("balance", id), listInventoryMovements: input => call("movements", input), applyInventoryMovement: input => call("adjust", input), setInventoryCount: input => call("count", input), getProductPublication: id => call("publication", id), saveProductPublication: input => call("publish", input), getProductImageDataUrl: async () => "" },
+      commerce: { listProducts: input => call("products", input), saveProduct: input => call("saveProduct", input), getInventoryBalance: id => call("balance", id), listInventoryMovements: input => call("movements", input), applyInventoryMovement: input => call("adjust", input), setInventoryCount: input => call("count", input), getProductPublication: id => call("publication", id), saveProductPublication: input => call("publish", input), getProductImageDataUrl: async () => "" },
       saveCustomer: input => call("saveCustomer", input), getCustomer: id => call("customer", id), assignTableCustomer: input => call("assign", input),
       getBusinessMessagingConfiguration: async () => ({ enabled: false, configured: false })
     };
@@ -66,7 +68,7 @@ try {
   const dialog = page.getByRole("dialog");
   const button = name => dialog.getByRole("button", { name, exact: true });
   const close = () => button("Çalışma alanını kapat").click();
-  await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+  await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
   await expect(dialog.getByRole("complementary", { name: "Ürün işlemleri" })).toBeVisible();
   await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toHaveCount(0);
   await dialog.getByLabel("Ürün adı", { exact: true }).fill("Yeni tek kart");
@@ -85,7 +87,7 @@ try {
   await dialog.getByLabel("Web satışında yayınla", { exact: true }).uncheck();
   await expect.poll(() => calls.filter(call => call.method === "publish").length).toBe(1);
   await expect(dialog.getByLabel("Aktif ürün", { exact: true })).toBeChecked();
-  await close(); await expect(page.getByRole("button", { name: "Ürün Ekle", exact: true })).toBeFocused();
+  await close(); await expect(page.getByRole("button", { name: "Yeni ürün", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Düzenle", exact: true }).first().click();
   await expect(dialog.getByRole("button", { name: "Kategori", exact: true })).toContainText("Pasif gerçek kategori (Pasif)");
   await dialog.getByLabel("Stok işlem miktarı").fill("3"); await expect(dialog.getByText("İşlem sonrası: 13 piece", { exact: true })).toBeVisible();
@@ -169,6 +171,8 @@ try {
   assert.ok(Math.abs(addressBounds.x + addressBounds.width - gridBounds.x - gridBounds.width) < 2, "Address spans grid to the right");
   assert.ok(Math.abs(noteBounds.x + noteBounds.width - gridBounds.x - gridBounds.width) < 18, "Right customer column ends close to the form edge");
   await dialog.getByLabel("Ad soyad", { exact: true }).fill("Yeni müşteri kartı");
+  await verifyPhoneInput(page, dialog.getByLabel("Telefon", { exact: true }));
+  await dialog.getByLabel("Telefon", { exact: true }).fill("+90 (532) 123-45-67");
   await dialog.getByLabel("Adres", { exact: true }).fill("Korunan adres");
   await dialog.locator("summary").click();
   const birthBounds = await dialog.getByRole("button", { name: "Doğum tarihi", exact: true }).boundingBox();
@@ -182,6 +186,9 @@ try {
   await expect(button("Müşteri Kartını Kaydet")).toBeDisabled();
   const customerSaves = calls.filter(call => call.method === "saveCustomer");
   assert.equal(customerSaves.length, 2); assert.ok(customerSaves[1].input.id);
+  assert.equal(customerSaves[0].input.phone, "+90 (532) 123-45-67");
+  await expect(dialog.getByLabel("Telefon", { exact: true })).toHaveValue("+905321234567");
+  await verifyPhoneInput(page, dialog.getByLabel("Telefon", { exact: true }));
   assert.equal(customerSaves[1].input.address, "Korunan adres"); assert.equal(customerSaves[1].input.identityNumber, "ABC123");
   await button("Kaydet ve Yeni Ekle").click(); await expect(dialog.getByLabel("Ad soyad", { exact: true })).toHaveValue("");
   await expect(dialog.getByLabel("Adres", { exact: true })).toHaveValue("");

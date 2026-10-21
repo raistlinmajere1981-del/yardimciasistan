@@ -123,7 +123,7 @@ try {
   const historicalLine = itemAdded.order.items[0];
   assert.equal(historicalLine.productId, menuItem.product_id);
   assert.equal(historicalLine.menuEntryId, menuItem.id);
-  const canonicalProduct = listCatalogProducts(database.databasePath).find(item => item.id === menuItem.product_id);
+  const canonicalProduct = listCatalogProducts(database.databasePath).items.find(item => item.id === menuItem.product_id);
   saveCatalogProduct(database.databasePath, { ...canonicalProduct, name: "Later product", salePrice: 999, currency: "USD" });
   assert.deepEqual(database.getActiveTableOrder(table.id).items[0], historicalLine,
     "Table line snapshots must not follow later canonical identity/pricing/currency edits.");

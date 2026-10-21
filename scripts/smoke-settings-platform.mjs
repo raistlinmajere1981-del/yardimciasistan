@@ -4,6 +4,7 @@ import { createServer } from 'vite';
 import { resolve } from 'node:path';
 import { cancelSettingsService, saveSettingsService } from './test-helpers/settings-ui.mjs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
+import { verifyPhoneInput } from './test-helpers/phone-input.mjs';
 
 const server = await createServer({
   root: resolve('apps/desktop-app'),
@@ -56,6 +57,9 @@ try {
   await expect(structure).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByLabel('Sektör tipi')).toBeHidden();
   await expect(page.getByLabel('Firma adı', { exact: true })).toBeVisible();
+  for (const label of ['Telefon', 'WhatsApp']) {
+    await verifyPhoneInput(page, page.locator('#settings-public-profile').getByLabel(label, { exact: true }));
+  }
   await expect(page.locator('#settings-web')).toBeVisible();
   await expand();
   await expect(page.getByLabel('Sektör tipi')).toBeVisible();

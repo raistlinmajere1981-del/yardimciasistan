@@ -22,13 +22,14 @@ function App() {
 function Harness({ page, setPage }: { page: DesktopPage; setPage: (page: DesktopPage) => void }) {
   const navigation = useWorkspaceNavigation();
   const [data, setData] = useState(control.__cards.data);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [products, setProducts] = useState(control.__cards.products);
   const saveCustomer = async (input: SaveCustomerInput) => {
     const result = await window.yardimciDesktop!.saveCustomer(input);
     if (result.ok) setData(previous => ({ ...previous, customers: result.dashboardData.customers, revision: previous.revision + 1 }));
     return result;
   };
-  const onProductSaved = (saved: CatalogProduct) => setProducts(current => [...current.filter(item => item.id !== saved.id), saved]);
+  const onProductSaved = (saved: CatalogProduct) => { setProducts(current => [...current.filter(item => item.id !== saved.id), saved]); setCatalogRevision(current => current + 1); };
   const analyze = async () => ({ ok: false as const, message: "fixture" });
   const capabilities = [C.CUSTOMERS, C.WHOLESALE, C.INVENTORY, C.ONLINE_SALES];
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: capabilities } }}>
@@ -37,7 +38,7 @@ function Harness({ page, setPage }: { page: DesktopPage; setPage: (page: Desktop
         <button onClick={() => { setPage("pension"); navigation.openWorkspace({ entityType: "room", entityId: data.rooms[0]!.id }); }}>Odayı aç</button>
         <button onClick={() => { setPage("restaurant"); navigation.openWorkspace({ entityType: "table", entityId: data.tables[0]!.id }); }}>Masayı aç</button>
       </nav>
-      {page === "market" && <MarketProductsWorkspace products={products} categories={control.__cards.categories} busy={false} onReload={async () => {}} onProductSaved={onProductSaved} onStateChange={() => {}} />}
+      {page === "market" && <MarketProductsWorkspace catalogRevision={catalogRevision} categories={control.__cards.categories} busy={false} onReload={async () => {}} onStateChange={() => {}} />}
       {page === "customerWork" && <CustomersWorkspace customers={data.customers} stays={[]} reservations={[]} notifications={[]} kbsOverview={data.kbsOverview} aiEnabled={false} wholesaleEnabled onSave={saveCustomer} onAnalyzeIdentity={analyze} onDelete={() => {}} onSendKbs={() => {}} />}
       <HospitalityWorkspaceHost page="pension" activePage={page} definition={roomWorkspaceDefinition} context={{ data, onDashboard: setData, staysEnabled: true, reservationsEnabled: false, folioEnabled: false, menuEnabled: false, customersEnabled: true, aiEnabled: false, onSaveCustomer: saveCustomer, onAnalyzeIdentity: analyze }} />
       <HospitalityWorkspaceHost page="restaurant" activePage={page} definition={tableWorkspaceDefinition} context={{ data, onDashboardDataChanged: setData, ordersEnabled: false, menuEnabled: false, customersEnabled: true, reservationsEnabled: false, roomFolioTransferEnabled: false, aiEnabled: false, onSaveCustomer: saveCustomer, onAnalyzeIdentity: analyze, onSaveReservation: async () => ({ ok: false, message: "fixture" }), onUpdateTableStatus: async () => ({ ok: false, message: "fixture" }) }} />

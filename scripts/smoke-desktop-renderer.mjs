@@ -1,3 +1,4 @@
+import { catalogPageFixture } from "./test-helpers/catalog-page-fixture.ts";
 import { expandSettingsStructure, openSettingsService, cancelSettingsService, saveSettingsService } from "./test-helpers/settings-ui.mjs";
 import { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture } from "./lib/desktop-renderer-fixtures.mjs";
 import { chromium, expect } from "@playwright/test";
@@ -31,6 +32,7 @@ try {
   const browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
+  await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await page.addInitScript(({ setupData, dashboardData, reportData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
@@ -65,6 +67,7 @@ try {
     window.__openedExternalUrls = [];
     window.__stockImageAnalysisCalls = [];
     window.__stockImageApplyCalls = [];
+    window.__stockProductLookups = [];
     window.__reportRanges = [];
     window.__reportAiCalls = [];
     window.__androidProvisionCalls = [];
@@ -120,7 +123,10 @@ try {
     };
     window.yardimciDesktop = {
       commerce: {
-        listProducts: async () => structuredClone(products), listCategories: async () => [],
+        listProducts: async options => {
+          if (options?.productId) window.__stockProductLookups.push(structuredClone(options));
+          return window.__catalogPageFixture(structuredClone(products), options);
+        }, listCategories: async () => [],
         saveProduct: async input => {
           const existing = products.find(product => product.id === input.id);
           const saved = { ...existing, ...input, imageSourceUrl: input.clearImage ? "" : input.manualImageDataUrl ?? existing.imageSourceUrl,
@@ -749,6 +755,10 @@ try {
   await stockImageDialog.getByRole("button", { name: "Analiz Et" }).click();
   await expect(stockImageDialog.getByText("Smoke Tedarikçi", { exact: true })).toBeVisible();
   await expect(stockImageDialog.locator(".stock-image-row")).toHaveCount(3);
+  await expect(stockImageDialog.getByRole("spinbutton", { name: "Eklenecek miktar (g)", exact: true })).toHaveValue("3000");
+  await expect.poll(() => page.evaluate(() => window.__stockProductLookups)).toContainEqual({
+    productId: "product_gram_preview", activeOnly: true, inventoryOnly: true, limit: 1
+  });
   await expect(stockImageDialog.getByRole("button", { name: "Stokları Güncelle" })).toBeDisabled();
   await stockImageDialog.locator(".stock-image-row").nth(1).getByRole("button", { name: "Yok say" }).click();
   await stockImageDialog.getByRole("button", { name: "Manuel satır ekle" }).click();
@@ -923,7 +933,7 @@ try {
   await expect(page.locator(".menu-management-grid")).toBeVisible();
 
   // Menu quick-create is one natural task and lands in Product Workspace.
-  const countProducts = () => page.evaluate(async () => (await window.yardimciDesktop.commerce.listProducts()).length);
+  const countProducts = () => page.evaluate(async () => (await window.yardimciDesktop.commerce.listProducts()).total);
   const countMenuEntries = () => page.evaluate(async () => (await window.yardimciDesktop.getDashboardData()).menu.items.length);
   const productsBeforeCreate = await countProducts();
   const entriesBeforeCreate = await countMenuEntries();
@@ -1721,6 +1731,7 @@ try {
     .getByRole("button", { name: "Temizlik", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+  await compactPage.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await compactPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
@@ -1842,7 +1853,7 @@ try {
       publication: { rooms: false, tables: false }
     };
     window.yardimciDesktop = {
-      commerce: { listProducts: async () => products, listCategories: async () => [] },
+      commerce: { listProducts: async options => window.__catalogPageFixture(products, options), listCategories: async () => [] },
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",

@@ -3,7 +3,7 @@ import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
 import { completeMarketSale } from "./market-sale-operation";
-import { deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } from "./commerce-catalog-presentation-store";
+import { activateCatalogProduct, deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } from "./commerce-catalog-presentation-store";
 import {
   previewExternalProductImage
 } from "./product-data-service";
@@ -114,11 +114,14 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:category:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCategories"]>[0]) =>
     read(() => listRuntimeCatalogCategories(databasePath(), optionsArg))
   );
-  ipcMain.handle("commerce:catalog:reorder", (_event, kind: Parameters<DesktopCommerceBridge["reorderCatalog"]>[0], orderedIds: string[]) =>
-    mutateForIpc("commerce:catalog:reorder", () => reorderCatalogRecords(databasePath(), kind, orderedIds))
+  ipcMain.handle("commerce:catalog:reorder", (_event, kind: Parameters<DesktopCommerceBridge["reorderCatalog"]>[0], orderedIds: string[], page?: { offset: number; total: number }) =>
+    mutateForIpc("commerce:catalog:reorder", () => reorderCatalogRecords(databasePath(), kind, orderedIds, page))
   );
   ipcMain.handle("commerce:product:quickAccess", (_event, productId: string, enabled: boolean) =>
     mutateForIpc("commerce:product:quickAccess", () => setCatalogProductQuickAccess(databasePath(), productId, enabled))
+  );
+  ipcMain.handle("commerce:product:activate", (_event, productId: string) =>
+    mutateForIpc("commerce:product:activate", () => activateCatalogProduct(databasePath(), productId))
   );
   ipcMain.handle("commerce:product:delete", (_event, productId: string) =>
     mutateForIpc("commerce:product:delete", () => deleteCatalogProduct(databasePath(), productId))
@@ -201,7 +204,7 @@ export function registerCommerceIpcHandlers(options: {
     read(() => getRuntimeOrder(databasePath(), orderId))
   );
   ipcMain.handle("commerce:order:create", (_event, input: Parameters<DesktopCommerceBridge["createOrder"]>[0]) =>
-    mutateForIpc("commerce:order:create", () => createRuntimeOrder(databasePath(), input))
+    mutateForIpc("commerce:order:create", () => createRuntimeOrder(databasePath(), input, { desktopEntry: true }))
   );
   ipcMain.handle("commerce:order:updateStatus", (_event, input: Parameters<DesktopCommerceBridge["updateOrderStatus"]>[0]) =>
     mutateForIpc("commerce:order:updateStatus", () => updateRuntimeOrderStatus(databasePath(), input))

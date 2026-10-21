@@ -52,7 +52,7 @@ try {
   assert.ok(!/Canlı Sistem|fixture|public API referansı|Canlı referans site/.test(await page.locator('body').innerText()));
   await expect(page.locator('[data-site-nav] a[href="/odalar/"]')).toHaveCount(0);
   await expect(page.locator('[data-marketing-wrapper]')).toBeHidden();
-  await expect(page.locator('.download-card')).toHaveCount(3);
+  await expect(page.locator('.download-card')).toHaveCount(4);
   mkdirSync(join(root, 'downloads')); for (const link of await page.locator('.download-card').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')))) { writeFileSync(join(root, link), 'test-download'); assert.equal((await fetch(base + link)).status, 200); }
   const surfaces = [
     ['room_catalog', 'rooms', '/odalar/'], ['table_catalog', 'restaurant', '/restoran/'],

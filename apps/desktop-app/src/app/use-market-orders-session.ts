@@ -1,19 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { emptyArasShippingConfiguration } from "@yardimci-asistan/shared";
-import type { CommerceShipment, CommerceShipmentStatus, CatalogProduct, CommerceOrder, CommerceOrderDetail, CommerceResolvedUnitPrice } from "@yardimci-asistan/shared";
+import type { CommerceShipment, CommerceShipmentStatus, CommerceOrder, CommerceOrderDetail } from "@yardimci-asistan/shared";
 
-export interface MarketOrderDraftLine {
-  product: CatalogProduct;
-  pricing: CommerceResolvedUnitPrice;
-  quantity: number;
-}
 export type FulfillmentPaymentChoice = "cash" | "card" | "bank" | "other" | "credit";
-
-function createManualOrderReference() {
-  const randomId = typeof crypto?.randomUUID === "function"
-    ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `desktop-wholesale:${randomId}`;
-}
 
 /** Controller-owned session survives page/tab unmounts; only the visible panel renders. */
 export function useMarketOrdersSession({ enabled, onStateChange }: {
@@ -21,10 +10,9 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
-  const [customerId, setCustomerId] = useState("");
   const [search, setSearch] = useState("");
-  const [note, setNote] = useState("");
-  const [lines, setLines] = useState<MarketOrderDraftLine[]>([]);
+  const [statusFilter, setStatusFilter] = useState("");
+  const mutationInFlight = useRef(false);
   const [orders, setOrders] = useState<CommerceOrder[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<CommerceOrderDetail | null>(null);
   const [shippingProvider, setShippingProvider] = useState(emptyArasShippingConfiguration);
@@ -37,10 +25,6 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fulfillmentPayment, setFulfillmentPayment] = useState<FulfillmentPaymentChoice>("cash");
-  const [resolvingProductId, setResolvingProductId] = useState("");
-  const customerIdRef = useRef("");
-  const draftReferenceRef = useRef("");
-  if (!draftReferenceRef.current) draftReferenceRef.current = createManualOrderReference();
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const reloadGeneration = useRef(0);
@@ -51,7 +35,6 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   const stateChangeRef = useRef(onStateChange);
   stateChangeRef.current = onStateChange;
 
-  const resetDraftReference = useCallback(() => { draftReferenceRef.current = createManualOrderReference(); }, []);
 
   // Local mutation results invalidate older reads and update UI without an event round trip.
   const setSelectedOrder = useCallback((detail: CommerceOrderDetail | null) => {
@@ -198,9 +181,9 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     }
   }, [bridge, reloadShipments]);
 
-  return { shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments, customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
+  return { shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments,
+    search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
-    fulfillmentPayment, setFulfillmentPayment, resolvingProductId, setResolvingProductId,
-    draftReferenceRef, resetDraftReference, reloadOrders, openOrder };
+    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder };
 }
 export type MarketOrdersSession = ReturnType<typeof useMarketOrdersSession>;

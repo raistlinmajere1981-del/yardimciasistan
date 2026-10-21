@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { DesktopCommerceBridge } from "../../electron/commerce-ipc-contract";
 import type {
   CatalogProduct,
   CommerceSale,
@@ -30,16 +31,20 @@ export function useMarketQuickSaleSession({
   customerSelectionEnabled?: boolean;
   pricingContext?: string;
 }) {
+  const [transactionMode, setTransactionMode] = useState<"sale" | "order">("sale");
+  const [orderNote, setOrderNote] = useState("");
+  const pendingOrder = useRef<Parameters<DesktopCommerceBridge["createOrder"]>[0] | null>(null);
+  const [orderUncertain, setOrderUncertain] = useState(false);
   const [cart, setCart] = useState<MarketQuickSaleCartLine[]>([]);
   const cartRef = useRef<MarketQuickSaleCartLine[]>([]);
   const [discountTotal, setDiscountTotal] = useState("0");
+  const [paymentAmount, setPaymentAmount] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [customerId, setCustomerId] = useState("");
   const [sourceDraft, setSourceDraft] = useState<CommerceSaleDraft | null>(null);
   const [draftLoadWarnings, setDraftLoadWarnings] = useState<string[]>([]);
   const [reviewRecoveryDraft, setReviewRecoveryDraft] = useState<CommerceSaleDraft | null>(null);
   const [lastSale, setLastSale] = useState<CommerceSale | null>(null);
-  const [lastCreditCustomerName, setLastCreditCustomerName] = useState("");
   const saleInFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
@@ -78,6 +83,9 @@ export function useMarketQuickSaleSession({
     void Promise.all(products.map(product => bridge.resolveProductPrice({ productId: product.id, customerId })))
       .then(prices => {
         if (generation !== priceGeneration.current) return;
+        if (prices.some(price => products.find(product => product.id === price.productId)?.currency !== price.currency)) {
+          throw new Error("Sepetteki ürünün para birimi değişti. Ürünü çıkarıp yeniden ekleyin.");
+        }
         const byId = new Map(prices.map(price => [price.productId, price]));
         replaceCart(cartRef.current.map(line => {
           const price = byId.get(line.product.id);
@@ -101,7 +109,7 @@ export function useMarketQuickSaleSession({
   }, []);
 
   const addProduct = useCallback((product: CatalogProduct) => {
-    if (saleInFlight.current) return "blocked" as const;
+    if (saleInFlight.current || pendingOrder.current) return "blocked" as const;
     const current = cartRef.current;
     const currentCurrency = current[0]?.product.currency ?? "";
     if (currentCurrency && product.currency !== currentCurrency) return "currency_mismatch" as const;
@@ -116,7 +124,7 @@ export function useMarketQuickSaleSession({
   }, [replaceCart]);
 
   const setQuantity = useCallback((productId: string, quantityInput: number) => {
-    if (saleInFlight.current) return false;
+    if (saleInFlight.current || pendingOrder.current) return false;
     const quantity = roundQuantity(quantityInput);
     const current = cartRef.current;
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -128,8 +136,13 @@ export function useMarketQuickSaleSession({
   }, [replaceCart]);
 
   const clearSale = useCallback(() => {
+    pendingOrder.current = null;
+    setOrderUncertain(false);
+    setOrderNote("");
+    setTransactionMode("sale");
     replaceCart([]);
     setDiscountTotal("0");
+    setPaymentAmount(null);
     setPaymentMethod("cash");
     setCustomerId("");
     setSourceDraft(null);
@@ -138,7 +151,7 @@ export function useMarketQuickSaleSession({
   }, [replaceCart]);
 
   const startSale = useCallback(() => {
-    if (saleInFlight.current) return false;
+    if (saleInFlight.current || pendingOrder.current) return false;
     saleInFlight.current = true;
     setSubmitting(true);
     return true;
@@ -149,9 +162,8 @@ export function useMarketQuickSaleSession({
     setSubmitting(false);
   }, []);
 
-  const recordSale = useCallback((sale: CommerceSale, creditCustomerName: string) => {
+  const recordSale = useCallback((sale: CommerceSale) => {
     setLastSale(sale);
-    setLastCreditCustomerName(sale.status === "credit" ? creditCustomerName : "");
   }, []);
 
   const clearReviewRecoveryDraft = useCallback((draftId: string) => {
@@ -159,7 +171,7 @@ export function useMarketQuickSaleSession({
   }, []);
 
   const requestCartDraft = useCallback((draftId: string) => {
-    if (saleInFlight.current || reviewRecoveryDraft) return null;
+    if (saleInFlight.current || pendingOrder.current || reviewRecoveryDraft) return null;
     const request = { requestId: ++draftRequestSequence.current, draftId };
     cartDraftRequestRef.current = request;
     setCartDraftRequest(request);
@@ -181,17 +193,56 @@ export function useMarketQuickSaleSession({
     );
     replaceCart(result.items.map((item) => ({ product: item.product, quantity: item.quantity })));
     setDiscountTotal("0");
+    setPaymentAmount(null);
     setPaymentMethod("cash");
     setCustomerId("");
+    setTransactionMode("sale");
+    setOrderNote("");
     setSourceDraft(result.draft);
     setDraftLoadWarnings(warnings);
     setLastSale(null);
-    setLastCreditCustomerName("");
     loadedDraftRequestId.current = requestId;
     return warnings;
   }, [replaceCart]);
 
+  // The immutable intent survives workspace/tab unmounts. A lost response must
+  // retry this payload and reference before the cart can become another operation.
+  const createOrder = useCallback(async (input: Parameters<DesktopCommerceBridge["createOrder"]>[0]) => {
+    const bridge = window.yardimciDesktop?.commerce;
+    if (!bridge || saleInFlight.current || sourceDraft || reviewRecoveryDraft) return null;
+    saleInFlight.current = true;
+    setSubmitting(true);
+    if (!pendingOrder.current) pendingOrder.current = { ...input, source: "desktop", sourceReference: `desktop-order:${crypto.randomUUID()}` };
+    let rejected = false;
+    try {
+      const response = await bridge.createOrder(pendingOrder.current);
+      if (response?.ok === false && response.expected === true) {
+        rejected = true;
+        pendingOrder.current = null;
+        setOrderUncertain(false);
+        throw new Error(response.message);
+      }
+      if (response?.ok !== true) throw new Error("Sipariş sonucu doğrulanamadı. Aynı işlemle yeniden deneyin.");
+      const result = response.value;
+      if (!result?.order?.id || result.order.source !== pendingOrder.current.source
+        || result.order.sourceReference !== pendingOrder.current.sourceReference) {
+        throw new Error("Sipariş sonucu doğrulanamadı. Aynı işlemle yeniden deneyin.");
+      }
+      clearSale();
+      return result;
+    } catch (error) {
+      // contextBridge strips custom Error names. Only the existing typed IPC
+      // rejection envelope proves rollback; thrown errors may follow a commit.
+      if (!rejected) setOrderUncertain(true);
+      throw error;
+    } finally {
+      saleInFlight.current = false;
+      setSubmitting(false);
+    }
+  }, [clearSale, sourceDraft, reviewRecoveryDraft]);
+
   return {
+    transactionMode, setTransactionMode, orderNote, setOrderNote, orderUncertain, createOrder,
     cart,
     cartRef,
     pricingContext,
@@ -202,6 +253,8 @@ export function useMarketQuickSaleSession({
     prepareSaleOperation,
     discountTotal,
     setDiscountTotal,
+    paymentAmount,
+    setPaymentAmount,
     paymentMethod,
     setPaymentMethod,
     customerId,
@@ -212,7 +265,6 @@ export function useMarketQuickSaleSession({
     setReviewRecoveryDraft,
     clearReviewRecoveryDraft,
     lastSale,
-    lastCreditCustomerName,
     submitting,
     saleInFlight,
     cartDraftRequest,

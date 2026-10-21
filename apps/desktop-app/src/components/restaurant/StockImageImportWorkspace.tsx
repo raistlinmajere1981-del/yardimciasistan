@@ -1,4 +1,4 @@
-import { SearchSelect } from "../ui/SearchSelect";
+import { MarketCatalogPicker } from "../market/MarketCatalogPicker";
 import { observeNexaAi } from "../../app/nexa-activity";
 import { Camera, FileImage, Plus, RotateCw, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -48,8 +48,10 @@ export function StockImageImportWorkspace({ products, onApplied }: StockImageImp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisAttemptRef = useRef(0);
-  const trackedItems = useMemo(() => products.filter(product => product.isActive && product.trackInventory)
-    .map(product => ({ id: product.id, name: product.name, stock_unit: product.unit })), [products]);
+  const [pickedProducts, setPickedProducts] = useState<CatalogProduct[]>([]);
+  const selectionProducts = useMemo(() => [...products, ...pickedProducts.filter(product => !products.some(item => item.id === product.id))], [products, pickedProducts]);
+  const trackedItems = useMemo(() => selectionProducts.filter(product => product.isActive && product.trackInventory)
+    .map(product => ({ id: product.id, name: product.name, stock_unit: product.unit })), [selectionProducts]);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -84,6 +86,7 @@ export function StockImageImportWorkspace({ products, onApplied }: StockImageImp
     setError("");
     setAnalysis(null);
     setReviewLines([]);
+    setPickedProducts([]);
     setActiveImportId("");
     setImageHash("");
     setDuplicateWarning(false);
@@ -191,16 +194,43 @@ export function StockImageImportWorkspace({ products, onApplied }: StockImageImp
         setActiveImportId("");
         return;
       }
+      // Analysis can match products outside the currently loaded catalog page.
+      // Resolve only those records before showing totals or enabling stock apply.
+      const matchedProducts = new Map(selectionProducts.map(product => [product.id, product]));
+      const missingIds = [...new Set(result.analysis.lines.flatMap(line => line.matched_product_id ? [line.matched_product_id] : []))]
+        .filter(id => !matchedProducts.has(id));
+      try {
+        const resolved = await Promise.all(missingIds.map(async productId => {
+          if (!bridge.commerce?.listProducts) throw new Error("Katalog kullanılamıyor.");
+          const page = await bridge.commerce.listProducts({ productId, activeOnly: true, inventoryOnly: true, limit: 1 });
+          return page.items.find(product => product.id === productId);
+        }));
+        if (analysisAttemptRef.current !== attempt) return;
+        for (const product of resolved) if (product) matchedProducts.set(product.id, product);
+      } catch {
+        if (analysisAttemptRef.current !== attempt) return;
+        void bridge.cancelStockImageAnalysis?.(importId).catch(() => undefined);
+        setStage("image");
+        setError("Eşleşen ürün bilgileri alınamadı. Analizi yeniden deneyin.");
+        setMessage("");
+        setActiveImportId("");
+        return;
+      }
+      setPickedProducts([...matchedProducts.values()]);
       setAnalysis(result.analysis);
-      setReviewLines(result.analysis.lines.map((line) => ({
-        id: crypto.randomUUID(),
-        rawText: line.raw_text,
-        productId: line.matched_product_id ?? "",
-        quantity: line.suggested_quantity === null ? "" : String(line.suggested_quantity),
-        confidence: line.confidence,
-        reason: line.needs_review_reason ?? "",
-        ignored: false
-      })));
+      setReviewLines(result.analysis.lines.map((line) => {
+        const product = matchedProducts.get(line.matched_product_id ?? "");
+        const selectable = product?.isActive && product.trackInventory;
+        return {
+          id: crypto.randomUUID(),
+          rawText: line.raw_text,
+          productId: selectable ? product.id : "",
+          quantity: line.suggested_quantity === null ? "" : String(line.suggested_quantity),
+          confidence: line.confidence,
+          reason: line.needs_review_reason ?? "",
+          ignored: false
+        };
+      }));
       setImageHash(result.imageHash);
       setDuplicateWarning(result.duplicateWarning);
       setDuplicateAcknowledged(false);
@@ -336,8 +366,8 @@ export function StockImageImportWorkspace({ products, onApplied }: StockImageImp
                 {reviewLines.map(line => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}>
                   <div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div>
                   <label><span className="stock-image-mobile-label">Ürün karşılığı</span>
-                    <SearchSelect ariaLabel={`Ürün karşılığı ${line.rawText}`} disabled={line.ignored} value={line.productId} placeholder="Eşleşme yok"
-                      onChange={productId => updateLine(line.id, { productId })} options={trackedItems.map(item => ({ id: item.id, label: item.name, description: stockUnitLabel(item.stock_unit) }))} />
+                    <MarketCatalogPicker ariaLabel={`Ürün karşılığı ${line.rawText}`} disabled={line.ignored} value={line.productId} products={selectionProducts}
+                      onChange={productId => updateLine(line.id, { productId })} onProductSelected={product => { if (product) setPickedProducts(current => [...current.filter(item => item.id !== product.id), product]); }} />
                   </label>
                   <label><span className="stock-image-mobile-label">Eklenecek miktar</span>
                     <input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find(item => item.id === line.productId)?.stock_unit ?? "piece")})`}

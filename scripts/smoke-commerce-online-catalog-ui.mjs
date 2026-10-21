@@ -50,6 +50,7 @@ try {
   let failSave = false;
   await page.exposeFunction("__publicationCall", (method, input) => {
     if (method === "create") { const saved = saveRuntimeCatalogProduct(database.databasePath, input); createdProducts.push(saved); return saved; }
+    if (method === "list") return listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "get") return database.getCommerceProductPublication(input);
     if (method === "save") {
       saves++;
@@ -61,6 +62,7 @@ try {
   await page.addInitScript((product) => {
     window.__product = product;
     window.yardimciDesktop = { commerce: {
+      listProducts: input => window.__publicationCall("list", input),
       saveProduct: (input) => window.__publicationCall("create", input),
       getProductPublication: (id) => window.__publicationCall("get", id),
       saveProductPublication: (input) => window.__publicationCall("save", input)
@@ -98,7 +100,7 @@ try {
   await expect(checkbox).not.toBeChecked();
   await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   for (const optOut of [false, true]) {
-    await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+    await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
     const create = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
     const createCheckbox = create.getByRole("checkbox", { name: "Web satışında yayınla", exact: true });
     await expect(createCheckbox).toBeChecked();
@@ -121,7 +123,7 @@ try {
   }
   selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
-  await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+  await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
   const offlineCreate = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
   await expect(offlineCreate.getByRole("checkbox", { name: "Web satışında yayınla" })).toHaveCount(0);
   await offlineCreate.getByLabel("Ürün adı", { exact: true }).fill("Created offline");
@@ -148,6 +150,7 @@ try {
   await detailPage.exposeFunction("__detailCall", (method, input) => {
     detailCalls.push(method);
     if (method === "save") return saveRuntimeCatalogProduct(database.databasePath, input);
+    if (method === "list") return listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "balance") return getRuntimeInventoryBalance(database.databasePath, input);
     if (method === "movements") return listRuntimeInventoryMovements(database.databasePath, input);
     if (method === "count") return setRuntimeInventoryCount(database.databasePath, input);
@@ -159,6 +162,7 @@ try {
     window.__product = product;
     window.__inventoryEnabled = true;
     window.yardimciDesktop = { commerce: {
+      listProducts: input => window.__detailCall("list", input),
       saveProduct: input => window.__detailCall("save", input),
       getInventoryBalance: id => window.__detailCall("balance", id),
       listInventoryMovements: input => window.__detailCall("movements", input),
@@ -219,7 +223,7 @@ try {
   await detail.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(detail.getByRole("heading", { name: "Hybrid saved product", exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
-  assert.equal(listRuntimeCatalogProducts(database.databasePath).find(product => product.id === stockProduct.id).name, "Hybrid saved product");
+  assert.equal(listRuntimeCatalogProducts(database.databasePath).items.find(product => product.id === stockProduct.id).name, "Hybrid saved product");
   assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
   assert.equal(detailCalls.filter(method => method === "count").length, 1);
   await fields.getByLabel("Ürün adı", { exact: true }).fill("Discard this draft");
@@ -246,8 +250,8 @@ try {
   assert.equal(menuResult.ok, true, menuResult.message);
   const menuData = database.getDashboardData();
   const menuProductId = menuData.menu.items.find(item => item.id === menuResult.savedId).product_id;
-  const menuProduct = listRuntimeCatalogProducts(database.databasePath).find(item => item.id === menuProductId);
-  const countBeforePublish = listRuntimeCatalogProducts(database.databasePath).length;
+  const menuProduct = listRuntimeCatalogProducts(database.databasePath).items.find(item => item.id === menuProductId);
+  const countBeforePublish = listRuntimeCatalogProducts(database.databasePath).items.length;
   await page.addInitScript(({ menuData, menuProduct }) => { window.__menuData = menuData; window.__product = menuProduct; }, { menuData, menuProduct });
   await page.reload();
   await page.getByRole("button", { name: "Menü Ürününü Aç", exact: true }).click();
@@ -256,7 +260,7 @@ try {
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();
   await expect.poll(() => database.createCommerceOnlineCatalog().products.some(item => item.productId === menuProductId)).toBe(true);
-  assert.equal(listRuntimeCatalogProducts(database.databasePath).length, countBeforePublish, "Menu publication must not insert another product row");
+  assert.equal(listRuntimeCatalogProducts(database.databasePath).items.length, countBeforePublish, "Menu publication must not insert another product row");
   selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
   await expect(checkbox).toHaveCount(0);

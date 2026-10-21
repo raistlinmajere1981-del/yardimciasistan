@@ -239,7 +239,7 @@ try {
     assert.equal(updatedMenu.stockQuantity, menuStockBefore - menuItem.stockConsumptionQuantity);
   }
 
-  const product = listCatalogProducts(database.databasePath).find(item => item.id === menuItem.productId);
+  const product = listCatalogProducts(database.databasePath).items.find(item => item.id === menuItem.productId);
   saveCatalogProduct(database.databasePath, { ...product, name: "Later canonical label", salePrice: 999, currency: "USD" });
   const entry = database.getPublishedMenu().items.find(item => item.id === menuItem.id);
   assert.equal(database.saveMenuProductEntry({ ...entry, product_id: product.id, stock_consumption_quantity: 0.5, price_override: 77 }).ok, true);
@@ -254,7 +254,7 @@ try {
   assert.equal(doubled.data.folios.find(item => item.id === opened.folioId).items.find(item => item.id === menuLine.id).lineTotalMinor, menuItem.priceMinor * 2);
   assert.equal(service.updateItemQuantity({ itemId: menuLine.id, quantity: 1 }).ok, true);
   assert.equal(database.deleteMenuProductEntry(menuItem.id).ok, true);
-  assert.ok(listCatalogProducts(database.databasePath).find(item => item.id === product.id));
+  assert.ok(listCatalogProducts(database.databasePath).items.find(item => item.id === product.id));
 
   const manualAdded = service.addManualItem({
     folioId: opened.folioId,

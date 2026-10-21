@@ -12,8 +12,6 @@ import { useMarketController } from "../../apps/desktop-app/src/app/use-market-c
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
 import "../../apps/desktop-app/src/styles/index.css";
-
-
 const control = window as typeof window & {
   __m82Initial: { dashboard: DesktopDashboardData; snapshot: BusinessCapabilitySnapshot };
   __m82Toggle: (enabled: boolean) => Promise<void>;
@@ -42,45 +40,45 @@ function Harness() {
   }), []);
 
   return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
-    <main className="smoke-shell">
-      {customers.confirmDialog}
-      <nav aria-label="Çalışma alanı">
-        <button type="button" onClick={() => setPage("market")}>Market</button>
-        <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>
-      </nav>
-      <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
-      {page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} /> : <div className="customer-work-page">
-        <div className="customer-work-content is-customers">
-          <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
-          <CustomersWorkspace
-            customers={dashboardData.customers}
-            stays={dashboardData.customerRoomStays}
-            reservations={dashboardData.reservations}
-            notifications={dashboardData.hospitalityNotifications}
-            kbsOverview={dashboardData.kbsOverview}
-            aiEnabled={false}
-            onSave={customers.handleSaveCustomer}
-            onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
-            onDelete={customers.handleDeleteCustomer}
-            onSendKbs={async () => undefined}
-          />
-          <WorkspaceHost definition={customerWorkspaceDefinition} context={{
-            data: dashboardData,
-            aiEnabled: false,
-            whatsappEnabled: false,
-            reservationsEnabled: false,
-            staysEnabled: false,
-            accommodationFolioEnabled: true,
-            customerCreditEnabled: snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT),
-            onWhatsApp: () => undefined,
-            onSave: customers.handleSaveCustomer,
-            onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
-            onDelete: customers.handleDeleteCustomer
-          }} />
-          </WorkspaceNavigationProvider>
-        </div>
-      </div>}
-    </main>
+    <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={page === "market" ? "market" : "customerWork"}>
+      <main className="smoke-shell">
+        {customers.confirmDialog}
+        <nav aria-label="Çalışma alanı">
+          <button type="button" onClick={() => setPage("market")}>Market</button>
+          <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>
+        </nav>
+        <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
+        {page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} /> : <div className="customer-work-page">
+          <div className="customer-work-content is-customers">
+            <CustomersWorkspace
+              customers={dashboardData.customers}
+              stays={dashboardData.customerRoomStays}
+              reservations={dashboardData.reservations}
+              notifications={dashboardData.hospitalityNotifications}
+              kbsOverview={dashboardData.kbsOverview}
+              aiEnabled={false}
+              onSave={customers.handleSaveCustomer}
+              onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+              onDelete={customers.handleDeleteCustomer}
+              onSendKbs={async () => undefined}
+            />
+          </div>
+        </div>}
+      </main>
+      <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+        data: dashboardData,
+        aiEnabled: false,
+        whatsappEnabled: false,
+        reservationsEnabled: false,
+        staysEnabled: false,
+        accommodationFolioEnabled: true,
+        customerCreditEnabled: snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT),
+        onWhatsApp: () => undefined,
+        onSave: customers.handleSaveCustomer,
+        onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
+        onDelete: customers.handleDeleteCustomer
+      }} />
+    </WorkspaceNavigationProvider>
   </BusinessCapabilityRuntimeProvider>;
 }
 

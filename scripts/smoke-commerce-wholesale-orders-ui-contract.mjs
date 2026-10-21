@@ -47,26 +47,12 @@ try {
     "The persisted Market profile defaults must expose Sales");
 } finally { await server.close(); }
 assert.match(page, /id:\s*"orders"[\s\S]*label:\s*"Siparişler"/);
-assert.match(page, /enabled:\s*ordersEnabled && wholesaleEnabled/);
+assert.match(page, /enabled:\s*ordersEnabled/);
 assert.match(page, /<MarketOrdersWorkspace/);
 assert.match(page, /customerCreditEnabled=\{customerCreditEnabled\}/);
 
-assert.match(workspace, /Aktif bayi/);
-assert.match(
-  workspace,
-  /product\.isActive !== false/,
-  "Orders UI must only exclude products that are explicitly inactive."
-);
-assert.match(
-  workspace,
-  /resolveProductPrice\(\{ productId: product\.id, customerId: requestedCustomerId \}\)/,
-  "Price preview must resolve against the customer captured when the request starts."
-);
-assert.match(workspace, /source:\s*"desktop-wholesale"/);
-assert.match(workspace, /sourceReference:\s*draftReferenceRef\.current/);
-assert.match(workspace, /customerIdRef\.current !== requestedCustomerId/);
-assert.match(workspace, /disabled=\{disabled \|\| Boolean\(resolvingProductId\)\}/);
-assert.match(workspace, /createOrder\(/);
+assert.doesNotMatch(workspace, /createOrder|setLines|RecordPicker|resolveProductPrice/);
+assert.match(page, /label: "Yeni İşlem"/);
 assert.match(workspace, /Siparişi Onayla/);
 assert.match(workspace, /Siparişi İptal Et/);
 assert.match(workspace, /Siparişi Tamamla/);
@@ -77,11 +63,7 @@ assert.match(workspace, /desktop-order-fulfillment:\$\{orderId\}:\$\{paymentChoi
 assert.match(workspace, /type:\s*"no_payment"/);
 assert.match(workspace, /type:\s*"credit"/);
 assert.match(workspace, /type:\s*"paid"/);
-assert.match(
-  marketCss,
-  /\.market-order-product-grid\s*\{[\s\S]*min-height:\s*112px/,
-  "Order product grid must keep a visible minimum height."
-);
+assert.match(marketCss, /market-order-detail-panel/);
 assert.doesNotMatch(workspace, /createPaidSale/);
 assert.doesNotMatch(workspace, /applyInventoryMovement/);
 assert.doesNotMatch(workspace, /createCustomerCreditSale/);

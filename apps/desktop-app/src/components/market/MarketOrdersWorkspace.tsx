@@ -1,9 +1,7 @@
-import { RecordPicker } from "../ui/RecordPicker";
-import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards, XCircle } from "lucide-react";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { CheckCircle2, ClipboardList, Search, WalletCards, XCircle } from "lucide-react";
 import { useMemo } from "react";
-import type { CatalogProduct } from "@yardimci-asistan/shared";
 import type { MarketOrdersSession, FulfillmentPaymentChoice } from "../../app/use-market-orders-session";
-import type { DesktopCustomer } from "../../../electron/database";
 import { MarketOrderShipments } from "./MarketOrderShipments";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
@@ -18,12 +16,6 @@ function money(value: number, currency = "TRY") {
   } catch {
     return `${value.toFixed(2)} ${currency}`;
   }
-}
-
-function priceGroupLabel(group: string) {
-  if (group === "dealer_a") return "Bayi A";
-  if (group === "dealer_b") return "Bayi B";
-  return "Perakende";
 }
 
 function orderStatusLabel(status: string) {
@@ -41,6 +33,7 @@ function orderStatusTone(status: string): StatusTone {
 }
 
 function sourceLabel(source: string) {
+  if (source === "desktop") return "Manuel";
   if (source === "desktop-wholesale") return "Manuel bayi";
   if (source === "web-online-sales") return "Web siparişi";
   if (source === "web-dealer") return "Bayi web siparişi";
@@ -48,139 +41,32 @@ function sourceLabel(source: string) {
   return source || "Sipariş";
 }
 
-function catalogPreviewPrice(product: CatalogProduct, customer: DesktopCustomer | undefined) {
-  const profile = customer?.commercialProfile;
-  if (!profile || profile.dealerStatus !== "active") {
-    return { value: product.salePrice, label: "Perakende" };
-  }
-  if (profile.priceGroup === "dealer_a" && product.dealerPriceA != null) {
-    return { value: product.dealerPriceA, label: "Bayi A" };
-  }
-  if (profile.priceGroup === "dealer_b" && product.dealerPriceB != null) {
-    return { value: product.dealerPriceB, label: "Bayi B" };
-  }
-  return { value: product.salePrice, label: profile.priceGroup === "retail" ? "Perakende" : "Perakende · yedek" };
-}
-
 export function MarketOrdersWorkspace({
   session,
-  customers,
-  products,
   customerCreditEnabled = false,
   busy,
   onStateChange
 }: {
   session: MarketOrdersSession;
-  customers: DesktopCustomer[];
-  products: CatalogProduct[];
   customerCreditEnabled?: boolean;
   busy: boolean;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
-  const activeDealers = useMemo(
-    () => customers.filter((customer) => customer.commercialProfile?.dealerStatus === "active"),
-    [customers]
-  );
-  const orderProducts = useMemo(() => products.filter((product) => product.isActive !== false), [products]);
-  const { customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
+  const { search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
-    fulfillmentPayment, setFulfillmentPayment, resolvingProductId, setResolvingProductId,
-    draftReferenceRef, resetDraftReference, reloadOrders, openOrder } = session;
-
-  const selectedCustomer = activeDealers.find((customer) => customer.id === customerId);
-  const filteredProducts = useMemo(() => {
+    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder } = session;
+  const filteredOrders = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
-    if (!needle) return orderProducts;
-    return orderProducts.filter((product) =>
-      [product.name, product.brand, product.sku, product.barcode]
-        .some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle))
-    );
-  }, [orderProducts, search]);
-
-  const currency = lines[0]?.pricing.currency ?? "TRY";
-  const subtotal = lines.reduce((sum, line) => sum + line.pricing.unitPrice * line.quantity, 0);
+    return orders.filter(order => (!statusFilter || order.status === statusFilter)
+      && (!needle || [order.customerName, order.buyerSnapshot?.name, order.source, sourceLabel(order.source), order.id]
+        .some(value => value?.toLocaleLowerCase("tr-TR").includes(needle))));
+  }, [orders, search, statusFilter]);
   const disabled = busy || submitting || loadingOrders;
 
-  function changeCustomer(nextCustomerId: string) {
-    customerIdRef.current = nextCustomerId;
-    setCustomerId(nextCustomerId);
-    setLines([]);
-    resetDraftReference();
-  }
-
-  async function addProduct(product: CatalogProduct) {
-    if (!bridge || !customerId || resolvingProductId || disabled) return;
-    const existing = lines.find((line) => line.product.id === product.id);
-    if (existing) {
-      resetDraftReference();
-      setLines((current) => current.map((line) =>
-        line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line
-      ));
-      return;
-    }
-
-    const requestedCustomerId = customerId;
-    customerIdRef.current = customerId;
-    setResolvingProductId(product.id);
-    try {
-      const pricing = await bridge.resolveProductPrice({ productId: product.id, customerId: requestedCustomerId });
-      if (customerIdRef.current !== requestedCustomerId) return;
-      if (lines.length > 0 && pricing.currency !== currency) {
-        onStateChange("error", "Tek siparişte birden fazla para birimi kullanılamaz.");
-        return;
-      }
-      resetDraftReference();
-      setLines((current) => [...current, { product, pricing, quantity: 1 }]);
-    } catch (error) {
-      onStateChange("error", error instanceof Error ? error.message : "Ürün fiyatı çözümlenemedi.");
-    } finally {
-      setResolvingProductId("");
-    }
-  }
-
-  function setQuantity(productId: string, quantity: number) {
-    resetDraftReference();
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      setLines((current) => current.filter((line) => line.product.id !== productId));
-      return;
-    }
-    setLines((current) => current.map((line) =>
-      line.product.id === productId
-        ? { ...line, quantity: Math.round(quantity * 10000) / 10000 }
-        : line
-    ));
-  }
-
-  async function createOrder() {
-    if (!bridge || !selectedCustomer || lines.length === 0 || submitting) return;
-    setSubmitting(true);
-    try {
-      const created = await bridge.createOrder({
-        customerId: selectedCustomer.id,
-        source: "desktop-wholesale",
-        sourceReference: draftReferenceRef.current,
-        note,
-        items: lines.map((line) => ({
-          productId: line.product.id,
-          quantity: line.quantity
-        }))
-      });
-      setSelectedOrder(created);
-      setLines([]);
-      setNote("");
-      resetDraftReference();
-      await reloadOrders();
-      onStateChange("success", `Sipariş kaydedildi: ${money(created.order.total, created.order.currency)}.`);
-    } catch (error) {
-      onStateChange("error", error instanceof Error ? error.message : "Sipariş kaydedilemedi.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function updateStatus(status: "confirmed" | "cancelled") {
-    if (!bridge || !selectedOrder || submitting) return;
+    if (!bridge || !selectedOrder || submitting || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setSubmitting(true);
     try {
       const updated = await bridge.updateOrderStatus({
@@ -193,12 +79,13 @@ export function MarketOrdersWorkspace({
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Sipariş durumu güncellenemedi.");
     } finally {
+      mutationInFlight.current = false;
       setSubmitting(false);
     }
   }
 
   async function fulfillSelectedOrder() {
-    if (!bridge || !selectedOrder || selectedOrder.order.status !== "confirmed" || submitting) return;
+    if (!bridge || !selectedOrder || selectedOrder.order.status !== "confirmed" || submitting || mutationInFlight.current) return;
     const zeroTotal = selectedOrder.order.total === 0;
     const paymentChoice = zeroTotal ? "no_payment" : fulfillmentPayment;
     if (paymentChoice === "credit" && (!customerCreditEnabled || !selectedOrder.order.customerId)) {
@@ -206,6 +93,7 @@ export function MarketOrdersWorkspace({
       return;
     }
 
+    mutationInFlight.current = true;
     setSubmitting(true);
     try {
       const result = await bridge.fulfillOrder({
@@ -230,199 +118,41 @@ export function MarketOrdersWorkspace({
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Sipariş tamamlanamadı.");
     } finally {
+      mutationInFlight.current = false;
       setSubmitting(false);
     }
   }
 
   return (
     <div className="market-order-layout">
-      <section className="market-panel market-order-compose">
-        <header className="market-panel-heading">
-          <span>Bayi / Toptan</span>
-          <h2>Yeni Sipariş</h2>
-          <p>Aktif bayi seçin; ürün fiyatı müşterinin fiyat grubuna göre hesaplanır.</p>
+      <section className="market-panel market-order-history" aria-label="Sipariş listesi">
+        <header className="market-panel-heading-row">
+          <small>Son 100 sipariş · {filteredOrders.length} sonuç</small>
+          <ActionButton variant="secondary" size="sm" onClick={() => void reloadOrders()} disabled={disabled}>Yenile</ActionButton>
         </header>
-
-        <div className="market-order-customer">
-          <label className="form-field form-field--fluid">
-            Aktif bayi
-            <RecordPicker pickerType="dealer" alphabetical searchPlaceholder="Firma, ad veya telefon" ariaLabel="Sipariş müşterisi" value={customerId} onChange={changeCustomer} disabled={disabled || Boolean(resolvingProductId)} placeholder="Bayi seçin" options={activeDealers.map(customer => ({ id: customer.id, label: customer.commercialProfile?.companyName || customer.fullName, description: `${customer.fullName} · ${priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}`, keywords: customer.phone }))} />
-          </label>
-          {selectedCustomer && (
-            <div className="market-order-customer-summary">
-              <strong>{selectedCustomer.commercialProfile?.companyName || selectedCustomer.fullName}</strong>
-              <span>{selectedCustomer.fullName}</span>
-              <StatusBadge tone="success">Aktif bayi · {priceGroupLabel(selectedCustomer.commercialProfile?.priceGroup ?? "retail")}</StatusBadge>
-            </div>
-          )}
-          {activeDealers.length === 0 && (
-            <p className="market-muted">Sipariş oluşturmak için Müşteri İşleri'nde aktif bir bayi profili oluşturun.</p>
-          )}
-        </div>
-
         <label className="market-search-field">
           <Search size={16} aria-hidden="true" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Ürün ara"
-            disabled={!selectedCustomer || disabled}
-          />
+          <input aria-label="Sipariş ara" placeholder="Müşteri veya kaynak ara" value={search} onChange={event => setSearch(event.target.value)} />
         </label>
-
-        <div className="market-order-product-grid">
-          {filteredProducts.map((product) => {
-            const preview = catalogPreviewPrice(product, selectedCustomer);
-            return (
-              <button
-                type="button"
-                className="market-sale-product interactive-surface interactive-surface--record"
-                key={product.id}
-                disabled={!selectedCustomer || disabled || resolvingProductId === product.id}
-                onClick={() => void addProduct(product)}
-              >
-                <span>
-                  <strong>{product.name}</strong>
-                  <small>{product.sku || product.barcode || "Kod yok"}</small>
-                </span>
-                <b>{money(preview.value, product.currency)}</b>
-                <small>{preview.label}</small>
-              </button>
-            );
-          })}
-          {filteredProducts.length === 0 && (
-            <div className="market-order-product-empty">
-              <ShoppingCart size={24} aria-hidden="true" />
-              <strong>{search.trim() ? "Aramaya uygun ürün yok." : "Siparişe eklenebilir ürün yok."}</strong>
-              <span>{search.trim() ? "Arama metnini değiştirin veya temizleyin." : "Ürünler sekmesinden aktif bir ürün ekleyin."}</span>
-            </div>
-          )}
-        </div>
-
-      </section>
-
-      <section className="market-panel market-order-history">
-        <header className="market-panel-heading-row">
-          <div>
-            <span>Siparişler</span>
-            <h2>Sipariş Geçmişi</h2>
-            <p>{orders.length} kayıt · tüm commerce sipariş kaynakları.</p>
-          </div>
-          <ActionButton variant="secondary" size="sm" onClick={() => void reloadOrders()} disabled={disabled}>
-            Yenile
-          </ActionButton>
-        </header>
-
+        <ChoiceChips ariaLabel="Sipariş durumu" value={statusFilter} onChange={setStatusFilter} options={[
+          { id: "", label: "Tümü" }, { id: "placed", label: "Yeni" }, { id: "confirmed", label: "Onaylanan" },
+          { id: "fulfilled", label: "Tamamlanan" }, { id: "cancelled", label: "İptal" }
+        ]} />
+        {loadingOrders && <p role="status" className="market-muted">Siparişler yükleniyor…</p>}
         <div className="market-order-list">
-          {orders.map((order) => (
-            <button
-              type="button"
-              className={selectedOrder?.order.id === order.id
-                ? "market-order-card interactive-surface interactive-surface--record is-selected"
-                : "market-order-card interactive-surface interactive-surface--record"}
-              key={order.id}
-              onClick={() => void openOrder(order.id)}
-            >
-              <span>
-                <strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
-                <small>{new Date(order.placedAt).toLocaleString("tr-TR")} · {sourceLabel(order.source)}</small>
-              </span>
-              <span className="market-order-card-meta">
-                <StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
-                <b>{money(order.total, order.currency)}</b>
-              </span>
+          {filteredOrders.map(order => (
+            <button type="button" className={`market-order-card interactive-surface interactive-surface--record${selectedOrder?.order.id === order.id ? " is-selected" : ""}`}
+              key={order.id} aria-pressed={selectedOrder?.order.id === order.id} disabled={submitting} onClick={() => void openOrder(order.id)}>
+              <span><strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
+                <small>{sourceLabel(order.source)} · {new Date(order.placedAt).toLocaleString("tr-TR")}</small></span>
+              <span className="market-order-card-meta"><StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
+                <b>{money(order.total, order.currency)}</b></span>
             </button>
           ))}
-          {!loadingOrders && orders.length === 0 && <p className="market-muted">Henüz sipariş kaydı yok.</p>}
+          {!loadingOrders && filteredOrders.length === 0 && <p className="market-muted">Sipariş bulunamadı.</p>}
         </div>
-
-        <div className="market-order-draft">
-          <header className="market-panel-heading-row">
-            <div>
-              <span>Taslak</span>
-              <h2>Sipariş Kalemleri</h2>
-              <p>{lines.length} kalem · fiyatlar kayıtta yeniden doğrulanır.</p>
-            </div>
-            {lines.length > 0 && (
-              <ActionButton variant="secondary" size="sm" onClick={() => {
-                setLines([]);
-                resetDraftReference();
-              }} disabled={disabled}>
-                <Trash2 size={15} aria-hidden="true" /> Temizle
-              </ActionButton>
-            )}
-          </header>
-
-          <div className="market-order-lines">
-            {lines.map((line) => (
-              <div className="market-sale-cart-line" key={line.product.id}>
-                <span className="market-sale-cart-product">
-                  <span>
-                    <strong>{line.product.name}</strong>
-                    <small>
-                      {money(line.pricing.unitPrice, line.pricing.currency)} · {priceGroupLabel(line.pricing.appliedGroup)}
-                      {line.pricing.fallbackToRetail ? " · perakendeye düştü" : ""}
-                    </small>
-                  </span>
-                </span>
-                <div className="market-sale-quantity">
-                  <ActionButton variant="secondary" fullWidth aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
-                    <Minus size={15} aria-hidden="true" />
-                  </ActionButton>
-                  <input
-                    type="number"
-                    min="0.0001"
-                    step="0.0001"
-                    aria-label={`${line.product.name} miktarı`}
-                    value={line.quantity}
-                    onChange={(event) => setQuantity(line.product.id, Number(event.target.value))}
-                    disabled={disabled}
-                  />
-                  <ActionButton variant="secondary" fullWidth aria-label={`${line.product.name} miktarını artır`} onClick={() => setQuantity(line.product.id, line.quantity + 1)} disabled={disabled}>
-                    <Plus size={15} aria-hidden="true" />
-                  </ActionButton>
-                </div>
-                <strong>{money(line.pricing.unitPrice * line.quantity, line.pricing.currency)}</strong>
-              </div>
-            ))}
-            {lines.length === 0 && (
-              <div className="market-sale-empty-cart">
-                <ShoppingCart size={28} aria-hidden="true" />
-                <p>Siparişe ürün eklemek için yukarıdan bir ürün seçin.</p>
-              </div>
-            )}
-          </div>
-
-          <label className="form-field form-field--fluid">
-            Sipariş notu
-            <textarea
-              rows={2}
-              value={note}
-              onChange={(event) => {
-                setNote(event.target.value);
-                resetDraftReference();
-              }}
-              maxLength={4000}
-              disabled={disabled}
-            />
-          </label>
-
-          <div className="market-sale-totals">
-            <span className="market-sale-grand-total"><small>Sipariş toplamı</small><strong>{money(subtotal, currency)}</strong></span>
-          </div>
-
-          <ActionButton
-            size="lg"
-            fullWidth
-            busy={submitting}
-            busyLabel="Sipariş kaydediliyor…"
-            disabled={!selectedCustomer || lines.length === 0 || disabled}
-            onClick={() => void createOrder()}
-          >
-            <ClipboardList size={18} aria-hidden="true" /> Siparişi Kaydet
-          </ActionButton>
-        </div>
-
+      </section>
+      <section className="market-panel market-order-detail-panel" aria-label="Sipariş detayı">
         {selectedOrder ? (
           <div className="market-order-detail">
             <header className="market-panel-heading-row">
@@ -486,6 +216,8 @@ export function MarketOrdersWorkspace({
               <span className="market-sale-grand-total"><small>Toplam</small><strong>{money(selectedOrder.order.total, selectedOrder.order.currency)}</strong></span>
             </div>
 
+            {selectedOrder.order.status === "fulfilled" && <p role="status">Sipariş {new Date(selectedOrder.order.fulfilledAt).toLocaleString("tr-TR")} tarihinde tamamlandı.</p>}
+            {selectedOrder.order.status === "cancelled" && <p role="status">Sipariş {new Date(selectedOrder.order.cancelledAt).toLocaleString("tr-TR")} tarihinde iptal edildi.</p>}
             {selectedOrder.order.status === "placed" && (
               <div className="action-row market-order-actions">
                 <ActionButton onClick={() => void updateStatus("confirmed")} disabled={disabled}>

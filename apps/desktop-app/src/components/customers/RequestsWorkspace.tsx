@@ -1,4 +1,5 @@
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
+import { PhoneInput } from "../ui/PhoneInput";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -443,7 +444,7 @@ export function RequestsWorkspace({
                 </label>
                 <label className="form-field form-field--short">
                   Telefon
-                  <input inputMode="tel" value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="+90 5xx… / +44…" />
+                  <PhoneInput value={manualRequestForm.customerPhone} onChange={(value) => updateManualRequestForm("customerPhone", value)} placeholder="+90 5xx… / +44…" />
                 </label>
                 <label className="form-field form-field--medium">
                   Tarih notu

@@ -57,43 +57,43 @@ function Harness() {
     onDeleteMessage={messaging.handleDeleteWhatsAppMessage} />;
 
   return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
-    <main className="smoke-shell">
-      {customers.confirmDialog}
-      {messaging.confirmDialog}
-      <nav aria-label="Çalışma alanı">{["customers", "market", "prepared"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Hazır Mesajlar"}</button>)}</nav>
-      <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
-      {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
-        <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
-        <CustomersWorkspace
-          customers={dashboardData.customers}
-          stays={dashboardData.customerRoomStays}
-          reservations={dashboardData.reservations}
-          notifications={dashboardData.hospitalityNotifications}
-          kbsOverview={dashboardData.kbsOverview}
-          aiEnabled={false}
-          onSave={customers.handleSaveCustomer}
-          onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
-          onDelete={customers.handleDeleteCustomer}
-          onSendKbs={async () => undefined}
-        />
-        <WorkspaceHost definition={customerWorkspaceDefinition} context={{
-          data: dashboardData,
-          aiEnabled: false,
-          whatsappEnabled,
-          reservationsEnabled: false,
-          staysEnabled: false,
-          customerCreditEnabled,
-          onPreparedCreditWhatsApp: messaging.openPreparedCreditWhatsApp,
-          onWhatsApp: messaging.openCustomerWhatsApp,
-          onSave: customers.handleSaveCustomer,
-          onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
-          onDelete: customers.handleDeleteCustomer
-        }} />
-        </WorkspaceNavigationProvider>
-      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} />
-        : <CustomerMessagesWorkspace safeMode={(onOpenWeb) => workspace("safe", undefined, onOpenWeb)} webMode={(onReturn) => workspace("web", onReturn)}
-          whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
-    </main>
+    <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={page === "market" ? "market" : "customerWork"}>
+      <main className="smoke-shell">
+        {customers.confirmDialog}
+        {messaging.confirmDialog}
+        <nav aria-label="Çalışma alanı">{["customers", "market", "prepared"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Hazır Mesajlar"}</button>)}</nav>
+        <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
+        {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
+          <CustomersWorkspace
+            customers={dashboardData.customers}
+            stays={dashboardData.customerRoomStays}
+            reservations={dashboardData.reservations}
+            notifications={dashboardData.hospitalityNotifications}
+            kbsOverview={dashboardData.kbsOverview}
+            aiEnabled={false}
+            onSave={customers.handleSaveCustomer}
+            onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+            onDelete={customers.handleDeleteCustomer}
+            onSendKbs={async () => undefined}
+          />
+        </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} />
+          : <CustomerMessagesWorkspace safeMode={(onOpenWeb) => workspace("safe", undefined, onOpenWeb)} webMode={(onReturn) => workspace("web", onReturn)}
+            whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
+      </main>
+      <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+        data: dashboardData,
+        aiEnabled: false,
+        whatsappEnabled,
+        reservationsEnabled: false,
+        staysEnabled: false,
+        customerCreditEnabled,
+        onPreparedCreditWhatsApp: messaging.openPreparedCreditWhatsApp,
+        onWhatsApp: messaging.openCustomerWhatsApp,
+        onSave: customers.handleSaveCustomer,
+        onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
+        onDelete: customers.handleDeleteCustomer
+      }} />
+    </WorkspaceNavigationProvider>
   </BusinessCapabilityRuntimeProvider>;
 }
 

@@ -4,6 +4,14 @@ Bağımsız native Java Android pilotu. `applicationId`: `com.yardimciasistan.de
 minimum SDK 26. Personel Companion APK'sı ve izinleriyle ortak runtime kullanmaz.
 Sunucu/işletme/marka ve yayın anahtarı APK'ya gömülmez.
 
+## Demo pilot indirmesi
+
+Demo /kurulum/ sayfasında Bayi Android, sürümlü pilot APK olarak bulunur.
+Bu dosya **debug imzalı test sürümüdür**, üretim ya da uygulama mağazası sürümü değildir.
+Companion ve Bayi Android, aynı canonical product-version.json içindeki versionName ve
+androidVersionCode değerlerini kullanır. Demo deploy, APK build metadata ve SHA-256
+eşleşmesini doğrular. Bayi APK'sını dağıtmadan önce birim/lint/derleme testleri çalışır.
+
 ## Derleme ve kurulum
 
 ```sh

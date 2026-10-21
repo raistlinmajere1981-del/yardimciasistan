@@ -20,7 +20,7 @@ function mutateCatalogPresentation<T>(databasePath: string, operation: (db: Data
 }
 
 /** Reordering writes only presentation fields, never product prices/stock/image drafts. */
-export function reorderCatalogRecords(databasePath: string, kind: CatalogOrderKind, orderedIds: string[]): void {
+export function reorderCatalogRecords(databasePath: string, kind: CatalogOrderKind, orderedIds: string[], page?: { offset: number; total: number }): void {
   if (!["categories", "products", "quickAccess"].includes(kind)) throw new Error("Katalog sıralama türü geçersiz.");
   if (!Array.isArray(orderedIds) || orderedIds.some(id => typeof id !== "string" || !id.trim()) || new Set(orderedIds).size !== orderedIds.length) {
     throw new Error("Katalog sıralama kimlikleri geçersiz.");
@@ -29,10 +29,18 @@ export function reorderCatalogRecords(databasePath: string, kind: CatalogOrderKi
     const table = kind === "categories" ? "catalog_categories" : "catalog_products";
     const column = kind === "quickAccess" ? "quick_access_order" : "sort_order";
     const filter = kind === "quickAccess" ? " AND quick_access_enabled = 1" : "";
-    const ids = (db.prepare(`SELECT id FROM ${table} WHERE business_id = ? AND deleted_at = ''${filter}`).all(businessId) as { id: string }[]).map(row => row.id);
-    if (ids.length !== orderedIds.length || ids.some(id => !orderedIds.includes(id))) throw new Error("Katalog sıralama listesi değişti; yeniden yükleyin.");
+    const rows = db.prepare(`SELECT id FROM ${table} WHERE business_id = ? AND deleted_at = ''${filter}
+      ORDER BY ${column} ASC, ${kind === "quickAccess" ? "sort_order ASC, " : ""}name COLLATE NOCASE ASC, id ASC`).all(businessId) as { id: string }[];
+    const ids = rows.map(row => row.id);
+    const offset = page?.offset ?? 0;
+    if (!Number.isInteger(offset) || offset < 0 || (page && (kind === "categories" || page.total !== ids.length))) throw new Error("Katalog sıralama listesi değişti; yeniden yükleyin.");
+    const expected = page ? ids.slice(offset, offset + orderedIds.length) : ids;
+    const submitted = new Set(orderedIds);
+    if (expected.length !== orderedIds.length || expected.some(id => !submitted.has(id))) throw new Error("Katalog sıralama listesi değişti; yeniden yükleyin.");
+    const nextIds = [...ids];
+    nextIds.splice(offset, orderedIds.length, ...orderedIds);
     const statement = db.prepare(`UPDATE ${table} SET ${column} = ?, updated_at = ? WHERE id = ? AND business_id = ? AND deleted_at = ''`);
-    orderedIds.forEach((id, index) => statement.run(index, now, id, businessId));
+    nextIds.forEach((id, index) => statement.run(index, now, id, businessId));
   });
 }
 
@@ -45,6 +53,16 @@ export function setCatalogProductQuickAccess(databasePath: string, productId: st
     const next = Number((db.prepare("SELECT COALESCE(MAX(quick_access_order), -1) + 1 AS value FROM catalog_products WHERE business_id = ? AND quick_access_enabled = 1 AND deleted_at = ''").get(businessId) as { value: number }).value);
     db.prepare("UPDATE catalog_products SET quick_access_enabled = ?, quick_access_order = ?, updated_at = ? WHERE id = ? AND business_id = ?")
       .run(enabled ? 1 : 0, next, now, productId, businessId);
+  });
+}
+
+/** Activation preserves the current product fields instead of resaving a renderer snapshot. */
+export function activateCatalogProduct(databasePath: string, productId: string): void {
+  mutateCatalogPresentation(databasePath, (db, businessId, now) => {
+    const row = db.prepare("SELECT is_active FROM catalog_products WHERE id = ? AND business_id = ? AND deleted_at = ''").get(productId, businessId) as { is_active: number } | undefined;
+    if (!row) throw new Error("Düzenlenecek ürün bulunamadı.");
+    if (row.is_active === 1) return;
+    db.prepare("UPDATE catalog_products SET is_active = 1, updated_at = ? WHERE id = ? AND business_id = ? AND deleted_at = ''").run(now, productId, businessId);
   });
 }
 

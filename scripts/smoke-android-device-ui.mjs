@@ -1037,6 +1037,11 @@ function restoreCompanionPreferences() {
 }
 
 async function runCompanionOnly(baseUrl) {
+  await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Yenile"') && xml.includes('text="Bugün"'),
+    20000,
+    "Companion Bugün ekranı yüklenemedi."
+  );
   const deviceId = readDeviceId();
   const time = "2026-10-13T10:00:00.000Z";
   const rights = ["commerce_order.view", "commerce_order.confirm", "commerce_order.cancel",
@@ -1083,6 +1088,23 @@ async function runCompanionOnly(baseUrl) {
     tap(centerOf(findClickableBoundsByText(xml, text)));
     await delay(400);
   }
+  async function clickDescription(prefix) {
+    const xml = await waitForUiCondition(
+      (candidate) => Boolean(findBoundsByContentDescriptionPrefix(candidate, prefix)),
+      8000,
+      `Açıklamalı UI öğesi görünmedi: ${prefix}`
+    );
+    tap(centerOf(findBoundsByContentDescriptionPrefix(xml, prefix)));
+    await delay(400);
+  }
+  async function backToToday() {
+    await clickText("Bugün'e dön");
+    await waitForUiText("Öncelikli işler", 8000);
+  }
+  async function openMore(prefix) {
+    await clickText("Diğer");
+    await clickDescription(prefix);
+  }
   async function readPage(label) {
     let xml = "";
     for (let index = 0; index < 5; index += 1) {
@@ -1096,10 +1118,10 @@ async function runCompanionOnly(baseUrl) {
     return xml;
   }
   let top = await publish(snapshot(), "staff");
-  assertContains(top, ["Ticari sipariş 123", "Gönderi 12", "Pazarlama hatası 3",
-    "Ticari siparişler", "Gönderiler", "Pazarlama durumu"]);
+  assertContains(top, ['content-desc="Ticari sipariş: 123"', 'content-desc="Gönderi: 12"',
+    'content-desc="Pazarlama hatası: 3"']);
   assertNotContains(top, ['text="Market"', 'text="Restoran"', 'text="Pansiyon"']);
-  await clickText("Ticari siparişler");
+  await clickDescription("Ticari sipariş: ");
   await waitForUiText("Tümü", 8000);
   await clickText("Bayi siparişleri");
   const dealer = await readPage("dealer");
@@ -1110,36 +1132,42 @@ async function runCompanionOnly(baseUrl) {
   const online = await readPage("online");
   assertContains(online, ["Sipariş online-order", "Kaynak: Online satış", "Online katalog", "Yayın güncellemesi bekliyor"]);
   assertNotContains(online, ["Sipariş dealer-order"]);
-  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await waitForUiText("Öncelikli işler", 8000);
-  await clickText("Gönderiler");
+  await backToToday();
+  await clickText("Diğer");
+  assertContains(await dumpUi("companion-more.xml"),
+    ["Ticari siparişler", "Gönderiler", "Pazarlama durumu"]);
+  await clickDescription("Gönderiler,");
   assertContains(await readPage("shipments"), ["Sipariş dealer-order", "Takip kaydı: Var"]);
-  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await clickText("Pazarlama durumu");
+  await backToToday();
+  await clickDescription("Pazarlama hatası: ");
   assertContains(await readPage("marketing"), ["Yayın publication-1", "Başarısız", "Plan schedule-1",
     "Son çalıştırma: Başarısız", "Kampanya campaign-1", "Bekleyen: 0 · Başarısız: 2"]);
   captureScreenshot("companion-marketing.png");
 
   top = await publish(snapshot({ permissions: [] }), "revoked");
   assertContains(top, ["Görünüm kapatıldı", "izni kaldırıldı"]);
-  assertNotContains(top, ['text="Ticari siparişler"', 'text="Pazarlama durumu"', "publication-1", "dealer-order"]);
+  assertNotContains(top, ['content-desc="Ticari sipariş', 'content-desc="Gönderi', 'content-desc="Pazarlama hatası',
+    "publication-1", "dealer-order"]);
   top = await publish(snapshot({ role: "admin" }), "admin");
-  assertContains(top, ["Yönetici", "Ticari siparişler"]);
-  await clickText("Ticari siparişler");
+  assertContains(top, ["Yönetici", 'content-desc="Ticari sipariş: 123"']);
+  await clickDescription("Ticari sipariş: ");
   await readPage("admin-read-only"); // Decision permissions still produce no buttons.
   await publish(snapshot({ capabilities: ["service.android"] }), "capability-off");
-  assertNotContains(await readPage("capability-off"), ['text="Ticari siparişler"', "Sipariş online-order"]);
+  const capabilityOff = await readPage("capability-off");
+  assertContains(capabilityOff, ["Öncelikli işler"]);
+  assertNotContains(capabilityOff, ['content-desc="Ticari sipariş', 'content-desc="Gönderi',
+    'content-desc="Pazarlama hatası', "Sipariş online-order"]);
 
   await publish(snapshot({ legacy: true }), "legacy");
-  await clickText("Ticari siparişler");
+  await openMore("Ticari siparişler,");
   assertContains(await readPage("legacy-orders"), ["Bu özette sipariş yok"]);
-  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await clickText("Pazarlama durumu");
+  await backToToday();
+  await openMore("Pazarlama durumu,");
   assertContains(await readPage("legacy-marketing"), ["Bu özette yayın yok", "Bu özette plan yok"]);
   await publish(snapshot({ empty: true }), "empty");
   assertContains(await readPage("empty-marketing"), ["Bu özette yayın yok", "Bu özette plan yok", "Bu özette kampanya yok"]);
-  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await clickText("Ticari siparişler");
+  await backToToday();
+  await openMore("Ticari siparişler,");
   assertContains(await readPage("empty-orders"), ["Bu özette sipariş yok"]);
 
   await publish(snapshot({ permissions: ["commerce_order.view"], capabilities: ["service.android", "commerce.orders"] }), "source-rights");

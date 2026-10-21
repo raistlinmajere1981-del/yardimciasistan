@@ -18,6 +18,7 @@ const SMOKE_FILES = [
   "scripts/smoke-profile-transition-ui.mjs",
   "scripts/smoke-sales-correctness.mjs",
   "scripts/smoke-sales-workspace-ui.mjs",
+  "scripts/smoke-catalog-pagination.mjs",
   "scripts/smoke-settings-correctness.mjs",
   "scripts/smoke-settings-ui-correctness.mjs",
   "scripts/smoke-voice-stt-settings.mjs",
@@ -396,7 +397,7 @@ const SETTINGS_CHECKS = new Set([
   "commerce-online-catalog", "commerce-dealer-orders", "commerce-aras-provider", "commerce-aras-ui", "business-messaging-provider", "kbs-domain"
 ]);
 const SALES_WORKSPACE_CHECKS = new Set([
-  "sales-correctness", "sales-workspace-ui", "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "design-audit-strict",
+  "sales-correctness", "sales-workspace-ui", "catalog-pagination", "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "design-audit-strict",
   "market-quick-sale-contract", "market-quick-sale-session", "market-sale-runtime", "market-barcode-input-contract",
   "market-live-scanner-contract", "market-product-data-contract", "commerce-product-media", "commerce-foundation", "commerce-runtime",
   "commerce-ipc-contract", "commerce-orders", "commerce-order-fulfillment", "commerce-wholesale-pricing", "commerce-wholesale-order-flow",
@@ -654,6 +655,7 @@ function smokeDomainsForGeneralOwnership(file) {
   if (file.includes("desktop-tts")) return ["voice", "settings", "desktop", "platform"];
   if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
+  if (name === "catalog-pagination") return ["desktop", "commerce"];
   if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];
   if (name === "android-companion-v3") return ["android", "commerce", "marketing", "web", "platform"];
   if (name === "market-sale-finance") return ["commerce", "finance", "android"];

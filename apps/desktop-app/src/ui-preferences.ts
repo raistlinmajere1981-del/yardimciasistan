@@ -31,31 +31,22 @@ export function saveRecordPickerPreference(type: RecordPickerType, screen: Picke
   try { window.localStorage.setItem(`${PICKER_VIEW_STORAGE_KEY}:${key}`, JSON.stringify(preference)); } catch { /* Keep the session preference when storage is unavailable. */ }
 }
 
-export type SaleProductViewPreset = "comfortable" | "balanced" | "dense" | "list" | "custom";
-export interface SaleProductViewPreference {
-  preset: SaleProductViewPreset;
-  columns: number;
-  showImages: boolean;
-  emphasizePrice: boolean;
-}
-const SALE_VIEW_STORAGE_KEY = "yardimci-asistan.sale-product-view";
-const DEFAULT_SALE_VIEW: SaleProductViewPreference = { preset: "balanced", columns: 4, showImages: true, emphasizePrice: true };
+export type MarketProductViewPreset = "comfortable" | "balanced" | "dense" | "list";
+export interface MarketProductViewPreference { preset: MarketProductViewPreset; showImages: boolean }
+export type MarketProductViewContext = "sale" | "catalog";
 
-export function readSaleProductViewPreference(): SaleProductViewPreference {
+export function readMarketProductViewPreference(context: MarketProductViewContext): MarketProductViewPreference {
+  const fallback: MarketProductViewPreference = { preset: context === "sale" ? "balanced" : "list", showImages: true };
   try {
-    const record = JSON.parse(window.localStorage.getItem(SALE_VIEW_STORAGE_KEY) ?? "null") as Partial<SaleProductViewPreference> | null;
-    if (!record) return { ...DEFAULT_SALE_VIEW };
-    return {
-      preset: ["comfortable", "balanced", "dense", "list", "custom"].includes(String(record.preset)) ? record.preset! : "balanced",
-      columns: Number.isInteger(record.columns) && Number(record.columns) >= 2 && Number(record.columns) <= 6 ? Number(record.columns) : 4,
-      showImages: typeof record.showImages === "boolean" ? record.showImages : true,
-      emphasizePrice: typeof record.emphasizePrice === "boolean" ? record.emphasizePrice : true
-    };
-  } catch { return { ...DEFAULT_SALE_VIEW }; }
+    const record = JSON.parse(window.localStorage.getItem(`yardimci-asistan.${context}-product-view`) ?? "null") as Partial<MarketProductViewPreference> | null;
+    const preset = record?.preset;
+    if (preset !== "comfortable" && preset !== "balanced" && preset !== "dense" && preset !== "list") return fallback;
+    return { preset, showImages: typeof record?.showImages === "boolean" ? record.showImages : true };
+  } catch { return fallback; }
 }
 
-export function saveSaleProductViewPreference(preference: SaleProductViewPreference) {
-  try { window.localStorage.setItem(SALE_VIEW_STORAGE_KEY, JSON.stringify(preference)); } catch { /* Storage disabled: retain the session preference. */ }
+export function saveMarketProductViewPreference(context: MarketProductViewContext, preference: MarketProductViewPreference) {
+  try { window.localStorage.setItem(`yardimci-asistan.${context}-product-view`, JSON.stringify(preference)); } catch { /* Storage disabled: retain the session preference. */ }
 }
 
 export interface UiPreferences {

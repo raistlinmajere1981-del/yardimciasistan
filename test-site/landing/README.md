@@ -11,7 +11,7 @@ Tek aktif site kaynağı bu dizindir; Sayfa yapısı PHP'dir; asistan TypeScript
 - `assets/showcase/workspace.webp`: mevcut uygulama ekranından seçilmiş statik hero. `site_hero_image()` ileride medya seçimini bağlamak için tek sahiplik noktasıdır.
 - `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/magaza/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
 - `/duyurular/`: D4 marketing yayınının tümünü siteye ait renderer ile gösterir; ana sayfa ilk üç yayını gösterir.
-- `/kurulum/`: Windows x64/x86, Android, demo bağlantısı ve kısa kurulum adımları.
+- `/kurulum/`: Windows x64/x86, Android Companion, Bayi Android pilot APK, demo bağlantısı ve kısa kurulum adımları.
 - `/kullanim-kilavuzu/`: sonraki ekran görüntülü bölümlere uygun sidebar/content shell.
 - `/bayi/`: siteye ait bayi portalı; işlemler `/yardimci-asistan/api/dealer/` üzerinden yürür.
 
@@ -31,7 +31,7 @@ Bu helper firm-template, generic müşteri paketi veya BlackSea'ye taşınmaz. S
 
 ## Paketler ve deploy
 
-`release.json` download adlarını belirleyen Desktop/Android sürümleridir.
+`release.json` download adlarını belirleyen Desktop/Android Companion/Bayi Android sürümleridir.
 `scripts/product-version.mjs` canonical ürün sürümü değiştiğinde bu metadata'yı günceller.
 
 ```bash
@@ -48,7 +48,7 @@ Bilinen eski bundle'lar, product-guide ve eski demo ağacı yedek sonrası temiz
 Backend değişiklikleri ayrıca normal `npm run deploy:web -- --yes` ile yayınlanır.
 Web deploy'un `--fresh` semantiği ayrı kalır; normal yayın runtime/config'i taşır.
 
-`--with-downloads` güncel Windows x64/x86 ve release APK artefaktlarını SHA-256 doğrulayarak yayınlar;
+`--with-downloads` güncel Windows x64/x86, Companion release APK ve debug imzalı Bayi pilot APK artefaktlarını SHA-256 doğrulayarak yayınlar;
 normal site deploy download dosyalarını değiştirmez. Download sürümleri yayınlanmış paketlerle eşleşmelidir.
 
 ## Doğrulama

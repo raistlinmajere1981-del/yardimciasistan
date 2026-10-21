@@ -28,6 +28,11 @@ function stepsFor(action: ReleaseOperationRequest["action"]): Step[] {
         args: ["run", "pack:desktop:all"]
       },
       {
+        label: "Bayi Android pilot APK, birim testleri ve lint",
+        command: npmCommand(),
+        args: ["run", "verify:check", "--", "dealer-android-build"]
+      },
+      {
         label: "Web modülü paketi",
         command: npmCommand(),
         args: ["run", "pack:web-module"]

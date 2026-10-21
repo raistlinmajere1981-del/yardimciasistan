@@ -6,6 +6,7 @@ import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
 import { primeIdentityCameraFeedback } from "../../app/identity-camera-feedback";
 import type { CustomerFormState } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
+import { PhoneInput } from "../ui/PhoneInput";
 import { DatePicker } from "../ui/DateTimePicker";
 import { CustomerCommercialProfileFields } from "./CustomerCommercialProfileFields";
 import { IdentityCameraCapture } from "./IdentityCameraCapture";
@@ -175,7 +176,7 @@ export function CustomerFormFields({
       <DetailSectionCard title="Temel bilgiler">
         <div className="form-grid form-grid--compact">
           <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
-          <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
+          <label className="form-field form-field--short">Telefon<PhoneInput value={form.phone} onChange={(value) => update("phone", value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium customer-note-field">Not<textarea aria-label="Not" rows={1} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
           <label className="form-field form-field--fluid form-field--span customer-address-field">Adres<textarea aria-label="Adres" rows={1} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>

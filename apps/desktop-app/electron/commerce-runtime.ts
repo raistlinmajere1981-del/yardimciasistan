@@ -67,6 +67,7 @@ import {
   getCommerceStoreSnapshot,
   getInventoryBalance,
   listCatalogProducts,
+  type CatalogProductPage,
   listCommerceSuppliers,
   listInventoryMovements,
   saveCatalogProduct,
@@ -211,12 +212,13 @@ export function deleteRuntimeCatalogCategory(
 export function listRuntimeCatalogProducts(
   databasePath: string,
   options: ListCatalogProductsOptions = {}
-): CatalogProduct[] {
+): CatalogProductPage {
   requireCapability(
     databasePath,
     BUSINESS_CAPABILITIES.CATALOG,
     "Ürün kataloğu bu işletmede etkin değil."
   );
+  if (String(options.customerId ?? "").trim()) requireCapability(databasePath, BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
   return listCatalogProducts(databasePath, options);
 }
 
@@ -359,14 +361,19 @@ export function getRuntimeOrder(
 export function createRuntimeOrder(
   databasePath: string,
   input: CreateCommerceOrderInput,
-  options: { dealerAccess?: { accessId: string; accessRevision: number } } = {}
+  options: { dealerAccess?: { accessId: string; accessRevision: number }; desktopEntry?: boolean } = {}
 ): CommerceOrderDetail {
   requireCapability(
     databasePath,
     BUSINESS_CAPABILITIES.ORDERS,
     "Sipariş yönetimi bu işletmede etkin değil."
   );
-  return createCommerceOrder(databasePath, input, {
+  if (options.desktopEntry) {
+    requireCapability(databasePath, BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    if (!String(input.customerId ?? "").trim()) throw new Error("Sipariş için kayıtlı müşteri gerekli.");
+    if (!String(input.sourceReference ?? "").trim()) throw new Error("Sipariş kaynak kimliği gerekli.");
+  }
+  return createCommerceOrder(databasePath, options.desktopEntry ? { ...input, source: "desktop" } : input, {
     ...(options.dealerAccess !== undefined ? { dealerAccess: options.dealerAccess } : {}),
     wholesaleEnabled: hasPersistedBusinessCapability(databasePath, BUSINESS_CAPABILITIES.WHOLESALE)
   });

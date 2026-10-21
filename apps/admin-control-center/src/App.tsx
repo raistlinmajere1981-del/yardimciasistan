@@ -219,7 +219,7 @@ function Overview({
           <div>
             <span>Ürün sürümü</span>
             <strong>v{data.product.version}</strong>
-            <small>Web v{data.product.webModuleVersion} · Android #{data.product.androidVersionCode}</small>
+            <small>Web v{data.product.webModuleVersion} · Companion/Bayi Android #{data.product.androidVersionCode}</small>
           </div>
         </article>
 
@@ -989,7 +989,7 @@ function Release({
           <div className="release-version-heading">
             <div>
               <strong>1 · Yeni Sürüm Hazırla</strong>
-              <small>Mevcut v{data.product.version} · Android kodu {data.product.androidVersionCode} · Web v{data.product.webModuleVersion}</small>
+              <small>Mevcut v{data.product.version} · Companion/Bayi Android kodu {data.product.androidVersionCode} · Web v{data.product.webModuleVersion}</small>
             </div>
             <span className="quiet">Yalnız sürüm dosyaları değişir; test ve paketleme başlamaz.</span>
           </div>
@@ -1012,7 +1012,7 @@ function Release({
           </div>
           {confirmVersion && !busy ? (
             <div className="release-version-confirm" role="group" aria-label="Sürüm hazırlama onayı">
-              <span><strong>Onay:</strong> v{data.product.version} → v{versionInput.trim()} · Android kodu {data.product.androidVersionCode + 1}
+              <span><strong>Onay:</strong> v{data.product.version} → v{versionInput.trim()} · Companion/Bayi Android kodu {data.product.androidVersionCode + 1}
                 {" · "}Web modülü {updateWebModule ? `v${versionInput.trim()}` : `v${data.product.webModuleVersion} (değişmez)`}</span>
               <div className="release-version-confirm-actions">
                 <button className="button button--secondary" onClick={() => setConfirmVersion(false)}>Vazgeç</button>

@@ -20,8 +20,7 @@ assert.doesNotMatch(barcodeInput, /getUserMedia|MediaDevices|androidBridge|adb/i
 assert.match(marketPage, /C\.RETAIL_BARCODE/, "Market page must derive barcode availability from persisted capability state.");
 assert.match(quickSale, /barcodeEnabled/, "Quick Sale must receive an explicit barcode capability gate.");
 assert.match(quickSale, /bridge\.findProductByBarcode\s*\(/, "Barcode scans must use exact guarded barcode lookup.");
-assert.match(quickSale, /keyboard-wedge/, "Quick Sale must expose USB keyboard-wedge mode.");
-assert.match(quickSale, /simulator/, "Quick Sale must expose simulator mode.");
+assert.match(quickSale, /createKeyboardBarcodeInputAdapter/, "Quick Sale must keep the USB keyboard adapter active.");
 assert.doesNotMatch(quickSale, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Barcode UI must not bind to removed profile flags.");
 
 console.log("market-barcode-input-contract-smoke-ok");

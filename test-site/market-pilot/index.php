@@ -1,4 +1,4 @@
-<?php
+<?php /* market-pilot-site */
 require_once __DIR__ . '/inc/site.php';
 market_header('home');
 ?>

@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { BUSINESS_CAPABILITIES as C, type CommerceSale } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, moneyToMinor, type CommerceSale } from "@yardimci-asistan/shared";
 import { createCommerceSaleInTransaction, type CreateCommerceSaleInput } from "./commerce-store.js";
-import { assertCustomerCreditBusinessInTransaction, createCustomerCreditSaleInTransaction } from "./customer-credit-runtime.js";
+import { assertCustomerCreditBusinessInTransaction, createCustomerCreditSaleInTransaction, recordCustomerCreditSaleInTransaction, recordCustomerCreditPaymentInTransaction } from "./customer-credit-runtime.js";
 import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
 import { markMarketCartDraftReviewed } from "./market-companion-runtime.js";
 import { desktopLog } from "./desktop-logger.js";
 
 export interface CompleteMarketSaleInput extends CreateCommerceSaleInput {
   settlement: "paid" | "credit";
+  /** Explicit tender in minor units; omission preserves full paid/credit settlement. */
+  paymentAmountMinor?: number;
   customerId?: string;
   sourceDraftId?: string;
   operationId?: string;
@@ -17,6 +19,7 @@ export interface CompleteMarketSaleResult {
   sale: CommerceSale;
   draftReview: "not_requested" | "reviewed" | "failed";
   replayed: boolean;
+  payment?: { receivedMinor: number; appliedToSaleMinor: number; appliedToDebtMinor: number; newDebtMinor: number };
 }
 
 function persistedSale(db: DatabaseSync, id: string): CommerceSale {
@@ -40,16 +43,16 @@ export function completeMarketSale(databasePath: string, input: CompleteMarketSa
       db.exec("COMMIT");
     } catch (error) { db.exec("ROLLBACK"); throw error; }
   } finally { db.close(); }
-  const { sale, replayed } = result;
-  if (!draftId) return { sale, draftReview: "not_requested", replayed };
+  const { sale } = result;
+  if (!draftId) return { ...result, draftReview: "not_requested" };
   try {
     markMarketCartDraftReviewed(databasePath, draftId);
-    return { sale, draftReview: "reviewed", replayed };
+    return { ...result, draftReview: "reviewed" };
   } catch (error) {
     desktopLog.warn({ scope: "commerce", event: "commerce.quick-sale.draft-review.failed",
       message: "Satış kaydedildi; telefon sepeti inceleme durumu güncellenemedi.",
       operationId: sale.id, meta: { draftId, saleId: sale.id }, error });
-    return { sale, draftReview: "failed", replayed };
+    return { ...result, draftReview: "failed" };
   }
 }
 
@@ -78,13 +81,33 @@ export function completeMarketSaleInTransaction(db: DatabaseSync, input: Complet
     const saleInput = { ...input, customerId };
     sale = input.settlement === "credit"
       ? createCustomerCreditSaleInTransaction(db, { ...saleInput, customerId }, now)
-      : createCommerceSaleInTransaction(db, saleInput, "paid", now);
+      : createCommerceSaleInTransaction(db, saleInput, total => input.paymentAmountMinor !== undefined && input.paymentAmountMinor < moneyToMinor(total) ? "credit" : "paid", now);
+    if (input.paymentAmountMinor !== undefined && input.settlement === "paid") {
+      const totalMinor = moneyToMinor(sale.total);
+      const appliedToDebtMinor = Math.max(0, input.paymentAmountMinor - totalMinor);
+      if (sale.status === "credit" || appliedToDebtMinor > 0) {
+        const creditBusinessId = assertCustomerCreditBusinessInTransaction(db);
+        if (sale.status === "credit") recordCustomerCreditSaleInTransaction(db, creditBusinessId, { customerId, sale, now, source: input.source ?? "desktop-market-quick-sale" });
+        const collectionMinor = sale.status === "credit" ? input.paymentAmountMinor : appliedToDebtMinor;
+        if (collectionMinor > 0) recordCustomerCreditPaymentInTransaction(db, {
+          customerId, amountMinor: collectionMinor, currency: sale.currency,
+          paymentMethod: input.paymentMethod === "transfer" ? "bank" : (input.paymentMethod ?? "cash") as "cash" | "card" | "bank" | "other",
+          source: input.source ?? "desktop-market-quick-sale"
+        }, now);
+      }
+    }
     if (draftId) db.prepare("INSERT INTO commerce_cart_draft_sales (draft_id, sale_id, request_hash, created_at) VALUES (?, ?, ?, ?)")
       .run(draftId, sale.id, requestHash, now);
     if (operationId) db.prepare("INSERT INTO commerce_market_sale_receipts (operation_id, business_id, sale_id, request_hash, created_at) VALUES (?, ?, ?, ?, ?)")
       .run(operationId, businessId, sale.id, requestHash, now);
   }
-  return { sale, draftReview: "not_requested", replayed };
+  const receivedMinor = input.paymentAmountMinor;
+  if (replayed && receivedMinor !== undefined && (sale.status === "credit" || receivedMinor > moneyToMinor(sale.total))) assertCustomerCreditBusinessInTransaction(db);
+  return { sale, draftReview: "not_requested", replayed,
+    ...(receivedMinor === undefined ? {} : { payment: { receivedMinor,
+      appliedToSaleMinor: Math.min(receivedMinor, moneyToMinor(sale.total)),
+      appliedToDebtMinor: Math.max(0, receivedMinor - moneyToMinor(sale.total)),
+      newDebtMinor: Math.max(0, moneyToMinor(sale.total) - receivedMinor) } }) };
 }
 
 function prepareMarketSaleRequest(input: CompleteMarketSaleInput) {
@@ -93,6 +116,12 @@ function prepareMarketSaleRequest(input: CompleteMarketSaleInput) {
   const operationId = String(input?.operationId ?? "").trim();
   if (operationId && !/^[a-zA-Z0-9_-]{8,128}$/.test(operationId)) throw new Error("Satış işlem anahtarı geçersiz.");
   if (!["paid", "credit"].includes(input?.settlement)) throw new Error("Satış ödeme seçimi geçersiz.");
+  if (input.paymentAmountMinor !== undefined) {
+    if (!operationId) throw new Error("Manuel ödeme için satış işlem anahtarı gerekli.");
+    if (!Number.isSafeInteger(input.paymentAmountMinor) || input.paymentAmountMinor < 0 || input.paymentAmountMinor > 999_999_999_999) throw new Error("Ödeme tutarı geçersiz.");
+    if (input.settlement === "credit" && input.paymentAmountMinor !== 0) throw new Error("Veresiye seçiliyken ödeme tutarı sıfır olmalı.");
+    if (input.settlement === "paid" && !["cash", "card", "transfer", "bank", "other"].includes(input.paymentMethod ?? "cash")) throw new Error("Tahsilat ödeme yöntemi geçersiz.");
+  }
   if (!Array.isArray(input.items)) throw new Error("Satış için en az bir ürün gerekli.");
   const requestHash = createHash("sha256").update(JSON.stringify({
     items: input.items.map(item => ({ productId: String(item.productId).trim(), quantity: Number(item.quantity),
@@ -100,6 +129,7 @@ function prepareMarketSaleRequest(input: CompleteMarketSaleInput) {
       ...(item.expectedCurrency === undefined ? {} : { expectedCurrency: item.expectedCurrency }),
       ...(item.expectedUpdatedAt === undefined ? {} : { expectedUpdatedAt: item.expectedUpdatedAt }) }))
       .sort((a, b) => a.productId.localeCompare(b.productId) || a.quantity - b.quantity),
+    ...(input.paymentAmountMinor === undefined ? {} : { paymentAmountMinor: input.paymentAmountMinor }),
     discountTotal: Number(input.discountTotal ?? 0), locationId: String(input.locationId ?? "").trim(),
     settlement: input.settlement, customerId, draftId,
     paymentMethod: input.settlement === "credit" ? "" : String(input.paymentMethod ?? "cash").trim()

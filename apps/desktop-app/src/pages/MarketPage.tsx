@@ -1,10 +1,11 @@
+import { useCatalogProductPage } from "../app/use-catalog-product-page";
 import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
+import { useWorkspaceNavigation } from "../components/workspace/WorkspaceNavigation";
 import { Archive, Boxes, ClipboardList, ShoppingBasket, Smartphone, Tags, Truck, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   type CommerceSaleDraftDetail,
-  type CommerceSale,
   type ProductLookupCandidate
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
@@ -48,6 +49,7 @@ export function MarketPage({
   onDashboardDataChanged?: (data: DesktopDashboardData) => void;
 }) {
   const { snapshot } = useBusinessCapabilityRuntime();
+  const navigation = useWorkspaceNavigation();
   const C = BUSINESS_CAPABILITIES;
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
@@ -55,13 +57,13 @@ export function MarketPage({
   const salesEnabled = runtimeHasCapability(snapshot, C.SALES);
   const customerCreditEnabled = runtimeHasCapability(snapshot, C.CUSTOMER_CREDIT);
   const ordersEnabled = runtimeHasCapability(snapshot, C.ORDERS);
-  const wholesaleEnabled = runtimeHasCapability(snapshot, C.WHOLESALE);
   const barcodeEnabled = runtimeHasCapability(snapshot, C.RETAIL_BARCODE);
   const purchasingEnabled = runtimeHasCapability(snapshot, C.RETAIL_PURCHASING);
   const suppliersEnabled = runtimeHasCapability(snapshot, C.RETAIL_SUPPLIERS);
   const labelsEnabled = runtimeHasCapability(snapshot, C.RETAIL_LABELS);
   const {
     products,
+    catalogRevision,
     categories,
     dataState,
     productDataEnabled,
@@ -73,18 +75,21 @@ export function MarketPage({
   } = controller;
 
   const tabs = useMemo<MarketTabDefinition[]>(() => [
-    { id: "quickSale", label: "Hızlı Satış", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
+    { id: "quickSale", label: "Yeni İşlem", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
     { id: "products", label: "Ürünler", icon: Archive, enabled: catalogEnabled },
-    { id: "orders", label: "Siparişler", icon: ClipboardList, enabled: ordersEnabled && wholesaleEnabled },
+    { id: "orders", label: "Siparişler", icon: ClipboardList, enabled: ordersEnabled },
     { id: "phoneCarts", label: "Telefon Sepetleri", icon: Smartphone, enabled: catalogEnabled && salesEnabled },
     { id: "inventory", label: "Stok", icon: Boxes, enabled: inventoryEnabled },
     { id: "purchasing", label: "Tedarikçiler / Alım", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
     { id: "labels", label: "Etiketler", icon: Tags, enabled: labelsEnabled }
-  ], [catalogEnabled, inventoryEnabled, labelsEnabled, ordersEnabled, purchasingEnabled, salesEnabled, suppliersEnabled, wholesaleEnabled]);
+  ], [catalogEnabled, inventoryEnabled, labelsEnabled, ordersEnabled, purchasingEnabled, salesEnabled, suppliersEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
   const activeTab = availableTabs.some((tab) => tab.id === activeView)
     ? activeView
     : (availableTabs[0]?.id ?? "products");
+  const auxiliaryCatalog = useCatalogProductPage("market.auxiliary", { activeOnly: true, inventoryOnly: activeTab !== "labels" }, catalogRevision,
+    ["inventory", "purchasing", "labels"].includes(activeTab));
+  const auxiliaryProducts = [...(auxiliaryCatalog.page?.items ?? []), ...products.filter(product => !auxiliaryCatalog.page?.items.some(item => item.id === product.id))];
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
   const [inventoryRevision, setInventoryRevision] = useState(0);
   const productHandoffRequestId = useRef(0);
@@ -94,16 +99,6 @@ export function MarketPage({
       onViewChange(activeTab);
     }
   }, [activeTab, activeView, onViewChange]);
-
-  async function handleSaleCompleted(sale: CommerceSale) {
-    await reloadCatalog();
-    handleStateChange(
-      "success",
-      sale.status === "credit"
-        ? "Veresiye satış kaydedildi."
-        : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`
-    );
-  }
 
   function handleStockImageApplied(data: DesktopDashboardData) {
     onDashboardDataChanged?.(data);
@@ -143,15 +138,19 @@ export function MarketPage({
       {activeTab === "quickSale" ? (
         <MarketQuickSaleWorkspace
           customers={customers}
+          ordersEnabled={ordersEnabled}
+          onOrderCreated={detail => { ordersSession.setSearch(""); ordersSession.setStatusFilter(""); ordersSession.setSelectedOrder(detail); onViewChange("orders"); }}
           customerCreditEnabled={customerCreditEnabled}
           customerSelectionEnabled={runtimeHasCapability(snapshot, C.CUSTOMERS)}
-          products={products}
+          onCreateCustomer={() => navigation.openWorkspace({ entityType: "customer", entityId: "new-customer", mode: "create", returnContext: { page: "market", view: "quickSale" } }, {
+            onReturn: context => { if (context.createdEntityId) quickSaleSession.setCustomerId(context.createdEntityId); }
+          })}
+          catalogRevision={catalogRevision}
           categories={categories}
           session={quickSaleSession}
           barcodeEnabled={barcodeEnabled}
-          inventoryEnabled={inventoryEnabled}
           busy={dataState === "loading"}
-          onSaleCompleted={handleSaleCompleted}
+          onSaleCompleted={reloadCatalog}
           onStateChange={handleStateChange}
           cartDraftRequest={quickSaleSession.cartDraftRequest}
           onCartDraftLoaded={quickSaleSession.clearCartDraftRequest}
@@ -160,12 +159,11 @@ export function MarketPage({
         />
       ) : activeTab === "products" ? (
         <MarketProductsWorkspace
-          products={products}
+          catalogRevision={catalogRevision}
           categories={categories}
           busy={dataState === "loading"}
           productDataEnabled={productDataEnabled}
           onReload={reloadCatalog}
-          onProductSaved={upsertProduct}
           onStateChange={handleStateChange}
           productLookupRequest={productLookupRequest}
           onProductLookupLoaded={clearProductLookupRequest}
@@ -173,8 +171,6 @@ export function MarketPage({
       ) : activeTab === "orders" ? (
         <MarketOrdersWorkspace
           session={ordersSession}
-          customers={customers}
-          products={products}
           customerCreditEnabled={customerCreditEnabled}
           busy={dataState === "loading"}
           onStateChange={handleStateChange}
@@ -188,23 +184,23 @@ export function MarketPage({
         />
       ) : activeTab === "inventory" ? (
         <MarketInventoryWorkspace
-          products={products}
+          products={auxiliaryProducts}
           busy={dataState === "loading"}
           onStateChange={handleStateChange}
           refreshRevision={inventoryRevision}
           utilityAction={catalogEnabled && inventoryEnabled && aiEnabled
-            ? <StockImageImportWorkspace products={products} onApplied={handleStockImageApplied} />
+            ? <StockImageImportWorkspace products={auxiliaryProducts} onApplied={handleStockImageApplied} />
             : undefined}
         />
       ) : activeTab === "purchasing" ? (
         <MarketPurchasingWorkspace
-          products={products}
+          products={auxiliaryProducts}
           busy={dataState === "loading"}
           onStateChange={handleStateChange}
         />
       ) : (
         <MarketLabelsWorkspace
-          products={products}
+          products={auxiliaryProducts}
           categories={categories}
           busy={dataState === "loading"}
           onProductSelected={upsertProduct}

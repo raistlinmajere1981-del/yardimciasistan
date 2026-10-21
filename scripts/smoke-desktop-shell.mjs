@@ -1,3 +1,4 @@
+import { catalogPageFixture } from "./test-helpers/catalog-page-fixture.ts";
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
@@ -23,6 +24,7 @@ try {
   page.on('console', message => { if (message.type() === 'error') console.error(message.text()); });
   // Stable local tiles: the visual test does not depend on OSM/network availability.
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
+  await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await page.addInitScript(({ setup, dashboard, report, allCapabilities }) => {
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
     const enabledCapabilities = allCapabilities;
@@ -48,7 +50,7 @@ try {
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: {
-        listProducts: async () => [],
+        listProducts: async options => window.__catalogPageFixture([], options),
         listCategories: async () => [],
         setBarcodeScanMode: async () => true,
         consumePendingBarcodeScans: async () => []
@@ -240,15 +242,14 @@ try {
   });
   const readsBeforeSync = await page.evaluate(() => window.__customerReadCount);
   await page.evaluate(() => window.__pushDashboard({}));
-  await page.waitForTimeout(300); // Includes the customer's 150ms read debounce.
-  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
+  // The page read runs after a 150ms debounce; poll instead of assuming a fixed idle slice.
+  await expect.poll(() => page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
   await page.getByRole('button', { name: /^Eşitleme durumu:/ }).click();
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
   await search.focus();
   await page.evaluate(() => window.__pushDashboard({ backupPath: '/fixture-unrelated-backup' }));
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 2);
+  await expect.poll(() => page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 2);
   expect(await page.evaluate(() => window.__customerBusyStarts)).toBe(0);
   expect(await search.evaluate(element => document.activeElement === element && window.__focusedSearch === element)).toBe(true);
   expect(await customerList.evaluate(element => element.scrollTop === window.__customerScrollTop)).toBe(true);
@@ -257,10 +258,9 @@ try {
   await expect(customers.getByRole('button', { name: 'Sync güncel müşteri', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 3);
   await page.evaluate(() => window.__pushStaleDashboard());
-  await page.waitForTimeout(300);
+  await expect.poll(() => page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 4);
   await expect(customers.getByRole('button', { name: 'Sync güncel müşteri', exact: true })).toBeVisible();
   await expect(customers.getByText('Eski yanıt', { exact: true })).toHaveCount(0);
-  expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 4);
   await page.evaluate(() => window.__pushDashboard({ customers: window.__syncOriginalCustomers }));
   await expect(customers.getByRole('button', { name: firstCustomer, exact: true })).toBeVisible();
   await page.evaluate(() => { window.__customerPageOverride = 'Sayfalı müşteri güncellendi'; window.__pushDashboard({}); });

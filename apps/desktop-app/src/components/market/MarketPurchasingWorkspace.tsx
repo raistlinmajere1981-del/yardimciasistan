@@ -6,6 +6,7 @@ import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type Com
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { MoneyInput } from "../ui/MoneyInput";
+import { PhoneInput } from "../ui/PhoneInput";
 import { ActionButton } from "../ui/ActionButton";
 import { IconButton } from "../ui/IconButton";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -186,7 +187,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
           </div>
           <div className="form-grid form-grid--compact market-form-divider">
             <label className="form-field form-field--fluid form-field--span">Tedarikçi adı<input value={supplierForm.name} onChange={(event) => setSupplierForm((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label className="form-field form-field--fluid">Telefon<input value={supplierForm.phone} onChange={(event) => setSupplierForm((current) => ({ ...current, phone: event.target.value }))} /></label>
+            <label className="form-field form-field--fluid">Telefon<PhoneInput value={supplierForm.phone} onChange={(value) => setSupplierForm((current) => ({ ...current, phone: value }))} /></label>
             <label className="form-field form-field--fluid">E-posta<input value={supplierForm.email} onChange={(event) => setSupplierForm((current) => ({ ...current, email: event.target.value }))} /></label>
             <label className="form-field form-field--fluid">Vergi no<input value={supplierForm.taxNumber} onChange={(event) => setSupplierForm((current) => ({ ...current, taxNumber: event.target.value }))} /></label>
             <label className="form-field form-field--fluid form-field--span">Not<textarea value={supplierForm.notes} onChange={(event) => setSupplierForm((current) => ({ ...current, notes: event.target.value }))} /></label>

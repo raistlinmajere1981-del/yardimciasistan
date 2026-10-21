@@ -37,7 +37,7 @@ try {
     const projection = () => database.getPublishedMenu().items.find(entry => entry.id === entryId);
     const productId = projection().product_id;
     const editProduct = patch => commerce.saveCatalogProduct(database.databasePath,
-      { ...commerce.listCatalogProducts(database.databasePath).find(product => product.id === productId), ...patch });
+      { ...commerce.listCatalogProducts(database.databasePath).items.find(product => product.id === productId), ...patch });
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, 1);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM menu_product_entries").get().n, 1);
     assert.equal(projection().category_id, category);
@@ -85,7 +85,7 @@ try {
     assert.equal(database.addTableOrderItem({ orderId: order.id, menuEntryId: entryId, quantity: 1 }).ok, false);
     editProduct({ isActive: true });
     ok(database.deleteMenuProductEntry(entryId));
-    assert.equal(commerce.listCatalogProducts(database.databasePath).find(product => product.id === productId).id, productId);
+    assert.equal(commerce.listCatalogProducts(database.databasePath).items.find(product => product.id === productId).id, productId);
     assert.ok(database.getTrackedStockProducts().find(product => product.product_id === productId && product.menu_entry_id === ""));
     assert.ok(database.getMenuProductCandidates().find(product => product.product_id === productId));
     ok(database.removeTableOrderItem(added.id)); assert.equal(stock(), 10);
@@ -135,7 +135,7 @@ try {
     ok(database.applyAndroidAction(phoneAction("canonical_phone_edit", "menu_entry_update", { ...entryInput, menu_entry_id: phoneEntry.id, price_override: 15, expected_updated_at: phoneEntry.updated_at })));
     assert.equal(database.getPublishedMenu().items.find(entry => entry.id === phoneEntry.id).price, 15);
     ok(database.applyAndroidAction(phoneAction("canonical_phone_remove", "menu_item_delete", { menu_entry_id: phoneEntry.id })));
-    assert.ok(commerce.listCatalogProducts(database.databasePath).find(product => product.id === phoneEntry.product_id));
+    assert.ok(commerce.listCatalogProducts(database.databasePath).items.find(product => product.id === phoneEntry.product_id));
     const phoneLink = phoneAction("canonical_phone_link", "menu_entry_create", { ...entryInput, product_id: phoneEntry.product_id });
     ok(database.applyAndroidAction(phoneLink));
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM catalog_products WHERE id = ?").get(phoneEntry.product_id).n, 1);

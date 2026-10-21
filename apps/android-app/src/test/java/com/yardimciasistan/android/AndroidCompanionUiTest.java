@@ -188,6 +188,31 @@ public final class AndroidCompanionUiTest {
     assertTrue(data.companion.orders.isEmpty());
   }
 
+  @Test public void revokedViewNoticeClearsOnlyWhenPermissionReturns() throws Exception {
+    OperationData allowed = OperationData.fromJson(snapshot(), DEVICE);
+    AndroidTodayCoordinator coordinator = new AndroidTodayCoordinator(null, null, null);
+    coordinator.applyDestination(allowed, AndroidUiRules.resolveDestination("today:shipments"));
+    assertEquals("Gönderiler", coordinator.title());
+
+    JSONObject revokedSnapshot = snapshot();
+    revokedSnapshot.getJSONObject("androidPermissions")
+        .put(DEVICE, profile("staff", "commerce_order.view"));
+    OperationData revoked = OperationData.fromJson(revokedSnapshot, DEVICE);
+    coordinator.normalize(revoked);
+    assertEquals("Bugün", coordinator.title());
+    assertTrue(coordinator.screenKey().endsWith(":denied"));
+
+    coordinator.normalize(OperationData.fromJson(revokedSnapshot, DEVICE));
+    assertTrue("Revocation warning must remain while access is denied.",
+        coordinator.screenKey().endsWith(":denied"));
+
+    coordinator.normalize(OperationData.fromJson(snapshot(), DEVICE));
+    assertEquals("Bugün", coordinator.title());
+    assertFalse("Restored permission must remove the stale warning without navigation.",
+        coordinator.screenKey().endsWith(":denied"));
+    assertFalse(coordinator.isCompanionViewOpen());
+  }
+
   @Test public void staleCachedReadingsLoadingAndOfflineRetryHaveExplicitStatus() throws Exception {
     OperationData data = OperationData.fromJson(snapshot(), DEVICE);
     data.pulledAt = TIME;

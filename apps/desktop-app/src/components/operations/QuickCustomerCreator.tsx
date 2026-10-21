@@ -7,6 +7,7 @@ import type {
 import { customerFormToInput, toCustomerForm } from "../../app/customer-model";
 import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
+import { PhoneInput } from "../ui/PhoneInput";
 
 type QuickCustomerState = "idle" | "loading" | "success" | "error";
 
@@ -112,11 +113,10 @@ export function QuickCustomerCreator({
         </label>
         <label className="form-field form-field--short">
           Telefon
-          <input
-            type="tel"
+          <PhoneInput
             maxLength={32}
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={setPhone}
             placeholder="+90 5xx… / +44…"
           />
         </label>

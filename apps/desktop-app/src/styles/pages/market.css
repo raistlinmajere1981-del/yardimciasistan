@@ -48,21 +48,23 @@
   flex: 1 1 auto;
 }
 
-.market-workspace--quickSale .market-sale-cart-lines {
-  min-height: calc(2 * var(--interaction-target-min));
+.market-workspace--quickSale .market-sale-product-grid {
+  flex-basis: 0;
 }
 
-.market-sale-cart > :is(header, .action-button) {
+.market-sale-catalog > :is(.market-product-toolbar, .market-category-chips, .market-catalog-pagination) {
+  flex: 0 0 auto;
+}
+
+.market-sale-cart > header {
   flex-shrink: 0;
 }
 
 .market-sale-checkout-fields {
   display: grid;
   gap: var(--space-2);
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  flex: 0 1 auto;
+  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .market-workspace--products .market-two-column {
@@ -204,7 +206,7 @@
   font-size: var(--text-md);
 }
 
-.market-workspace--products .market-panel > :is(header, .market-search-field, .choice-chips) {
+.market-workspace--products .market-panel > :is(header, .market-product-toolbar, .market-product-bulk-actions, .choice-chips) {
   flex-shrink: 0;
 }
 
@@ -649,7 +651,7 @@ button.market-list-row {
 
 .market-order-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.15fr);
   align-items: stretch;
   gap: var(--space-4);
   min-width: 0;
@@ -660,75 +662,17 @@ button.market-list-row {
   height: 100%;
 }
 
-.market-order-compose,
 .market-order-history {
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--space-3);
+}
+
+.market-order-detail-panel {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-}
-
-.market-order-customer {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.market-order-customer-summary {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-}
-
-.market-order-customer-summary > span {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.market-order-product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  align-content: start;
-  gap: var(--space-2);
-  min-height: 112px;
-  max-height: 280px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-
-.market-order-product-grid .market-sale-product {
-  min-height: 112px;
-}
-
-.market-order-product-grid .market-sale-product > small {
-  color: var(--color-text-muted);
-}
-
-.market-order-product-empty {
-  grid-column: 1 / -1;
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-  min-height: 112px;
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.market-order-product-empty strong {
-  color: var(--color-text);
-}
-
-.market-order-draft {
-  display: grid;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
 }
 
 .market-order-detail-lines {
@@ -738,22 +682,12 @@ button.market-list-row {
   min-height: 0;
 }
 
-.market-order-lines {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
-  min-height: 0;
-  max-height: 280px;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .market-order-list {
   display: grid;
   align-content: start;
   gap: var(--space-2);
   min-height: 0;
-  max-height: 330px;
+  flex: 1;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -802,8 +736,7 @@ button.market-list-row {
 .market-order-detail {
   display: grid;
   gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
+  align-content: start;
 }
 
 .market-order-buyer {
@@ -874,6 +807,16 @@ button.market-list-row {
   text-transform: uppercase;
 }
 
+.market-sale-sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .market-quick-sale-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(340px, 32%, 440px);
@@ -883,51 +826,10 @@ button.market-list-row {
   min-height: 0;
 }
 
-.market-barcode-panel {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-}
-
-.market-barcode-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.market-barcode-heading > span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.market-barcode-heading > span svg {
-  color: var(--color-accent);
-}
-
-.market-barcode-heading select,
-.market-barcode-simulator input {
-  min-height: var(--control-height-md);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-  padding: 0 var(--space-3);
-}
-
-.market-barcode-simulator {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-}
-
 .market-sale-product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-auto-rows: max-content;
   align-content: start;
   gap: var(--space-2);
   min-height: 0;
@@ -938,8 +840,11 @@ button.market-list-row {
 
 .market-sale-product {
   display: grid;
+  align-content: start;
   gap: var(--space-3);
+  min-width: 0;
   min-height: calc(var(--control-height-lg) + var(--space-6));
+  overflow-wrap: anywhere;
   text-align: left;
 }
 
@@ -958,6 +863,7 @@ button.market-list-row {
 .market-sale-product span {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .market-sale-product small {
@@ -974,6 +880,7 @@ button.market-list-row {
   border-color: var(--color-role-integration-border);
 }
 
+.market-sale-checkout,
 .market-sale-cart {
   background: linear-gradient(150deg, var(--color-role-operation-bg), var(--color-bg-panel));
   border-color: var(--color-role-operation-border);
@@ -1092,28 +999,26 @@ button.market-list-row {
   color: var(--color-text-muted);
 }
 
-.market-sale-grand-total {
+.market-sale-totals .customer-credit-selected-debt {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-warning);
+}
+
+.market-sale-totals .customer-credit-selected-debt > small {
+  color: inherit;
+}
+
+.market-sale-grand-total,
+.market-sale-total-debt {
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
   color: var(--color-accent);
 }
 
-.market-sale-grand-total strong {
+.market-sale-grand-total strong,
+.market-sale-total-debt strong {
   font-size: var(--text-xl);
-}
-
-.market-sale-receipt {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-}
-
-.market-sale-receipt span,
-.market-sale-receipt small {
-  color: var(--color-text-muted);
 }
 
 .market-sale-review-recovery {
@@ -1151,7 +1056,7 @@ button.market-list-row {
     min-height: 100%;
   }
 
-  .market-workspace--orders :is(.market-order-compose, .market-order-history),
+  .market-workspace--orders :is(.market-order-history, .market-order-detail-panel),
   .market-workspace--inventory .market-panel {
     height: auto;
     overflow: visible;
@@ -1183,42 +1088,67 @@ button.market-list-row {
   gap: var(--space-3);
 }
 
-.market-sale-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
+.market-workspace--quickSale :is(.market-sale-checkout, .market-sale-cart) {
   gap: var(--space-2);
 }
 
-.market-sale-toolbar .market-barcode-panel {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.market-sale-toolbar .market-barcode-heading {
-  flex-direction: row;
+.market-sale-checkout .market-sale-totals {
   gap: var(--space-1);
+  padding: var(--space-2);
 }
 
-.market-sale-toolbar :is(input, select) {
+.market-product-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.market-product-search-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  flex: 1 1 360px;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.market-product-view-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+.market-product-view-controls .form-check {
+  white-space: nowrap;
+  margin: 0;
+}
+
+.market-product-view-controls select {
+  width: auto;
   min-height: var(--interaction-target-min);
 }
 
-.market-phone-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  white-space: nowrap;
+.market-catalog-products--comfortable {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
-.market-sale-browse-tools {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: var(--space-2);
+.market-catalog-products--balanced {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.market-catalog-products--dense {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-list-row {
+  flex-wrap: wrap;
+}
+
+.market-catalog-products--list {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .market-category-chips {
@@ -1231,12 +1161,6 @@ button.market-list-row {
 .market-category-chips button {
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.market-sale-custom-view {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .market-sale-product-grid--comfortable {
@@ -1255,17 +1179,6 @@ button.market-list-row {
   height: 64px;
 }
 
-.market-sale-product-grid--custom[data-columns="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.market-sale-product-grid--custom[data-columns="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.market-sale-product-grid--custom[data-columns="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.market-sale-product-grid--custom[data-columns="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.market-sale-product-grid--custom[data-columns="6"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-
-.market-sale-product-grid--quiet-price b {
-  font-size: var(--text-sm);
-  color: var(--color-text);
-}
-
 .market-sale-product-grid--list {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -1274,6 +1187,10 @@ button.market-list-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   min-height: var(--interaction-target-min);
+}
+
+.market-sale-product-grid--list .market-sale-product:not(:has(img)) {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .market-sale-product-grid--list .market-sale-product-thumb {
@@ -1309,22 +1226,123 @@ button.market-list-row {
   gap: var(--space-2);
 }
 
-.market-workspace--quickSale .market-sale-payment > .form-field {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+@media (max-height: 800px) {
+  .market-sale-sidebar {
+    gap: var(--space-2);
+  }
+
+  .market-workspace--quickSale :is(.market-sale-checkout, .market-sale-cart) {
+    gap: var(--space-1);
+    padding: var(--space-2);
+  }
+
+  .market-sale-cart > header {
+    padding-bottom: var(--space-1);
+  }
+
+  .market-sale-checkout-fields {
+    gap: var(--space-1);
+  }
+
+  .market-sale-checkout .market-sale-totals {
+    line-height: var(--leading-tight);
+  }
+
+  .market-workspace--quickSale .market-sale-payment {
+    padding-top: var(--space-1);
+  }
+
+  .market-sale-payment .choice-chips {
+    gap: var(--space-1);
+  }
+
+  .market-sale-payment .choice-chips button {
+    padding-inline: var(--space-2);
+  }
+
+  .market-sale-totals :is(.market-sale-grand-total, .market-sale-total-debt, .customer-credit-selected-debt) {
+    padding-top: var(--space-1);
+  }
+
+  .market-sale-totals :is(.market-sale-grand-total, .market-sale-total-debt) strong {
+    font-size: var(--text-lg);
+  }
+
+  .market-sale-checkout-fields > p {
+    margin: 0;
+    font-size: var(--text-xs);
+  }
 }
 
-.market-sale-cart .customer-credit-picker--compact {
+.market-sale-checkout-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.market-sale-checkout-action--credit {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.market-sale-cart-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  align-self: center;
+}
+
+.market-sale-cart-heading small {
+  color: var(--color-text-muted);
+}
+
+.market-sale-discount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.market-sale-discount-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.market-sale-discount-controls input {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+.market-sale-checkout .customer-credit-picker .market-inline-field {
+  align-items: end;
+}
+
+.market-sale-checkout .customer-credit-picker .customer-credit-picker-actions {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr) auto;
+}
+
+.market-sale-payment-difference {
+  color: var(--color-warning);
+}
+
+.market-sale-payment-difference > small {
+  color: inherit;
+}
+
+.market-sale-checkout .customer-credit-picker--compact {
+  margin: 0;
   min-width: 0;
   gap: var(--space-1);
 }
 
-.market-sale-cart .customer-credit-picker--compact h3 {
-  margin: 0;
-  font-size: var(--text-sm);
-}
-
-.market-sale-cart .customer-credit-picker--compact :is(p, .form-field) {
+.market-sale-checkout .customer-credit-picker--compact :is(p, .form-field) {
   margin: 0;
   min-width: 0;
   max-width: 100%;
@@ -1348,6 +1366,45 @@ button.market-list-row {
 
 .market-catalog-record .market-list-row {
   min-width: 0;
+}
+
+.market-product-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  white-space: nowrap;
+}
+
+.market-product-bulk-actions > span {
+  padding-inline: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.market-product-selection {
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  grid-row: 1;
+  min-height: var(--interaction-target-min);
+  cursor: pointer;
+}
+
+.market-catalog-products .menu-drag-handle-hitbox {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.market-catalog-products .market-list-row {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .market-record-actions {
@@ -1424,17 +1481,11 @@ button.market-list-row {
   .market-label-options,
   .market-label-product-summary,
   .market-label-actions,
-  .market-barcode-simulator,
   .market-sale-payment,
   .market-sale-cart-line,
   .market-sale-review-recovery,
   .market-inline-field {
     grid-template-columns: 1fr;
-  }
-
-  .market-barcode-heading {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .market-sale-quantity {
@@ -1445,3 +1496,16 @@ button.market-list-row {
 .product-workspace-frame > .workspace-frame__footer { padding: var(--space-3); border-top: 0; }
 .product-workspace-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; min-width: 0; margin: 0; padding: var(--space-3); }
 .product-workspace-actions .form-status { margin: 0; overflow-wrap: anywhere; }
+
+.market-catalog-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.market-catalog-pagination > span {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

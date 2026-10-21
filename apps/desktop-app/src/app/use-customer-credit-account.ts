@@ -3,7 +3,7 @@ import type { CustomerCreditAccountDetail } from "@yardimci-asistan/shared";
 import { customerCreditError, onCustomerCreditChanged } from "./customer-credit-ui";
 
 /** Mount only inside a customer-credit capability boundary. */
-export function useCustomerCreditAccount(customerId: string) {
+export function useCustomerCreditAccount(customerId: string, enabled = true) {
   const bridge = window.yardimciDesktop?.commerce;
   const [account, setAccount] = useState<CustomerCreditAccountDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -12,6 +12,12 @@ export function useCustomerCreditAccount(customerId: string) {
 
   const reload = useCallback(async () => {
     const current = ++request.current;
+    if (!enabled || !customerId) {
+      setAccount(null);
+      setError("");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -26,7 +32,7 @@ export function useCustomerCreditAccount(customerId: string) {
     } finally {
       if (current === request.current) setLoading(false);
     }
-  }, [bridge, customerId]);
+  }, [bridge, customerId, enabled]);
 
   useEffect(() => {
     void reload();

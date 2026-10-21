@@ -344,11 +344,11 @@ try {
   await expect(page.getByRole("region", { name: "Veresiye WhatsApp paylaşımı" })).toHaveCount(0);
   await toggle("commerce.customer_credit", true); await navigate("Market");
   await page.locator(".market-sale-product").filter({ hasText: product.name }).click();
-  const quick = page.locator(".market-sale-cart");
+  const quick = page.locator(".market-sale-sidebar");
   await quick.getByRole("button", { name: "Veresiye" }).click();
   await chooseSearchSelect(quick, "Müşteri", {value:customerId});
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
-  await expect(quick.locator(".market-sale-receipt")).toContainText("Veresiye satış kaydedildi.");
+  await expect(page.getByTestId("topbar-status")).toContainText("Veresiye satış kaydedildi.");
   assert.equal(preparedCount(), noAutoStart); assert.equal(external.length, noAutoExternal);
   await navigate("Müşteriler"); await openAccount(); await share();
   assert.ok(account().entries.some((entry) => entry.saleDetail?.items.some((item) => item.productName === product.name)));

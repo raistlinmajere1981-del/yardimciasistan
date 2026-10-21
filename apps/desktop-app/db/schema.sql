@@ -1109,6 +1109,15 @@ CREATE UNIQUE INDEX idx_catalog_products_barcode_unique
 CREATE INDEX idx_catalog_products_business
   ON catalog_products (business_id, is_active, name);
 
+CREATE INDEX idx_catalog_products_page
+  ON catalog_products (business_id, sort_order, name COLLATE NOCASE, id) WHERE deleted_at = '';
+CREATE INDEX idx_catalog_products_sale_page
+  ON catalog_products (business_id, is_active, sort_order, name COLLATE NOCASE, id) WHERE deleted_at = '';
+CREATE INDEX idx_catalog_products_category_page
+  ON catalog_products (business_id, category_id, is_active, sort_order, name COLLATE NOCASE, id) WHERE deleted_at = '';
+CREATE INDEX idx_catalog_products_quick_page
+  ON catalog_products (business_id, quick_access_enabled, quick_access_order, sort_order, name COLLATE NOCASE, id) WHERE deleted_at = '';
+
 CREATE UNIQUE INDEX idx_catalog_products_sku_unique
   ON catalog_products (business_id, sku)
   WHERE sku != '' AND deleted_at = '';

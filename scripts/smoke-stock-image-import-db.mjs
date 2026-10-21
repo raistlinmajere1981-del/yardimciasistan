@@ -295,7 +295,7 @@ function verifyCatalogOnlyImport() {
     const movement = runtime.listRuntimeInventoryMovements(path).find(item => item.referenceId === importId);
     assert.equal(movement.type, "purchase"); assert.equal(movement.quantityDelta, 3);
     assert.equal(movement.referenceType, "stock_image_import");
-    assert.equal(runtime.listRuntimeCatalogProducts(path).length, 2, "AI guesses never create catalog products");
+    assert.equal(runtime.listRuntimeCatalogProducts(path).items.length, 2, "AI guesses never create catalog products");
   } finally { cleanupRetail(); }
 }
 

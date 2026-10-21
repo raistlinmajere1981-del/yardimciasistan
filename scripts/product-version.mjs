@@ -131,7 +131,7 @@ export function bumpProductVersion(part, root = repoRoot) {
 export function syncLandingDownloadVersion(root = repoRoot, version = readProductVersion(root).version) {
   const path = resolve(root, "test-site", "landing", "release.json");
   if (!existsSync(dirname(path))) return false;
-  writeJson(path, { desktopVersion: version, androidVersion: version });
+  writeJson(path, { desktopVersion: version, androidVersion: version, dealerAndroidVersion: version });
   return true;
 }
 
@@ -163,7 +163,8 @@ export function readLandingDownloadVersions(root = repoRoot) {
   const release = JSON.parse(readFileSync(path, "utf8"));
   validateVersion(release.desktopVersion);
   validateVersion(release.androidVersion);
-  return [release.desktopVersion, release.androidVersion];
+  validateVersion(release.dealerAndroidVersion);
+  return [release.desktopVersion, release.androidVersion, release.dealerAndroidVersion];
 }
 
 function validateVersion(version) {

@@ -136,11 +136,11 @@ try {
   );
 
   assert.deepEqual(
-    listRuntimeCatalogProducts(databasePath, { search: "RT-001" }).map((item) => item.id),
+    listRuntimeCatalogProducts(databasePath, { search: "RT-001" }).items.map((item) => item.id),
     [product.id]
   );
   assert.deepEqual(
-    listRuntimeCatalogProducts(databasePath, { categoryId: coldCategory.id }).map((item) => item.id),
+    listRuntimeCatalogProducts(databasePath, { categoryId: coldCategory.id }).items.map((item) => item.id),
     [product.id]
   );
 
@@ -290,7 +290,7 @@ try {
     /ürün kataloğu/i
   );
   assert.throws(
-    () => listRuntimeCatalogProducts(databasePath),
+    () => listRuntimeCatalogProducts(databasePath).items,
     /ürün kataloğu/i
   );
   assert.throws(

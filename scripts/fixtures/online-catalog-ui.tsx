@@ -11,11 +11,12 @@ const control = window as typeof window & { __product: CatalogProduct; __menuDat
 function Harness() {
   const navigation = useWorkspaceNavigation();
   const [enabled, setEnabled] = useState(true);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [products, setProducts] = useState([control.__product]);
-  const onProductSaved = (saved: CatalogProduct) => setProducts((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+  const onProductSaved = (saved: CatalogProduct) => { setProducts(current => [...current.filter(item => item.id !== saved.id), saved]); setCatalogRevision(current => current + 1); };
   useEffect(() => { control.__onlineToggle = setEnabled; return () => { delete control.__onlineToggle; }; }, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: control.__menuData ? "restaurant" : "market", capabilities: [], enabledCapabilities: getBusinessProfileSelectionCapabilities(control.__menuData ? "restaurant" : "market", enabled ? [C.ONLINE_SALES] : []) } }}>
-    {!control.__menuData && <MarketProductsWorkspace products={products} categories={[]} busy={false} onReload={async () => {}} onProductSaved={onProductSaved} onStateChange={() => {}} />}
+    {!control.__menuData && <MarketProductsWorkspace catalogRevision={catalogRevision} categories={[]} busy={false} onReload={async () => {}} onStateChange={() => {}} />}
     <button onClick={() => navigation.openWorkspace({ entityType: "product", entityId: control.__product.id, mode: "details" })}>Ürünü Aç</button>
     {control.__menuData && <button onClick={() => navigation.openWorkspace({ entityType: "product", entityId: control.__product.id,
       menuEntryId: control.__menuData?.menu.items.find(item => item.product_id === control.__product.id)?.id,

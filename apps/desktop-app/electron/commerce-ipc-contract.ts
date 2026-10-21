@@ -43,6 +43,7 @@ import type {
   ApplyInventoryMovementInput,
   CreateCommerceSaleInput,
   ListCatalogProductsOptions,
+  CatalogProductPage,
   ListCommerceSuppliersOptions,
   ListInventoryMovementsOptions,
   SaveCatalogProductInput,
@@ -82,11 +83,12 @@ export interface DesktopCommerceBridge {
   listCategories: (options?: ListCatalogCategoriesOptions) => Promise<CatalogCategory[]>;
   saveCategory: (input: SaveCatalogCategoryInput) => Promise<CatalogCategory>;
   deleteCategory: (categoryId: string) => Promise<DeleteCatalogCategoryResult>;
-  reorderCatalog: (kind: import("./commerce-catalog-presentation-store").CatalogOrderKind, orderedIds: string[]) => Promise<void>;
+  reorderCatalog: (kind: import("./commerce-catalog-presentation-store").CatalogOrderKind, orderedIds: string[], page?: { offset: number; total: number }) => Promise<void>;
   setProductQuickAccess: (productId: string, enabled: boolean) => Promise<void>;
+  activateProduct: (productId: string) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
 
-  listProducts: (options?: ListCatalogProductsOptions) => Promise<CatalogProduct[]>;
+  listProducts: (options?: ListCatalogProductsOptions) => Promise<CatalogProductPage>;
   getProductPublication: (productId: string) => Promise<CommerceProductPublication | null>;
   saveProductPublication: (input: SaveCommerceProductPublicationInput) => Promise<CommerceProductPublication>;
   saveProduct: (input: SaveCatalogProductInput) => Promise<CatalogProduct>;
@@ -116,7 +118,7 @@ export interface DesktopCommerceBridge {
   onOrdersChanged: (listener: () => void) => () => void;
   listOrders: (options?: ListCommerceOrdersOptions) => Promise<CommerceOrder[]>;
   getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;
-  createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceOrderDetail>;
+  createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceIpcMutationResult<CommerceOrderDetail>>;
   updateOrderStatus: (input: UpdateCommerceOrderStatusInput) => Promise<CommerceOrderDetail>;
   fulfillOrder: (input: FulfillCommerceOrderInput) => Promise<CommerceOrderFulfillmentResult>;
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;

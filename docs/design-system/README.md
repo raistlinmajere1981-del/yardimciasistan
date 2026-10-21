@@ -156,6 +156,7 @@ Güncel ortak sözlük:
 - `FeatureWorkspacePage` / `FeatureViewSelector`
 - `SearchSelect`
 - `RecordPicker` — yüksek hacimli sayfa seçimleri
+- `PhoneInput` — telefon biçim ayraçlarını koruyarak harf ve ilgisiz sembol girişini/yapıştırılmasını filtreler; numara doğrulaması mevcut kayıt akışında kalır.
 - `ActionButton`
 - `IconButton`
 - `StatusBadge`
@@ -199,8 +200,8 @@ düğme ailesindedir; takvim günleri ve saat seçenekleri kendi seçim semanti�
 ortalanmış tek `ModalSurface` kullanır. Küçük enum'lar `SearchSelect` kullanmaya
 devam eder. `MarketInventoryWorkspace` ve `MarketPurchasingWorkspace` ürünleri
 `MarketCatalogPicker` üzerinden seçer; Etiketler aynı seçiciyi stok takibi
-olmayan aktif ürünleri de dahil ederek kullanır. Siparişler yalnız mevcut uygun aktif
-bayileri verir. `CustomerPicker` kayıtlı müşteri seçiminde aynı yüzeyi kullanır; var olan bir modal içindeyse
+olmayan aktif ürünleri de dahil ederek kullanır. Yeni İşlem müşteri seçimini satış ve sipariş için ortak kullanır; Siparişler yalnız
+mevcut siparişlerin yönetimini sahiplenir. `CustomerPicker` kayıtlı müşteri seçiminde aynı yüzeyi kullanır; var olan bir modal içindeyse
 ikinci modal açmamak için güvenli `SearchSelect` davranışına döner. Seçim mevcut kimlik/onChange hattını kullanır; fiyat, capability,
 veresiye, stok ve mutasyon sahipliği değişmez.
 
@@ -227,23 +228,21 @@ uzak kaynak URL'si img src'ye bağlanmaz. Bu panel `object-fit: contain` kullan�
 eksik veya kırık görsel alanı boş kalır. Yalnız görünür sayfanın thumbnail'ları
 mount edilir.
 
-Mevcut katalog/tedarikçi read API'leri çağrı başına en fazla 500 kayıt verir.
-Sayfa projeksiyonu bu sınırı korur; seçicinin debounce ve eski yanıt korumalı
-araması aynı canonical API'yi kullanarak ilk 500 dışındaki ürün/tedarikçileri de
-bulur. Geniş sonuçlar ilk 500'de sınırlıdır ve aramayı daraltma bilgisi gösterilir;
-bu API'de offset/total olmadığı için tüm kataloğun sıralı sayfalanması iddia
-edilmez. Projeksiyon dışından seçilen ürün, seçicinin/sayımın mevcut yaşamı boyunca
-korunur; yeni domain cache veya ikinci writer oluşturulmaz.
-Etiketlerde aramadan seçilen ürün, mevcut katalog controller'ının `upsertProduct`
-projection hattına verilir; page view store yalnız mevcut ürün kimliğini korur,
-entity snapshot saklamaz.
+Katalog read API'si ürünleri SQLite'ta filtreler ve en çok 100 satırlık sayfa,
+kararlı sıralama, toplam/sonraki offset ve tüm katalogdan kategori adetlerini döndürür.
+Ürünler ve Yeni İşlem 60 satır render eder; arama, kategori, hızlı erişim ve uygunluk
+filtreleri birlikte veritabanında uygulanır. Eski yanıtlar istek nesliyle elenir;
+sepet ve müşteri bu görünümün dışında yaşar. Ürün yönetimi pasif kayıtları içerir,
+satış yalnız aktif ürünleri ister. Ortak ürün seçicisi modal ve modal-içi SearchSelect
+sunumunda aynı sayfalı okumayı kullanır; yalnız sunulan sayfanın görselleri yüklenir.
+Sayfa dışındaki entity editörü ürünü kimliğiyle okur. Stok, alım ve etiket seçimi
+kanonik mutasyon ve fiyat sahipliğini değiştirmez. Tedarikçi API'sinin 500 kayıtlık
+sınırı bu ürün sayfalaması kapsamında değildir.
 
 Müşteri/bayi verisi mevcut dashboard müşteri projeksiyonundan gelir. Bu sahibin
 500 müşteri sınırı ve katalog API'sinin mevcut SQLite metin eşleştirme davranışı
 değiştirilmemiştir. Component 10.000+ sunulan kaydı sınırlı DOM ile destekler;
-bu, canlı dashboard'ın tüm müşteri verisini sağladığı anlamına gelmez. Tüm
-müşterileri backend'de aramak veya katalogda sınırsız sıralı gezinmek ayrı bir
-read-projection sözleşmesi gerektirir.
+bu, canlı dashboard'ın tüm müşteri verisini sağladığı anlamına gelmez. Tüm müşterileri backend'de aramak ayrı bir read-projection sözleşmesi gerektirir.
 
 `FormDialog` veya modal `WorkspaceFrame` içinde `RecordPicker` mevcut
 `useInsideModalSurface()` sınırını okuyup non-modal `SearchSelect` kullanır.

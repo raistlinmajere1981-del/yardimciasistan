@@ -157,7 +157,7 @@ function assertSourceContracts() {
 
   assert.match(page, /Telefon Sepetleri/);
   assert.doesNotMatch(page, /businessType|business_type|Ürün önerileri/);
-  assert.match(inbox, /Hızlı Satış'a Yükle/);
+  assert.match(inbox, /Yeni İşlem'e Yükle/);
   assert.match(inbox, /Sepeti Kapat/);
   assert.doesNotMatch(inbox, /Ürün Kartına Aktar|ürün önerileri/i);
   assert.match(quickSaleSession, /ürünü artık aktif olmadığı için sepete eklenmedi\./);

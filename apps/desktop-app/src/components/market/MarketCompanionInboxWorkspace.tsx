@@ -71,7 +71,7 @@ export function MarketCompanionInboxWorkspace({
             <span>Telefon Companion</span>
             <h2>Telefon Sepetleri</h2>
             <p>
-              Telefonda hazırlanan sepetler burada bekler. Ürünler Hızlı Satış'a yüklenirken güncel katalog ve güncel fiyatla çözülür.
+              Telefonda hazırlanan sepetler burada bekler. Ürünler Yeni İşlem'e yüklenirken güncel katalog ve güncel fiyatla çözülür.
             </p>
           </div>
           <ActionButton variant="secondary" type="button" onClick={() => void reload()} disabled={disabled}>
@@ -85,7 +85,7 @@ export function MarketCompanionInboxWorkspace({
           <header className="market-panel-heading">
             <span>Hazır sepetler</span>
             <h2>Bekleyen Telefon Sepetleri</h2>
-            <p>Ödeme ve gerçek satış kaydı masaüstü Hızlı Satış ekranında tamamlanır.</p>
+            <p>Ödeme ve gerçek satış kaydı masaüstü Yeni İşlem ekranında tamamlanır.</p>
           </header>
           <div className="market-draft-list">
             {cartDrafts.map((detail) => (
@@ -108,7 +108,7 @@ export function MarketCompanionInboxWorkspace({
                 {detail.draft.note && <p className="market-draft-note"><strong>Telefon notu:</strong> {detail.draft.note}</p>}
                 <div className="market-draft-actions">
                   <ActionButton type="button" onClick={() => onOpenCartDraft(detail)} disabled={disabled}>
-                    <ShoppingCart size={16} aria-hidden="true" /> Hızlı Satış'a Yükle
+                    <ShoppingCart size={16} aria-hidden="true" /> Yeni İşlem'e Yükle
                   </ActionButton>
                   <ActionButton variant="secondary" type="button" onClick={() => void closeCartDraft(detail.draft.id)} disabled={disabled}>
                     Sepeti Kapat

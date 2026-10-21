@@ -135,7 +135,8 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 286, "all production invoke registrations must execute, including customer pagination and data transfer");
+assert.equal(handlers.size, 287, "all production invoke registrations must execute, including product activation, customer pagination and data transfer");
+assert.ok(handlers.has("commerce:product:activate"), "product activation must be included in the production lock sweep");
 for (const action of ["pick", "upload", "preview", "apply", "rows", "summary", "export", "report", "release"]) {
   assert.ok(handlers.has(`dataTransfer:${action}`), `dataTransfer:${action}: included in the production lock sweep`);
 }
@@ -189,6 +190,10 @@ for (const [channel, input] of representatives) {
   assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
 }
+const beforeActivation = calls.length;
+assert.equal((await invoke("commerce:product:activate", "product-fixture")).ok, true);
+assert.ok(calls.slice(beforeActivation).includes("commerce-catalog-presentation-store.activateCatalogProduct"),
+  "unlocked product activation delegates to its canonical writer");
 for (const [channel, input, dependency] of [
   ["sync:probeConnection", { baseUrl: "https://fixture.invalid", syncSecret: "fixture-only-secret" }, "web-connection-test.testWebConnection"],
   ["marketingProviders:cancelInstagramOAuth", undefined, "marketing/instagram-oauth-service.cancelPending"]

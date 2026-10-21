@@ -20,6 +20,7 @@
  *   www/downloads/YardimciAsistan-Setup-<version>.exe
  *   www/downloads/YardimciAsistan-Setup-<version>-x86.exe
  *   www/downloads/YardimciAsistan-Android-<version>.apk
+ *   www/downloads/YardimciAsistan-Bayi-Android-<version>-pilot.apk (debug signed pilot)
  *
  * NEVER touches:
  *   www/yardimci-asistan/** (web module code, config/business.json, data/, sqlite, AI local config)
@@ -52,7 +53,7 @@ Kullanim:
   node scripts/deploy.mjs --yes --with-downloads       Landing + Windows/APK paketlerini yayinlar.
 
 Secenekler:
-  --with-downloads   Windows x64/x86 installer ve Android release APK'yi /downloads altina yayinlar.
+  --with-downloads   Windows x64/x86, Companion release ve Bayi pilot APK'yi /downloads altina yayinlar.
 
 Ortam degiskenleri:
   LANDING_DEPLOY_HOST            SSH hedefi
@@ -136,8 +137,11 @@ if (withDownloads) {
   const androidResourceDir = join(monorepoRoot, "apps", "desktop-app", "resources", "android");
   const androidApk = join(androidResourceDir, "yardimci-asistan-release.apk");
   const androidVersionFile = join(androidResourceDir, "version.json");
+  const dealerDir = join(monorepoRoot, "apps", "dealer-android-app", "build", "outputs", "apk", "debug");
+  const dealerApk = join(dealerDir, "yardimci-asistan-bayi-debug.apk");
+  const dealerMetadataFile = join(dealerDir, "output-metadata.json");
 
-  for (const f of [desktopInstaller, desktopInstallerX86, androidApk, androidVersionFile]) {
+  for (const f of [desktopInstaller, desktopInstallerX86, androidApk, androidVersionFile, dealerApk, dealerMetadataFile]) {
     if (!existsSync(f)) {
       fail(
         `Kurulum paketi eksik: ${f}\n` +
@@ -156,8 +160,17 @@ if (withDownloads) {
     );
   }
 
+  const dealerMetadata = JSON.parse(readFileSync(dealerMetadataFile, "utf8"));
+  const dealerEntry = dealerMetadata?.elements?.[0];
+  if (dealerMetadata?.applicationId !== "com.yardimciasistan.dealer"
+      || dealerMetadata?.variantName !== "debug"
+      || dealerEntry?.outputFile !== "yardimci-asistan-bayi-debug.apk"
+      || dealerEntry?.versionName !== `${androidVersion}-pilot`
+      || dealerEntry?.versionCode !== androidResourceVersion.versionCode) {
+    fail("Bayi pilot APK Gradle metadata surumu/kimligi uyumsuz; guncel Bayi APK'sini derleyin.");
+  }
   const release = JSON.parse(readFileSync(localRelease, "utf8"));
-  if (release.desktopVersion !== desktopVersion || release.androidVersion !== androidVersion) {
+  if (release.desktopVersion !== desktopVersion || release.androidVersion !== androidVersion || release.dealerAndroidVersion !== androidVersion) {
     fail("Site release.json ile kurulum paketlerinin sürümleri eşleşmiyor.");
   }
 
@@ -176,6 +189,11 @@ if (withDownloads) {
       label: "Android",
       source: androidApk,
       name: `YardimciAsistan-Android-${androidVersion}.apk`
+    },
+    {
+      label: "Bayi Android Pilot (debug imzalı)",
+      source: dealerApk,
+      name: `YardimciAsistan-Bayi-Android-${androidVersion}-pilot.apk`
     }
   );
 
@@ -451,7 +469,7 @@ if (withDownloads) {
   const keepTests = keepNames.map((name) => `! -name \'${name}\'`).join(" ");
   sshRun(
     `find \'${remoteDownloads}\' -mindepth 1 -maxdepth 1 -type f \\( ` +
-    `-name \'YardimciAsistan-Setup-*.exe\' -o -name \'YardimciAsistan-Android-*.apk\' \\) ` +
+    `-name \'YardimciAsistan-Setup-*.exe\' -o -name \'YardimciAsistan-Android-*.apk\' -o -name \'YardimciAsistan-Bayi-Android-*.apk\' \\) ` +
     `${keepTests} -delete`
   );
   for (const manifest of updateManifests) {

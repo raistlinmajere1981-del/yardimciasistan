@@ -91,7 +91,10 @@ printf 'Web modülü durumu: %s\n' "$module_state"
 ssh "${ssh_opts[@]}" "$host" bash -s -- "$www_root" <<'REMOTE_SITE_CHECK'
 set -Eeuo pipefail
 www="$1"
-if test -f "$www/index.php" && ! grep -q 'market-pilot-site' "$www/index.php"; then
+if test -f "$www/index.php" &&
+   ! grep -q 'market-pilot-site' "$www/index.php" &&
+   ! { grep -Fq "market_header('home')" "$www/index.php" &&
+       grep -Fq 'data-ui="Günlük alışveriş"' "$www/index.php"; }; then
   echo 'Market Pilot dışı index.php bulundu; yayın durduruldu.' >&2; exit 1
 fi
 if test -f "$www/index.html" && ! grep -qi 'alwaysdata' "$www/index.html"; then

@@ -4,6 +4,20 @@ import type { CatalogProduct } from "@yardimci-asistan/shared";
 const imageCache = new Map<string, string>();
 const pendingImages = new Map<string, Promise<string>>();
 
+// Paging must not retain every previously visited image in a long catalog.
+let cachedImageCharacters = 0;
+function rememberImage(key: string, value: string) {
+  cachedImageCharacters -= imageCache.get(key)?.length ?? 0;
+  imageCache.set(key, value);
+  cachedImageCharacters += value.length;
+  while (imageCache.size > 180 || cachedImageCharacters > 6_000_000) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest === undefined) break;
+    cachedImageCharacters -= imageCache.get(oldest)?.length ?? 0;
+    imageCache.delete(oldest);
+  }
+}
+
 function cacheKey(product: CatalogProduct) {
   return `${product.id}:${product.imageAssetPath || ""}:${product.updatedAt || ""}`;
 }
@@ -23,11 +37,11 @@ function loadProductImage(product: CatalogProduct): Promise<string> {
   const request = bridge.getProductImageDataUrl(product.id)
     .then((dataUrl) => {
       const value = String(dataUrl ?? "");
-      imageCache.set(key, value);
+      rememberImage(key, value);
       return value;
     })
     .catch(() => {
-      imageCache.set(key, "");
+      rememberImage(key, "");
       return "";
     })
     .finally(() => {

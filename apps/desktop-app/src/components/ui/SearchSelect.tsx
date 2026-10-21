@@ -11,7 +11,14 @@ export interface SearchSelectOption {
   disabled?: boolean;
   leading?: ReactNode;
 }
+export interface SearchSelectPage {
+  options: SearchSelectOption[];
+  total: number;
+  offset: number;
+  nextOffset: number | null;
+}
 interface SearchSelectProps {
+  loadPage?: (query: string, offset: number) => Promise<SearchSelectPage>;
   value: string;
   options: SearchSelectOption[];
   onChange: (value: string) => void;
@@ -28,23 +35,41 @@ interface SearchSelectProps {
 
 /** Non-modal top-layer picker: also works inside the one canonical modal boundary. */
 export function SearchSelect({ value, options, onChange, ariaLabel, placeholder = "Seçin", searchPlaceholder = "Ara",
-  emptyMessage = "Eşleşen kayıt yok.", disabled = false, clearable = true, autoFocus = false, onCreate, createLabel = "Yeni ekle" }: SearchSelectProps) {
+  loadPage, emptyMessage = "Eşleşen kayıt yok.", disabled = false, clearable = true, autoFocus = false, onCreate, createLabel = "Yeni ekle" }: SearchSelectProps) {
   const anchorRef = useRef<HTMLButtonElement>(null), popoverRef = useRef<HTMLDivElement>(null), searchRef = useRef<HTMLInputElement>(null);
   const id = useId(), listId = `${id}-options`;
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [activeId, setActiveId] = useState("");
+  const [remote, setRemote] = useState<SearchSelectPage | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false), [loadError, setLoadError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const [picked, setPicked] = useState<SearchSelectOption | null>(null);
+  useEffect(() => {
+    if (!open || !loadPage) return;
+    let current = true;
+    setLoading(true); setLoadError("");
+    const timer = window.setTimeout(() => {
+      void loadPage(query.trim(), offset).then(page => { if (current) setRemote(page); })
+        .catch(() => { if (current) setLoadError("Kayıtlar yüklenemedi."); })
+        .finally(() => { if (current) setLoading(false); });
+    }, query.trim() ? 180 : 0);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [loadPage, open, query, offset, attempt]);
+  const available = loadPage && remote ? remote.options : options;
   const [position, setPosition] = useState<CSSProperties>({ visibility: "hidden" });
-  const selected = options.find(option => option.id === value);
+  const selected = options.find(option => option.id === value) ?? (loadPage && picked?.id === value ? picked : null);
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("tr-TR"), digits = needle.replace(/\D/g, "");
-    return options.filter(option => !needle || `${option.label} ${option.description ?? ""} ${option.keywords ?? ""}`.toLocaleLowerCase("tr-TR").includes(needle)
+    if (loadPage) return available;
+    return available.filter(option => !needle || `${option.label} ${option.description ?? ""} ${option.keywords ?? ""}`.toLocaleLowerCase("tr-TR").includes(needle)
       || /^\+?[\d\s()-]+$/.test(needle) && digits.length > 0 && `${option.description ?? ""} ${option.keywords ?? ""}`.replace(/\D/g, "").includes(digits));
-  }, [options, query]);
+  }, [available, loadPage, query]);
   const enabledOptions = filtered.filter(option => !option.disabled);
   const active = enabledOptions.find(option => option.id === activeId) ?? enabledOptions.find(option => option.id === value) ?? enabledOptions[0];
-  const optionId = (option: SearchSelectOption) => `${id}-${options.indexOf(option)}`;
+  const optionId = (option: SearchSelectOption) => `${id}-${available.indexOf(option)}`;
   const close = (restore = true) => { setOpen(false); if (restore) anchorRef.current?.focus({ preventScroll: true }); };
-  const choose = (next: string) => { close(); onChange(next); };
-  function show() { if (disabled) return; setQuery(""); setActiveId(value); setOpen(true); }
+  const choose = (next: string) => { if (loading || loadError) return; setPicked(available.find(option => option.id === next) ?? null); close(); onChange(next); };
+  function show() { if (disabled) return; setQuery(""); setOffset(0); setActiveId(value); setOpen(true); }
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -67,10 +92,10 @@ export function SearchSelect({ value, options, onChange, ariaLabel, placeholder 
   }, [open]);
   useEffect(() => {
     if (open && active?.id) {
-      const index = options.findIndex((option) => option.id === active.id);
+      const index = available.findIndex((option) => option.id === active.id);
       if (index >= 0) document.getElementById(`${id}-${index}`)?.scrollIntoView({ block: "nearest" });
     }
-  }, [open, active?.id, query, options, id]);
+  }, [open, active?.id, query, available, id]);
   useEffect(() => {
     if (!open) return;
     const pointer = (event: PointerEvent) => { const target = event.target as Node; if (!anchorRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false); };
@@ -100,19 +125,25 @@ export function SearchSelect({ value, options, onChange, ariaLabel, placeholder 
     {open && <div ref={popoverRef} id={`${id}-picker`} popover="manual" className="search-select-popover" role="dialog" aria-label={`${ariaLabel} seçici`} style={position}>
       <div className="search-select-search"><Search size={16} aria-hidden="true" />
         <input ref={searchRef} role="combobox" aria-label={`${ariaLabel} ara`} aria-expanded="true" aria-autocomplete="list" aria-controls={listId}
-          aria-activedescendant={active ? optionId(active) : undefined} value={query} onChange={event => { setQuery(event.target.value); setActiveId(""); }} onKeyDown={navigate} placeholder={searchPlaceholder} />
-        {query && <IconButton size="sm" variant="quiet" aria-label="Aramayı temizle" onClick={() => { setQuery(""); setActiveId(value); searchRef.current?.focus(); }}><X size={15} aria-hidden="true" /></IconButton>}
+          aria-activedescendant={active ? optionId(active) : undefined} value={query} onChange={event => { setQuery(event.target.value); setOffset(0); setActiveId(""); }} onKeyDown={navigate} placeholder={searchPlaceholder} />
+        {query && <IconButton size="sm" variant="quiet" aria-label="Aramayı temizle" onClick={() => { setQuery(""); setOffset(0); setActiveId(value); searchRef.current?.focus(); }}><X size={15} aria-hidden="true" /></IconButton>}
       </div>
       {clearable && value && <ActionButton size="sm" variant="ghost" fullWidth className="search-select-clear" onClick={() => choose("")}>Seçimi temizle</ActionButton>}
-      <div id={listId} className="search-select-options" role="listbox" aria-label={ariaLabel}>
-        {!filtered.length && <p role="status">{emptyMessage}</p>}
+      <div id={listId} className="search-select-options" role="listbox" aria-label={ariaLabel} aria-busy={loading}>
+        {!loading && !loadError && !filtered.length && <p role="status">{emptyMessage}</p>}
         {filtered.map(option => <button key={option.id} id={optionId(option)} type="button" role="option" data-value={option.id} aria-selected={option.id === value} tabIndex={-1}
-          className={`${option.id === value ? "is-selected" : ""} ${option.id === active?.id ? "is-active" : ""}`} disabled={option.disabled} title={[option.label, option.description].filter(Boolean).join(" · ")}
+          className={`${option.id === value ? "is-selected" : ""} ${option.id === active?.id ? "is-active" : ""}`} disabled={loading || Boolean(loadError) || option.disabled} title={[option.label, option.description].filter(Boolean).join(" · ")}
           onPointerMove={() => { if (!option.disabled) setActiveId(option.id); }} onClick={() => choose(option.id)}>
           {option.leading && <span className="search-select-option-leading" aria-hidden="true">{option.leading}</span>}
           <span className="search-select-option-copy"><span>{option.label}</span>{option.description && <small>{option.description}</small>}</span>
         </button>)}
       </div>
+      {loadPage && <div className="record-picker__pagination" aria-label="Sonuç sayfaları">
+        <ActionButton size="sm" variant="ghost" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - 60))}>Önceki</ActionButton>
+        <span role="status">{loading ? "Yükleniyor…" : `${remote?.total ?? 0} sonuç`}</span>
+        <ActionButton size="sm" variant="ghost" disabled={loading || Boolean(loadError) || remote?.nextOffset == null} onClick={() => setOffset(remote?.nextOffset ?? 0)}>Sonraki</ActionButton>
+      </div>}
+      {loadError && <p role="alert">{loadError} <ActionButton variant="ghost" size="sm" onClick={() => setAttempt(value => value + 1)}>Yeniden dene</ActionButton></p>}
       {onCreate && <button type="button" className="search-select-clear" onClick={() => { close(); onCreate(); }}>{createLabel}</button>}
     </div>}
   </div>;

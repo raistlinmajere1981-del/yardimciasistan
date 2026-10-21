@@ -25,6 +25,7 @@ final class AndroidTodayCoordinator {
   private String mode = "";
   private String source = CompanionUiRules.ALL;
   private String notice = "";
+  private String permissionNoticeMode = "";
   private String orderId = "";
 
   AndroidTodayCoordinator(
@@ -41,6 +42,7 @@ final class AndroidTodayCoordinator {
     if (!AndroidUiRules.TAB_TODAY.equals(destination.tab)) return;
     mode = CompanionUiRules.canOpen(data, destination.mode) ? destination.mode : "";
     notice = CompanionUiRules.isMode(destination.mode) && mode.isEmpty() ? "Bu cihazın bu görünüm için yetkisi yok." : "";
+    permissionNoticeMode = "";
     source = CompanionUiRules.ALL;
     orderId = "";
   }
@@ -48,12 +50,17 @@ final class AndroidTodayCoordinator {
   void normalize(OperationData data) {
     data.companion.redact(data);
     if (!mode.isEmpty() && !CompanionUiRules.canOpen(data, mode)) {
+      permissionNoticeMode = mode;
       mode = "";
       notice = "Bu görünümün izni kaldırıldı veya işletme yeteneği kapatıldı.";
       orderId = "";
+    } else if (!permissionNoticeMode.isEmpty() && CompanionUiRules.canOpen(data, permissionNoticeMode)) {
+      permissionNoticeMode = "";
+      notice = "";
     }
     if (!orderId.isEmpty() && data.companion.orderById(orderId) == null) {
       orderId = "";
+      permissionNoticeMode = "";
       notice = "Sipariş bu eşitlemede görüntülenemiyor.";
     }
     if (!CompanionUiRules.sourceFilterAvailable(data, source)) source = CompanionUiRules.ALL;
@@ -64,6 +71,7 @@ final class AndroidTodayCoordinator {
     if (mode.isEmpty()) return false;
     mode = "";
     notice = "";
+    permissionNoticeMode = "";
     source = CompanionUiRules.ALL;
     return true;
   }
@@ -76,7 +84,7 @@ final class AndroidTodayCoordinator {
 
   void openOrder(OperationData data, String id) {
     if (!CompanionUiRules.canOpen(data, mode) || data.companion.orderById(id) == null) return;
-    orderId = id; notice = "";
+    orderId = id; notice = ""; permissionNoticeMode = "";
   }
 
   View build(OperationData data, int bottomPaddingDp, boolean loading, boolean syncFailed) {

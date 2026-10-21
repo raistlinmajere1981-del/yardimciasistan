@@ -1,3 +1,4 @@
+import { catalogPageFixture } from "./test-helpers/catalog-page-fixture.ts";
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
@@ -24,6 +25,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   // Stable local tiles: the visual test does not depend on OSM/network availability.
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
+  await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await page.addInitScript(({ setup, dashboard, report, allCapabilities }) => {
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
     const enabledCapabilities = allCapabilities;
@@ -78,7 +80,7 @@ try {
       getInstagramConfiguration: async () => ({ providerId: 'instagram_api', enabled: false, accountId: '', username: '', expiresAt: '', apiVersion: 'v25.0', hasSecret: false, configured: false }),
       onBusinessMessagingChanged: () => () => {},
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
-      commerce: { listProducts: async () => [], listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
+      commerce: { listProducts: async options => window.__catalogPageFixture([], options), listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
       deleteCustomer: async id => { window.__designCalls.push({ kind: "delete-customer", input: id }); return { ok: false, message: "Aktif konaklaması olan müşteri silinemez." }; },
       saveCustomer: async input => {
         window.__designCalls.push({ kind: 'customer', input });

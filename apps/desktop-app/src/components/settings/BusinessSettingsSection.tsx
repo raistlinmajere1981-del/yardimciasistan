@@ -2,6 +2,7 @@ import { getBusinessProfiles } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "../../app/setup-model";
 import type { SetupFieldsProps } from "./setup-fields";
 import { BusinessProfileOptionEditor } from "./BusinessCapabilitySettings";
+import { PhoneInput } from "../ui/PhoneInput";
 
 export function BusinessSettingsSection({ form, onFormChange, persistedProfileId }: SetupFieldsProps & { persistedProfileId: string }) {
   const profileChanged = form.profileId !== persistedProfileId;
@@ -39,11 +40,11 @@ export function BusinessContactFields({ form, onFormChange }: SetupFieldsProps) 
     <div className="form-row">
       <label className="form-field form-field--short">
         Telefon
-        <input value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx xxx xx xx" />
+        <PhoneInput value={form.phone} onChange={(value) => update("phone", value)} placeholder="+90 5xx xxx xx xx" />
       </label>
       <label className="form-field form-field--short">
         WhatsApp
-        <input value={form.whatsapp} onChange={(event) => update("whatsapp", event.target.value)} placeholder="+90 5xx xxx xx xx" />
+        <PhoneInput value={form.whatsapp} onChange={(value) => update("whatsapp", value)} placeholder="+90 5xx xxx xx xx" />
       </label>
       <label className="form-field form-field--medium">
         E-posta

@@ -17,6 +17,7 @@ const channels = [
   "commerce:category:save",
   "commerce:category:delete",
   "commerce:product:list",
+  "commerce:product:activate",
   "commerce:product:save",
   "commerce:product:findByBarcode",
   "commerce:product:lookupExternal",
@@ -62,6 +63,7 @@ const contractMethods = [
   "saveCategory",
   "deleteCategory",
   "listProducts",
+  "activateProduct",
   "saveProduct",
   "findProductByBarcode",
   "lookupExternalProductByBarcode",
@@ -187,8 +189,8 @@ assert.match(
 );
 assert.match(
   preloadSource,
-  /createOrder:\s*\(input\) => invokeCommerceMutation<CommerceOrderDetail>\("commerce:order:create"/,
-  "Order creation bridge must use the commerce mutation unwrap path."
+  /createOrder:\s*\(input\) => invokeWhenUnlocked<CommerceIpcMutationResult<CommerceOrderDetail>>\("commerce:order:create"/,
+  "Order creation must preserve the typed rejection envelope across contextBridge for safe retry."
 );
 assert.match(
   preloadSource,

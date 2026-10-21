@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
+import { runInNewContext } from "node:vm";
 import { createServer } from "vite";
 
 const require = createRequire(import.meta.url);
@@ -11,7 +12,7 @@ const { BUSINESS_CAPABILITIES: C, getBusinessProfile, expandBusinessCapabilities
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { completeMarketSale } = require("../apps/desktop-app/dist-electron/market-sale-operation.js");
 const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts, saveRuntimeCatalogCategory, listRuntimeCatalogCategories, setRuntimeInventoryCount, getRuntimeInventoryBalance, listRuntimeInventoryMovements, getCustomerCreditAccount } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
-const { reorderCatalogRecords, setCatalogProductQuickAccess } = require("../apps/desktop-app/dist-electron/commerce-catalog-presentation-store.js");
+const { activateCatalogProduct, deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } = require("../apps/desktop-app/dist-electron/commerce-catalog-presentation-store.js");
 const { applyBusinessProfileCapabilities, setBusinessCapability, readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 let buildNavigation;
 const failures = [];
@@ -101,15 +102,15 @@ try {
       setCatalogProductQuickAccess(database.databasePath, product.id, true);
       setCatalogProductQuickAccess(database.databasePath, second.id, true);
       reorderCatalogRecords(database.databasePath, "quickAccess", [second.id, product.id]);
-      const quick = listRuntimeCatalogProducts(database.databasePath).filter(item => item.quickAccessEnabled).sort((a, b) => a.quickAccessOrder - b.quickAccessOrder);
+      const quick = listRuntimeCatalogProducts(database.databasePath).items.filter(item => item.quickAccessEnabled).sort((a, b) => a.quickAccessOrder - b.quickAccessOrder);
       assert.deepEqual(quick.map(item => item.id), [second.id, product.id]);
       reorderCatalogRecords(database.databasePath, "products", [second.id, product.id]);
-      assert.deepEqual(listRuntimeCatalogProducts(database.databasePath).map(item => item.id), [second.id, product.id]);
-      const before = listRuntimeCatalogProducts(database.databasePath);
+      assert.deepEqual(listRuntimeCatalogProducts(database.databasePath).items.map(item => item.id), [second.id, product.id]);
+      const before = listRuntimeCatalogProducts(database.databasePath).items;
       assert.throws(() => reorderCatalogRecords(database.databasePath, "products", [second.id]), /listesi değişti/);
-      assert.deepEqual(listRuntimeCatalogProducts(database.databasePath), before);
+      assert.deepEqual(listRuntimeCatalogProducts(database.databasePath).items, before);
       setCatalogProductQuickAccess(database.databasePath, product.id, false);
-      assert.equal(listRuntimeCatalogProducts(database.databasePath).find(item => item.id === product.id).quickAccessEnabled, false);
+      assert.equal(listRuntimeCatalogProducts(database.databasePath).items.find(item => item.id === product.id).quickAccessEnabled, false);
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, 2);
       const c1 = saveRuntimeCatalogCategory(database.databasePath, { name: "Birinci" });
       const c2 = saveRuntimeCatalogCategory(database.databasePath, { name: "İkinci" });
@@ -131,6 +132,61 @@ try {
       assert.equal(getRuntimeInventoryBalance(database.databasePath, tracked.id).quantity, 5.125);
       assert.equal(listRuntimeInventoryMovements(database.databasePath, { productId: tracked.id }).length, 2);
       assert.throws(() => setRuntimeInventoryCount(database.databasePath, { productId: tracked.id, countedQuantity: 9, expectedUpdatedAt: counted.balance.updatedAt }), /Stok bu sayımdan sonra değişti/);
+    });
+    check("manual tender is atomic, customer/currency scoped and replayed once", () => {
+      const path = database.databasePath;
+      const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+      const customer = database.saveCustomer({ fullName: "Tender fixture" }).savedId;
+      const tenderProduct = saveRuntimeCatalogProduct(path, { name: "Tender product", salePrice: 100, trackInventory: true });
+      setRuntimeInventoryCount(path, { productId: tenderProduct.id, countedQuantity: 50 });
+      runtime.addCustomerCreditAdjustment(path, { customerId: customer, currency: "TRY", amountMinor: 16000, entryType: "adjustment_debit", source: "fixture", note: "Old debt" });
+      runtime.addCustomerCreditAdjustment(path, { customerId: customer, currency: "EUR", amountMinor: 9000, entryType: "adjustment_debit", source: "fixture", note: "Separate currency" });
+      const balance = currency => getCustomerCreditAccount(path, customer).balances.find(item => item.currency === currency)?.amountMinor ?? 0;
+      const tables = ["commerce_sales", "commerce_sale_items", "inventory_balances", "inventory_movements", "customer_credit_entries", "finance_entries", "commerce_market_sale_receipts"];
+      const state = () => tables.map(table => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+      const input = (id, amount, extra = {}) => ({ settlement: "paid", paymentMethod: "cash", customerId: customer, operationId: `manual-tender-${id}`, paymentAmountMinor: amount, items: [{ productId: tenderProduct.id, quantity: 1, expectedUnitPrice: 100, expectedCurrency: "TRY" }], ...extra });
+      const income = () => db.prepare("SELECT COALESCE(SUM(amount_minor),0) AS n FROM finance_entries WHERE direction='income' AND deleted_at='' AND currency='TRY'").get().n;
+      let debt = 16000;
+      for (const method of ["cash", "card", "transfer", "other"]) {
+        const intent = input(method, 4000, { paymentMethod: method });
+        const beforeIncome = income();
+        const result = completeMarketSale(path, intent);
+        assert.equal(result.sale.status, "credit"); assert.equal(result.sale.paymentMethod, "");
+        assert.deepEqual(result.payment, { receivedMinor: 4000, appliedToSaleMinor: 4000, appliedToDebtMinor: 0, newDebtMinor: 6000 });
+        debt += 6000; assert.equal(balance("TRY"), debt); assert.equal(income() - beforeIncome, 4000);
+        assert.equal(db.prepare("SELECT payment_method FROM customer_credit_entries WHERE customer_id=? AND entry_type='payment' ORDER BY rowid DESC LIMIT 1").get(customer).payment_method, method === "transfer" ? "bank" : method);
+        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM finance_entries WHERE source_type='commerce_sale' AND source_id=?").get(result.sale.id).n, 0);
+        const snapshot = state();
+        assert.equal(completeMarketSale(path, intent).sale.id, result.sale.id);
+        assert.deepEqual(state(), snapshot);
+        assert.throws(() => completeMarketSale(path, { ...intent, paymentAmountMinor: 4001 }), /farklı bir satış/);
+      }
+      const beforeIncome = income();
+      const excess = completeMarketSale(path, input("excess", 12000));
+      assert.equal(excess.sale.status, "paid"); assert.equal(income() - beforeIncome, 12000);
+      assert.equal(excess.payment.appliedToDebtMinor, 2000); debt -= 2000; assert.equal(balance("TRY"), debt);
+      const afterExcess = state(); assert.equal(completeMarketSale(path, input("excess", 12000)).sale.id, excess.sale.id); assert.deepEqual(state(), afterExcess);
+      const exact = completeMarketSale(path, input("exact", 10000)); assert.equal(exact.sale.status, "paid"); assert.equal(balance("TRY"), debt);
+      completeMarketSale(path, input("zero", 0)); debt += 10000; assert.equal(balance("TRY"), debt);
+      assert.equal(balance("EUR"), 9000);
+      for (const bad of [input("no-receipt", 5000, { operationId: "" }), input("over", 10000 + debt + 1), input("negative", -1), input("fraction", 1.1), input("huge", Number.MAX_SAFE_INTEGER), input("no-customer", 5000, { customerId: "" }), input("deleted", 5000, { customerId: "missing" }), input("credit-positive", 1, { settlement: "credit" }), input("method", 5000, { paymentMethod: "invalid" }), input("stale", 5000, { items: [{ productId: tenderProduct.id, quantity: 1, expectedUnitPrice: 99 }] })]) {
+        const before = state(); assert.throws(() => completeMarketSale(path, bad)); assert.deepEqual(state(), before);
+      }
+      db.exec("CREATE TRIGGER tender_payment_failure BEFORE INSERT ON finance_entries WHEN NEW.source_type='customer_credit_payment' BEGIN SELECT RAISE(ABORT,'tender_payment_failure'); END");
+      for (const amount of [5000, 11000]) {
+        const before = state(); assert.throws(() => completeMarketSale(path, input(`rollback-${amount}`, amount)), /tender_payment_failure/); assert.deepEqual(state(), before);
+      }
+      db.exec("DROP TRIGGER tender_payment_failure");
+      db.exec("CREATE TRIGGER tender_receipt_failure BEFORE INSERT ON commerce_market_sale_receipts WHEN NEW.operation_id='manual-tender-receipt' BEGIN SELECT RAISE(ABORT,'tender_receipt_failure'); END");
+      const beforeReceipt = state(); assert.throws(() => completeMarketSale(path, input("receipt", 5000)), /tender_receipt_failure/); assert.deepEqual(state(), beforeReceipt);
+      db.exec("DROP TRIGGER tender_receipt_failure");
+      const displayedDebt = debt;
+      runtime.recordCustomerCreditPayment(path, { customerId: customer, amountMinor: debt, currency: "TRY", paymentMethod: "cash" });
+      const beforeRace = state(); assert.throws(() => completeMarketSale(path, input("balance-race", 10000 + displayedDebt)), /borcunu aşamaz/); assert.deepEqual(state(), beforeRace);
+      setBusinessCapability(path, { capability: C.CUSTOMER_CREDIT, enabled: false });
+      for (const amount of [0, 5000, 11000]) { const before = state(); assert.throws(() => completeMarketSale(path, input(`gate-${amount}`, amount))); assert.deepEqual(state(), before); }
+      setBusinessCapability(path, { capability: C.CUSTOMER_CREDIT, enabled: true });
+      assert.equal(getRuntimeInventoryBalance(path, tenderProduct.id).quantity, 43);
     });
     check("profile switch and persisted capability navigation", () => {
       for (const profile of ["pension", "pension_restaurant", "restaurant"]) {
@@ -154,6 +210,31 @@ try {
         try { reopened.initialize(); assert.equal(buildNavigation(readBusinessCapabilitySnapshot(reopened.databasePath)).some(item => item.id === "market"), false); } finally { reopened.close(); }
 
       }
+    });
+    check("product activation IPC keeps fields, session gate and capability gate", () => {
+      const path = database.databasePath;
+      applyBusinessProfileCapabilities(path, "market");
+      const record = saveRuntimeCatalogProduct(path, { name: "Activation guard", salePrice: 31, sku: "ACTIVATE-GUARD", description: "Keep description", trackInventory: false, isActive: false });
+      const stored = () => db.prepare("SELECT * FROM catalog_products WHERE id = ?").get(record.id);
+      const before = stored();
+      const handlers = new Map(), api = {};
+      const ipcRequire = createRequire(resolve("apps/desktop-app/dist-electron/commerce-ipc.js"));
+      let locked = true, notifications = 0;
+      runInNewContext(readFileSync(resolve("apps/desktop-app/dist-electron/commerce-ipc.js"), "utf8"), {
+        exports: api, Error, require: id => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } }
+          : id === "./desktop-logger" ? { desktopLog: { warn() {} } } : ipcRequire(id)
+      });
+      api.registerCommerceIpcHandlers({ databasePath: () => path, assertUnlocked: () => { if (locked) throw new Error("Uygulama kilitli."); }, onMutation: () => { notifications++; } });
+      const activate = () => handlers.get("commerce:product:activate")({}, record.id);
+      assert.throws(activate, /kilitli/); assert.deepEqual(stored(), before); assert.equal(notifications, 0);
+      locked = false; assert.equal(activate().ok, true); assert.equal(notifications, 1);
+      const after = stored(); assert.equal(after.is_active, 1);
+      assert.deepEqual({ ...after, is_active: 0, updated_at: "" }, { ...before, updated_at: "" });
+      activateCatalogProduct(path, record.id); assert.deepEqual(stored(), after);
+      deleteCatalogProduct(path, record.id); const deleted = stored();
+      assert.throws(() => activateCatalogProduct(path, record.id), /bulunamadı/); assert.deepEqual(stored(), deleted);
+      applyBusinessProfileCapabilities(path, "pension");
+      assert.throws(activate, /etkin değil/); assert.equal(notifications, 1);
     });
   } finally { db.close(); }
 } finally { database.close(); rmSync(dataDir, { recursive: true, force: true }); }

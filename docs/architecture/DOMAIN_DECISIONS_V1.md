@@ -403,7 +403,19 @@ the profile into a pricing engine.
 
 **Status:** ACCEPTED (2026-10-03)
 
-Manual wholesale order UX may preview the customer's current price group, but the renderer
+The Yeni İşlem workspace owns one cart and customer selection for Sale and Order modes.
+Sale uses the existing Market checkout operation; Order uses canonical `createOrder`.
+Desktop orders require ORDERS and a registered Customer, independently of WHOLESALE.
+Dealer pricing and dealer access retain their WHOLESALE gates. The management-only
+Siparişler workspace owns order selection, status, fulfillment and shipments.
+Phone sale drafts cannot enter Order mode until their lifecycle has explicit support.
+An uncertain create response retains and locks the cart and immutable source reference
+for retry; only a verified success clears the cart. Desktop `createOrder` passes
+the existing IPC result envelope through preload, because contextBridge drops custom
+Error identity. A typed rejection allows correction; thrown/unknown responses retain
+the immutable request, even when current prices or customer data can no longer load.
+
+The shared workspace may preview the customer's current price group, but the renderer
 does not own pricing. Adding a product asks the centralized commerce pricing service for a
 typed resolved price. Creating the order resolves the price again inside the database
 transaction and snapshots that backend result into the order item.
@@ -412,8 +424,8 @@ This deliberately tolerates a product/customer price change between draft compos
 save: the persisted order reflects the authoritative price at save time. The created order
 response is therefore the final total.
 
-Manual dealer orders use the shared `commerce.orders` aggregate with source
-`desktop-wholesale`. Confirmation does not create a Sale, inventory movement, payment or
+Desktop orders use the shared `commerce.orders` aggregate with source
+`desktop`; existing orders retain their original channel source. Confirmation does not create a Sale, inventory movement, payment or
 shipment. Those side effects remain deferred to an explicit fulfillment/application slice.
 
 ## D-025 — Fulfillment owns Order → Sale atomically
@@ -1679,3 +1691,36 @@ presentation. OFF retains translations and withdraws language metadata through t
 same ordered publication lifecycle. Current schema only; no historical upgrade path.
 
 See [Web data service contract v1](WEB_DATA_SERVICE_CONTRACT_V1.md#çok-dilli-public-veri).
+
+
+## D-052 — Quick Sale tender settles the new sale before existing customer debt
+
+**Status:** ACCEPTED
+
+Desktop Quick Sale may specify an explicit non-negative tender in integer minor units.
+The canonical sale writer resolves current customer prices, discount, currency and stock
+before the application operation decides settlement. The renderer may send price/currency
+expectations for a manually entered tender; a mismatch rejects the entire operation.
+
+Tender below the new sale total requires an active customer and persisted customer-credit
+capability. The sale remains `credit`: the existing ledger records the full sale debit and
+the received amount as a customer payment. Only the received amount creates finance income.
+There is no new sale-allocation ledger and later collections do not rewrite sale status.
+
+Tender equal to the new sale total uses the existing `paid` sale and finance projection.
+Excess tender uses that same paid sale plus a customer-level collection against existing
+debt in the sale currency. Excess beyond that debt is rejected; advance/negative balances
+remain unsupported. Transfer chips map to the existing `bank` collection method.
+
+Sale, stock, debit, collection, finance and durable operation receipt share one transaction.
+Explicit tender requires an operation id and participates in the receipt fingerprint; a retry replays every effect once. A source
+phone draft keeps the same acknowledgement/review lifecycle. Omitted tender preserves
+existing paid/credit callers, including Android. The Veresiye chip represents zero tender.
+
+The selected customer's current debt is visible independently of the payment chip whenever
+customer-credit capability is enabled. Total debt combines the new sale after discount
+with the selected customer's existing debt in the sale currency. Untouched tender defaults
+to that combined total; account reads must finish before payment can be confirmed, and a
+manual tender is retained until explicitly changed or the sale/session is cleared.
+Historical M8 scope exclusions in
+`MODULAR_BUSINESS_FOUNDATION.md` are extended by this decision for Desktop Quick Sale only.
