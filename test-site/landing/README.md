@@ -28,6 +28,12 @@ bağlantısını gösterir. Native `details` menü Enter/Space/Tab ile kullanıl
 Özellik ve kılavuz görselleri native `dialog` ile büyür; sağ/sol oklar ve Escape desteklenir,
 kapanış odağı açan bağlantıya döndürür. Profil kartları açılan alanı `aria-expanded` ile bildirir.
 
+Tek kolonlu mobil görünüm (≤540 px) beş öne çıkan özellikle açılır; seçim günlük iş,
+konaklama/servis, satış ve Android kategorilerini kapsar. Tümü ve kategori düğmeleri
+tüm özelliklere erişir; açık kullanıcı seçimi pencere genişliği değişince korunur.
+Masaüstü ve tablet başlangıçta tüm özellikleri gösterir. Öne çıkan kartlar merkezi
+içerikteki `featured` alanıyla belirlenir.
+
 
 ## Demo anahtarı sınırı
 
@@ -68,6 +74,13 @@ npm run verify:check -- package-web-module
 
 Showcase smoke gerçek PHP/SQLite ve Desktop publication servisleriyle menü, availability, demo-only secret,
 çoklu görsel, edit/reorder/remove/add/unpublish, route'lar, mobil menü ve reduced-motion davranışını doğrular.
+
+Önizlemeler `artifacts/showcase/desktop.png` ve `mobile.png` yanında 320/768 px,
+TR/EN ve tüm kartları açık mobil görüntüleri içerir. Smoke sayfayı kontrollü
+kaydırır, görünür her görselde `complete`, `naturalWidth > 0` ve `decode()`
+sonucunu doğrular; sabit yükleme beklemesi kullanmaz. `image-checks.json`
+doğrulanan görselleri listeler. Önizleme DOM'una eklenen DEMO etiketleri yorum,
+iletişim ve paket fixture'larını belirtir; üretim sayfasına veya API'ye eklenmez.
 
 Mağaza `/magaza/` sayfası `inc/storefront.php` ve `assets/css/storefront.css`,
 `assets/js/storefront.js` dosyalarını kullanır. `data-api-base="/yardimci-asistan/api/"`

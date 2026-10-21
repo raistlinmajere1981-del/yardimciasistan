@@ -22,10 +22,29 @@
     profileDetails.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   }));
   document.querySelector('[data-profile-close]')?.addEventListener('click', closeProfile);
-  document.querySelectorAll('[data-feature-filter]').forEach(button => button.addEventListener('click', () => {
-    document.querySelectorAll('[data-feature-filter]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-    document.querySelectorAll('[data-feature-group]').forEach(card => { card.hidden = button.dataset.featureFilter !== 'all' && card.dataset.featureGroup !== button.dataset.featureFilter; });
+  const filters = [...document.querySelectorAll('[data-feature-filter]')];
+  const features = [...document.querySelectorAll('[data-feature-group]')];
+  const mobileFeatures = matchMedia('(max-width: 540px)');
+  // Only the single-column view starts with a balanced editorial selection.
+  // An explicit category or "all" choice survives viewport changes.
+  let selectedFilter = null;
+  function renderFeatures() {
+    const selected = selectedFilter ?? (mobileFeatures.matches ? 'featured' : 'all');
+    const filter = selected === 'featured' && !mobileFeatures.matches ? 'all' : selected;
+    filters.forEach(button => {
+      button.hidden = button.dataset.featureFilter === 'featured' && !mobileFeatures.matches;
+      button.setAttribute('aria-pressed', String(button.dataset.featureFilter === filter));
+    });
+    features.forEach(card => {
+      card.hidden = filter === 'featured' ? card.dataset.featured !== 'true' : filter !== 'all' && card.dataset.featureGroup !== filter;
+    });
+  }
+  filters.forEach(button => button.addEventListener('click', () => {
+    selectedFilter = button.dataset.featureFilter;
+    renderFeatures();
   }));
+  mobileFeatures.addEventListener('change', renderFeatures);
+  renderFeatures();
 
   const anchors = [...document.querySelectorAll('a[data-gallery-image]')];
   if (!anchors.length) return;

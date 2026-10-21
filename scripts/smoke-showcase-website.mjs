@@ -11,6 +11,58 @@ import http from 'node:http';
 import { chromium, expect } from '@playwright/test';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { marketingFixture, imageBytes, editorialInput } from './test-helpers/marketing-fixtures.mjs';
+// Full-page screenshots do not trigger loading="lazy" below the viewport.
+// Visit every viewport, wait for actual image decoding, then return to the top.
+async function loadPreviewImages(page) {
+  await page.evaluate(() => document.fonts.ready);
+  let reachedBottom = false;
+  for (let step = 0; step < 200; step++) {
+    reachedBottom = await page.evaluate(async step => {
+      const offset = step * Math.max(1, Math.floor(innerHeight * .75));
+      scrollTo({ top: offset, behavior: 'instant' });
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+      return scrollY + innerHeight >= document.documentElement.scrollHeight - 1;
+    }, step);
+    const inView = page.locator('img:visible');
+    for (const img of await inView.all()) {
+      const intersects = await img.evaluate(node => { const r = node.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+      if (!intersects) continue;
+      const src = await img.getAttribute('src');
+      await expect.poll(() => img.evaluate(node => node.complete && node.naturalWidth > 0), { message: `Image failed to load: ${src}`, timeout: 10000 }).toBe(true);
+      await img.evaluate(node => node.decode());
+    }
+    if (reachedBottom) break;
+  }
+  assert.ok(reachedBottom, 'Preview scroll must reach the end of the page');
+  await expect.poll(() => page.locator('img:visible').evaluateAll(nodes => nodes.filter(node => !node.complete || node.naturalWidth === 0).map(node => node.getAttribute('src'))), { message: 'All rendered images must be loaded before capture' }).toEqual([]);
+  const images = await page.locator('img:visible').evaluateAll(nodes => nodes.map(node => ({ src: new URL(node.currentSrc).pathname, width: node.naturalWidth, height: node.naturalHeight })));
+  await page.evaluate(async () => {
+    scrollTo({ top: 0, behavior: 'instant' });
+    await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  return images;
+}
+
+// Preview-only labels: fixtures and the live site's publication path stay intact.
+async function labelPreviewFixtures(page, language) {
+  await page.evaluate(english => {
+    const notice = document.createElement('aside');
+    notice.dataset.previewNotice = '';
+    notice.textContent = english
+      ? 'DEMO PREVIEW · Reviews, contact details and download files are isolated test fixtures, not real customer reviews or installable packages.'
+      : 'DEMO ÖNİZLEME · Yorumlar, iletişim bilgileri ve indirme dosyaları izole test verileridir; gerçek müşteri yorumu veya kurulabilir paket değildir.';
+    notice.style.cssText = 'padding:12px 20px;background:var(--cream);color:var(--navy);border-bottom:1px solid var(--line);font:600 12px/1.6 var(--sans);text-align:center';
+    document.body.prepend(notice);
+    for (const host of document.querySelectorAll('[data-google-reviews], .site-footer [data-business-address]')) {
+      const label = document.createElement('p');
+      label.textContent = english ? 'DEMO · Isolated sample data' : 'DEMO · İzole örnek veriler';
+      label.style.cssText = 'font-weight:700;font-size:13px;color:var(--ocean)';
+      (host.matches('[data-business-address]') ? host.parentElement : host).prepend(label);
+    }
+  }, language === 'en');
+  await expect(page.locator('[data-preview-notice]')).toBeVisible();
+}
+
 const require = createRequire(import.meta.url);
 const { PhpHostingSyncTransport } = require('../packages/sync-core/dist');
 const { SyncCoordinator } = require('../apps/desktop-app/dist-electron/sync-coordinator.js');
@@ -92,6 +144,11 @@ try {
   await expect(page.locator('[data-feature-group]:visible')).toHaveCount(2);
   await page.locator('[data-feature-filter="all"]').click(); await expect(page.locator('[data-feature-group]:visible')).toHaveCount(11);
   const provenance = JSON.parse(readFileSync('test-site/landing/assets/showcase/sources.json', 'utf8'));
+  for (const image of provenance.images) {
+    const bytes = readFileSync(join('test-site/landing/assets/showcase', image.file));
+    assert.equal(bytes.length, image.bytes, `Missing or changed showcase asset: ${image.file}`);
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', image.file);
+  }
   assert.ok(provenance.images.every(image => image.bytes < 100000));
   assert.ok(provenance.images.reduce((sum, image) => sum + image.bytes, 0) < 600000);
   const surfaces = [
@@ -299,24 +356,105 @@ try {
   await page.locator('.guide-task a[data-gallery-image]').first().click();
   await expect(page.locator('dialog.showcase-gallery')).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.goto(base); for (const width of [375, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow ${width}`); }
-  await page.setViewportSize({ width: 375, height: 900 }); await page.locator('[data-menu-toggle]').click(); await expect(page.locator('[data-site-nav]')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.locator('[data-site-nav]')).toBeHidden();
-  await page.emulateMedia({ reducedMotion: 'reduce' }); assert.equal(await page.locator('.showcase-hero-image').evaluate(node => getComputedStyle(node).animationName), 'none');
-  await page.emulateMedia({ reducedMotion: 'no-preference' }); assert.equal(await page.locator('.showcase-hero-image').evaluate(node => getComputedStyle(node).animationName), 'none');
   // Existing Google normalizer remains the source of visitor data; provider calls stay mocked.
   const reviewsRaw = { rating: 4.8, userRatingCount: 42, googleMapsUri: 'https://maps.google.com/', googleMapsLinks: { reviewsUri: 'https://www.google.com/maps/place/example/data=!9m1!1b1' }, reviews: Array.from({ length: 4 }, (_, i) => ({ rating: 5, text: { text: `Örnek yorum ${i}` }, authorAttribution: { displayName: `Ziyaretçi ${i}` } })) };
   const normalized = spawnSync('php', ['-r', 'require $argv[1]; echo json_encode(ya_google_reviews_normalize_place(json_decode($argv[2],true),5));', resolve('firm-template/web-module/lib/google-reviews.php'), JSON.stringify(reviewsRaw)], { encoding: 'utf8' }); assert.equal(normalized.status, 0); assert.equal(JSON.parse(normalized.stdout).reviews_uri, reviewsRaw.googleMapsLinks.reviewsUri);
   await page.route('**/api/google-reviews.php', route => route.fulfill({ contentType: 'application/json', body: normalized.stdout }));
-  await page.reload(); await expect(page.locator('[data-google-rating]')).toContainText('4,8'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
+  await page.goto(base); await expect(page.locator('[data-google-rating]')).toContainText('4,8'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
   await page.goto(base + '/?lang=en'); await expect(page.locator('[data-google-rating]')).toContainText('4.8');
   await expect(page.locator('[data-google-rating]')).toContainText('42 reviews');
   await expect(page.locator('[data-google-review-list] blockquote').first()).toContainText('Örnek yorum 0');
   await page.goto(base + '/?lang=tr');
   await page.goto(base + '/yorumlar/'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(4);
-  await page.goto(base);
-  mkdirSync('artifacts/showcase', { recursive: true }); await page.screenshot({ path: 'artifacts/showcase/mobile.png', fullPage: true }); await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: 'artifacts/showcase/desktop.png', fullPage: true });
+  const previews = [];
+  for (const language of ['tr', 'en']) {
+    for (const width of [320, 375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto(`${base}/?lang=${language}`);
+      await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
+      const cards = page.locator('[data-feature-group]:visible');
+      await expect(cards).toHaveCount(width <= 540 ? 5 : 11);
+      await expect(page.locator('[data-feature-filter][aria-pressed="true"]')).toHaveAttribute('data-feature-filter', width <= 540 ? 'featured' : 'all');
+      if (width <= 540) {
+        assert.deepEqual(new Set(await cards.evaluateAll(nodes => nodes.map(node => node.dataset.featureGroup))), new Set(['daily', 'hospitality', 'sales', 'mobile']));
+        await expect(page.locator('[data-feature-filter="featured"]')).toHaveText(language === 'en' ? 'Highlights' : 'Öne çıkanlar');
+      }
+      // Use the keyboard for menus, filters, profiles and gallery controls.
+      if (width < 1100) {
+        await page.locator('[data-menu-toggle]').focus(); await page.keyboard.press('Enter');
+      }
+      const live = page.locator('[data-live-menu]>summary');
+      await live.focus(); await page.keyboard.press('Space');
+      await expect(page.locator('[data-live-menu] a').first()).toBeVisible();
+      await page.keyboard.press('Escape'); await expect(page.locator('[data-live-menu]')).not.toHaveAttribute('open', '');
+      if (width < 1100) { await page.keyboard.press('Escape'); await expect(page.locator('[data-site-nav]')).toBeHidden(); }
+      for (const [filter, count] of [['daily', 3], ['hospitality', 2], ['sales', 4], ['mobile', 2], ['all', 11]]) {
+        const button = page.locator(`[data-feature-filter="${filter}"]`);
+        await button.focus(); await page.keyboard.press('Enter'); await expect(cards).toHaveCount(count);
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+      }
+      if (width <= 540) {
+        await page.locator('[data-feature-filter="featured"]').focus(); await page.keyboard.press('Enter');
+        await expect(cards).toHaveCount(5);
+      }
+      for (const profile of await page.locator('[data-profile]').all()) {
+        await profile.focus(); await page.keyboard.press('Enter');
+        const opener = page.locator('[data-profile-panel]:visible a[data-gallery-image]').first();
+        await opener.focus(); await page.keyboard.press('Enter');
+        const gallery = page.locator('dialog.showcase-gallery');
+        await expect(gallery).toBeVisible();
+        await expect.poll(() => gallery.locator('img').evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
+        assert.ok(await gallery.evaluate(node => { const r = node.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }), `gallery bounds ${width} ${language}`);
+        await page.keyboard.press('Escape'); await expect(gallery).not.toBeVisible(); await expect(opener).toBeFocused();
+        // Let the browser finish native dialog focus restoration before Tab.
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        await page.keyboard.press('Shift+Tab');
+        await expect(page.locator('[data-profile-close]'), `Close profile: ${width}/${language}/${await profile.getAttribute('data-profile')}`).toBeFocused();
+        await page.keyboard.press('Enter'); await expect(profile).toHaveAttribute('aria-expanded', 'false'); await expect(profile).toBeFocused();
+      }
+      // Restore the initial selection for the visual review, including lazy images.
+      await page.reload();
+      await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
+      await labelPreviewFixtures(page, language);
+      await page.locator('[data-showcase-avatar]').scrollIntoViewIfNeeded();
+      const heroRig = page.locator('[data-showcase-avatar] svg[data-nexa-rig]');
+      await expect(heroRig).toHaveAttribute('data-nexa-state', 'ready');
+      await expect(heroRig).toHaveAttribute('data-motion-active', 'true');
+      assert.ok(await page.locator('[data-showcase-avatar]').evaluate(node => {
+        const r = node.getBoundingClientRect(), p = node.parentElement.getBoundingClientRect();
+        const bubble = node.querySelector('.showcase-avatar-speech-slot').getBoundingClientRect();
+        const stage = node.querySelector('.showcase-avatar-stage');
+        return r.left >= p.left && r.right <= p.right && bubble.left >= r.left && bubble.right <= r.right && parseFloat(getComputedStyle(stage, '::after').top) > stage.querySelector('.showcase-avatar-character').getBoundingClientRect().height;
+      }), `hero bounds and ground ${width} ${language}`);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(heroRig).toHaveAttribute('data-motion-active', 'false');
+      const images = await loadPreviewImages(page);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `homepage overflow ${width} ${language}`);
+      await expect(page.locator('a.download-card')).toHaveCount(4);
+      const suffix = language === 'tr' ? '' : '-en';
+      const name = width === 1440 ? `desktop${suffix}` : width === 375 ? `mobile${suffix}` : `home-${width}${suffix}`;
+      await page.screenshot({ path: `artifacts/showcase/${name}.png`, fullPage: true });
+      await page.screenshot({ path: `artifacts/showcase/hero-${width}${suffix}.png` });
+      // Sticky chrome belongs in the full-page preview, not across a tall section crop.
+      await page.locator('#ozellikler').screenshot({ path: `artifacts/showcase/features-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
+      previews.push({ language, width, images });
+      if (width === 375) {
+        await page.locator('[data-feature-filter="all"]').click();
+        const expanded = await loadPreviewImages(page);
+        assert.equal(await page.locator('[data-feature-group]:visible').count(), 11);
+        await page.screenshot({ path: `artifacts/showcase/mobile-all${suffix}.png`, fullPage: true });
+        previews.push({ language, width, selection: 'all', images: expanded });
+        // Resizing respects an explicit choice rather than resetting the list.
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.setViewportSize({ width: 375, height: 900 });
+        await expect(cards).toHaveCount(11);
+      }
+    }
+  }
+  writeFileSync('artifacts/showcase/image-checks.json', JSON.stringify(previews, null, 2) + '\n');
   assert.deepEqual(errors, []);
   assert.deepEqual(assetErrors, []);
   assert.deepEqual(consoleErrors, []);
-  console.log('Showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
+  console.log('TR/EN previews at 320/375/768/1440, decoded lazy images, mobile highlights, keyboard galleries, avatar bounds, showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
 } finally { await browser?.close(); coordinator.stop(); php.kill(); await new Promise(r => php.once('exit', r)); f.dispose(); rmSync(root, { recursive: true, force: true }); }

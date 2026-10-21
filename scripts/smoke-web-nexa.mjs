@@ -202,6 +202,30 @@ try {
         noPageOverflow: document.documentElement.scrollWidth <= innerWidth,
       };
     })).toEqual({ width: 144, inside: true, groundBelow: true, noPageOverflow: true });
+    if (language === 'tr') {
+      // Count distinct animated poses rather than assuming every browser frame
+      // mutates the SVG. Shared natural motion is capped near 30 poses/second.
+      const rate = await heroRig.evaluate(async rig => {
+        const presence = rig.querySelector('[data-part="presence"]');
+        let changes = 0, previous = presence.getAttribute('transform');
+        const start = performance.now();
+        await new Promise(done => {
+          function sample(now) {
+            const current = presence.getAttribute('transform');
+            if (current !== previous) { changes++; previous = current; }
+            if (now - start >= 1000) done(); else requestAnimationFrame(sample);
+          }
+          requestAnimationFrame(sample);
+        });
+        return changes * 1000 / (performance.now() - start);
+      });
+      expect(rate).toBeGreaterThan(0); expect(rate).toBeLessThanOrEqual(33);
+      console.log(`Hero natural motion: ${rate.toFixed(1)} observed poses/second`);
+      await heroPage.evaluate(() => { document.querySelector('main').style.marginTop = '2000px'; });
+      await expect(heroRig).toHaveAttribute('data-motion-active', 'false');
+      await heroPage.evaluate(() => { document.querySelector('main').style.marginTop = '12px'; });
+      await expect(heroRig).toHaveAttribute('data-motion-active', 'true');
+    }
     await heroPage.emulateMedia({ reducedMotion: 'reduce' });
     await expect(heroRig).toHaveAttribute('data-motion-active', 'false');
     const restingHero = await heroRig.evaluate(element => element.outerHTML);
@@ -214,6 +238,28 @@ try {
     await heroPage.evaluate(() => window.dispatchEvent(new Event('pageshow')));
     await expect(heroRig).toBeVisible();
     await heroPage.close();
+  }
+  // Exercise the actual chat presentation at all publication-review widths.
+  nextResult = { ok: true, answer: 'İşletme yanıtı hazır.' };
+  for (const width of [320, 375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: "Yardımcı Asistan'ı aç" }).click();
+    await expect(page.locator('[data-nexa-role="welcome"] svg')).toHaveAttribute('data-motion-active', 'false');
+    await page.locator('[data-ya-view="info"]').click();
+    release = undefined;
+    await page.locator('.ya-widget-ai textarea').fill('Bir sorum var');
+    await page.locator('.ya-widget-ai button[type="submit"]').click();
+    await expect(speech).toBeVisible();
+    expect(await speech.evaluate(element => {
+      const r = element.getBoundingClientRect(), p = element.closest('.ya-widget-panel').getBoundingClientRect();
+      return r.left >= p.left && r.right <= p.right && p.left >= 0 && p.right <= innerWidth && p.top >= 0 && p.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth;
+    })).toBe(true);
+    await page.screenshot({ path: `artifacts/nexa-integration/web-thinking-${width}.png` });
+    await expect.poll(() => typeof release).toBe('function'); release();
+    await expect(page.locator('.ya-widget-ai-answer')).toContainText('İşletme yanıtı hazır.');
+    await page.getByRole('button', { name: 'Asistanı kapat' }).click();
+    await expect(root).toHaveAttribute('data-nexa-motion-active', 'false');
   }
   // A real SVG-unavailable browser uses the retained manifest URLs, resolved
   // beside widget.js even when the page and API live at different paths.

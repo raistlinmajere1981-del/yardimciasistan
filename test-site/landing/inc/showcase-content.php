@@ -6,15 +6,15 @@ declare(strict_types=1);
 function showcase_features(): array
 {
     return [
-        'customers' => ['title'=>'Müşteri yönetimi', 'text'=>'Müşteri kartlarını, talepleri ve iletişim geçmişini bir arada tutun.', 'image'=>'customers', 'group'=>'daily', 'guide'=>'musteri'],
-        'pension' => ['title'=>'Rezervasyon ve konaklama', 'text'=>'Oda durumundan giriş, çıkış ve konaklama hesabına aynı yerden ulaşın.', 'image'=>'pension', 'group'=>'hospitality', 'guide'=>'rezervasyon'],
-        'restaurant' => ['title'=>'Masa ve sipariş', 'text'=>'Açık masaları ve siparişleri takip edin, hesabı mevcut satış akışıyla kapatın.', 'image'=>'restaurant', 'group'=>'hospitality', 'guide'=>''],
+        'customers' => ['featured'=>true, 'title'=>'Müşteri yönetimi', 'text'=>'Müşteri kartlarını, talepleri ve iletişim geçmişini bir arada tutun.', 'image'=>'customers', 'group'=>'daily', 'guide'=>'musteri'],
+        'pension' => ['featured'=>true, 'title'=>'Rezervasyon ve konaklama', 'text'=>'Oda durumundan giriş, çıkış ve konaklama hesabına aynı yerden ulaşın.', 'image'=>'pension', 'group'=>'hospitality', 'guide'=>'rezervasyon'],
+        'restaurant' => ['featured'=>true, 'title'=>'Masa ve sipariş', 'text'=>'Açık masaları ve siparişleri takip edin, hesabı mevcut satış akışıyla kapatın.', 'image'=>'restaurant', 'group'=>'hospitality', 'guide'=>''],
         'products' => ['title'=>'Ürün, stok ve barkod', 'text'=>'Ürünleri düzenleyin, stok hareketlerini ve barkodlu ürünlerinizi yönetin.', 'image'=>'products', 'group'=>'sales', 'guide'=>'stok'],
-        'quick-sale' => ['title'=>'Hızlı satış ve kasa', 'text'=>'Ürünü okutun veya seçin, sepeti oluşturup ödemeyi tamamlayın.', 'image'=>'quick-sale', 'group'=>'sales', 'guide'=>'stok'],
+        'quick-sale' => ['featured'=>true, 'title'=>'Hızlı satış ve kasa', 'text'=>'Ürünü okutun veya seçin, sepeti oluşturup ödemeyi tamamlayın.', 'image'=>'quick-sale', 'group'=>'sales', 'guide'=>'stok'],
         'credit' => ['title'=>'Veresiye ve tahsilat', 'text'=>'Market müşterilerinin hesap hareketlerini ve tahsilatlarını takip edin.', 'image'=>'credit', 'group'=>'sales', 'guide'=>'musteri'],
         'finance' => ['title'=>'Finans ve raporlar', 'text'=>'Gelir, gider ve ödeme hareketlerini tarih aralığına göre inceleyin.', 'image'=>'finance', 'group'=>'daily', 'guide'=>''],
         'calendar' => ['title'=>'Takvim ve görevler', 'text'=>'Rezervasyonları ve günlük görevleri aynı takvimden açın.', 'image'=>'calendar', 'group'=>'daily', 'guide'=>''],
-        'companion' => ['title'=>'Android Companion', 'text'=>'Telefon erişimini Desktop’tan eşleştirin ve cihaz yetkilerini yönetin.', 'image'=>'companion', 'group'=>'mobile', 'guide'=>'android', 'note'=>'Desktop eşleştirme ekranı'],
+        'companion' => ['featured'=>true, 'title'=>'Android Companion', 'text'=>'Telefon erişimini Desktop’tan eşleştirin ve cihaz yetkilerini yönetin.', 'image'=>'companion', 'group'=>'mobile', 'guide'=>'android', 'note'=>'Desktop eşleştirme ekranı'],
         'wholesale' => ['title'=>'Toptan ve bayi', 'text'=>'Market profilinde bayi müşterilerini ve fiyat gruplarını isteğe bağlı açın.', 'image'=>'wholesale', 'group'=>'sales', 'guide'=>'musteri', 'note'=>'İsteğe bağlı'],
         'dealer' => ['title'=>'Bayi Android', 'text'=>'Davetli bayi girişi, katalog ve sipariş akışını pilot uygulamada deneyin.', 'image'=>'dealer', 'group'=>'mobile', 'guide'=>'', 'note'=>'Pilot'],
     ];
