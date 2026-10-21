@@ -190,6 +190,36 @@
         1310,
         710
       ]
+    },
+    {
+      "file": "translations.webp",
+      "width": 1200,
+      "height": 885,
+      "bytes": 24374,
+      "source": "/tmp/yardimci-translations-desktop-polished.png",
+      "uiOwner": "scripts/smoke-public-translations-ui.mjs / real Language Workspace",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        96,
+        70,
+        1344,
+        990
+      ]
+    },
+    {
+      "file": "requests.webp",
+      "width": 1192,
+      "height": 890,
+      "bytes": 44682,
+      "source": "artifacts/design-system/stage2a/final/1440-requests.png",
+      "uiOwner": "scripts/smoke-desktop-customer-pension.mjs / real Requests area",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        94,
+        1416,
+        984
+      ]
     }
   ]
 }

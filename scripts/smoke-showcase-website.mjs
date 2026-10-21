@@ -49,16 +49,10 @@ async function labelPreviewFixtures(page, language) {
     const notice = document.createElement('aside');
     notice.dataset.previewNotice = '';
     notice.textContent = english
-      ? 'DEMO PREVIEW · Reviews, contact details and download files are isolated test fixtures, not real customer reviews or installable packages.'
-      : 'DEMO ÖNİZLEME · Yorumlar, iletişim bilgileri ve indirme dosyaları izole test verileridir; gerçek müşteri yorumu veya kurulabilir paket değildir.';
+      ? 'DEMO PREVIEW · Download files are isolated test fixtures, not installable packages. Homepage examples are static presentation content.'
+      : 'DEMO ÖNİZLEME · İndirme dosyaları izole test verileridir; kurulum paketi değildir. Ana sayfa örnekleri sabit tanıtım içeriğidir.';
     notice.style.cssText = 'padding:12px 20px;background:var(--cream);color:var(--navy);border-bottom:1px solid var(--line);font:600 12px/1.6 var(--sans);text-align:center';
     document.body.prepend(notice);
-    for (const host of document.querySelectorAll('[data-google-reviews], .site-footer [data-business-address]')) {
-      const label = document.createElement('p');
-      label.textContent = english ? 'DEMO · Isolated sample data' : 'DEMO · İzole örnek veriler';
-      label.style.cssText = 'font-weight:700;font-size:13px;color:var(--ocean)';
-      (host.matches('[data-business-address]') ? host.parentElement : host).prepend(label);
-    }
   }, language === 'en');
   await expect(page.locator('[data-preview-notice]')).toBeVisible();
 }
@@ -106,7 +100,7 @@ try {
   assert.equal(await page.locator('script[type="module"]').count(), 0);
   assert.ok(!/Canlı Sistem|fixture|public API referansı|Canlı referans site/.test(await page.locator('body').innerText()));
   await expect(page.locator('[data-site-nav] a[href="/odalar/"]')).toHaveCount(0);
-  await expect(page.locator('[data-marketing-wrapper]')).toBeHidden();
+  await expect(page.locator('[data-marketing-wrapper], [data-marketing-surface], [data-google-reviews], [data-room-list]')).toHaveCount(0);
   await expect(page.locator('[data-showcase-section]')).toHaveCount(6);
   await expect(page.locator('[data-site-nav]>a')).toHaveCount(3);
   await expect(page.locator('[data-site-nav] a[href="/kullanim-kilavuzu/"]')).toHaveCount(0);
@@ -142,7 +136,7 @@ try {
   }
   await page.locator('[data-feature-filter="mobile"]').click();
   await expect(page.locator('[data-feature-group]:visible')).toHaveCount(2);
-  await page.locator('[data-feature-filter="all"]').click(); await expect(page.locator('[data-feature-group]:visible')).toHaveCount(11);
+  await page.locator('[data-feature-filter="all"]').click(); await expect(page.locator('[data-feature-group]:visible')).toHaveCount(13);
   const provenance = JSON.parse(readFileSync('test-site/landing/assets/showcase/sources.json', 'utf8'));
   for (const image of provenance.images) {
     const bytes = readFileSync(join('test-site/landing/assets/showcase', image.file));
@@ -151,22 +145,50 @@ try {
   }
   assert.ok(provenance.images.every(image => image.bytes < 100000));
   assert.ok(provenance.images.reduce((sum, image) => sum + image.bytes, 0) < 600000);
+  // Compare the server-rendered introduction, excluding header availability,
+  // installation metadata/secret and the real chat. No runtime publication is written.
+  const introduction = async () => {
+    const html = await (await fetch(base)).text();
+    const start = html.indexOf('<div class="showcase-v2">');
+    const end = html.indexOf('<section class="section installation-section"', start);
+    assert.ok(start >= 0 && end > start);
+    return html.slice(start, end);
+  };
+  const staticIntroduction = await introduction();
+  await expect(page.locator('[data-showcase-product]')).toHaveCount(18);
+  await expect(page.locator('[data-showcase-catalog] button, [data-showcase-catalog] form')).toHaveCount(0);
+  await expect(page.locator('.service-grid')).toContainText('Teslimat ve kargo');
+  await expect(page.locator('.service-grid')).toContainText('AI çeviri ve Dil Yönetimi');
+  await expect(page.locator('.feature-grid')).toContainText('Bayi Android');
+  await expect(page.locator('[data-profile="market"]')).toContainText('Toptan');
+  await page.route('**/api/**', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }));
+  await page.reload();
+  await expect(page.locator('[data-showcase-product]')).toHaveCount(18);
+  await expect(page.locator('[data-feature-group]')).toHaveCount(13);
+  await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
+  await expect(page.locator('a.download-card')).toHaveCount(4);
+  assert.equal(await introduction(), staticIntroduction, 'API outage must not change the introduction');
+  await page.unroute('**/api/**');
   const surfaces = [
     ['room_catalog', 'rooms', '/odalar/'], ['table_catalog', 'restaurant', '/restoran/'],
     ['menu', 'qr_menu', '/qr-menu/'], ['online_catalog', 'store', '/magaza/']
   ];
   const assertSurfaces = async (visible) => {
     await page.goto(base);
+    await expect(page.locator('[data-showcase-catalog]')).toBeVisible();
+    await expect(page.locator('[data-showcase-product]:visible')).toHaveCount(18);
     const business = (await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business;
     for (const [, surface, path] of surfaces) {
       await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(visible ? 1 : 0);
-      await expect(page.locator(`.demo-surface-card a[href="${path}"]`)).toHaveCount(visible ? 1 : 0);
+      await expect(page.locator(`.demo-surface-card a[href="${path}"]`)).toHaveCount(1);
+      assert.equal(await introduction(), staticIntroduction, `Publication availability must not change the introduction: ${surface}`);
       assert.equal(business.public_surfaces.includes(surface), visible, surface);
     }
   };
   await assertSurfaces(false);
   await page.goto(base + '/magaza/');
   await expect(page.locator('#catalog-state')).toContainText('online sipariş almıyor');
+  await expect(page.locator('.product-card, [data-showcase-product]')).toHaveCount(0);
   await expect(page.locator('.site-header')).toBeVisible();
   // Android disabled/empty capabilities cannot hide independently enabled Web publications.
   seed('android_snapshot', { enabled: false, business_capabilities: [] });
@@ -325,9 +347,14 @@ try {
   await expect(page.getByRole('button', { name: 'Sepete ekle' })).toBeDisabled();
   const pickupFixture = new DatabaseSync(f.db.databasePath);
   try { pickupFixture.exec('UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0'); } finally { pickupFixture.close(); }
+  saveRuntimeCatalogProduct(f.db.databasePath, { id: product.id, name: 'Updated live product', salePrice: 75, trackInventory: false });
   const pickupPublish = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 5, idempotencyKey: 'showcase-pickup-on-5' });
   assert.equal(pickupPublish.ok, true, pickupPublish.message);
   await page.reload();
+  await expect(page.locator('.product-card')).toHaveCount(1);
+  await expect(page.locator('.product-card')).toContainText('Updated live product');
+  await expect(page.locator('.product-card')).not.toContainText('Canonical showcase product');
+  await expect(page.locator('[data-showcase-product]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sepete ekle' })).toBeEnabled();
   await assertSurfaces(true);
   setBusinessCapability(f.db.databasePath, { capability: 'channel.online_sales', enabled: false });
@@ -335,17 +362,23 @@ try {
   assert.equal(onlineWithdrawal.ok, true, onlineWithdrawal.message);
   await page.goto(base);
   await expect(page.locator('[data-site-nav] a[href="/magaza/"]')).toHaveCount(0);
-  await expect(page.locator('.demo-surface-card a[href="/magaza/"]')).toHaveCount(0);
+  await expect(page.locator('.demo-surface-card a[href="/magaza/"]')).toHaveCount(1);
+  assert.equal(await introduction(), staticIntroduction);
+  await page.goto(base + '/magaza/');
+  await expect(page.locator('.product-card, [data-showcase-product]')).toHaveCount(0);
   assert.equal((await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business.public_surfaces.includes('store'), false);
   const a = f.media.importBytes(imageBytes, 'upload'), b = f.media.importBytes(imageBytes, 'upload'), c = f.media.importBytes(imageBytes, 'upload');
   const content = f.service.saveContent(editorialInput());
   let publication = f.service.savePublication({ contentId: content.content.id, channel: 'website', placement: 'homepage_feature', title: 'Demo kampanya', text: 'İlk paylaşım', mediaAssetIds: [a.id, b.id] });
   publication = f.service.publish(publication.id, publication.revision); await push();
-  for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('.ya-marketing-card')).toHaveCount(1); await expect(page.locator('.ya-marketing-gallery img')).toHaveCount(2); }
+  for (const route of ['/duyurular/']) { await page.goto(base + route); await expect(page.locator('.ya-marketing-card')).toHaveCount(1); await expect(page.locator('.ya-marketing-gallery img')).toHaveCount(2); }
+  assert.equal(await introduction(), staticIntroduction, 'Published campaign must not enter the introduction');
   publication = f.db.listMarketingPublications()[0]; publication = f.service.savePublication({ ...publication, expectedRevision: publication.revision, text: 'Yeni metin', mediaAssetIds: [b.id, c.id] }); await push();
-  for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('.ya-marketing-text')).toHaveText('Yeni metin'); const urls = await page.locator('.ya-marketing-gallery img').evaluateAll(nodes => nodes.map(n => n.src)); assert.ok(urls[0].includes(b.id)); assert.ok(urls[1].includes(c.id)); }
+  for (const route of ['/duyurular/']) { await page.goto(base + route); await expect(page.locator('.ya-marketing-text')).toHaveText('Yeni metin'); const urls = await page.locator('.ya-marketing-gallery img').evaluateAll(nodes => nodes.map(n => n.src)); assert.ok(urls[0].includes(b.id)); assert.ok(urls[1].includes(c.id)); }
+  assert.equal(await introduction(), staticIntroduction, 'Campaign edit must not change the introduction');
   publication = f.db.listMarketingPublications()[0]; f.service.unpublish(publication.id, publication.revision); await push();
-  for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('[data-marketing-surface]')).toBeHidden(); await expect(page.locator('.ya-marketing-card')).toHaveCount(0); }
+  for (const route of ['/duyurular/']) { await page.goto(base + route); await expect(page.locator('[data-marketing-surface]')).toBeHidden(); await expect(page.locator('.ya-marketing-card')).toHaveCount(0); }
+  assert.equal(await introduction(), staticIntroduction, 'Withdrawal must not change the introduction');
   for (const route of ['/odalar/', '/odalar/oda/', '/restoran/', '/restoran/masa/', '/yorumlar/', '/iletisim/', '/kullanim-kilavuzu/', '/magaza/', '/duyurular/', '/bayi/']) { const response = await page.goto(base + route); assert.equal(response.status(), 200); await expect(page.locator('#demo-sync-secret')).toHaveCount(0); assert.ok(!(await response.text()).includes(secret)); }
   const redirect = await page.request.get(base + '/kurulum/?lang=en', { maxRedirects: 0 });
   assert.equal(redirect.status(), 301); assert.equal(redirect.headers().location, '/?lang=en#kurulum');
@@ -360,8 +393,8 @@ try {
   const reviewsRaw = { rating: 4.8, userRatingCount: 42, googleMapsUri: 'https://maps.google.com/', googleMapsLinks: { reviewsUri: 'https://www.google.com/maps/place/example/data=!9m1!1b1' }, reviews: Array.from({ length: 4 }, (_, i) => ({ rating: 5, text: { text: `Örnek yorum ${i}` }, authorAttribution: { displayName: `Ziyaretçi ${i}` } })) };
   const normalized = spawnSync('php', ['-r', 'require $argv[1]; echo json_encode(ya_google_reviews_normalize_place(json_decode($argv[2],true),5));', resolve('firm-template/web-module/lib/google-reviews.php'), JSON.stringify(reviewsRaw)], { encoding: 'utf8' }); assert.equal(normalized.status, 0); assert.equal(JSON.parse(normalized.stdout).reviews_uri, reviewsRaw.googleMapsLinks.reviewsUri);
   await page.route('**/api/google-reviews.php', route => route.fulfill({ contentType: 'application/json', body: normalized.stdout }));
-  await page.goto(base); await expect(page.locator('[data-google-rating]')).toContainText('4,8'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
-  await page.goto(base + '/?lang=en'); await expect(page.locator('[data-google-rating]')).toContainText('4.8');
+  await page.goto(base + '/yorumlar/'); await expect(page.locator('[data-google-rating]')).toContainText('4,8'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(4);
+  await page.goto(base + '/yorumlar/?lang=en'); await expect(page.locator('[data-google-rating]')).toContainText('4.8');
   await expect(page.locator('[data-google-rating]')).toContainText('42 reviews');
   await expect(page.locator('[data-google-review-list] blockquote').first()).toContainText('Örnek yorum 0');
   await page.goto(base + '/?lang=tr');
@@ -372,9 +405,10 @@ try {
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await page.goto(`${base}/?lang=${language}`);
-      await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
+      await expect(page.locator('[data-google-review-list], [data-marketing-surface], [data-room-list]')).toHaveCount(0);
+      await expect(page.locator('[data-showcase-product]')).toHaveCount(18);
       const cards = page.locator('[data-feature-group]:visible');
-      await expect(cards).toHaveCount(width <= 540 ? 5 : 11);
+      await expect(cards).toHaveCount(width <= 540 ? 5 : 13);
       await expect(page.locator('[data-feature-filter][aria-pressed="true"]')).toHaveAttribute('data-feature-filter', width <= 540 ? 'featured' : 'all');
       if (width <= 540) {
         assert.deepEqual(new Set(await cards.evaluateAll(nodes => nodes.map(node => node.dataset.featureGroup))), new Set(['daily', 'hospitality', 'sales', 'mobile']));
@@ -389,7 +423,7 @@ try {
       await expect(page.locator('[data-live-menu] a').first()).toBeVisible();
       await page.keyboard.press('Escape'); await expect(page.locator('[data-live-menu]')).not.toHaveAttribute('open', '');
       if (width < 1100) { await page.keyboard.press('Escape'); await expect(page.locator('[data-site-nav]')).toBeHidden(); }
-      for (const [filter, count] of [['daily', 3], ['hospitality', 2], ['sales', 4], ['mobile', 2], ['all', 11]]) {
+      for (const [filter, count] of [['daily', 5], ['hospitality', 2], ['sales', 4], ['mobile', 2], ['all', 13]]) {
         const button = page.locator(`[data-feature-filter="${filter}"]`);
         await button.focus(); await page.keyboard.press('Enter'); await expect(cards).toHaveCount(count);
         await expect(button).toHaveAttribute('aria-pressed', 'true');
@@ -415,7 +449,8 @@ try {
       }
       // Restore the initial selection for the visual review, including lazy images.
       await page.reload();
-      await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
+      await expect(page.locator('[data-google-review-list], [data-marketing-surface], [data-room-list]')).toHaveCount(0);
+      await expect(page.locator('[data-showcase-product]')).toHaveCount(18);
       await labelPreviewFixtures(page, language);
       await page.locator('[data-showcase-avatar]').scrollIntoViewIfNeeded();
       const heroRig = page.locator('[data-showcase-avatar] svg[data-nexa-rig]');
@@ -438,17 +473,18 @@ try {
       await page.screenshot({ path: `artifacts/showcase/hero-${width}${suffix}.png` });
       // Sticky chrome belongs in the full-page preview, not across a tall section crop.
       await page.locator('#ozellikler').screenshot({ path: `artifacts/showcase/features-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
+      await page.locator('[data-showcase-catalog]').screenshot({ path: `artifacts/showcase/catalog-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
       previews.push({ language, width, images });
       if (width === 375) {
         await page.locator('[data-feature-filter="all"]').click();
         const expanded = await loadPreviewImages(page);
-        assert.equal(await page.locator('[data-feature-group]:visible').count(), 11);
+        assert.equal(await page.locator('[data-feature-group]:visible').count(), 13);
         await page.screenshot({ path: `artifacts/showcase/mobile-all${suffix}.png`, fullPage: true });
         previews.push({ language, width, selection: 'all', images: expanded });
         // Resizing respects an explicit choice rather than resetting the list.
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.setViewportSize({ width: 375, height: 900 });
-        await expect(cards).toHaveCount(11);
+        await expect(cards).toHaveCount(13);
       }
     }
   }
@@ -456,5 +492,5 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(assetErrors, []);
   assert.deepEqual(consoleErrors, []);
-  console.log('TR/EN previews at 320/375/768/1440, decoded lazy images, mobile highlights, keyboard galleries, avatar bounds, showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
+  console.log('Static homepage / live publication independence, 18 homepage-only sample products, TR/EN previews at 320/375/768/1440, decoded lazy images, mobile highlights, keyboard galleries, avatar bounds, showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
 } finally { await browser?.close(); coordinator.stop(); php.kill(); await new Promise(r => php.once('exit', r)); f.dispose(); rmSync(root, { recursive: true, force: true }); }

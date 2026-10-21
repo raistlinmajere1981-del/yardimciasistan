@@ -1,21 +1,43 @@
-# Yardımcı Asistan showcase / çalışma merkezi
+# Yardımcı Asistan tanıtım ve test merkezi
 
-`https://yardimciasistan.alwaysdata.net/` kişisel demo ve kurulum merkezidir.
+`https://yardimciasistan.alwaysdata.net/` tanıtım, kurulum ve kullanıcı yayını test merkezidir; reklam veya satış sitesi değildir.
 Tek aktif site kaynağı bu dizindir; Sayfa yapısı PHP'dir; asistan TypeScript kaynaklarından bu site için derlenir.
 
 ## Kaynak ve route sahipliği
 
-- `index.php`: altı bölümlü ürün vitrini; açılış, işletme profilleri, görsel özellikler, canlı web örnekleri, servisler ve kurulum.
-- `inc/showcase-content.php`: profil, özellik ve servis metinlerinin merkezi kaynağı. Yeni özellik mevcut kart/galeri düzenine eklenir; CMS veya ikinci bir capability sistemi değildir.
+- `index.php`: altı bölümlü sabit tanıtım; açılış, dört gerçek işletme profili, görsel özellikler, örnek web kataloğu/test sayfaları, servisler ve kurulum.
+- `inc/showcase-content.php`: profil, özellik, servis, test sayfası açıklamaları ve ana sayfaya özel örnek ürünlerin merkezi kaynağı. Yeni özellik mevcut kart/galeri düzenine eklenir; CMS veya ikinci bir capability sistemi değildir.
 - `inc/header.php`, `inc/footer.php`, `inc/site.php`: ortak PHP shell ve publication okunması.
 - `assets/css`, `assets/js`: responsive site, oda/masa/QR menü ve normalize Google yorumları.
 - `assets/showcase/*.webp`: gerçek uygulama bileşenlerinden alınan, örnek verili optimize ekranlar. `sources.json` kaynak, boyut ve kırpım bilgisini korur. Companion görseli Desktop cihaz eşleştirme ekranıdır; Bayi Android pilot olarak etiketlenir.
 - `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/magaza/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
-- `/duyurular/`: D4 marketing yayınının tümünü siteye ait renderer ile gösterir; ana sayfa ilk üç yayını gösterir.
+- `/duyurular/`: D4 marketing yayınının tümünü siteye ait renderer ile gösterir; ana sayfaya yayın içeriği taşınmaz.
 - `/#kurulum`: Windows x64/x86, Android Companion, Bayi Android pilot APK, demo bağlantısı ve üç kısa adım. `release.json` sürümü belirler; yalnız bu hostta `downloads/` altında mevcut, okunabilir ve dolu dosya indirilebilir. Linux yayın mekanizması/paketi bulunmadığından bağlantı üretilmez.
 - `/kurulum/`: dil tercihini koruyan 301 yönlendirmesi → `/?lang=tr|en#kurulum`.
 - `/kullanim-kilavuzu/`: başlangıç, rezervasyon, stok, Android eşleştirme ve müşteri adımları; eski route korunur. Ana menüde değil footer ve ilgili özelliklerde bulunur.
 - `/bayi/`: siteye ait bayi portalı; işlemler `/yardimci-asistan/api/dealer/` üzerinden yürür.
+
+## Sabit tanıtım ve gerçek yayın sınırı
+
+Ana sayfanın tanıtım bölümleri Desktop publication verisinden oluşturulmaz. Oda,
+duyuru ve Google yorum renderer'ları ana sayfada çalışmaz. İşletme adı, adresi,
+telefonu ve sosyal hesapları da ana sayfa footer'ına taşınmaz. Profil ve özellik
+metinleri, gerçek uygulamadan alınan örnek verili ekranlar ve temsili ürün çizimleri
+site kaynağına aittir; veriler değişse, yayın kaldırılsa veya API okunamasa da kalır.
+
+`showcase_sample_products()` içindeki 18 ürün yalnız `index.php` tanıtım kataloğunda
+render edilir. Sepet, fiyat hesaplama, sipariş, API yazma veya otomatik seed/yayın
+akışı yoktur. Canlı mağaza bu dosyayı kullanmaz; yalnız yayınlanmış katalog gelir.
+
+Ana sayfadaki sabit test sayfası kartları mevcut route'ları açıklar; yayının etkin
+olduğunu iddia etmez. Yayın bulunmadığında ilgili sayfa kendi boş durumunu gösterir;
+bayi portalı kendi davet/oturum/yetki kontrolünü korur. Header/footer'daki koşullu
+Canlı Sayfalar navigasyonu, gerçek sohbet ve kurulumun release/dosya/anahtar
+mekanizması mevcut dinamik sahiplerinde kalır. Yeni availability registry yoktur.
+
+Kullanıcı önce tanıtımı inceler, uygulamayı indirip demo adresi/anahtarını bağlar;
+Desktop'tan içerik yayınlar, ardından test sayfalarında düzenleme, kaldırma ve gerçek
+işlemlerin sonucunu kontrol eder. Publication/outbox/API/sipariş sözleşmeleri değişmez.
 
 ## Navigasyon sahipliği
 
@@ -74,13 +96,15 @@ npm run verify:check -- package-web-module
 
 Showcase smoke gerçek PHP/SQLite ve Desktop publication servisleriyle menü, availability, demo-only secret,
 çoklu görsel, edit/reorder/remove/add/unpublish, route'lar, mobil menü ve reduced-motion davranışını doğrular.
+Sabit tanıtımın publication açma/kapatma/düzenleme ve API kesintisinden bağımsızlığını;
+18 örnek ürünün canlı mağazaya sızmadığını da kontrol eder.
 
 Önizlemeler `artifacts/showcase/desktop.png` ve `mobile.png` yanında 320/768 px,
 TR/EN ve tüm kartları açık mobil görüntüleri içerir. Smoke sayfayı kontrollü
 kaydırır, görünür her görselde `complete`, `naturalWidth > 0` ve `decode()`
 sonucunu doğrular; sabit yükleme beklemesi kullanmaz. `image-checks.json`
-doğrulanan görselleri listeler. Önizleme DOM'una eklenen DEMO etiketleri yorum,
-iletişim ve paket fixture'larını belirtir; üretim sayfasına veya API'ye eklenmez.
+doğrulanan görselleri listeler. Önizleme DOM'una eklenen DEMO etiketleri indirme fixture'larını belirtir; üretim sayfasına veya API'ye eklenmez.
+Tanıtım kataloğunun örnek/temsili etiketi ise sitenin sabit içeriğinde her zaman bulunur.
 
 Mağaza `/magaza/` sayfası `inc/storefront.php` ve `assets/css/storefront.css`,
 `assets/js/storefront.js` dosyalarını kullanır. `data-api-base="/yardimci-asistan/api/"`

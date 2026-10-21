@@ -2,22 +2,23 @@
 require_once __DIR__ . '/inc/site.php';
 require_once __DIR__ . '/inc/showcase-content.php';
 $pageTitle = 'Yardımcı Asistan | Keşfet ve Dene';
-$pageScript = 'rooms.js';
-$features = showcase_features(); $profiles = showcase_profiles(); $available = site_availability();
+$pageScript = '';
+$isShowcaseHome = true;
+$features = showcase_features(); $profiles = showcase_profiles();
 require __DIR__ . '/inc/header.php';
 ?>
 <div class="showcase-v2">
 <section class="showcase-hero" data-showcase-section="welcome"><div class="shell showcase-hero-grid">
-    <div class="hero-copy"><p class="eyebrow"><?= site_e(site_text('İşletmenizin günlük yardımcısı')) ?></p>
-        <h1><?= site_e(site_text('İşinizin her günü,')) ?><br><?= site_e(site_text('biraz daha kolay.')) ?></h1>
-        <p class="hero-lead"><?= site_e(site_text('Müşteriler, odalar, masalar ve satışlar. İşinize uygun bir çalışma alanı; Desktop, Android ve web ile birlikte.')) ?></p>
-        <div class="hero-actions"><a class="button button-primary" href="#profiller"><?= site_e(site_text('İşletmeni keşfet')) ?> <span aria-hidden="true">↗</span></a><a class="button button-outline" href="#kurulum"><?= site_e(site_text('İndir ve Kur')) ?></a></div>
+    <div class="hero-copy"><p class="eyebrow"><?= site_e(site_text('Tanıtım ve test merkezi')) ?></p>
+        <h1><?= site_e(site_text('Yardımcı Asistan’ı tanıyın,')) ?><br><?= site_e(site_text('uygulamadan deneyin.')) ?></h1>
+        <p class="hero-lead"><?= site_e(site_text('Konaklama, restoran, perakende ve toptan işlemlerini örnek ekranlarda inceleyin. Desktop’ı bağlayın, kendi yayınlarınızı web ve Android ile test edin.')) ?></p>
+        <div class="hero-actions"><a class="button button-primary" href="#profiller"><?= site_e(site_text('Profilleri incele')) ?> <span aria-hidden="true">↗</span></a><a class="button button-outline" href="#kurulum"><?= site_e(site_text('İndir ve Kur')) ?></a></div>
         <p class="hero-caption"><?= site_e(site_text('Gerçek uygulama ekranları. Örnek verilerle, yakından inceleyin.')) ?></p>
     </div>
     <figure class="hero-workspace"><div class="hero-visuals">
         <a class="hero-image-frame showcase-image" href="<?= site_e(site_hero_image()) ?>" data-gallery-image data-gallery-title="<?= site_e(site_text('Günlük çalışma ekranı')) ?>" aria-label="<?= site_e(site_text('Günlük çalışma ekranı') . ' · ' . site_text('Görseli büyüt')) ?>"><img class="showcase-hero-image" src="<?= site_e(site_hero_image()) ?>" alt="<?= site_e(site_text('Yardımcı Asistan günlük çalışma ekranı')) ?>" width="1116" height="663" fetchpriority="high"><span class="image-zoom" aria-hidden="true">↗</span></a>
         <a class="hero-phone showcase-image" href="<?= site_e(site_asset('showcase/dealer.webp')) ?>" data-gallery-image data-gallery-title="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı')) ?>" aria-label="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı') . ' · ' . site_text('Görseli büyüt')) ?>"><img src="<?= site_e(site_asset('showcase/dealer.webp')) ?>" alt="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı')) ?>" width="500" height="889"><span><?= site_e(site_text('Bayi Android · Pilot')) ?></span></a>
-    </div><div class="hero-connections"><div data-showcase-avatar data-showcase-size="144"></div><figcaption><span class="platform-labels"><span>Desktop</span><i aria-hidden="true">↔</i><span>Android</span><i aria-hidden="true">↔</i><span>Web</span></span><p><?= site_e(site_text('Aynı işin farklı yüzleri.')) ?></p><a class="text-link" href="#canli-yuzeyler"><?= site_e(site_text('Çalışan örnekleri gör')) ?> →</a></figcaption></div></figure>
+    </div><div class="hero-connections"><div data-showcase-avatar data-showcase-size="144"></div><figcaption><span class="platform-labels"><span>Desktop</span><i aria-hidden="true">↔</i><span>Android</span><i aria-hidden="true">↔</i><span>Web</span></span><p><?= site_e(site_text('Aynı işin farklı yüzleri.')) ?></p><a class="text-link" href="#canli-yuzeyler"><?= site_e(site_text('Web bağlantısını incele')) ?> →</a></figcaption></div></figure>
 </div></section>
 
 <section class="section profile-section" id="profiller" data-showcase-section="profiles"><div class="shell">
@@ -39,18 +40,20 @@ require __DIR__ . '/inc/header.php';
 <section class="section live-section" id="canli-yuzeyler" data-showcase-section="web"><div class="shell">
     <div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('Uygulamadan web’e')) ?></p><h2><?= site_e(site_text('Web siten de sistemin bir parçası')) ?></h2></div><p><?= site_e(site_text('Yayınlanan içerik web’de görünür; talepler ve siparişler işinize geri döner.')) ?></p></div>
     <div class="web-story"><?php showcase_image('web-store', 'Online mağaza örneği'); ?><div class="web-path"><span>Desktop</span><i aria-hidden="true">↓</i><strong><?= site_e(site_text('Menü · oda · ürün · duyuru')) ?></strong><i aria-hidden="true">↓</i><span>Web</span><p><?= site_e(site_text('Rezervasyon talebi · müşteri talebi · sipariş')) ?></p><i aria-hidden="true">↩ Desktop</i></div></div>
-    <div class="demo-surface-grid"><?php $live = false; foreach (site_live_navigation() as $page): $live = true; ?><article class="demo-surface-card"><span class="demo-status-chip"><?= site_e(site_text('Canlı · Uygulamaya bağlı')) ?></span><h3><?= site_e(site_text($page['label'])) ?></h3><a class="text-link" href="<?= site_e($page['path']) ?>"><?= site_e(site_text('Canlı örneği aç')) ?> →</a></article><?php endforeach; ?><?php if (!$live): ?><p class="surface-empty"><?= site_e(site_text('Etkin ve yayınlanmış örnekler burada görünür.')) ?></p><?php endif; ?></div>
-    <?php if ($available['rooms'] && !empty(site_publication('room_catalog')['rooms'])): ?><div class="live-extras"><h3><?= site_e(site_text('Odalar')) ?></h3><div class="room-grid" data-room-list data-room-limit="3"></div></div><?php endif; ?>
-    <div class="live-extras homepage-campaigns" data-marketing-wrapper hidden><div class="split-heading"><h3><?= site_e(site_text('Kampanyalar ve duyurular')) ?></h3><a class="text-link" href="/duyurular/"><?= site_e(site_text('Tüm kampanyalar →')) ?></a></div><div data-marketing-surface data-marketing-limit="3" data-marketing-heading="false" hidden aria-label="<?= site_e(site_text('Kampanyalar ve duyurular')) ?>"></div></div>
-    <div class="live-extras" data-google-reviews data-review-limit="3" hidden><div class="split-heading"><h3><?= site_e(site_text('Google yorumları')) ?></h3><div class="rating-pill" data-google-rating></div></div><div class="review-grid" data-google-review-list></div><a class="text-link" href="/yorumlar/"><?= site_e(site_text('Tüm yorumlar →')) ?></a></div>
+    <div class="sample-catalog" data-showcase-catalog aria-labelledby="sample-catalog-title">
+        <div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('Örnek katalog · 18 ürün')) ?></p><h3 id="sample-catalog-title"><?= site_e(site_text('Mağaza görünümünü inceleyin')) ?></h3></div><p><?= site_e(site_text('Bu ürünler yalnızca tanıtım örneğidir; canlı mağazaya eklenmez ve sipariş oluşturmaz. Ürün çizimleri temsilidir.')) ?></p></div>
+        <ul class="sample-product-grid"><?php foreach (showcase_sample_products() as $product): ?><li data-showcase-product><div class="sample-product-visual" data-product-kind="<?= site_e($product['kind']) ?>"><?php showcase_product_icon($product['kind']); ?><span><?= site_e(site_text($product['group'])) ?></span></div><strong><?= site_e(site_text($product['name'])) ?></strong><small><?= site_e(site_text($product['unit'])) ?></small></li><?php endforeach; ?></ul>
+    </div>
+    <div class="section-heading"><h3><?= site_e(site_text('Kendi yayınlarınızla test edin')) ?></h3><p><?= site_e(site_text('Aşağıdaki sayfalar yalnız Desktop’tan yayınladığınız verileri gösterir. Yayın yoksa boş görünür; içerik kaldırıldığında sayfadan da kalkar. Bayi portalı davet ve oturum gerektirir.')) ?></p></div>
+    <div class="demo-surface-grid"><?php foreach (showcase_web_surfaces() as $surface): ?><article class="demo-surface-card"><span class="demo-status-chip"><?= site_e(site_text('Desktop yayınıyla test')) ?></span><h3><?= site_e(site_text($surface['title'])) ?></h3><p><?= site_e(site_text($surface['text'])) ?></p><a class="text-link" href="<?= site_e($surface['path']) ?>"><?= site_e(site_text('Test sayfasını aç')) ?> →</a></article><?php endforeach; ?></div>
 </div></section>
 
 <section class="section service-section" id="servisler" data-showcase-section="services"><div class="shell">
     <div class="section-heading"><p class="eyebrow"><?= site_e(site_text('İhtiyacınız olduğunda, yanınızda')) ?></p><h2><?= site_e(site_text('Akıllı yardımcı ve servisler')) ?></h2><p><?= site_e(site_text('Servisler kendi hesaplarınız, bağlantılarınız ve izinlerinizle etkinleşir.')) ?></p></div>
     <div class="service-grid"><?php foreach (showcase_services() as $service): ?><article><span class="content-tag"><?= site_e(site_text($service['status'])) ?></span><h3><?= site_e(site_text($service['title'])) ?></h3><p><?= site_e(site_text($service['text'])) ?></p></article><?php endforeach; ?></div>
+    <div class="showcase-tools"><?php foreach (showcase_tools() as $tool): ?><article><h3><?= site_e(site_text($tool['title'])) ?></h3><p><?= site_e(site_text($tool['text'])) ?></p></article><?php endforeach; ?></div>
     <div class="service-assistant"><p><?= site_e(site_text('Sağ alttaki yardımcıya sorun veya canlı örneklerden birini açın.')) ?></p><a class="text-link" href="/iletisim/"><?= site_e(site_text('Birlikte deneyelim.')) ?> →</a></div>
 </div></section>
 <?php require __DIR__ . '/inc/demo-installation.php'; render_demo_installation(); ?>
 </div>
-<link rel="stylesheet" href="<?= site_e(site_asset('css/marketing.css')) ?>"><script src="<?= site_e(site_asset('js/marketing.js')) ?>" data-api-base="/yardimci-asistan/" defer></script>
 <?php require __DIR__ . '/inc/footer.php'; ?>

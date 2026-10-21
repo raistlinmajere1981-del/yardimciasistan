@@ -70,7 +70,7 @@ function render_demo_installation(): void
             <ol class="installation-steps">
                 <li><strong><?= site_e(site_text('Uygulamayı indir')) ?></strong><p><?= site_e(site_text('Bilgisayarınıza uygun yayınlanmış paketi seçin ve kurulumu tamamlayın.')) ?></p></li>
                 <li><strong><?= site_e(site_text('Demo bağlantısını kur')) ?></strong><p><?= site_e(site_text('Ayarlar → Web bağlantısı alanına aşağıdaki adresi ve anahtarı girip Bağlan düğmesine basın.')) ?></p></li>
-                <li><strong><?= site_e(site_text('Özellikleri keşfet')) ?></strong><p><?= site_e(site_text('İşletme profilinizi seçin; örnek ekranları ve canlı sayfaları inceleyin.')) ?></p></li>
+                <li><strong><?= site_e(site_text('Özellikleri keşfet')) ?></strong><p><?= site_e(site_text('Desktop’tan içerik yayınlayın; Canlı Sayfalar üzerinden değişiklikleri, yayından kaldırmayı ve yeni işlemleri test edin.')) ?></p></li>
             </ol>
             <div class="installation-details">
                 <div class="copy-field"><label for="demo-web-address"><?= site_e(site_text('Web modül adresi')) ?></label><div><input id="demo-web-address" readonly value="https://yardimciasistan.alwaysdata.net/yardimci-asistan"><button type="button" data-copy-target="demo-web-address"><?= site_e(site_text('Kopyala')) ?></button></div></div>
