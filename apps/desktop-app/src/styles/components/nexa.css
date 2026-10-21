@@ -9,18 +9,18 @@
   margin-top: auto;
   place-items: center;
   isolation: isolate;
+  pointer-events: none;
 }
 .nexa-habitat--compact { --nexa-character-size: 64px; height: 72px; grid-template-rows: 1fr; }
 .nexa-habitat--micro { --nexa-character-size: 40px; height: 44px; grid-template-rows: 1fr; }
 .nexa-habitat--hidden { height: 0; }
-.nexa-habitat-shadow { position: absolute; bottom: var(--space-2); width: 50%; height: var(--space-5); z-index: -1; pointer-events: none; }
-.nexa-habitat .nexa-character-control {
+.nexa-habitat-shadow { position: absolute; bottom: var(--space-2); inset-inline: 0; margin-inline: auto; width: 80%; height: var(--space-5); z-index: -1; }
+.nexa-character-stage {
   position: relative;
   width: var(--nexa-character-size);
   height: var(--nexa-character-size);
-  padding: 0;
-  border: 0;
   justify-self: center;
+  isolation: isolate;
 }
 .nexa-character { display: block; width: var(--nexa-character-size); height: var(--nexa-character-size); object-fit: contain; }
 .nexa-character-fallback { position: absolute; inset: 0; margin: auto; }

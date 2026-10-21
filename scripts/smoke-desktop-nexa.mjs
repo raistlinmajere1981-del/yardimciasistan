@@ -35,12 +35,23 @@ try {
       const nav = document.querySelector('.sidebar-primary-nav').getBoundingClientRect();
       const footer = document.querySelector('.sidebar-footer-nav').getBoundingClientRect();
       const main = document.querySelector('main').getBoundingClientRect();
-      return [...el.querySelectorAll('.nexa-character-control, .nexa-habitat-speech')].every(node => {
+      return [...el.querySelectorAll('.nexa-character-stage, .nexa-habitat-speech')].every(node => {
         const rect = node.getBoundingClientRect();
         return rect.left >= sidebar.left && rect.right <= sidebar.right && rect.right <= main.left
           && rect.top >= nav.bottom && rect.bottom <= footer.top;
       });
     })).toBe(true);
+    if (await habitat.locator('.nexa-character-stage').count()) {
+      const alignment = await habitat.evaluate(el => {
+        const stage = el.querySelector('.nexa-character-stage').getBoundingClientRect();
+        const shadow = el.querySelector('.nexa-habitat-shadow').getBoundingClientRect();
+        const avatar = el.querySelector('.nexa-character').getBoundingClientRect();
+        const area = el.getBoundingClientRect();
+        const center = rect => rect.left + rect.width / 2;
+        return Math.max(Math.abs(center(stage) - center(shadow)), Math.abs(center(stage) - center(avatar)), Math.abs(center(stage) - center(area)));
+      });
+      expect(alignment).toBeLessThan(1);
+    }
     await expect(page.getByRole('button', { name: 'Ayarlar', exact: true })).toBeInViewport();
   }
   await expect(habitat).toHaveClass(/--wide/);
@@ -77,8 +88,24 @@ try {
   expect(eyeMotion.shapes).toBeGreaterThan(1); expect(eyeMotion.gazes).toBeGreaterThan(1);
   expect(eyeMotion.matched).toBe(true); expect(eyeMotion.rootTransform).toBe("none"); expect(eyeMotion.bodyTransform).toBeNull();
   await expect(svg.locator('[data-part="presence"]')).toHaveAttribute('transform', /scale/);
-  // Hover/press are local visual feedback, never synthetic work or success.
-  await page.getByRole('button', { name: 'Yardımcı Asistan ile etkileş' }).click();
+  // The avatar is decorative: no hover surface, click target or tab stop.
+  await expect(habitat.locator('button, [tabindex]')).toHaveCount(0);
+  const stage = habitat.locator('.nexa-character-stage');
+  const beforeHover = await stage.evaluate(el => {
+    const style = getComputedStyle(el);
+    return { background: style.backgroundColor, border: style.border, shadow: style.boxShadow };
+  });
+  const stageBounds = await stage.boundingBox();
+  await page.mouse.move(stageBounds.x + stageBounds.width / 2, stageBounds.y + stageBounds.height / 2);
+  await page.mouse.down(); await page.mouse.up();
+  expect(await stage.evaluate(el => {
+    const style = getComputedStyle(el);
+    return { background: style.backgroundColor, border: style.border, shadow: style.boxShadow };
+  })).toEqual(beforeHover);
+  expect(await stage.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    return !el.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2));
+  })).toBe(true);
   await expect(habitat).toHaveAttribute('data-nexa-state', 'ready');
   await expect(speech).toHaveCount(0);
   mkdirSync("artifacts/nexa-integration", { recursive: true });
@@ -107,7 +134,7 @@ try {
         await expect(habitat).toHaveAttribute('data-nexa-state', 'thinking');
         if ((await habitat.getAttribute('class')).includes('--wide')) {
           await expect(speech).toBeVisible();
-          const above = await speech.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.nexa-character-control').getBoundingClientRect().top);
+          const above = await speech.evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.nexa-character-stage').getBoundingClientRect().top);
           expect(above).toBe(true);
         }
       }

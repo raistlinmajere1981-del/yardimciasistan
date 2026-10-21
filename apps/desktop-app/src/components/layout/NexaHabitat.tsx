@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { mountNexaRig, nexaStatusMessages, resolveNexaAsset, type NexaRigController } from "@yardimci-asistan/shared";
 import manifest from "../../../../../assets/nexa/manifest.json";
 import { desktopNexa } from "../../app/nexa-activity";
-import { ActionButton } from "../ui/ActionButton";
 
 type HabitatSize = "wide" | "compact" | "micro" | "hidden";
 
@@ -91,18 +90,16 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
   return (
     <div ref={host} className={`nexa-habitat nexa-habitat--${size}`} data-nexa-state={state} data-motion-active={motionActive}>
       {size !== "hidden" && <>
-        <img className="nexa-habitat-shadow" src={url(shadow.assetPath)} alt="" />
         {size === "wide" && <div className="nexa-speech-slot">
           {nexaStatusMessages[state] && <span className="nexa-habitat-speech" role="status" aria-atomic="true" aria-label={nexaStatusMessages[state]} key={state}>
             {state === "thinking" ? <>Düşünüyorum<span className="nexa-speech-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></> : nexaStatusMessages[state]}
           </span>}
         </div>}
-        <ActionButton variant="ghost" className="nexa-character-control" aria-label="Yardımcı Asistan ile etkileş"
-          onPointerEnter={() => rig.current?.react("hover")} onFocus={() => rig.current?.react("hover")}
-          onClick={() => rig.current?.react("press")}>
+        <div className="nexa-character-stage" aria-hidden="true">
+          <img className="nexa-habitat-shadow" src={url(shadow.assetPath)} alt="" />
           <span ref={rigHost} className="nexa-character" aria-hidden="true" />
           {rigFailed && <img className="nexa-character nexa-character-fallback" src={url(character.assetPath)} alt="" decoding="async" />}
-        </ActionButton>
+        </div>
       </>}
     </div>
   );
