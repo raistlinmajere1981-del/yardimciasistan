@@ -103,7 +103,7 @@ try {
   // Real PHP renders site copy; navigation uses the persisted cookie, not rewritten links.
   const dictionary=JSON.parse(readFileSync('test-site/landing/assets/i18n/en.json','utf8'));
   const ui=source=>dictionary[source] ?? source;
-  for(const [path,title] of [['/','Yardımcı Asistan | Keşfet ve Dene'],['/odalar/','Odalar | Yardımcı Asistan'],['/restoran/','Restoran | Yardımcı Asistan'],['/qr-menu/','QR Menü | Yardımcı Asistan'],['/galeri/','Galeri | Yardımcı Asistan'],['/hakkimizda/','Hakkımızda | Yardımcı Asistan'],['/magaza/','Mağaza | Yardımcı Asistan'],['/duyurular/','Kampanyalar ve Duyurular | Yardımcı Asistan'],['/iletisim/','İletişim | Yardımcı Asistan'],['/kurulum/','Kurulum | Yardımcı Asistan'],['/kullanim-kilavuzu/','Kullanım Kılavuzu | Yardımcı Asistan'],['/yorumlar/','Google Yorumları | Yardımcı Asistan']]) {
+  for(const [path,title] of [['/','Yardımcı Asistan | Keşfet ve Dene'],['/odalar/','Odalar | Yardımcı Asistan'],['/restoran/','Restoran | Yardımcı Asistan'],['/qr-menu/','QR Menü | Yardımcı Asistan'],['/galeri/','Galeri | Yardımcı Asistan'],['/hakkimizda/','Hakkımızda | Yardımcı Asistan'],['/magaza/','Mağaza | Yardımcı Asistan'],['/duyurular/','Kampanyalar ve Duyurular | Yardımcı Asistan'],['/iletisim/','İletişim | Yardımcı Asistan'],['/kurulum/','Yardımcı Asistan | Keşfet ve Dene'],['/kullanim-kilavuzu/','Kullanım Kılavuzu | Yardımcı Asistan'],['/yorumlar/','Google Yorumları | Yardımcı Asistan']]) {
     await page.goto(`${base}${path}`);
     await expect(page.locator('html')).toHaveAttribute('lang','en');
     await expect(page).toHaveTitle(ui(title));
@@ -112,6 +112,7 @@ try {
     await expect(page.locator('.site-nav')).toContainText('Home');
     await expect(page.locator('.site-footer')).toContainText(ui('Birlikte deneyelim.'));
   }
+  await page.locator('[data-live-menu]>summary').click();
   await page.locator('.site-nav a[href="/odalar/"]').click();
   await expect(page.locator('[data-room-list]')).toContainText('Garden Room');
   await page.getByRole('link',{name:ui('Odayı incele'),exact:true}).click();
@@ -232,6 +233,7 @@ try {
     await page.keyboard.press('Escape');
     await expect(page.locator('.flag-language__choices')).toBeHidden();
     await page.locator('[data-menu-toggle]').click();
+    await page.locator('[data-live-menu]>summary').click();
     await page.locator('.site-nav a[href="/restoran/"]').click();
     await expect(page.locator('[data-table-list]')).toContainText('Garden Table');
     await expect(page.locator('html')).toHaveAttribute('lang','en');

@@ -94,7 +94,7 @@ function render_site_hero(string $eyebrow, string $title, string $description = 
 }
 
 /** This host's fixed hero ownership is isolated for a future marketing-media selection. */
-function site_hero_image(): string { return site_asset('showcase/workspace.webp'); }
+function site_hero_image(): string { return site_asset('showcase/dashboard.webp'); }
 function site_navigation(): array
 {
     // Navigation belongs to this showcase host. Customer websites may expose a
@@ -110,7 +110,7 @@ function site_navigation(): array
         ['id'=>'about','label'=>'Hakkımızda','path'=>'/hakkimizda/','availability'=>'about'],
         ['id'=>'gallery','label'=>'Galeri','path'=>'/galeri/','availability'=>'gallery'],
         ['id'=>'contact','label'=>'İletişim','path'=>'/iletisim/','availability'=>'always'],
-        ['id'=>'installation','label'=>'Kurulum','path'=>'/kurulum/','availability'=>'always'],
+        ['id'=>'installation','label'=>'İndir ve Kur','path'=>'/#kurulum','availability'=>'always'],
         ['id'=>'guide','label'=>'Kullanım Kılavuzu','path'=>'/kullanim-kilavuzu/','availability'=>'always'],
     ];
     $availability = site_availability();
@@ -133,10 +133,28 @@ function site_availability(): array
         'restaurant'=>$has('table_catalog'), 'qr_menu'=>site_qr_menu_available(),
         'store'=>$has('online_catalog'), 'announcements'=>$announcements, 'reviews'=>$reviews];
 }
-function render_site_links(): void
+function site_live_navigation(): array
 {
-    foreach (site_navigation() as $page) {
-        $current = $page['path'] === '/' ? site_current_path() === '/' : site_is_current($page['path']);
-        ?><a href="<?= site_e($page['path']) ?>" <?= $current ? 'aria-current="page" class="active"' : '' ?>><?= site_e(site_text($page['label'])) ?></a><?php
+    return array_values(array_filter(site_navigation(), static fn(array $page): bool => !in_array($page['id'], ['home','contact','installation','guide','reviews'], true)));
+}
+function render_site_link(array $page, string $class = ''): void
+{
+    $current = !str_contains($page['path'], '#') && ($page['path'] === '/' ? site_current_path() === '/' : site_is_current($page['path']));
+    ?><a href="<?= site_e($page['path']) ?>" class="<?= site_e(trim($class . ($current ? ' active' : ''))) ?>" <?= $current ? 'aria-current="page"' : '' ?>><?= site_e(site_text($page['label'])) ?></a><?php
+}
+function render_site_links(bool $footer = false): void
+{
+    if ($footer) {
+        foreach (site_navigation() as $page) render_site_link($page);
+        return;
     }
+    render_site_link(['label'=>'Ana Sayfa','path'=>'/']);
+    $live = site_live_navigation();
+    if ($live) {
+        ?><details class="live-menu" data-live-menu><summary><?= site_e(site_text('Canlı Sayfalar')) ?><span class="live-count"><?= count($live) ?></span><span aria-hidden="true">⌄</span></summary><div class="live-menu-panel"><p><?= site_e(site_text('Desktop’tan yayınlanan sayfalar')) ?></p><?php foreach ($live as $page): ?><?php
+        $current = $page['path'] === '/' ? site_current_path() === '/' : site_is_current($page['path']);
+        ?><a href="<?= site_e($page['path']) ?>" <?= $current ? 'aria-current="page" class="active"' : '' ?>><span class="live-dot" aria-hidden="true"></span><?= site_e(site_text($page['label'])) ?><span class="live-link-tag"><?= site_e(site_text('Canlı')) ?></span></a><?php endforeach; ?></div></details><?php
+    }
+    render_site_link(['label'=>'İletişim','path'=>'/iletisim/']);
+    render_site_link(['label'=>'İndir ve Kur','path'=>'/#kurulum'], 'nav-download');
 }

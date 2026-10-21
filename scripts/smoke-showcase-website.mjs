@@ -3,7 +3,7 @@ import { installDemoSite } from './test-helpers/demo-site.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { activateFixtureSource } from './test-helpers/publication-protocol.mjs';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -46,14 +46,54 @@ try {
   assert.ok(!capabilities.features.includes('website_navigation'));
   await push(); assert.equal(f.db.getSyncRuntimeStatus().enabled, false);
   browser = await launchChromiumForSmoke(chromium); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const errors = [], assetErrors = [], consoleErrors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('response', response => { if (response.status() >= 400 && new URL(response.url()).pathname.startsWith('/assets/')) assetErrors.push(response.url()); });
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) consoleErrors.push(message.text()); });
   await page.goto(base); await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
   assert.equal(await page.locator('script[type="module"]').count(), 0);
   assert.ok(!/Canlı Sistem|fixture|public API referansı|Canlı referans site/.test(await page.locator('body').innerText()));
   await expect(page.locator('[data-site-nav] a[href="/odalar/"]')).toHaveCount(0);
   await expect(page.locator('[data-marketing-wrapper]')).toBeHidden();
-  await expect(page.locator('.download-card')).toHaveCount(4);
-  mkdirSync(join(root, 'downloads')); for (const link of await page.locator('.download-card').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')))) { writeFileSync(join(root, link), 'test-download'); assert.equal((await fetch(base + link)).status, 200); }
+  await expect(page.locator('[data-showcase-section]')).toHaveCount(6);
+  await expect(page.locator('[data-site-nav]>a')).toHaveCount(3);
+  await expect(page.locator('[data-site-nav] a[href="/kullanim-kilavuzu/"]')).toHaveCount(0);
+  await expect(page.locator('.download-card')).toHaveCount(5);
+  await expect(page.locator('a.download-card')).toHaveCount(0);
+  const release = JSON.parse(readFileSync(join(root, 'release.json'), 'utf8'));
+  const packageFiles = [`YardimciAsistan-Setup-${release.desktopVersion}.exe`, `YardimciAsistan-Setup-${release.desktopVersion}-x86.exe`, `YardimciAsistan-Android-${release.androidVersion}.apk`, `YardimciAsistan-Bayi-Android-${release.dealerAndroidVersion}-pilot.apk`];
+  mkdirSync(join(root, 'downloads'), { recursive: true });
+  for (const file of packageFiles) writeFileSync(join(root, 'downloads', file), 'test-download');
+  await page.reload();
+  await expect(page.locator('a.download-card')).toHaveCount(4);
+  await expect(page.locator('.download-card-unavailable')).toHaveCount(1);
+  await expect(page.locator('.download-card-unavailable')).toContainText('Linux');
+  for (const link of await page.locator('a.download-card').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')))) assert.equal((await fetch(base + link)).status, 200);
+  writeFileSync(join(root, 'downloads', packageFiles[2]), '');
+  await page.reload(); await expect(page.locator('a.download-card')).toHaveCount(3);
+  writeFileSync(join(root, 'downloads', packageFiles[2]), 'test-download');
+  // Profiles open real screen galleries; native dialog owns focus and keyboard navigation.
+  for (const id of ['pension_restaurant', 'pension', 'restaurant', 'market']) {
+    const profile = page.locator(`[data-profile="${id}"]`);
+    await profile.click(); await expect(profile).toHaveAttribute('aria-expanded', 'true');
+    const panel = page.locator(`[data-profile-panel="${id}"]`);
+    await expect(panel).toBeVisible();
+    const opener = panel.locator('a[data-gallery-image]').first();
+    await opener.click();
+    const gallery = page.locator('dialog.showcase-gallery');
+    await expect(gallery).toBeVisible();
+    await expect(gallery.locator('img')).toBeVisible();
+    const before = await gallery.locator('img').getAttribute('src');
+    await page.keyboard.press('ArrowRight'); await expect(gallery.locator('img')).not.toHaveAttribute('src', before);
+    await page.keyboard.press('Escape'); await expect(gallery).not.toBeVisible(); await expect(opener).toBeFocused();
+    await page.locator('[data-profile-close]').click(); await expect(profile).toBeFocused();
+  }
+  await page.locator('[data-feature-filter="mobile"]').click();
+  await expect(page.locator('[data-feature-group]:visible')).toHaveCount(2);
+  await page.locator('[data-feature-filter="all"]').click(); await expect(page.locator('[data-feature-group]:visible')).toHaveCount(11);
+  const provenance = JSON.parse(readFileSync('test-site/landing/assets/showcase/sources.json', 'utf8'));
+  assert.ok(provenance.images.every(image => image.bytes < 100000));
+  assert.ok(provenance.images.reduce((sum, image) => sum + image.bytes, 0) < 600000);
   const surfaces = [
     ['room_catalog', 'rooms', '/odalar/'], ['table_catalog', 'restaurant', '/restoran/'],
     ['menu', 'qr_menu', '/qr-menu/'], ['online_catalog', 'store', '/magaza/']
@@ -121,7 +161,10 @@ try {
     if (width < 960) {
       await expect(page.locator('[data-site-nav]')).toBeHidden();
       await page.locator('[data-menu-toggle]').click();
+      await page.locator('[data-live-menu]>summary').click();
       await expect(page.locator('[data-site-nav] a[href="/magaza/"]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-live-menu]')).not.toHaveAttribute('open', '');
       await page.keyboard.press('Escape');
       await expect(page.locator('[data-site-nav]')).toBeHidden();
       await expect(page.locator('.cart-access')).toBeVisible();
@@ -247,11 +290,19 @@ try {
   publication = f.db.listMarketingPublications()[0]; f.service.unpublish(publication.id, publication.revision); await push();
   for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('[data-marketing-surface]')).toBeHidden(); await expect(page.locator('.ya-marketing-card')).toHaveCount(0); }
   for (const route of ['/odalar/', '/odalar/oda/', '/restoran/', '/restoran/masa/', '/yorumlar/', '/iletisim/', '/kullanim-kilavuzu/', '/magaza/', '/duyurular/', '/bayi/']) { const response = await page.goto(base + route); assert.equal(response.status(), 200); await expect(page.locator('#demo-sync-secret')).toHaveCount(0); assert.ok(!(await response.text()).includes(secret)); }
-  await page.goto(base + '/kurulum/'); await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
+  const redirect = await page.request.get(base + '/kurulum/?lang=en', { maxRedirects: 0 });
+  assert.equal(redirect.status(), 301); assert.equal(redirect.headers().location, '/?lang=en#kurulum');
+  await page.goto(base + '/kurulum/'); await expect(page).toHaveURL(/\?lang=en#kurulum$/); await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
+  await page.goto(base + '/?lang=tr');
+  await page.goto(base + '/kullanim-kilavuzu/');
+  for (const id of ['baslangic', 'desktop', 'web', 'rezervasyon', 'stok', 'android', 'musteri']) await expect(page.locator(`#${id}`)).toBeAttached();
+  await page.locator('.guide-task a[data-gallery-image]').first().click();
+  await expect(page.locator('dialog.showcase-gallery')).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.goto(base); for (const width of [375, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow ${width}`); }
   await page.setViewportSize({ width: 375, height: 900 }); await page.locator('[data-menu-toggle]').click(); await expect(page.locator('[data-site-nav]')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.locator('[data-site-nav]')).toBeHidden();
   await page.emulateMedia({ reducedMotion: 'reduce' }); assert.equal(await page.locator('.showcase-hero-image').evaluate(node => getComputedStyle(node).animationName), 'none');
-  await page.emulateMedia({ reducedMotion: 'no-preference' }); assert.equal(await page.locator('.showcase-hero-image').evaluate(node => getComputedStyle(node).animationName), 'showcase-pan');
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); assert.equal(await page.locator('.showcase-hero-image').evaluate(node => getComputedStyle(node).animationName), 'none');
   // Existing Google normalizer remains the source of visitor data; provider calls stay mocked.
   const reviewsRaw = { rating: 4.8, userRatingCount: 42, googleMapsUri: 'https://maps.google.com/', googleMapsLinks: { reviewsUri: 'https://www.google.com/maps/place/example/data=!9m1!1b1' }, reviews: Array.from({ length: 4 }, (_, i) => ({ rating: 5, text: { text: `Örnek yorum ${i}` }, authorAttribution: { displayName: `Ziyaretçi ${i}` } })) };
   const normalized = spawnSync('php', ['-r', 'require $argv[1]; echo json_encode(ya_google_reviews_normalize_place(json_decode($argv[2],true),5));', resolve('firm-template/web-module/lib/google-reviews.php'), JSON.stringify(reviewsRaw)], { encoding: 'utf8' }); assert.equal(normalized.status, 0); assert.equal(JSON.parse(normalized.stdout).reviews_uri, reviewsRaw.googleMapsLinks.reviewsUri);
@@ -265,5 +316,7 @@ try {
   await page.goto(base);
   mkdirSync('artifacts/showcase', { recursive: true }); await page.screenshot({ path: 'artifacts/showcase/mobile.png', fullPage: true }); await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: 'artifacts/showcase/desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
+  assert.deepEqual(assetErrors, []);
+  assert.deepEqual(consoleErrors, []);
   console.log('Showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
 } finally { await browser?.close(); coordinator.stop(); php.kill(); await new Promise(r => php.once('exit', r)); f.dispose(); rmSync(root, { recursive: true, force: true }); }

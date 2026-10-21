@@ -5,14 +5,16 @@ Tek aktif site kaynağı bu dizindir; Sayfa yapısı PHP'dir; asistan TypeScript
 
 ## Kaynak ve route sahipliği
 
-- `index.php`: showcase; kurulum, kampanyalar, kullanılabilir canlı yüzeyler, ürün anlatımı ve iletişim.
+- `index.php`: altı bölümlü ürün vitrini; açılış, işletme profilleri, görsel özellikler, canlı web örnekleri, servisler ve kurulum.
+- `inc/showcase-content.php`: profil, özellik ve servis metinlerinin merkezi kaynağı. Yeni özellik mevcut kart/galeri düzenine eklenir; CMS veya ikinci bir capability sistemi değildir.
 - `inc/header.php`, `inc/footer.php`, `inc/site.php`: ortak PHP shell ve publication okunması.
 - `assets/css`, `assets/js`: responsive site, oda/masa/QR menü ve normalize Google yorumları.
-- `assets/showcase/workspace.webp`: mevcut uygulama ekranından seçilmiş statik hero. `site_hero_image()` ileride medya seçimini bağlamak için tek sahiplik noktasıdır.
+- `assets/showcase/*.webp`: gerçek uygulama bileşenlerinden alınan, örnek verili optimize ekranlar. `sources.json` kaynak, boyut ve kırpım bilgisini korur. Companion görseli Desktop cihaz eşleştirme ekranıdır; Bayi Android pilot olarak etiketlenir.
 - `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/magaza/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
 - `/duyurular/`: D4 marketing yayınının tümünü siteye ait renderer ile gösterir; ana sayfa ilk üç yayını gösterir.
-- `/kurulum/`: Windows x64/x86, Android Companion, Bayi Android pilot APK, demo bağlantısı ve kısa kurulum adımları.
-- `/kullanim-kilavuzu/`: sonraki ekran görüntülü bölümlere uygun sidebar/content shell.
+- `/#kurulum`: Windows x64/x86, Android Companion, Bayi Android pilot APK, demo bağlantısı ve üç kısa adım. `release.json` sürümü belirler; yalnız bu hostta `downloads/` altında mevcut, okunabilir ve dolu dosya indirilebilir. Linux yayın mekanizması/paketi bulunmadığından bağlantı üretilmez.
+- `/kurulum/`: dil tercihini koruyan 301 yönlendirmesi → `/?lang=tr|en#kurulum`.
+- `/kullanim-kilavuzu/`: başlangıç, rezervasyon, stok, Android eşleştirme ve müşteri adımları; eski route korunur. Ana menüde değil footer ve ilgili özelliklerde bulunur.
 - `/bayi/`: siteye ait bayi portalı; işlemler `/yardimci-asistan/api/dealer/` üzerinden yürür.
 
 ## Navigasyon sahipliği
@@ -21,11 +23,16 @@ Bu showcase kendi route listesini ve sırasını `inc/site.php` içinde sahiplen
 capability/publication gerçekten kullanılabilir olduğunda header/footer'da görünür. Desktop müşteri sitelerinin
 sayfa listesini, sırasını veya görünürlüğünü yayınlamaz; her müşteri sitesi kendi bilgi mimarisini korur.
 
+Header yalnız Ana Sayfa, koşullu Canlı Sayfalar açılır menüsü, İletişim ve İndir ve Kur
+bağlantısını gösterir. Native `details` menü Enter/Space/Tab ile kullanılabilir; Escape kapatır.
+Özellik ve kılavuz görselleri native `dialog` ile büyür; sağ/sol oklar ve Escape desteklenir,
+kapanış odağı açan bağlantıya döndürür. Profil kartları açılan alanı `aria-expanded` ile bildirir.
+
 
 ## Demo anahtarı sınırı
 
 **Yalnız bu site için** `inc/demo-installation.php`, `/yardimci-asistan/config/business.json` dosyasından
-anahtarı okur. Yalnız `/` ve `/kurulum/` bu helper'ı çağırır. Değer HTML-escaped readonly input'ta gösterilir;
+anahtarı okur. Yalnız `/` bu helper'ı çağırır; eski kurulum URL'si buraya yönlenir. Değer HTML-escaped readonly input'ta gösterilir;
 konfigürasyon yoksa temiz fallback kullanılır. Secret kaynakta, release metadata'da, JS bundle'da veya loglarda saklanmaz.
 Bu helper firm-template, generic müşteri paketi veya BlackSea'ye taşınmaz. Secret rendering için ortak modül yoktur.
 
@@ -118,3 +125,9 @@ kendi geçici API/SQLite kurulumlarını oluşturur ve çalışan işletme veris
 fallback testlerini; `public-translations-ui` 10.000 kayıt, boş/dolu SQLite fixture
 ve ilk yükleme/yenileme hatalarını içerir. Her biri `npm run verify:check -- <id>`
 ile çalıştırılır.
+
+Avatar V2 hero ve mevcut sohbet içinde paylaşılan `mountNexaRig({ natural: true })`
+denetleyicisini kullanır. Hero yalnız kısa bir karşılama gösterir; düşünme/sonuç
+balonu yalnız mevcut gerçek AI isteği durumundan gelir. Gölge avatarın altında
+ayrılmış zeminde kalır. Reduced motion, görünmezlik/odak ve pagehide temizliği
+korunur; Electron veya Desktop bileşeni web bundle'ına taşınmaz.

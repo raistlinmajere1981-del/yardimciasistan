@@ -14,11 +14,21 @@
   });
 
   nav?.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => setMenuOpen(false));
+    link.addEventListener("click", () => {
+      setMenuOpen(false);
+      nav.querySelectorAll('[data-live-menu]').forEach(menu => { menu.open = false; });
+    });
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setMenuOpen(false);
+    if (event.key === "Escape") {
+      const live = nav?.querySelector('[data-live-menu][open]');
+      if (live) { live.open = false; live.querySelector('summary').focus(); return; }
+      setMenuOpen(false);
+    }
+  });
+  document.addEventListener('pointerdown', event => {
+    nav?.querySelectorAll('[data-live-menu][open]').forEach(menu => { if (!menu.contains(event.target)) menu.open = false; });
   });
 
   document.querySelectorAll('[data-copy-target]').forEach(button => {

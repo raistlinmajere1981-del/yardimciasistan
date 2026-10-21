@@ -1,2 +1,6 @@
-<?php $pageTitle = 'Kurulum | Yardımcı Asistan'; require dirname(__DIR__) . '/inc/header.php'; render_site_hero('Başlayalım', 'Yardımcı Asistan’ı deneyin', 'Desktop’u kurun, demo bağlantısını ekleyin ve kendi çalışma alanınızı keşfedin.'); require dirname(__DIR__) . '/inc/demo-installation.php'; render_demo_installation(); ?>
-<section class="section"><div class="shell"><div class="section-heading"><p class="eyebrow"><?= site_e(site_text('Dört kısa adım')) ?></p><h2><?= site_e(site_text('İlk kurulum')) ?></h2></div><ol class="installation-steps"><li><strong><?= site_e(site_text('Desktop’u kur')) ?></strong><p><?= site_e(site_text('Bilgisayarınıza uygun Windows paketini indirin ve kurulumu tamamlayın.')) ?></p></li><li><strong><?= site_e(site_text('İşletme profilini seç')) ?></strong><p><?= site_e(site_text('Başlangıç ekranında denemek istediğiniz çalışma alanını seçin.')) ?></p></li><li><strong><?= site_e(site_text('Web bağlantısını ekle')) ?></strong><p><?= site_e(site_text('Ayarlar → Servisler → Website bölümünde yukarıdaki web adresini ve demo anahtarını kullanın.')) ?></p></li><li><strong><?= site_e(site_text('Android’i bağla')) ?></strong><p><?= site_e(site_text('İhtiyaç duyarsanız Android companion’ı kurun ve Desktop üzerinden cihazınızı bağlayın.')) ?></p></li></ol></div></section><?php require dirname(__DIR__) . '/inc/footer.php'; ?>
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__) . '/inc/language.php';
+// Keep bookmarks and incoming links working; installation now belongs to the home page.
+header('Location: /?lang=' . rawurlencode(site_language()) . '#kurulum', true, 301);
+exit;

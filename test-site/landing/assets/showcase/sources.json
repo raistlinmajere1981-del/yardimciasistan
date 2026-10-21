@@ -1,0 +1,195 @@
+{
+  "description": "Provenance for real application UI screenshots used by the demo showcase. Crops remove test harness navigation or unused surrounding space; no application UI was drawn or replaced. All visible people, phone numbers, tax data and amounts originate from disposable synthetic fixtures. Dealer is the native pilot login screen; Companion image shows Desktop pairing settings, not a connected phone.",
+  "images": [
+    {
+      "file": "dashboard.webp",
+      "width": 1116,
+      "height": 663,
+      "bytes": 50732,
+      "source": "artifacts/screenshots/desktop-compact-dashboard-light-1366x768.png",
+      "uiOwner": "scripts/smoke-desktop-renderer.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1340,
+        752
+      ]
+    },
+    {
+      "file": "customers.webp",
+      "width": 1191,
+      "height": 891,
+      "bytes": 37190,
+      "source": "artifacts/design-system/stage2a/final/1440-customers.png",
+      "uiOwner": "scripts/smoke-desktop-customer-pension.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1415,
+        980
+      ]
+    },
+    {
+      "file": "pension.webp",
+      "width": 1116,
+      "height": 663,
+      "bytes": 68250,
+      "source": "artifacts/screenshots/desktop-compact-pension-1366x768.png",
+      "uiOwner": "scripts/smoke-desktop-renderer.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1340,
+        752
+      ]
+    },
+    {
+      "file": "restaurant.webp",
+      "width": 1116,
+      "height": 663,
+      "bytes": 36816,
+      "source": "artifacts/screenshots/desktop-table-order-workspace-1366x768.png",
+      "uiOwner": "scripts/smoke-desktop-renderer.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1340,
+        752
+      ]
+    },
+    {
+      "file": "products.webp",
+      "width": 1200,
+      "height": 797,
+      "bytes": 38628,
+      "source": "artifacts/screenshots/market-products/inline-edit-1440.png",
+      "uiOwner": "scripts/smoke-sales-workspace-ui.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        0,
+        44,
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "quick-sale.webp",
+      "width": 1200,
+      "height": 738,
+      "bytes": 22400,
+      "source": "artifacts/screenshots/quick-sale/dark-1440.png",
+      "uiOwner": "scripts/smoke-sales-workspace-ui.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": null
+    },
+    {
+      "file": "credit.webp",
+      "width": 842,
+      "height": 844,
+      "bytes": 16542,
+      "source": "artifacts/screenshots/m82-credit/account-narrow.png",
+      "uiOwner": "scripts/smoke-market-customer-credit-ui-contract.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        0,
+        0,
+        842,
+        844
+      ]
+    },
+    {
+      "file": "finance.webp",
+      "width": 1200,
+      "height": 551,
+      "bytes": 19546,
+      "source": "artifacts/showcase/finance-source.png",
+      "uiOwner": "scripts/smoke-finance-workspace.mjs / scripts/fixtures/finance-workspace.tsx",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": null
+    },
+    {
+      "file": "calendar.webp",
+      "width": 1200,
+      "height": 565,
+      "bytes": 42700,
+      "source": "artifacts/showcase/calendar-source.png",
+      "uiOwner": "scripts/smoke-calendar-workspace.mjs / scripts/fixtures/calendar-workspace.tsx",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        0,
+        0,
+        1254,
+        590
+      ]
+    },
+    {
+      "file": "companion.webp",
+      "width": 1000,
+      "height": 734,
+      "bytes": 23666,
+      "source": "artifacts/desktop-architecture/style-parity/settings-android-A__k-1649-after.png",
+      "uiOwner": "scripts/smoke-settings-platform.mjs / scripts/test-helpers/settings-style-parity.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        325,
+        97,
+        1325,
+        831
+      ]
+    },
+    {
+      "file": "android-pairing.webp",
+      "width": 1000,
+      "height": 734,
+      "bytes": 23666,
+      "source": "artifacts/desktop-architecture/style-parity/settings-android-A__k-1649-after.png",
+      "uiOwner": "scripts/smoke-settings-platform.mjs / scripts/test-helpers/settings-style-parity.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        325,
+        97,
+        1325,
+        831
+      ]
+    },
+    {
+      "file": "wholesale.webp",
+      "width": 1056,
+      "height": 1024,
+      "bytes": 27250,
+      "source": "artifacts/showcase/wholesale-source.png",
+      "uiOwner": "scripts/smoke-commerce-wholesale-customer-ui.mjs / scripts/fixtures/wholesale-customer-ui.tsx",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": null
+    },
+    {
+      "file": "dealer.webp",
+      "width": 500,
+      "height": 889,
+      "bytes": 25506,
+      "source": "artifacts/dealer-android/login.png",
+      "uiOwner": "apps/dealer-android-app/src/main/java/com/yardimciasistan/dealer/DealerActivity.java",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": null
+    },
+    {
+      "file": "web-store.webp",
+      "width": 1180,
+      "height": 600,
+      "bytes": 16258,
+      "source": "artifacts/showcase/store-1440.png",
+      "uiOwner": "test-site/landing/magaza/index.php / disposable local publication fixture",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        130,
+        110,
+        1310,
+        710
+      ]
+    }
+  ]
+}

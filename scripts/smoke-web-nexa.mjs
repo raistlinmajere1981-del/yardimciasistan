@@ -22,6 +22,11 @@ const server = createServer((req, res) => {
   }
   if (path.endsWith("/api/business.php")) { res.setHeader("content-type", "application/json"); res.end('{"ok":false}'); return; }
   res.setHeader("content-type", "text/html; charset=utf-8");
+  if (path.startsWith("/showcase")) {
+    const english = path.startsWith("/showcase-en");
+    res.end(`<!doctype html><html lang="${english ? "en" : "tr"}"><body><main style="width:180px;margin:12px"><div data-showcase-avatar data-showcase-size="144"></div></main><script src="/module/widget.js"></script></body></html>`);
+    return;
+  }
   res.end('<!doctype html><html><body><main>İşletme sitesi</main><script src="/module/widget.js"></script></body></html>');
 });
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
@@ -57,6 +62,8 @@ try {
   const welcome = page.locator('[data-nexa-role="welcome"] svg[data-nexa-rig]');
   await expect(welcome).toBeVisible();
   await expect(welcome).toHaveAttribute("data-motion-active", "true");
+  const welcomeGround = await page.locator('.ya-widget-nexa-welcome').evaluate(host => ({ groundTop: parseFloat(getComputedStyle(host, '::after').top), characterHeight: host.querySelector('[data-nexa-role]').getBoundingClientRect().height }));
+  expect(welcomeGround.groundTop).toBeGreaterThan(welcomeGround.characterHeight);
   // Capture settled appearance after the panel entrance fade, not its transparent first frame.
   await page.waitForTimeout(450);
   mkdirSync("artifacts/nexa-integration", { recursive: true });
@@ -96,6 +103,16 @@ try {
   const root = page.locator('#yardimci-asistan-widget');
   await expect(root).toHaveAttribute('data-nexa-state','thinking');
   await expect(header).toHaveAttribute("data-expression", "thinking");
+  const speech = page.locator('[data-ya-nexa-speech]');
+  await expect(speech).toBeVisible();
+  await expect(speech).toHaveAttribute('aria-label', 'Düşünüyorum…');
+  await expect(speech.locator('.ya-nexa-speech-dots i')).toHaveCount(3);
+  const bubbleBounds = await speech.evaluate(element => {
+    const bubble = element.getBoundingClientRect(), panel = element.closest('.ya-widget-panel').getBoundingClientRect();
+    const character = element.closest('.ya-widget-header').querySelector('[data-nexa-role]').getBoundingClientRect();
+    return { inside: bubble.left >= panel.left && bubble.right <= panel.right, above: bubble.bottom < character.top };
+  });
+  expect(bubbleBounds).toEqual({ inside: true, above: true });
   const fin = header.locator('[data-part="side-fin"]');
   const thinkingFin = await fin.getAttribute("transform");
   await expect.poll(() => fin.getAttribute("transform")).not.toBe(thinkingFin);
@@ -109,6 +126,7 @@ try {
   await expect(page.locator('.ya-widget-nexa')).toHaveCount(1);
   await expect(page.locator('.ya-widget-answer-avatar')).toHaveCount(0);
   await expect(root).toHaveAttribute('data-nexa-state','ready');
+  await expect(speech).toBeHidden();
   await page.emulateMedia({ colorScheme: "light" });
   await page.screenshot({ path: 'artifacts/nexa-integration/web-conversation-mobile-light.png' });
   await page.emulateMedia({ colorScheme: "dark" });
@@ -142,7 +160,11 @@ try {
   await expect(header.locator("[data-mouth-line]")).not.toHaveAttribute("d", idleMouth);
   await expect(header.locator('[data-brow="left"]')).not.toHaveAttribute("d", idleBrow);
   await expect(page.locator('.ya-widget-notice')).toContainText('test_failure');
+  await expect(speech).toHaveAttribute('aria-label', 'Bir sorun oldu.');
   await expect(page.locator('.ya-widget-panel')).toBeInViewport();
+  await expect(root).toHaveAttribute('data-nexa-state', 'ready', { timeout: 4000 });
+  await expect(speech).toBeHidden();
+  await expect(page.locator('.ya-widget-notice')).toContainText('test_failure');
   await page.getByRole('button',{name:'Asistanı kapat'}).click();
   await expect(root).toHaveAttribute('data-nexa-state','ready');
   await expect(root).toHaveAttribute('data-nexa-motion-active','false');
@@ -156,6 +178,43 @@ try {
   expect(await page.evaluate(() => window.__removedRig.dataset.motionActive)).toBe("false");
   await expect(launcher).toBeVisible();
   expect(await page.evaluate(() => window.__removedRig.isConnected)).toBe(false);
+  // Hero presentation shares the real rig without manufacturing an AI activity.
+  for (const language of ['tr', 'en']) {
+    const heroPage = await browser.newPage({ viewport: { width: 320, height: 700 } });
+    heroPage.on('pageerror', error => errors.push(error.message));
+    await heroPage.goto(`${base}/${language === 'en' ? 'showcase-en' : 'showcase'}/`);
+    const hero = heroPage.locator('[data-showcase-avatar]');
+    const heroRig = hero.locator('svg[data-nexa-rig]');
+    const greeting = hero.locator('.showcase-avatar-speech');
+    await expect(heroRig).toHaveAttribute('data-nexa-state', 'ready');
+    await expect(heroRig).toHaveAttribute('data-motion-active', 'true');
+    await expect(greeting).toHaveText(language === 'en' ? 'Hello!' : 'Merhaba!');
+    await expect(greeting).toBeVisible();
+    expect(await hero.evaluate(element => {
+      const bounds = element.getBoundingClientRect(), parent = element.parentElement.getBoundingClientRect();
+      const bubble = element.querySelector('.showcase-avatar-speech').getBoundingClientRect();
+      const stage = element.querySelector('.showcase-avatar-stage');
+      const character = stage.querySelector('.showcase-avatar-character').getBoundingClientRect();
+      return {
+        width: bounds.width,
+        inside: bounds.left >= parent.left && bounds.right <= parent.right && bubble.left >= bounds.left && bubble.right <= bounds.right,
+        groundBelow: parseFloat(getComputedStyle(stage, '::after').top) > character.height,
+        noPageOverflow: document.documentElement.scrollWidth <= innerWidth,
+      };
+    })).toEqual({ width: 144, inside: true, groundBelow: true, noPageOverflow: true });
+    await heroPage.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(heroRig).toHaveAttribute('data-motion-active', 'false');
+    const restingHero = await heroRig.evaluate(element => element.outerHTML);
+    await heroPage.waitForTimeout(200);
+    expect(await heroRig.evaluate(element => element.outerHTML)).toBe(restingHero);
+    await expect(greeting).toBeHidden({ timeout: 4500 });
+    await expect(heroRig).toHaveAttribute('data-nexa-state', 'ready');
+    await heroPage.evaluate(() => { window.__heroRig = document.querySelector('[data-showcase-avatar] svg'); window.dispatchEvent(new Event('pagehide')); });
+    expect(await heroPage.evaluate(() => ({ connected: window.__heroRig.isConnected, motion: window.__heroRig.dataset.motionActive }))).toEqual({ connected: false, motion: 'false' });
+    await heroPage.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await expect(heroRig).toBeVisible();
+    await heroPage.close();
+  }
   // A real SVG-unavailable browser uses the retained manifest URLs, resolved
   // beside widget.js even when the page and API live at different paths.
   const fallbackPage = await browser.newPage({ viewport: { width: 320, height: 700 } });

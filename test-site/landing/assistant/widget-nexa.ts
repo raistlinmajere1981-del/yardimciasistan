@@ -1,13 +1,14 @@
-import { createNexaPresence, mountNexaRig, resolveNexaAsset, type NexaRigController, type NexaState } from "@yardimci-asistan/shared";
+import { createNexaPresence, mountNexaRig, nexaStatusMessages, resolveNexaAsset, type NexaRigController, type NexaState } from "@yardimci-asistan/shared";
 import manifest from "../../../assets/nexa/manifest.json";
+import { ui } from "./site-language";
 
 const scriptUrl = document.currentScript instanceof HTMLScriptElement ? document.currentScript.src : "";
 export const widgetNexa = createNexaPresence({
   schedule: (callback, delay) => window.setTimeout(callback, delay),
   cancel: (handle) => window.clearTimeout(handle as number),
-});
+}, { response: 1400, success: 1600, error: 2800 });
 
-function widgetNexaUrl(role: "launcher" | "welcome" | "header", state: NexaState, apiBaseUrl: string) {
+export function widgetNexaUrl(role: "launcher" | "welcome" | "header", state: NexaState, apiBaseUrl: string) {
   const key = role !== "header" ? role : state === "thinking" || state === "speaking" || state === "concerned" ? state : "ready";
   const asset = resolveNexaAsset(manifest, manifest.runtime.web[key]);
   if (scriptUrl) return new URL(asset.assetPath, new URL(".", scriptUrl)).href;
@@ -16,11 +17,11 @@ function widgetNexaUrl(role: "launcher" | "welcome" | "header", state: NexaState
 
 type Role = "launcher" | "welcome" | "header";
 const roleSize: Record<Role, number> = { launcher: 48, welcome: 112, header: 32 };
-let mounted: { role: Role; controller: NexaRigController }[] = [];
+let mounted: { role: Role; controller: NexaRigController; removeHover: () => void }[] = [];
 let fallbacks: { role: Role; image: HTMLImageElement }[] = [];
 
 export function unmountWidgetNexa() {
-  for (const { controller } of mounted) controller.unmount();
+  for (const { controller, removeHover } of mounted) { removeHover(); controller.unmount(); }
   mounted = [];
   fallbacks = [];
 }
@@ -29,8 +30,10 @@ export function mountWidgetNexa(root: HTMLElement, apiBaseUrl: string) {
   for (const host of root.querySelectorAll<HTMLElement>("[data-nexa-role]")) {
     const role = host.dataset.nexaRole as Role;
     try {
-      const controller = mountNexaRig(host, { state: widgetNexa.getState(), motion: false, size: roleSize[role] });
-      mounted.push({ role, controller });
+      const controller = mountNexaRig(host, { state: widgetNexa.getState(), motion: false, natural: true, size: roleSize[role] });
+      const onHover = () => controller.react("hover");
+      host.addEventListener("pointerenter", onHover);
+      mounted.push({ role, controller, removeHover: () => host.removeEventListener("pointerenter", onHover) });
     } catch {
       const image = root.ownerDocument.createElement("img");
       image.alt = "";
@@ -45,10 +48,30 @@ export function mountWidgetNexa(root: HTMLElement, apiBaseUrl: string) {
 export function updateWidgetNexa(motion: boolean, apiBaseUrl: string) {
   const state = widgetNexa.getState();
   for (const { role, controller } of mounted) {
-    controller.update({ state, motion: motion && role !== "launcher", size: roleSize[role] });
+    controller.update({ state, motion: motion && role !== "launcher", natural: true, size: roleSize[role] });
   }
   for (const { role, image } of fallbacks) {
     const url = widgetNexaUrl(role, state, apiBaseUrl);
     if (image.src !== url) image.src = url;
+  }
+  const slot = document.querySelector<HTMLElement>("[data-ya-nexa-speech-slot]");
+  const speech = slot?.querySelector<HTMLElement>("[data-ya-nexa-speech]");
+  if (!slot || !speech || slot.dataset.state === state) return;
+  slot.dataset.state = state;
+  const message = ui(nexaStatusMessages[state]);
+  slot.hidden = !message;
+  speech.setAttribute("aria-label", message);
+  speech.textContent = message;
+  if (state === "thinking") {
+    speech.textContent = message.replace(/…$/, "");
+    const dots = document.createElement("span");
+    dots.className = "ya-nexa-speech-dots";
+    dots.setAttribute("aria-hidden", "true");
+    for (let index = 0; index < 3; index++) {
+      const dot = document.createElement("i");
+      dot.textContent = ".";
+      dots.append(dot);
+    }
+    speech.append(dots);
   }
 }

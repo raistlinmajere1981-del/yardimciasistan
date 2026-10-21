@@ -307,6 +307,7 @@ function panelTemplate() {
   return `
     <section class="ya-widget-panel${panelEntrancePending ? " is-opening" : ""}" role="dialog" aria-labelledby="ya-widget-title">
       <header class="ya-widget-header">
+        ${state.view === "home" ? "" : `<div class="ya-widget-nexa-speech-slot" data-ya-nexa-speech-slot hidden><span class="ya-widget-nexa-speech" data-ya-nexa-speech role="status" aria-atomic="true"></span></div>`}
         <div class="ya-widget-identity">
           ${state.view === "home" ? "" : `<span class="ya-widget-avatar">${nexaCharacter("header")}</span>`}
           <span class="ya-widget-title-copy">
