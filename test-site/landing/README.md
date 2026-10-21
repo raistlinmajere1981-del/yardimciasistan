@@ -39,6 +39,25 @@ Kullanıcı önce tanıtımı inceler, uygulamayı indirip demo adresi/anahtarı
 Desktop'tan içerik yayınlar, ardından test sayfalarında düzenleme, kaldırma ve gerçek
 işlemlerin sonucunu kontrol eder. Publication/outbox/API/sipariş sözleşmeleri değişmez.
 
+Mağaza tanıtım resmi `showcase_store_illustration()` ile aynı 18 ürün kaynağından
+seçilen ürün, çizim ve örnek fiyatları kullanır. Sepeti salt görseldir. `web-store*.webp`
+TR/EN ve dar/geniş yerleşimleridir; `<picture>` uygun dosyayı seçer ve galeri aynı
+varyantı büyütür. Kaynak `inc/showcase-content.php`, çizim CSS'i
+`assets/showcase/store-illustration.css` dosyasındadır. Üretim yalnız çevrimdışı PHP
+render + tarayıcı raster export kullanır; HTTP, API, veri tabanı ve yayın işlemi yoktur.
+
+```bash
+# Bilinçli görsel güncellemesi; build/smoke bu dosyaları yeniden yazmaz.
+node scripts/test-helpers/showcase-store-images.mjs --write
+# Salt okunur kaynak parmak izi, dosya özeti/boyutu ve metin sığma kontrolü.
+node scripts/test-helpers/showcase-store-images.mjs
+```
+
+`sources.json` her varyantın kaynağını, render parmak izini, WebP SHA-256'sını,
+piksel boyutunu ve dosya boyutunu tutar. Showcase smoke bu kontrolü de çalıştırır;
+`artifacts/showcase/web-story-375.png` ve diğer genişlik/dil görüntüleri bütün
+Desktop → Web bölümünün son halini gösterir.
+
 ## Navigasyon sahipliği
 
 Bu showcase kendi route listesini ve sırasını `inc/site.php` içinde sahiplenir. Opsiyonel sayfalar yalnız ilgili

@@ -788,5 +788,15 @@
   "Telefondan talep, rezervasyon, masa ve stok işlemlerine cihaz izinleriyle erişin; eşleştirmeyi Desktop’tan yönetin.": "Access requests, reservations, tables and stock operations from your phone with device permissions, and manage pairing from Desktop.",
   "Yayınlanan masaları inceleyin; masa rezervasyonu taleplerini uygulamayla test edin.": "Browse published tables and test table reservation requests with the app.",
   "Yerel yedek ve veri aktarımını kullanın; bildirimleri takip edin ve uygulama kilidiyle erişimi koruyun.": "Use local backups and data transfer, follow notifications and protect access with the app lock.",
-  "Davetle giriş yapın; bayiye özel katalog, fiyat, sepet ve sipariş geçmişini pilot uygulamada test edin.": "Sign in by invitation and test the dealer-specific catalogue, prices, cart and order history in the pilot app."
+  "Davetle giriş yapın; bayiye özel katalog, fiyat, sepet ve sipariş geçmişini pilot uygulamada test edin.": "Sign in by invitation and test the dealer-specific catalogue, prices, cart and order history in the pilot app.",
+  "Örnek mağaza": "Sample store",
+  "Ürünleri inceleyin": "Browse products",
+  "Temsili ürün ve fiyatlar": "Illustrative products and prices",
+  "Kategoriler": "Categories",
+  "Sepet örneği": "Sample cart",
+  "2 ürün · örnek toplam": "2 products · sample total",
+  "Sabit tanıtım örneği; sipariş oluşturmaz.": "Static illustration; no orders are created.",
+  "Temsili mağaza · örnek ürün ve fiyatlar": "Sample store · illustrative products and prices",
+  "Temsili ürün ve fiyatlar · sabit tanıtım görseli": "Illustrative products and prices · static presentation image",
+  "Toplam": "Total"
 }

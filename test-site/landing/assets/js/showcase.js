@@ -60,7 +60,7 @@
   let items = [], index = 0, opener = null, overflow = '';
   function render() {
     const anchor = items[index];
-    image.src = anchor.href;
+    image.src = anchor.hasAttribute('data-gallery-responsive') ? (anchor.querySelector('img').currentSrc || anchor.href) : anchor.href;
     image.alt = anchor.dataset.galleryTitle || anchor.querySelector('img')?.alt || '';
     title.textContent = image.alt;
     dialog.querySelector('[data-showcase-caption]').textContent = anchor.dataset.galleryCaption || ui('Gerçek uygulama ekranı · örnek veriler');

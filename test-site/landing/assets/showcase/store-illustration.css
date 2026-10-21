@@ -1,0 +1,40 @@
+/* Offline artwork source. Palette comes from the demo's existing :root tokens. */
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--navy);font-family:var(--sans)}
+.store-illustration{padding:22px;background:var(--cream)}
+.store-illustration header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.store-illustration header p{margin:0 0 5px;color:var(--ocean);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.store-illustration h1{margin:0;font-size:26px;line-height:1.2;letter-spacing:-.03em}
+.store-illustration header>span{max-width:140px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--white);color:var(--muted);font-size:12px;line-height:1.4}
+.store-illustration nav{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px;font-size:14px}
+.store-illustration nav span{padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--white);white-space:nowrap}
+.store-illustration nav span:first-child{background:var(--ocean);border-color:var(--ocean);color:var(--white)}
+.store-illustration-layout{display:grid;grid-template-columns:minmax(0,1fr) 190px;align-items:start;gap:14px}
+.store-illustration-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.store-illustration article{min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--white)}
+.store-product-drawing{display:grid;place-items:center;margin-bottom:9px;border-radius:8px;background:#e7f2ed;color:var(--ocean)}
+.store-product-drawing[data-kind=bag],.store-product-drawing[data-kind=jar]{background:#f3ecd9;color:#886725}
+.store-product-drawing svg{display:block;width:80px;height:80px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.store-illustration h2{margin:0 0 4px;font-size:16px;line-height:1.25}
+.store-illustration article small{display:block;color:var(--muted);font-size:12px}
+.store-illustration article>strong{display:block;margin-top:9px;font-size:18px;color:var(--ocean)}
+.store-illustration aside{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--white)}
+.store-illustration aside h2{font-size:19px}
+.store-illustration aside>p{margin:5px 0 16px;color:var(--muted);font-size:12px;line-height:1.5}
+.store-illustration ul{list-style:none;padding:0;margin:0}
+.store-illustration li{padding:12px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.4}
+.store-illustration li small{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.store-illustration li strong{display:block;margin-top:5px;font-size:15px}
+.store-illustration-total{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:16px 0;font-size:16px}
+.store-illustration-total strong{color:var(--ocean)}
+.store-illustration aside>.store-illustration-note{padding:10px;margin-bottom:0;border-radius:8px;background:var(--cream);font-size:12px}
+@media(max-width:540px){
+ .store-illustration{padding:14px}.store-illustration header{align-items:start;flex-direction:column;gap:8px;margin-bottom:12px}
+ .store-illustration header>span{max-width:100%;padding:0;border:0;background:transparent}.store-illustration h1{font-size:24px}
+ .store-illustration nav{gap:5px;font-size:12px;margin-bottom:14px}.store-illustration nav span{padding:5px 9px}
+ .store-illustration-layout{grid-template-columns:1fr;gap:14px}.store-illustration-products{gap:9px}
+ .store-illustration article{padding:10px}.store-product-drawing svg{height:68px;width:68px}
+ .store-illustration h2{font-size:15px}.store-illustration article>strong{font-size:17px}
+ .store-illustration aside{padding:12px}.store-illustration aside>p{margin-bottom:5px}
+ .store-illustration ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .store-illustration li{padding:8px 0;font-size:13px}.store-illustration-total{margin:12px 0}
+}

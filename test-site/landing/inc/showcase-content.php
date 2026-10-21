@@ -80,24 +80,24 @@ function showcase_tools(): array
 function showcase_sample_products(): array
 {
     return [
-        ['name'=>'Filtre kahve', 'unit'=>'250 g', 'kind'=>'bag', 'group'=>'Gıda'],
-        ['name'=>'Türk kahvesi', 'unit'=>'100 g', 'kind'=>'bag', 'group'=>'Gıda'],
-        ['name'=>'Bitki çayı', 'unit'=>'20 poşet', 'kind'=>'box', 'group'=>'Gıda'],
-        ['name'=>'Zeytinyağı', 'unit'=>'500 ml', 'kind'=>'bottle', 'group'=>'Gıda'],
-        ['name'=>'Çiçek balı', 'unit'=>'450 g', 'kind'=>'jar', 'group'=>'Gıda'],
-        ['name'=>'Çilek reçeli', 'unit'=>'380 g', 'kind'=>'jar', 'group'=>'Gıda'],
-        ['name'=>'Makarna', 'unit'=>'500 g', 'kind'=>'bag', 'group'=>'Gıda'],
-        ['name'=>'Bulgur', 'unit'=>'1 kg', 'kind'=>'bag', 'group'=>'Gıda'],
-        ['name'=>'Kırmızı mercimek', 'unit'=>'1 kg', 'kind'=>'bag', 'group'=>'Gıda'],
-        ['name'=>'Sıvı sabun', 'unit'=>'500 ml', 'kind'=>'pump', 'group'=>'Bakım'],
-        ['name'=>'Şampuan', 'unit'=>'400 ml', 'kind'=>'bottle', 'group'=>'Bakım'],
-        ['name'=>'El kremi', 'unit'=>'75 ml', 'kind'=>'tube', 'group'=>'Bakım'],
-        ['name'=>'Bulaşık deterjanı', 'unit'=>'750 ml', 'kind'=>'bottle', 'group'=>'Ev'],
-        ['name'=>'Yüzey temizleyici', 'unit'=>'1 l', 'kind'=>'bottle', 'group'=>'Ev'],
-        ['name'=>'Temizlik bezi', 'unit'=>'3 adet', 'kind'=>'box', 'group'=>'Ev'],
-        ['name'=>'Kâğıt havlu', 'unit'=>'2 rulo', 'kind'=>'box', 'group'=>'Ev'],
-        ['name'=>'Pamuklu havlu', 'unit'=>'50 × 90 cm', 'kind'=>'box', 'group'=>'Ev'],
-        ['name'=>'Defter', 'unit'=>'80 yaprak', 'kind'=>'box', 'group'=>'Kırtasiye'],
+        ['name'=>'Filtre kahve', 'priceMinor'=>18990, 'unit'=>'250 g', 'kind'=>'bag', 'group'=>'Gıda'],
+        ['name'=>'Türk kahvesi', 'priceMinor'=>7990, 'unit'=>'100 g', 'kind'=>'bag', 'group'=>'Gıda'],
+        ['name'=>'Bitki çayı', 'priceMinor'=>6490, 'unit'=>'20 poşet', 'kind'=>'box', 'group'=>'Gıda'],
+        ['name'=>'Zeytinyağı', 'priceMinor'=>21990, 'unit'=>'500 ml', 'kind'=>'bottle', 'group'=>'Gıda'],
+        ['name'=>'Çiçek balı', 'priceMinor'=>14990, 'unit'=>'450 g', 'kind'=>'jar', 'group'=>'Gıda'],
+        ['name'=>'Çilek reçeli', 'priceMinor'=>9990, 'unit'=>'380 g', 'kind'=>'jar', 'group'=>'Gıda'],
+        ['name'=>'Makarna', 'priceMinor'=>3490, 'unit'=>'500 g', 'kind'=>'bag', 'group'=>'Gıda'],
+        ['name'=>'Bulgur', 'priceMinor'=>5490, 'unit'=>'1 kg', 'kind'=>'bag', 'group'=>'Gıda'],
+        ['name'=>'Kırmızı mercimek', 'priceMinor'=>6990, 'unit'=>'1 kg', 'kind'=>'bag', 'group'=>'Gıda'],
+        ['name'=>'Sıvı sabun', 'priceMinor'=>4990, 'unit'=>'500 ml', 'kind'=>'pump', 'group'=>'Bakım'],
+        ['name'=>'Şampuan', 'priceMinor'=>8990, 'unit'=>'400 ml', 'kind'=>'bottle', 'group'=>'Bakım'],
+        ['name'=>'El kremi', 'priceMinor'=>5990, 'unit'=>'75 ml', 'kind'=>'tube', 'group'=>'Bakım'],
+        ['name'=>'Bulaşık deterjanı', 'priceMinor'=>7490, 'unit'=>'750 ml', 'kind'=>'bottle', 'group'=>'Ev'],
+        ['name'=>'Yüzey temizleyici', 'priceMinor'=>6990, 'unit'=>'1 l', 'kind'=>'bottle', 'group'=>'Ev'],
+        ['name'=>'Temizlik bezi', 'priceMinor'=>3990, 'unit'=>'3 adet', 'kind'=>'box', 'group'=>'Ev'],
+        ['name'=>'Kâğıt havlu', 'priceMinor'=>4590, 'unit'=>'2 rulo', 'kind'=>'box', 'group'=>'Ev'],
+        ['name'=>'Pamuklu havlu', 'priceMinor'=>12990, 'unit'=>'50 × 90 cm', 'kind'=>'box', 'group'=>'Ev'],
+        ['name'=>'Defter', 'priceMinor'=>3490, 'unit'=>'80 yaprak', 'kind'=>'box', 'group'=>'Kırtasiye'],
     ];
 }
 
@@ -113,6 +113,36 @@ function showcase_product_icon(string $kind): void
         'tube'=>'M25 15h30l-6 44H31z M31 59h18v8H31z M30 22h20 M33 39h14',
     ];
     ?><svg viewBox="0 0 80 80" aria-hidden="true" focusable="false"><path d="<?= site_e($paths[$kind] ?? $paths['box']) ?>"/></svg><?php
+}
+
+/** Read-only artwork source; only the offline image helper calls this renderer. */
+function showcase_store_illustration(): void
+{
+    $products = showcase_sample_products();
+    $visible = array_map(static fn(int $index): array => $products[$index], [0, 4, 9, 12]);
+    $cart = [$visible[0], $visible[2]];
+    $money = static fn(int $minor): string => number_format($minor / 100, 2, site_language() === 'en' ? '.' : ',', site_language() === 'en' ? ',' : '.') . ' ₺';
+    ?>
+    <section class="store-illustration" data-store-illustration>
+        <header><div><p><?= site_e(site_text('Örnek mağaza')) ?></p><h1><?= site_e(site_text('Ürünleri inceleyin')) ?></h1></div><span><?= site_e(site_text('Temsili ürün ve fiyatlar')) ?></span></header>
+        <nav aria-label="<?= site_e(site_text('Kategoriler')) ?>"><?php foreach (array_merge(['Tümü'], array_values(array_unique(array_column($products, 'group')))) as $category): ?><span><?= site_e(site_text($category)) ?></span><?php endforeach; ?></nav>
+        <div class="store-illustration-layout"><div class="store-illustration-products"><?php foreach ($visible as $product): ?><article data-store-product>
+            <div class="store-product-drawing" data-kind="<?= site_e($product['kind']) ?>"><?php showcase_product_icon($product['kind']); ?></div><h2><?= site_e(site_text($product['name'])) ?></h2><small><?= site_e(site_text($product['unit'])) ?></small><strong data-store-price><?= site_e($money($product['priceMinor'])) ?></strong>
+        </article><?php endforeach; ?></div>
+        <aside><h2><?= site_e(site_text('Sepet örneği')) ?></h2><p><?= site_e(site_text('2 ürün · örnek toplam')) ?></p><ul><?php foreach ($cart as $product): ?><li><span><?= site_e(site_text($product['name'])) ?><small>1 × <?= site_e(site_text($product['unit'])) ?></small></span><strong><?= site_e($money($product['priceMinor'])) ?></strong></li><?php endforeach; ?></ul><div class="store-illustration-total"><span><?= site_e(site_text('Toplam')) ?></span><strong><?= site_e($money(array_sum(array_column($cart, 'priceMinor')))) ?></strong></div><p class="store-illustration-note"><?= site_e(site_text('Sabit tanıtım örneği; sipariş oluşturmaz.')) ?></p></aside></div>
+    </section>
+    <?php
+}
+
+/** Keep the inline preview and gallery on the same language and viewport artwork. */
+function showcase_store_image(): void
+{
+    $name = site_language() === 'en' ? 'web-store-en' : 'web-store';
+    $source = json_decode((string)file_get_contents(dirname(__DIR__) . '/assets/showcase/sources.json'), true);
+    $images = array_column($source['images'], null, 'file');
+    $desktop = $images[$name . '.webp']; $mobile = $images[$name . '-mobile.webp'];
+    $title = site_text('Temsili mağaza · örnek ürün ve fiyatlar');
+    ?><a class="showcase-image" href="<?= site_e(site_asset('showcase/' . $name . '.webp')) ?>" data-gallery-image data-gallery-responsive data-gallery-caption="<?= site_e(site_text('Temsili ürün ve fiyatlar · sabit tanıtım görseli')) ?>" data-gallery-title="<?= site_e($title) ?>" aria-label="<?= site_e($title . ' · ' . site_text('Görseli büyüt')) ?>"><picture><source media="(max-width:540px)" srcset="<?= site_e(site_asset('showcase/' . $name . '-mobile.webp')) ?>" width="<?= (int)$mobile['width'] ?>" height="<?= (int)$mobile['height'] ?>"><img src="<?= site_e(site_asset('showcase/' . $name . '.webp')) ?>" alt="<?= site_e($title) ?>" width="<?= (int)$desktop['width'] ?>" height="<?= (int)$desktop['height'] ?>" loading="lazy" decoding="async"></picture><span class="image-zoom" aria-hidden="true">↗</span></a><?php
 }
 
 function showcase_image(string $id, string $title, string $class = ''): void

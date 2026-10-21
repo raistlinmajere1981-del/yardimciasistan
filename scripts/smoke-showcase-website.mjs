@@ -11,6 +11,7 @@ import http from 'node:http';
 import { chromium, expect } from '@playwright/test';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { marketingFixture, imageBytes, editorialInput } from './test-helpers/marketing-fixtures.mjs';
+import { checkShowcaseStoreImages } from './test-helpers/showcase-store-images.mjs';
 // Full-page screenshots do not trigger loading="lazy" below the viewport.
 // Visit every viewport, wait for actual image decoding, then return to the top.
 async function loadPreviewImages(page) {
@@ -91,7 +92,9 @@ try {
   f.db.ensurePublicationTarget(config.baseUrl);
   assert.ok(!capabilities.features.includes('website_navigation'));
   await push(); assert.equal(f.db.getSyncRuntimeStatus().enabled, false);
-  browser = await launchChromiumForSmoke(chromium); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  browser = await launchChromiumForSmoke(chromium);
+  await checkShowcaseStoreImages(browser);
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = [], assetErrors = [], consoleErrors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400 && new URL(response.url()).pathname.startsWith('/assets/')) assetErrors.push(response.url()); });
@@ -144,7 +147,9 @@ try {
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', image.file);
   }
   assert.ok(provenance.images.every(image => image.bytes < 100000));
-  assert.ok(provenance.images.reduce((sum, image) => sum + image.bytes, 0) < 600000);
+  // Repository includes four responsive/language store variants; each page uses one.
+  assert.ok(provenance.images.reduce((sum, image) => sum + image.bytes, 0) < 750000);
+  assert.ok(provenance.images.filter(image => image.file.startsWith('web-store')).every(image => image.bytes < 60000));
   // Compare the server-rendered introduction, excluding header availability,
   // installation metadata/secret and the real chat. No runtime publication is written.
   const introduction = async () => {
@@ -464,7 +469,24 @@ try {
       }), `hero bounds and ground ${width} ${language}`);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await expect(heroRig).toHaveAttribute('data-motion-active', 'false');
+      const store = page.locator('.web-story [data-gallery-responsive]');
+      await store.scrollIntoViewIfNeeded();
+      await expect.poll(() => store.locator('img').evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
+      const storeSource = await store.locator('img').evaluate(node => node.currentSrc);
+      const storeFile = `web-store${language === 'en' ? '-en' : ''}${width <= 540 ? '-mobile' : ''}.webp`;
+      assert.equal(new URL(storeSource).pathname, `/assets/showcase/${storeFile}`);
+      const storeMetadata = provenance.images.find(image => image.file === storeFile);
+      assert.deepEqual(await store.locator('img').evaluate(node => ({ width: node.naturalWidth, height: node.naturalHeight })), { width: storeMetadata.width, height: storeMetadata.height });
+      assert.ok(await store.evaluate(node => { const r = node.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }), `Store illustration ${width}/${language}`);
+      await store.focus(); await page.keyboard.press('Enter');
+      const storeGallery = page.locator('dialog.showcase-gallery');
+      await expect(storeGallery).toBeVisible();
+      await expect(storeGallery.locator('img')).toHaveAttribute('src', storeSource);
+      await expect(storeGallery.locator('[data-showcase-caption]')).toContainText(language === 'en' ? 'Illustrative products and prices' : 'Temsili ürün ve fiyatlar');
+      await page.keyboard.press('Escape'); await expect(storeGallery).not.toBeVisible(); await expect(store).toBeFocused();
       const images = await loadPreviewImages(page);
+      const displayedFiles = new Set(images.map(image => image.src.split('/').at(-1)));
+      assert.ok(provenance.images.filter(image => displayedFiles.has(image.file)).reduce((sum, image) => sum + image.bytes, 0) < 600000, 'Displayed showcase images retain their page byte budget');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `homepage overflow ${width} ${language}`);
       await expect(page.locator('a.download-card')).toHaveCount(4);
       const suffix = language === 'tr' ? '' : '-en';
@@ -473,6 +495,7 @@ try {
       await page.screenshot({ path: `artifacts/showcase/hero-${width}${suffix}.png` });
       // Sticky chrome belongs in the full-page preview, not across a tall section crop.
       await page.locator('#ozellikler').screenshot({ path: `artifacts/showcase/features-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
+      await page.locator('.web-story').screenshot({ path: `artifacts/showcase/web-story-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
       await page.locator('[data-showcase-catalog]').screenshot({ path: `artifacts/showcase/catalog-${width}${suffix}.png`, style: '.site-header,.skip-link,#yardimci-asistan-widget{visibility:hidden!important}' });
       previews.push({ language, width, images });
       if (width === 375) {

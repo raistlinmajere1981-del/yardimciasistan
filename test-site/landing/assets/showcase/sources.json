@@ -1,5 +1,5 @@
 {
-  "description": "Provenance for real application UI screenshots used by the demo showcase. Crops remove test harness navigation or unused surrounding space; no application UI was drawn or replaced. All visible people, phone numbers, tax data and amounts originate from disposable synthetic fixtures. Dealer is the native pilot login screen; Companion image shows Desktop pairing settings, not a connected phone.",
+  "description": "Provenance for real application screenshots and explicitly labelled homepage store illustrations. Each entry identifies its source. Application crops retain the original UI and use disposable synthetic data. Store illustrations reuse the homepage sample products and native SVG drawings without contacting a database or API.",
   "images": [
     {
       "file": "dashboard.webp",
@@ -177,21 +177,6 @@
       "crop": null
     },
     {
-      "file": "web-store.webp",
-      "width": 1180,
-      "height": 600,
-      "bytes": 16258,
-      "source": "artifacts/showcase/store-1440.png",
-      "uiOwner": "test-site/landing/magaza/index.php / disposable local publication fixture",
-      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
-      "crop": [
-        130,
-        110,
-        1310,
-        710
-      ]
-    },
-    {
       "file": "translations.webp",
       "width": 1200,
       "height": 885,
@@ -220,6 +205,54 @@
         1416,
         984
       ]
+    },
+    {
+      "file": "web-store.webp",
+      "width": 1320,
+      "height": 1114,
+      "bytes": 52294,
+      "source": "test-site/landing/inc/showcase-content.php#showcase_store_illustration",
+      "uiOwner": "Homepage-only illustration / showcase_sample_products() and showcase_product_icon()",
+      "capture": "Static illustration with sample prices and a sample cart. Not a live storefront, order or publication. Generated offline; no API or database.",
+      "crop": null,
+      "renderSourceSha256": "41ae130c0f445501f4e0076a3bcc7209d16f1789dfd43f1c9f08aa753c9b73cb",
+      "sha256": "b985e89b9fefb69ab2d1c75d5fe03b20facc094c176922dc7e12cc685765e701"
+    },
+    {
+      "file": "web-store-mobile.webp",
+      "width": 670,
+      "height": 1534,
+      "bytes": 48520,
+      "source": "test-site/landing/inc/showcase-content.php#showcase_store_illustration",
+      "uiOwner": "Homepage-only illustration / showcase_sample_products() and showcase_product_icon()",
+      "capture": "Static illustration with sample prices and a sample cart. Not a live storefront, order or publication. Generated offline; no API or database.",
+      "crop": null,
+      "renderSourceSha256": "cfac0da1c60d076891cf391110bed22900a5aba103d8696be4e131ec8a90a7df",
+      "sha256": "51432c647a204e9964ff06d50f96adb67f7f903b553d11daf90040d17a6221c4"
+    },
+    {
+      "file": "web-store-en.webp",
+      "width": 1320,
+      "height": 1114,
+      "bytes": 53622,
+      "source": "test-site/landing/inc/showcase-content.php#showcase_store_illustration",
+      "uiOwner": "Homepage-only illustration / showcase_sample_products() and showcase_product_icon()",
+      "capture": "Static illustration with sample prices and a sample cart. Not a live storefront, order or publication. Generated offline; no API or database.",
+      "crop": null,
+      "renderSourceSha256": "9fa689deb23c29232fdb5bb307712fe35532f4b27992f4f96ee3ba6a8034bb23",
+      "sha256": "d1d4e29487611fe706485fed0a08f58d005b0c9788c50a223de36df38275a7ff"
+    },
+    {
+      "file": "web-store-en-mobile.webp",
+      "width": 670,
+      "height": 1572,
+      "bytes": 49264,
+      "source": "test-site/landing/inc/showcase-content.php#showcase_store_illustration",
+      "uiOwner": "Homepage-only illustration / showcase_sample_products() and showcase_product_icon()",
+      "capture": "Static illustration with sample prices and a sample cart. Not a live storefront, order or publication. Generated offline; no API or database.",
+      "crop": null,
+      "renderSourceSha256": "b142ec4b720c3e00d25732e81c0b9811038c0d1944fb96fd1007b17916ee3beb",
+      "sha256": "6107d3c74623cf3a8358c2af5ee609618e708c11cd7c4f53db6bb3c9af51ebc4"
     }
   ]
 }
