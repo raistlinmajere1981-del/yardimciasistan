@@ -1058,6 +1058,9 @@ try {
   await page.getByRole("tab", { name: "WhatsApp", exact: true }).click();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  // Page navigation commits in a React transition. Finish leaving Customer Work
+  // before clicking its sidebar entry; otherwise the pending exit can win later.
+  await expect(page.getByRole("button", { name: "Ana Ekran", exact: true })).toHaveAttribute("aria-current", "page");
   await page.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(page.getByRole("button", { name: "Müşteri İşleri", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
