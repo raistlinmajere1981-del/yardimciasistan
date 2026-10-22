@@ -15,6 +15,7 @@ export function normalizeProfileTransitionInput(
     aiEnabled: false,
     servicePreferences: { whatsapp: false, android: false },
     dealerPortalEnabled: false,
+    dealerApplicationEnabled: false,
     onlineSalesDeliveryEnabled: false,
     productData: { ...(input.productData ?? current.productData), enabled: false },
     birthdaySettings: { ...(input.birthdaySettings ?? current.birthdaySettings), enabled: false },
@@ -74,7 +75,7 @@ export function resetUnavailableServiceActivationsInTransaction(
 /** Caller owns the profile/capability transaction. Never delete credentials or configuration. */
 export function resetProfileServiceActivationsInTransaction(db: DatabaseSync, businessId: string, now: string): void {
   db.prepare(`UPDATE settings SET product_data_enabled = 0, birthday_enabled = 0,
-    dealer_portal_enabled = 0, online_sales_delivery_enabled = 0, updated_at = ?
+    dealer_application_enabled = 0, dealer_portal_enabled = 0, online_sales_delivery_enabled = 0, updated_at = ?
     WHERE business_id = ? AND deleted_at = ''`).run(now, businessId);
   db.prepare("UPDATE commerce_shipping_provider_config SET enabled = 0, updated_at = ? WHERE business_id = ?").run(now, businessId);
   db.prepare("UPDATE business_messaging_provider_config SET enabled = 0, updated_at = ? WHERE business_id = ?").run(now, businessId);

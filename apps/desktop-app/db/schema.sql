@@ -661,6 +661,9 @@ CREATE TABLE purchase_orders (
 
 CREATE TABLE requests (
   id TEXT PRIMARY KEY,
+  dealer_application_json TEXT NOT NULL DEFAULT 'null',
+  documents_json TEXT NOT NULL DEFAULT '[]',
+  dealer_customer_id TEXT NOT NULL DEFAULT '',
   customer_id TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'manual',
   request_type TEXT NOT NULL,
@@ -846,6 +849,7 @@ CREATE TABLE settings (
   product_data_provider TEXT NOT NULL DEFAULT 'open_food_facts',
   product_data_auto_search INTEGER NOT NULL DEFAULT 1 CHECK (product_data_auto_search IN (0, 1)),
   product_data_include_images INTEGER NOT NULL DEFAULT 1 CHECK (product_data_include_images IN (0, 1)),
+  dealer_application_enabled INTEGER NOT NULL DEFAULT 0 CHECK (dealer_application_enabled IN (0, 1)),
   dealer_portal_enabled INTEGER NOT NULL DEFAULT 0 CHECK (dealer_portal_enabled IN (0, 1)),
   online_sales_pickup_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_sales_pickup_enabled IN (0, 1)),
   online_sales_delivery_enabled INTEGER NOT NULL DEFAULT 0 CHECK (online_sales_delivery_enabled IN (0, 1)),
@@ -2335,6 +2339,7 @@ CREATE TABLE commerce_dealer_web_access (
   customer_ref TEXT NOT NULL UNIQUE,
   enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
   access_revision INTEGER NOT NULL CHECK (access_revision > 0),
+  invite_revision INTEGER NOT NULL DEFAULT 1 CHECK (invite_revision > 0),
   invite_hash TEXT NOT NULL DEFAULT '' CHECK (invite_hash = '' OR length(invite_hash) = 64),
   invite_issued_at TEXT NOT NULL DEFAULT '',
   invite_expires_at TEXT NOT NULL DEFAULT '',
@@ -2400,26 +2405,44 @@ BEGIN
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
+CREATE TRIGGER trg_dealer_profile_active_insert AFTER INSERT ON customer_commercial_profiles
+WHEN NEW.dealer_status = 'active'
+BEGIN
+ INSERT INTO commerce_dealer_web_access (id, customer_id, business_id, customer_ref, enabled, access_revision, created_at, updated_at)
+ VALUES (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))), NEW.customer_id, NEW.business_id, lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))), 1, 1, NEW.updated_at, NEW.updated_at)
+ ON CONFLICT(customer_id) DO UPDATE SET enabled = 1,
+ access_revision = access_revision + CASE WHEN enabled = 0 THEN 1 ELSE 0 END,
+ invite_revision = invite_revision + CASE WHEN enabled = 0 THEN 1 ELSE 0 END;
+END;
+CREATE TRIGGER trg_dealer_profile_active_update AFTER UPDATE ON customer_commercial_profiles
+WHEN NEW.dealer_status = 'active' AND (OLD.dealer_status <> 'active' OR NOT EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE customer_id = NEW.customer_id))
+BEGIN
+ INSERT INTO commerce_dealer_web_access (id, customer_id, business_id, customer_ref, enabled, access_revision, created_at, updated_at)
+ VALUES (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))), NEW.customer_id, NEW.business_id, lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))), 1, 1, NEW.updated_at, NEW.updated_at)
+ ON CONFLICT(customer_id) DO UPDATE SET enabled = 1,
+ access_revision = access_revision + CASE WHEN enabled = 0 THEN 1 ELSE 0 END,
+ invite_revision = invite_revision + CASE WHEN enabled = 0 THEN 1 ELSE 0 END;
+END;
 CREATE TRIGGER trg_dealer_profile_inactive AFTER UPDATE OF dealer_status ON customer_commercial_profiles
 WHEN NEW.dealer_status <> 'active'
-BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
  revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE customer_id = NEW.customer_id; END;
 CREATE TRIGGER trg_dealer_profile_removed AFTER DELETE ON customer_commercial_profiles
-BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
  revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE customer_id = OLD.customer_id; END;
 CREATE TRIGGER trg_dealer_customer_deleted AFTER UPDATE OF deleted_at ON customers
 WHEN NEW.deleted_at <> ''
-BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
  revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE customer_id = NEW.id; END;
 CREATE TRIGGER trg_dealer_portal_settings AFTER UPDATE OF dealer_portal_enabled ON settings
 WHEN NEW.dealer_portal_enabled <> OLD.dealer_portal_enabled
 BEGIN
-UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
- revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE business_id = NEW.business_id AND NEW.dealer_portal_enabled = 0 AND enabled = 1;
+ revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE business_id = NEW.business_id AND NEW.dealer_portal_enabled = 0;
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
@@ -2427,9 +2450,9 @@ UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revi
 END;
 CREATE TRIGGER trg_dealer_wholesale_insert AFTER INSERT ON business_capabilities WHEN NEW.capability_id = 'commerce.wholesale' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
 BEGIN
-UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
- revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE enabled = 1 AND business_id = NEW.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
+ revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE business_id = NEW.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
@@ -2437,9 +2460,9 @@ UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revi
 END;
 CREATE TRIGGER trg_dealer_wholesale_update AFTER UPDATE ON business_capabilities WHEN NEW.capability_id = 'commerce.wholesale' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
 BEGIN
-UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
- revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE enabled = 1 AND business_id = NEW.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
+ revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE business_id = NEW.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
@@ -2447,9 +2470,9 @@ UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revi
 END;
 CREATE TRIGGER trg_dealer_wholesale_delete AFTER DELETE ON business_capabilities WHEN OLD.capability_id = 'commerce.wholesale' AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = OLD.business_id)
 BEGIN
-UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1,
+UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revision + 1, invite_revision = invite_revision + 1,
  invite_hash = '', invite_issued_at = '', invite_expires_at = '',
- revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE enabled = 1 AND business_id = OLD.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = OLD.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
+ revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE business_id = OLD.business_id AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = OLD.business_id AND capability_id = 'commerce.wholesale' AND is_enabled = 1);
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
@@ -3222,3 +3245,21 @@ BEGIN
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
+
+CREATE TRIGGER trg_dealer_automatic_portal AFTER UPDATE OF dealer_portal_enabled ON settings
+WHEN NEW.dealer_portal_enabled = 1 AND NEW.dealer_portal_enabled <> OLD.dealer_portal_enabled
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 1, access_revision = access_revision + 1, invite_revision = invite_revision + 1
+ WHERE business_id = NEW.business_id AND EXISTS (SELECT 1 FROM customer_commercial_profiles p JOIN customers c ON c.id = p.customer_id
+ WHERE p.customer_id = commerce_dealer_web_access.customer_id AND p.dealer_status = 'active' AND c.deleted_at = ''); END;
+
+CREATE TRIGGER trg_dealer_automatic_wholesale_insert AFTER INSERT ON business_capabilities
+WHEN NEW.capability_id = 'commerce.wholesale' AND NEW.is_enabled = 1
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 1, access_revision = access_revision + 1, invite_revision = invite_revision + 1
+ WHERE business_id = NEW.business_id AND EXISTS (SELECT 1 FROM customer_commercial_profiles p JOIN customers c ON c.id = p.customer_id
+ WHERE p.customer_id = commerce_dealer_web_access.customer_id AND p.dealer_status = 'active' AND c.deleted_at = ''); END;
+
+CREATE TRIGGER trg_dealer_automatic_wholesale_update AFTER UPDATE ON business_capabilities
+WHEN NEW.capability_id = 'commerce.wholesale' AND NEW.is_enabled = 1 AND OLD.is_enabled <> NEW.is_enabled
+BEGIN UPDATE commerce_dealer_web_access SET enabled = 1, access_revision = access_revision + 1, invite_revision = invite_revision + 1
+ WHERE business_id = NEW.business_id AND EXISTS (SELECT 1 FROM customer_commercial_profiles p JOIN customers c ON c.id = p.customer_id
+ WHERE p.customer_id = commerce_dealer_web_access.customer_id AND p.dealer_status = 'active' AND c.deleted_at = ''); END;

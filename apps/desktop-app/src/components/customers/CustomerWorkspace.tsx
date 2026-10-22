@@ -109,9 +109,17 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     setSaveState("idle");
   }, [customer, customerLoading, customerLoadError, dirty]);
 
+  const [customerRequests, setCustomerRequests] = useState<{id: string; items: SyncedCustomerRequest[]} | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (customer?.id && window.yardimciDesktop?.getCustomerRequests) {
+      window.yardimciDesktop.getCustomerRequests(customer.id).then(items => { if (active) setCustomerRequests({id: customer.id, items}); }).catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [customer?.id, data.requests]);
   const selectedRequests = useMemo<SyncedCustomerRequest[]>(
-    () => customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [],
-    [customer, data.requests]
+    () => customerRequests && customerRequests.id === customer?.id ? customerRequests.items : customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [],
+    [customer, data.requests, customerRequests]
   );
   const selectedReservations = useMemo(
     () => customer ? data.reservations.filter((reservation) => reservation.customerId === customer.id || reservation.customerPhone === customer.phone) : [],
@@ -251,7 +259,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         {customer && <>
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
-        {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
+        {wholesaleEnabled && customer.commercialProfile && <DealerWebAccessPanel key={customer.id} customerId={customerId} active={customer.commercialProfile.dealerStatus === "active"} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <DetailSectionCard className="customer-operation-card form-stack" title="Konaklama"
           actions={activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}>
           {activeStay ? <>

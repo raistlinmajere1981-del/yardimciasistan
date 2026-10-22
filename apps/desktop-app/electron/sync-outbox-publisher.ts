@@ -21,7 +21,7 @@ export class SyncOutboxPublisher {
   private dealerAccessSupported = false;
   setSupportedFeatures(features: readonly string[]) {
     this.onlineCatalogSupported = features.includes("online_catalog_v1");
-    this.dealerAccessSupported = features.includes("dealer_access_v1");
+    this.dealerAccessSupported = features.includes("dealer_access_v2");
   }
   private readonly outboxPublicationsInFlight = new Map<string, { sourceRevision: number; promise: Promise<unknown> }>();
   constructor(private readonly options: SyncOutboxPublisherOptions,

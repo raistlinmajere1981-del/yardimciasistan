@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/../lib/request-documents.php';
 
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
@@ -74,6 +75,7 @@ ya_business_response(200, [
         'whatsapp' => $whatsapp,
         'email' => $email,
         'website' => ya_business_string($config['website'] ?? ''),
+        'dealer_application_enabled' => ya_dealer_application_enabled(),
         'mapDisplayMode' => ($publicContext['mapDisplayMode'] ?? '') === 'google_maps_embed' ? 'google_maps_embed' : 'manual',
         'googleMapsEmbedUrl' => ya_business_google_maps_embed_url($publicContext['googleMapsEmbedUrl'] ?? ''),
         'address' => $address,

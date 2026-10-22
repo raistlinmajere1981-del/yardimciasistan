@@ -364,6 +364,7 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       whatsapp_enabled: options.context.whatsappEnabled,
       email: options.context.email,
       address: options.context.address,
+      dealerApplicationEnabled: options.context.dealerApplicationEnabled === true,
       mapDisplayMode: options.context.mapDisplayMode ?? "manual",
       googleMapsEmbedUrl: options.context.googleMapsEmbedUrl ?? "",
       latitude: options.context.latitude,
@@ -474,6 +475,27 @@ export class PhpHostingSyncTransport implements SyncTransport {
       ...(input.replayThroughSeq === undefined ? {} : { replayThroughSeq: input.replayThroughSeq }),
       sourceEpoch: this.config.sourceEpoch
     });
+  }
+
+  async downloadRequestDocument(requestId: string, documentId: string): Promise<Uint8Array> {
+    const response = await (this.config.fetchImpl ?? fetch)(createSyncEndpointUrl(this.config.baseUrl), {
+      method: "POST", redirect: "error", headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": this.config.syncSecret },
+      body: JSON.stringify({ action: "request_document", request_id: requestId, document_id: documentId }),
+      signal: AbortSignal.timeout(60_000)
+    });
+    if (!response.ok || !response.body) throw new Error("Başvuru belgesi indirilemedi.");
+    const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
+    try {
+      while (true) {
+        const chunk = await reader.read(); if (chunk.done) break;
+        size += chunk.value.length;
+        if (size > 10 * 1024 * 1024) throw new Error("Başvuru belgesi boyutu geçersiz.");
+        chunks.push(chunk.value);
+      }
+    } finally { await reader.cancel(); }
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return bytes;
   }
 
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult> {

@@ -64,7 +64,8 @@ const stagedSettingsContributions = {
     render: ({ draft, onChange, busy }) => (
       <ServiceSettingsCard id="settings-dealer-portal" readiness="Test kullanılamıyor" title="Bayi Web Erişimi" enabled={draft.dealerPortalEnabled}
         disabled={busy} onEnabledChange={dealerPortalEnabled => onChange({ dealerPortalEnabled })}>
-        <p>Aktif bayilere Müşteri kartından tek kullanımlık davet ile web erişimi verin.</p>
+        <label className="settings-service-toggle"><input type="checkbox" checked={draft.dealerApplicationEnabled} disabled={busy}
+          onChange={event => onChange({ dealerApplicationEnabled: event.target.checked })} /><span>Online Bayi Başvurusu</span></label>
       </ServiceSettingsCard>
     )
   }, {

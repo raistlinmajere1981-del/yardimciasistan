@@ -96,6 +96,12 @@ export function useCustomerController({
     return true;
   }
 
+  async function handleApproveDealerApplication(requestId: string, priceGroup: string) {
+    const result = await window.yardimciDesktop!.approveDealerApplication(requestId, priceGroup);
+    if (result.ok) setDashboardData(result.dashboardData);
+    return result;
+  }
+
   async function handleConvertRequestToReservation(request: SyncedCustomerRequest) {
     setConvertingRequestId(request.id);
     setSyncState("loading");
@@ -255,6 +261,7 @@ export function useCustomerController({
     convertingRequestId,
     handleCreateManualRequest,
     handleConvertRequestToReservation,
+    handleApproveDealerApplication,
     handleUpdateRequestStatus,
     handleDeleteRequest,
     handleDeleteCustomer,

@@ -174,7 +174,7 @@ try {
   // In wholesale profiles, identity fields are collapsed until explicitly needed.
   await profile.locator("details.customer-identity-details > summary").click();
   await profile.getByRole("region", { name: "Kimlik kartı bilgileri", exact: true }).getByLabel("Veren makam", { exact: true }).scrollIntoViewIfNeeded();
-  await expect(operations.getByRole("region", { name: "Web bayi erişimi", exact: true })).toBeInViewport();
+  await expect(operations.getByRole("region", { name: "Bayi Girişi", exact: true })).toBeInViewport();
   await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
   await operations.getByRole("region", { name: "Hızlı işlemler", exact: true }).scrollIntoViewIfNeeded();
   await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
@@ -185,18 +185,17 @@ try {
   await expect(workspace.getByLabel("Fiyat grubu", { exact: true })).toHaveValue("dealer_a");
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("30");
 
-  const accessPanel = workspace.getByRole("region", { name: "Web bayi erişimi" });
+  const accessPanel = workspace.getByRole("region", { name: "Bayi Girişi" });
   await expect(accessPanel).toBeVisible();
-  await accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" }).click();
   await accessPanel.getByRole("button", { name: "Davet oluştur", exact: true }).click();
   const inviteOne = await accessPanel.getByLabel("Davet bağlantısı").inputValue();
   assert.match(inviteOne, /\/bayi\/#invite=[A-Za-z0-9_-]{43}$/);
-  await accessPanel.getByRole("button", { name: "Daveti yenile" }).click();
+  await accessPanel.getByRole("button", { name: "Yeni davet oluştur" }).click();
   await expect(accessPanel.getByLabel("Davet bağlantısı")).not.toHaveValue(inviteOne);
-  await accessPanel.getByRole("button", { name: "Oturumları sonlandır" }).click();
+  await accessPanel.getByRole("button", { name: "Tüm cihazlardan çıkış yap" }).click();
+  await accessPanel.getByRole("button", { name: "Çıkış yap", exact: true }).click();
   await expect(accessPanel.getByLabel("Davet bağlantısı")).toHaveCount(0);
-  await accessPanel.getByRole("button", { name: "Web erişimini kapat" }).click();
-  await expect(accessPanel).toContainText("İptal edildi");
+  await expect(accessPanel.getByRole("button", { name: "Web erişimini kapat" })).toHaveCount(0);
   assert.equal(calls.filter((call) => call.method === "saveCustomer").length, 1, "access actions do not submit Customer draft");
 
   const firstSave = calls.find((call) => call.method === "saveCustomer");
@@ -226,7 +225,7 @@ try {
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
   await workspace.getByLabel("Not", { exact: true }).fill("Vade güncellendi.");
   await expect(workspace.getByRole("button", { name: "Geçmiş", exact: true })).toBeDisabled();
-  await expect(accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" })).toBeDisabled();
+  await expect(accessPanel.getByRole("button", { name: /davet oluştur/i })).toBeDisabled();
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
 
@@ -261,7 +260,7 @@ try {
   workspace = page.locator("dialog.customer-workspace-frame");
   await expect(workspace).toBeVisible();
   await expect(workspace.getByText("Ticari bilgiler", { exact: true })).toHaveCount(0);
-  await expect(workspace.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
+  await expect(workspace.getByRole("region", { name: "Bayi Girişi" })).toHaveCount(0);
 
   await workspace.getByLabel("Ad soyad", { exact: true }).fill("Ada Bayi Güncel");
   const saveCallCountBeforeBasicEdit = calls.filter((call) => call.method === "saveCustomer").length;
@@ -318,7 +317,7 @@ try {
   await normalCreate.getByLabel("Ad soyad", { exact: true }).fill("Normal Müşteri");
   await normalCreate.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(page.locator("dialog.customer-workspace-frame").getByRole("heading", { name: "Normal Müşteri", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Bayi Girişi" })).toHaveCount(0);
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-customer-ui-smoke-ok");
 } catch (error) {

@@ -98,6 +98,7 @@ export function CustomerWorkRoute({
           onTabChange={onTabChange}
           requests={(
             <RequestsWorkspace
+              onApproveDealer={customerController.handleApproveDealerApplication}
               requests={surfaceData.requests}
               selectedRequest={selectedSurfaceRequest}
               aiEnabled={features.ai}

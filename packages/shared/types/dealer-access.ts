@@ -1,10 +1,11 @@
 /** Dealer identity is an access projection of canonical Customer, never a second Customer. */
-export type DealerAccessAction = "enable" | "invite" | "revoke_sessions" | "disable";
+export type DealerAccessAction = "invite" | "revoke_sessions";
 export interface DealerWebAccess {
   accessId: string;
   customerId: string;
   enabled: boolean;
   accessRevision: number;
+  inviteRevision: number;
   inviteIssuedAt: string;
   inviteExpiresAt: string;
   revokedAt: string;
@@ -17,13 +18,14 @@ export interface DealerAccessResult {
 }
 /** Private sync contract: no contact, tax, notes, pricing configuration or raw canonical Customer ids. */
 export interface DealerAccessProjection {
-  version: 1;
+  version: 1 | 2;
   enabled: boolean;
   dealers: Array<{
     access_id: string;
     customer_ref: string;
     display_name: string;
     access_revision: number;
+    invite_revision?: number;
     enabled: boolean;
     invite_hash: string;
     invite_expires_at: number;

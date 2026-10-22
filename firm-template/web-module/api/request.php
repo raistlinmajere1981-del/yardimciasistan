@@ -7,6 +7,7 @@ const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/public-request-guard.php';
 require_once YA_BASE_DIR . '/lib/public-request-submission.php';
+require_once YA_BASE_DIR . '/lib/request-documents.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
@@ -32,7 +33,7 @@ if (!ya_request_feature_enabled($businessConfig)) {
     ]);
 }
 
-ya_public_guard_enforce('request');
+ya_public_guard_enforce('request', str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') ? 51 * 1024 * 1024 : YA_PUBLIC_GUARD_MAX_BODY_BYTES);
 
 $payloadResult = ya_read_payload();
 if (!$payloadResult['ok']) {
@@ -43,6 +44,18 @@ if (!$payloadResult['ok']) {
 }
 
 $payload = $payloadResult['data'];
+$isApplication = ($payload['request_type'] ?? '') === 'dealer_application';
+if ($isApplication && !ya_dealer_application_enabled()) ya_json_response(403, ['ok' => false, 'code' => 'dealer_application_disabled', 'message' => 'Online bayi başvurusu kapalı.']);
+if ($isApplication) {
+    $payload['customer_name'] = ya_string($payload['authorized_person'] ?? '');
+    $payload['guest_count'] = 1; $payload['adult_count'] = 0; $payload['child_count'] = 0;
+    foreach (['date_text', 'start_date', 'end_date', 'time'] as $field) $payload[$field] = '';
+}
+$uploads = [];
+try {
+    if ($isApplication) $uploads = ya_request_document_uploads($_FILES['documents'] ?? [], $payload['document_kinds'] ?? []);
+    elseif ($_FILES !== []) throw new InvalidArgumentException('Bu talebe belge eklenemez.');
+} catch (InvalidArgumentException $error) { ya_json_response(422, ['ok' => false, 'message' => $error->getMessage()]); }
 $errors = ya_validate_request_payload($payload);
 
 if ($errors !== []) {
@@ -63,8 +76,8 @@ if ($whatsappMessage === '') {
 
 $request = [
     'id' => ya_create_id('request_'),
-    'customer_id' => ya_string($payload['customer_id'] ?? ''),
-    'source' => ya_string($payload['source'] ?? 'web_form'),
+    'customer_id' => $isApplication ? '' : ya_string($payload['customer_id'] ?? ''),
+    'source' => $isApplication ? 'web_form' : ya_string($payload['source'] ?? 'web_form'),
     'request_type' => ya_string($payload['request_type'] ?? 'general_info'),
     'status' => 'new',
     'customer_name' => ya_string($payload['customer_name'] ?? ''),
@@ -88,6 +101,13 @@ $request = [
     'updated_at' => $now
 ];
 
+if ($isApplication) {
+    $request['dealer_application'] = [];
+    foreach (['company_name', 'authorized_person', 'email', 'tax_office', 'tax_number'] as $field) $request['dealer_application'][$field] = ya_string($payload[$field] ?? '');
+    $request['customer_name'] = $request['dealer_application']['authorized_person'];
+    $request['documents'] = array_map(static function (array $doc): array { unset($doc['_upload'], $doc['_extension']); return $doc; }, $uploads);
+}
+
 try {
     $result = ya_public_request_submit($payload['idempotency_key'] ?? null, $request, [
         'ok' => true,
@@ -95,7 +115,7 @@ try {
         'request_id' => $request['id'],
         'whatsapp_message' => $whatsappMessage,
         'whatsapp_phone' => $phone['whatsapp']
-    ], ya_string($businessConfig['business_id'] ?? ''));
+    ], ya_string($businessConfig['business_id'] ?? ''), $uploads);
 } catch (YaPublicRequestRejection $error) {
     ya_json_response($error->status, ['ok' => false, 'code' => $error->responseCode, 'message' => $error->getMessage()]);
 } catch (Throwable $error) {
@@ -235,6 +255,7 @@ function ya_validate_request_payload(array $payload): array
     $errors = [];
     $requestType = ya_string($payload['request_type'] ?? 'general_info');
     $allowedTypes = [
+        'dealer_application',
         'general_info',
         'pension_reservation',
         'restaurant_reservation',
@@ -309,7 +330,7 @@ function ya_validate_request_payload(array $payload): array
                 'message' => 'Rezervasyon saati HH:MM biçiminde olmalı.'
             ];
         }
-    } elseif ($dateText === '' && $startDate === '') {
+    } elseif ($requestType !== 'dealer_application' && $dateText === '' && $startDate === '') {
         $errors[] = [
             'field' => 'date_text',
             'message' => 'Tarih bilgisi gerekli.'
@@ -345,6 +366,13 @@ function ya_validate_request_payload(array $payload): array
         ];
     }
 
+    if ($requestType === 'dealer_application') {
+        foreach (['company_name' => 180, 'authorized_person' => 160, 'email' => 254, 'tax_office' => 120, 'tax_number' => 32] as $field => $max) {
+            $value = ya_string($payload[$field] ?? '');
+            if (mb_strlen($value) > $max || (in_array($field, ['company_name','authorized_person','email'], true) && $value === '')) $errors[] = ['field' => $field, 'message' => 'Başvuru bilgilerini kontrol edin.'];
+        }
+        if (!filter_var($payload['email'] ?? '', FILTER_VALIDATE_EMAIL)) $errors[] = ['field' => 'email', 'message' => 'Geçerli e-posta adresi girin.'];
+    }
     return $errors;
 }
 

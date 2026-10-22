@@ -69,6 +69,7 @@ export interface SetupFormState {
   whatsappCloud: WhatsAppCloudConfigurationInput & { hasSecret: boolean; configured: boolean };
   arasShipping: Omit<ArasShippingConfigurationInput, "enabled"> & { hasSecret: boolean };
   dealerPortalEnabled: boolean;
+  dealerApplicationEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled: boolean;
 }
@@ -137,6 +138,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
       password: "", clearPassword: false
     },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
+    dealerApplicationEnabled: setupData.dealerApplicationEnabled ?? false,
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
     onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? false,
     productDataEnabled: setupData.productData.enabled,
@@ -282,6 +284,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
         customerCode: setupForm.arasShipping.customerCode, username: setupForm.arasShipping.username,
         ...(setupForm.arasShipping.password === undefined ? {} : { password: setupForm.arasShipping.password }), ...(setupForm.arasShipping.clearPassword === undefined ? {} : { clearPassword: setupForm.arasShipping.clearPassword }) },
       dealerPortalEnabled: setupForm.dealerPortalEnabled,
+      dealerApplicationEnabled: setupForm.dealerApplicationEnabled,
       onlineSalesDelivery: setupForm.onlineSalesDelivery,
       onlineSalesDeliveryEnabled: setupForm.onlineSalesDeliveryEnabled,
       productData: {

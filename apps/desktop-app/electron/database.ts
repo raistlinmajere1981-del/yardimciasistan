@@ -1196,6 +1196,8 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
+  getCustomerRequests(customerId: string) { return getRequests(this.db, customerId); }
+
   getRequestById(requestId: string): SyncedCustomerRequest | null {
     return getStoredRequestById(this.db, requestId);
   }
@@ -1206,6 +1208,11 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  approveDealerApplication(requestId: string, priceGroup: string) {
+    const result = approveDealerApplication(this.db, requestId, priceGroup, this.getEnabledBusinessCapabilities());
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   convertRequestToReservation(requestId: string): RequestReservationConversionResult {
@@ -1424,6 +1431,7 @@ import {
 } from "./android-action-service.js";
 
 import {
+  approveDealerApplication,
   createManualRequest as createStoredManualRequest,
   convertRequestToReservation as convertStoredRequestToReservation,
   upsertSyncedRequests,

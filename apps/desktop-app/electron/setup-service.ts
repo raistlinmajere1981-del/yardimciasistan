@@ -120,6 +120,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     arasShipping: getArasShippingConfiguration(db),
     sms: smsConfiguration(db), instagram: instagramConfiguration(db),
     whatsappCloud: getMessagingConfiguration(db),
+    dealerApplicationEnabled: Number(settings?.dealer_application_enabled ?? 0) === 1,
     dealerPortalEnabled: available("dealerPortal") && Number(settings?.dealer_portal_enabled ?? 0) === 1,
     onlineSalesDeliveryEnabled: available("delivery") && Number(settings?.online_sales_delivery_enabled ?? 0) === 1,
     onlineSalesDelivery: {
@@ -523,6 +524,9 @@ export function saveSetupData(
 
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
+
+    db.prepare("UPDATE settings SET dealer_application_enabled = ? WHERE id = ?")
+      .run((input.dealerApplicationEnabled ?? Number(existingSettings?.dealer_application_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
     saveMarketingProviderConfigurations(db, businessId, input.sms, marketingSecretWrites);
     if (input.instagram) setInstagramOAuthEnabled(db, input.instagram.enabled);

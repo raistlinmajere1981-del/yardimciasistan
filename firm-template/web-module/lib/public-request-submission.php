@@ -26,18 +26,23 @@ function ya_public_request_intent(array $request, string $businessId): array
     foreach (['guest_count', 'adult_count', 'child_count'] as $field) $intent[$field] = (int) ($request[$field] ?? 0);
     $context = $request['context'] ?? [];
     foreach (['resourceType', 'resourceId', 'resourceName'] as $field) $intent['context'][$field] = trim((string) ($context[$field] ?? ''));
+    if (($request['request_type'] ?? '') === 'dealer_application') {
+        $intent['dealer_application'] = $request['dealer_application'];
+        $intent['documents'] = array_map(static function (array $doc): array { unset($doc['id']); return $doc; }, $request['documents'] ?? []);
+    }
     return $intent;
 }
 
 /** Creation ingress is independent of publication ordering. Queue and exact
  * response receipt commit together under the same SQLite write lock.
  */
-function ya_public_request_submit(mixed $key, array $request, array $response, string $businessId): array
+function ya_public_request_submit(mixed $key, array $request, array $response, string $businessId, array $uploads = []): array
 {
     if (!is_string($key) || preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $key) !== 1) {
         throw new YaPublicRequestRejection(422, 'invalid_idempotency_key', 'Tekrar deneme kimliği gerekli veya geçersiz.');
     }
     $database = ya_storage_open();
+    $createdFiles = [];
     $database->exec('BEGIN IMMEDIATE');
     try {
         $secret = $database->query("SELECT value FROM sync_meta WHERE key = 'web_request_receipt_secret'")->fetchColumn();
@@ -57,6 +62,19 @@ function ya_public_request_submit(mixed $key, array $request, array $response, s
             $database->exec('COMMIT');
             return ya_storage_decode($receipt['response_json'], []);
         }
+        foreach ($uploads as $index => $doc) {
+            // Stable private identity also reuses bytes left by a process crash before COMMIT.
+            $doc['id'] = substr(hash_hmac('sha256', $keyHash . ':' . $requestHash . ':' . $index, $secret), 0, 32);
+            $request['documents'][$index]['id'] = $doc['id'];
+            $path = ya_request_document_root() . '/' . $doc['id'];
+            if (!is_file($path)) {
+                if (!move_uploaded_file($doc['_upload'], $path)) throw new RuntimeException('document_move_failed');
+                $createdFiles[] = $path;
+            } elseif (filesize($path) !== $doc['size'] || hash_file('sha256', $path) !== $doc['sha256']) {
+                throw new RuntimeException('document_integrity_failed');
+            }
+            if (!chmod($path, 0600)) throw new RuntimeException('document_permissions_failed');
+        }
         ya_storage_insert_request($request);
         $database->prepare('INSERT INTO web_request_submission_receipts (key_hash, request_hash, response_json, created_at) VALUES (?, ?, ?, ?)')
             ->execute([$keyHash, $requestHash, ya_storage_encode($response), $request['created_at']]);
@@ -64,6 +82,7 @@ function ya_public_request_submit(mixed $key, array $request, array $response, s
         return $response;
     } catch (Throwable $error) {
         $database->exec('ROLLBACK');
+        foreach ($createdFiles as $path) @unlink($path);
         throw $error;
     }
 }

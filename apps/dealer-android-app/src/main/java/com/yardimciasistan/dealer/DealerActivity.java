@@ -23,6 +23,7 @@ import java.util.concurrent.*;
 
 /** Four native destinations. No Companion permissions, device actions or publication credentials. */
 public final class DealerActivity extends ComponentActivity {
+  private DealerApplicationForm application;
   private DealerState state;
   private LinearLayout shell, body, navigation;
   private final ExecutorService network = Executors.newSingleThreadExecutor();
@@ -42,11 +43,13 @@ public final class DealerActivity extends ComponentActivity {
     super.onCreate(saved);
     try {
       DealerDisk disk = new DealerDisk(this); state = new DealerState(disk.read(), disk);
+      application = new DealerApplicationForm(this, network, this::render, saved);
       applyTheme(); images = new DealerImages(this);
       if (saved != null) { tab = saved.getString("tab", "Katalog"); detail = saved.getString("detail", ""); }
       getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
         public void handleOnBackPressed() {
-          if (!detail.isEmpty()) { detail = ""; render(); }
+          if (application.active()) { application.close(); }
+          else if (!detail.isEmpty()) { detail = ""; render(); }
           else if (!tab.equals("Katalog")) { tab = "Katalog"; render(); }
           else { setEnabled(false); getOnBackPressedDispatcher().onBackPressed(); setEnabled(true); }
         }
@@ -56,7 +59,7 @@ public final class DealerActivity extends ComponentActivity {
       else if (!state.text("cookie").isEmpty()) refresh();
     } catch (Exception error) { fatalStorage(); }
   }
-  @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putString("tab", tab); out.putString("detail", detail); }
+  @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putString("tab", tab); out.putString("detail", detail); if (application != null) application.save(out); }
   @Override protected void onDestroy() { network.shutdownNow(); if (images != null) images.close(); super.onDestroy(); }
   private void applyTheme() {
     String mode = state.text("theme"); boolean dark = mode.equals("dark") || (!mode.equals("light") && (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
@@ -129,6 +132,7 @@ public final class DealerActivity extends ComponentActivity {
   }
   private void render() {
     if (storageFailed) return;
+    if (application != null && application.active()) { application.show(); return; }
     shell = column(); shell.setBackgroundColor(background); setContentView(shell);
     ViewCompat.setOnApplyWindowInsetsListener(shell, (view, insets) -> {
       androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.ime());
@@ -184,6 +188,7 @@ public final class DealerActivity extends ComponentActivity {
         verifyClaim(base, result.getString("cookie"));
       }, false);
     }), true);
+    button(form, "Bayi Başvurusu Yap", () -> application.open(server.getText().toString()), false);
     label(form, "Davet tek kullanımlıktır. Süresi dolduysa firmanızdan yeni davet isteyin. Kaydedilmiş sepet yalnız aynı bayi hesabıyla yeniden giriş yaptığınızda açılır.", 13, muted);
   }
   private void verifyClaim(String base, String cookie) {

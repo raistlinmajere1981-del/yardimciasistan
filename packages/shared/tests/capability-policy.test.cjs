@@ -120,3 +120,10 @@ test("reservation-linked generic tasks use resource context", () => {
     { tableIds: ["table-1"] }
   ), false);
 });
+
+test("dealer application needs requests and wholesale and cannot become a reservation", () => {
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.REQUESTS], "dealer_application"), false);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.WHOLESALE], "dealer_application"), false);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.REQUESTS, C.WHOLESALE], "dealer_application"), true);
+  assert.equal(canConvertRequestToReservation([C.CUSTOMERS, C.REQUESTS, C.WHOLESALE], "dealer_application"), false);
+});

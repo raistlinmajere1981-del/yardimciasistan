@@ -1,3 +1,4 @@
+import { RequestDocuments } from "./RequestDocuments";
 import { useMemo, useState } from "react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -64,6 +65,7 @@ export function CustomerHistoryView({
         status={<StatusBadge tone={requestTone(request.status)}>{formatRequestStatus(request.status)}</StatusBadge>}
         meta={<span>{request.date_text || request.start_date || request.created_at || "-"}</span>}
         description={request.message || request.ai_summary || undefined}
+        children={<RequestDocuments requestId={request.id} documents={request.documents} />}
       />
     })),
     ...(reservationsEnabled ? reservations.map(reservation => ({

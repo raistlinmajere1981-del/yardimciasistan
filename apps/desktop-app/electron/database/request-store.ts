@@ -24,7 +24,7 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
-  const request = db.prepare("SELECT status FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string } | undefined;
+  const request = db.prepare("SELECT status, request_type, dealer_customer_id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string; request_type?: string; dealer_customer_id?: string } | undefined;
   if (!request) {
     return {
       ok: false,
@@ -32,6 +32,9 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
+  if (request.request_type === "dealer_application" && (status === "approved" || request.dealer_customer_id)) {
+    return { ok: false, message: "Bayi başvurusu için Onayla ve Bayi Oluştur işlemini kullanın." };
+  }
   const now = context.now ?? new Date().toISOString();
   db.exec("SAVEPOINT request_status");
   try {
@@ -72,6 +75,7 @@ export function getRequestById(db: DatabaseSync, requestId: string): SyncedCusto
     .prepare(`
         SELECT
           id,
+          dealer_application_json, documents_json, dealer_customer_id,
           customer_id,
           source,
           request_type,
@@ -214,11 +218,13 @@ export function saveRequestAiSuggestion(db: DatabaseSync, input: SaveRequestAiSu
   };
 }
 
-export function getRequests(db: DatabaseSync): SyncedCustomerRequest[] {
+export function getRequests(db: DatabaseSync, customerId?: string): SyncedCustomerRequest[] {
+  const phone = customerId ? String(db.prepare("SELECT phone FROM customers WHERE id = ? AND deleted_at = ''").get(customerId)?.phone ?? "") : "";
   const rows = db
     .prepare(`
         SELECT
           id,
+          dealer_application_json, documents_json, dealer_customer_id,
           customer_id,
           source,
           request_type,
@@ -242,7 +248,7 @@ export function getRequests(db: DatabaseSync): SyncedCustomerRequest[] {
           created_at,
           updated_at
         FROM requests
-        WHERE deleted_at = ''
+        WHERE deleted_at = '' AND (? = '' OR customer_id = ? OR (? <> '' AND customer_phone = ?))
         ORDER BY
           CASE
             WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'urgent' THEN 0
@@ -253,9 +259,9 @@ export function getRequests(db: DatabaseSync): SyncedCustomerRequest[] {
             ELSE 5
           END,
           created_at DESC
-        LIMIT 80
+        LIMIT ?
       `)
-    .all() as Array<Record<string, unknown>>;
+    .all(customerId ?? "", customerId ?? "", phone, phone, customerId ? -1 : 80) as Array<Record<string, unknown>>;
 
   return rows.map((row) => mapRequestRow(row));
 }
@@ -263,6 +269,9 @@ export function getRequests(db: DatabaseSync): SyncedCustomerRequest[] {
 function mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
   return {
     id: String(row.id ?? ""),
+    ...(row.dealer_application_json && row.dealer_application_json !== "null" ? { dealer_application: JSON.parse(String(row.dealer_application_json)) as NonNullable<SyncedCustomerRequest["dealer_application"]> } : {}),
+    documents: JSON.parse(String(row.documents_json ?? "[]")) as NonNullable<SyncedCustomerRequest["documents"]>,
+    dealer_customer_id: String(row.dealer_customer_id ?? ""),
     customer_id: String(row.customer_id ?? ""),
     source: row.source as SyncedCustomerRequest["source"],
     request_type: row.request_type as SyncedCustomerRequest["request_type"],

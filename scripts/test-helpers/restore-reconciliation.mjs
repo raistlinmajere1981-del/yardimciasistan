@@ -126,7 +126,6 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     const customer = f.db.saveCustomer({ fullName: 'Restore dealer', phone: '05550001199', email: '', notes: '', tags: [],
       commercialProfile: { companyName: 'Restore dealer', dealerStatus: 'active', priceGroup: 'dealer_a' } });
     assert.equal(customer.ok, true, customer.message);
-    f.db.changeDealerWebAccess(customer.savedId, 'enable');
     const invite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
     const token = new URL(invite.inviteUrl).hash.slice(8);
     const asset = f.media.importBytes(imageBytes, 'upload');
@@ -268,14 +267,14 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     // OFF backup: full reconciliation withdraws an enabled remote marketing/menu.
     setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: false });
     setPublicationFixtureCapability({ capability: C.QR_MENU, enabled: false });
-    f.db.changeDealerWebAccess(customer.savedId, 'disable');
+    mutate("UPDATE customer_commercial_profiles SET dealer_status = 'inactive'");
     const localRequest = f.db.getDashboardData().requests[0];
     assert.equal(f.db.updateRequestStatus({ requestId: localRequest.id, status: 'approved' }).ok, true);
     mutate("UPDATE commerce_orders SET status='confirmed';");
     const off = backup();
     setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: true });
     setPublicationFixtureCapability({ capability: C.QR_MENU, enabled: true });
-    f.db.changeDealerWebAccess(customer.savedId, 'enable');
+    mutate("UPDATE customer_commercial_profiles SET dealer_status = 'active'");
     const offRaceInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
     const offRaceClaim = await post('dealer/claim', { invite_token: new URL(offRaceInvite.inviteUrl).hash.slice(8) }, { 'X-YA-Dealer': '1' });

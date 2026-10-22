@@ -9,7 +9,7 @@ const YA_DEALER_SESSION_LIFETIME = 28800;
 /** Strict private allowlist. Desktop owns eligibility, web owns consumption/session state. */
 function ya_dealer_projection(array $input): array
 {
-    if (($input['version'] ?? null) !== 1 || !is_bool($input['enabled'] ?? null)
+    if (!in_array($input['version'] ?? null, [1, 2], true) || !is_bool($input['enabled'] ?? null)
         || !is_array($input['dealers'] ?? null) || count($input['dealers']) > 10000) {
         throw new InvalidArgumentException('dealer_projection_invalid');
     }
@@ -18,17 +18,18 @@ function ya_dealer_projection(array $input): array
         if (!is_array($row)) throw new InvalidArgumentException('dealer_projection_invalid');
         $id = $row['access_id'] ?? null; $ref = $row['customer_ref'] ?? null;
         $revision = $row['access_revision'] ?? null; $hash = $row['invite_hash'] ?? null;
+        $inviteRevision = $row['invite_revision'] ?? $revision;
         $expires = $row['invite_expires_at'] ?? null; $name = $row['display_name'] ?? null;
         if (!is_string($id) || preg_match('/^[a-f0-9-]{36}$/D', $id) !== 1 || isset($ids[$id])
             || !is_string($ref) || preg_match('/^[a-f0-9-]{36}$/D', $ref) !== 1 || isset($refs[$ref])
-            || !is_int($revision) || $revision < 1 || !is_bool($row['enabled'] ?? null)
+            || !is_int($inviteRevision) || $inviteRevision < 1 || !is_int($revision) || $revision < 1 || !is_bool($row['enabled'] ?? null)
             || !is_string($hash) || ($hash !== '' && preg_match('/^[a-f0-9]{64}$/D', $hash) !== 1)
             || !is_int($expires) || $expires < 0 || !is_string($name) || strlen($name) > 640
             || preg_match('/[\x00-\x1f\x7f]/', $name)) throw new InvalidArgumentException('dealer_projection_invalid');
         $ids[$id] = true; $refs[$ref] = true;
         $enabled = $input['enabled'] && $row['enabled'];
         $rows[] = ['access_id' => $id, 'customer_ref' => $ref, 'display_name' => $name,
-            'access_revision' => $revision, 'enabled' => $enabled,
+            'access_revision' => $revision, 'invite_revision' => $inviteRevision, 'enabled' => $enabled,
             'invite_hash' => $enabled ? $hash : '', 'invite_expires_at' => $enabled ? $expires : 0];
     }
     $catalogs = []; $catalogIds = []; $owners = array_column($rows, null, 'access_id');
@@ -54,23 +55,32 @@ function ya_dealer_projection(array $input): array
                 return $product;
             }, $safe['products'])];
     }
-    return ['version' => 1, 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs, 'order_history' => ya_dealer_history_projection($input['order_history'] ?? [], $owners)];
+    return ['version' => $input['version'], 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs, 'order_history' => ya_dealer_history_projection($input['order_history'] ?? [], $owners)];
 }
 
 /** Called inside the existing versioned publication transaction, only for an accepted new revision. */
 function ya_dealer_apply_projection(PDO $db, array $projection, int $sourceEpoch = 0): void
 {
-    $find = $db->prepare('SELECT * FROM dealer_access WHERE access_id = ?');
+    $find = $db->prepare('SELECT a.*, COALESCE(v.revision, a.access_revision) AS invite_revision FROM dealer_access a LEFT JOIN dealer_invite_versions v ON v.access_id = a.access_id WHERE a.access_id = ?');
     foreach ($projection['dealers'] as $row) {
         $find->execute([$row['access_id']]); $current = $find->fetch();
         if ($current && ($row['customer_ref'] !== $current['customer_ref']
-            || ((int)$current['source_epoch'] === $sourceEpoch && ($row['access_revision'] < (int)$current['access_revision']
-            || ($row['access_revision'] === (int)$current['access_revision']
-                 && $row['enabled'] && ($row['invite_hash'] !== $current['invite_hash'] || !(bool)$current['enabled'])))))) {
-            throw new YaStorageConflictException('stale_dealer_revision');
+            || ((int)$current['source_epoch'] === $sourceEpoch && (
+                $row['access_revision'] < (int)$current['access_revision']
+                || $row['invite_revision'] < (int)$current['invite_revision']
+                || ($row['access_revision'] === (int)$current['access_revision'] && $row['enabled'] && !(bool)$current['enabled'])
+                || ($row['invite_revision'] === (int)$current['invite_revision'] && $row['enabled'] && $row['invite_hash'] !== $current['invite_hash'])
+            )))) throw new YaStorageConflictException('stale_dealer_revision');
+        // Invalidate unconsumed old invitations too, including across restore epochs.
+        if ($current && ($current['invite_hash'] !== $row['invite_hash'] || !$row['enabled'] || (int)$current['source_epoch'] !== $sourceEpoch)) {
+            $db->prepare("INSERT OR IGNORE INTO dealer_consumed_invites VALUES (?, ?)")->execute([$current['invite_hash'], time()]);
         }
     }
-    // Missing/disabled rows are tombstones, not authority to resurrect a session.
+    // Missing rows also retire their invitation permanently.
+    $present = array_column($projection['dealers'], 'access_id');
+    foreach ($db->query("SELECT access_id, invite_hash FROM dealer_access WHERE invite_hash <> ''") as $old) {
+        if (!in_array($old['access_id'], $present, true)) $db->prepare('INSERT OR IGNORE INTO dealer_consumed_invites VALUES (?, ?)')->execute([$old['invite_hash'], time()]);
+    }
     $db->exec("INSERT OR IGNORE INTO dealer_consumed_invites(invite_hash, consumed_at) SELECT invite_hash, consumed_at FROM dealer_access WHERE consumed_at > 0 AND invite_hash <> ''");
     $db->prepare('UPDATE dealer_sessions SET revoked_at = ? WHERE revoked_at = 0 AND EXISTS
         (SELECT 1 FROM dealer_access a WHERE a.access_id = dealer_sessions.dealer_access_id AND a.source_epoch <> ?)')->execute([time(), $sourceEpoch]);
@@ -83,6 +93,8 @@ function ya_dealer_apply_projection(PDO $db, array $projection, int $sourceEpoch
         source_epoch = excluded.source_epoch, consumed_at = excluded.consumed_at');
     foreach ($projection['dealers'] as $row) $upsert->execute([$row['access_id'], $row['customer_ref'], $row['display_name'],
         $row['access_revision'], (int)$row['enabled'], $row['invite_hash'], $row['invite_expires_at'], $sourceEpoch, $row['invite_hash']]);
+    $version = $db->prepare('INSERT INTO dealer_invite_versions VALUES (?, ?) ON CONFLICT(access_id) DO UPDATE SET revision = excluded.revision');
+    foreach ($projection['dealers'] as $row) $version->execute([$row['access_id'], $row['invite_revision']]);
     $db->exec('DELETE FROM dealer_catalogs');
     $catalogInsert = $db->prepare('INSERT INTO dealer_catalogs (dealer_access_id, access_revision, catalog_revision, payload_json) VALUES (?, ?, ?, ?)');
     foreach ($projection['catalogs'] as $catalog) $catalogInsert->execute([$catalog['access_id'], $catalog['access_revision'],

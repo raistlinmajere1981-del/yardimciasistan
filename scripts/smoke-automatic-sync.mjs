@@ -1219,6 +1219,8 @@ function assertCapabilitiesShape() {
       "web_orders_v1",
       "online_catalog_v1",
       "dealer_access_v1",
+      "dealer_access_v2",
+      "request_documents_v1",
       "dealer_catalog_v1",
       "dealer_orders_v1",
       "request_cursor",

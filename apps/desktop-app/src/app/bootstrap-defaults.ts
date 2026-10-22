@@ -94,6 +94,7 @@ export const defaultSetupData: DesktopSetupData = {
   whatsappCloud: emptyWhatsAppCloudConfiguration(),
   arasShipping: emptyArasShippingConfiguration(),
   dealerPortalEnabled: false,
+  dealerApplicationEnabled: false,
   onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
   onlineSalesDeliveryEnabled: false,
   aiEnabled: false,

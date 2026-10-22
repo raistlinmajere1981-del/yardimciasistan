@@ -1,3 +1,4 @@
+import { dealerApplicationForm, mountDealerApplicationForm } from "./dealer-application-flow";
 import { ui, html, locale } from "./site-language";
 import { requestMessage } from "./request-message";
 import {
@@ -38,7 +39,7 @@ import {
   type WidgetView
 } from "./widget-navigation";
 
-type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
+type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info" | "dealer_application";
 interface RequestPayload {
   request_type: RequestType;
   customer_name: string;
@@ -94,6 +95,7 @@ interface PublicBusinessApiResponse {
     ai_enabled?: boolean;
     whatsapp_enabled?: boolean;
     requests_enabled?: boolean;
+    dealer_application_enabled?: boolean;
     address?: string;
     map_url?: string;
   };
@@ -124,6 +126,7 @@ const defaultConfig: WidgetConfig = {
   aiEnabled: true,
   whatsappEnabled: true,
   requestsEnabled: true,
+  dealerApplicationEnabled: false,
   address: "",
   mapUrl: ""
 };
@@ -362,6 +365,7 @@ function homeTemplate() {
       description: ui("Tarih, saat ve kişi sayısını seçin")
     }));
   }
+  if (config.requestsEnabled && config.dealerApplicationEnabled) actions.push(homeActionCard({ requestType: "dealer_application", icon: "send", title: "Bayi Başvurusu", description: "Firma bilgilerinizi iletin" }));
   if (config.aiEnabled && surfaces.has("catalog")) {
     actions.push(homeActionCard({
       view: "info",
@@ -438,6 +442,7 @@ function homeActionCard(input: {
 }
 
 function formTemplate() {
+  if (state.requestType === "dealer_application") return dealerApplicationForm();
   const isTableRequest = state.requestType === "restaurant_reservation";
   const requestLabel = isTableRequest ? ui("Masa talebi") : ui("Rezervasyon talebi");
   const title = isTableRequest ? ui("Masa talebinizi hazırlayalım") : ui("Rezervasyonunuzu hazırlayalım");
@@ -736,6 +741,7 @@ function subviewNavigationTemplate(label: string, icon: IconName) {
 }
 
 function bindEvents(root: HTMLElement) {
+  mountDealerApplicationForm(root, config.apiBaseUrl);
   root.querySelector("[data-ya-open]")?.addEventListener("click", () => open());
   root.querySelector("[data-ya-close]")?.addEventListener("click", close);
 
@@ -1448,6 +1454,7 @@ async function hydrateBusinessContext(loadId: number) {
       mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
       aiEnabled: typeof business.ai_enabled === "boolean" ? business.ai_enabled : config.aiEnabled,
       whatsappEnabled: typeof business.whatsapp_enabled === "boolean" ? business.whatsapp_enabled : config.whatsappEnabled,
+      dealerApplicationEnabled: business.dealer_application_enabled === true,
       requestsEnabled: typeof business.requests_enabled === "boolean" ? business.requests_enabled : config.requestsEnabled,
       profileId: profileId || config.profileId,
       publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces

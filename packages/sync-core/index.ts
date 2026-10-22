@@ -1032,6 +1032,7 @@ export interface SyncTransport {
   pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult>;
   acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult>;
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;
+  downloadRequestDocument?(requestId: string, documentId: string): Promise<Uint8Array>;
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;

@@ -168,7 +168,7 @@ kullanın:
 
 ```ini
 upload_max_filesize = 10M
-post_max_size = 12M
+post_max_size = 52M
 ```
 
 Endpoint mevcut `config/ai.php` yapılandırmasını kullanır; bu dosya masaüstünden
@@ -506,3 +506,9 @@ renderer'ını sağlar; demo sahibi `test-site/landing/assets/js/marketing.js` d
 Boş/yayından kaldırılmış içerik görünmez. Public API provider sırları, yerel dosya
 yolları ve Content/AI metadata yayınlamaz. Desktop intent revision ve kalıcı sync
 outbox ile yayınlar; tekrarlar idempotenttir. Publication binary medya içermez.
+
+Online Bayi Başvurusu belgeleri için PHP kullanıcısı HTTP belge kökünün üst dizininde
+özel bir klasör oluşturabilmelidir. Dosyalar bu klasörde 0600, klasör 0700 izinleriyle
+saklanır; web URL'si üretilmez. Modülün `.user.ini` dosyası yükleme sınırlarını tanımlar;
+hosting panelindeki daha düşük PHP sınırları da yukarıdaki değerlere yükseltilmelidir.
+Beş dosyanın toplamı için `post_max_size` en az 52M olmalıdır.

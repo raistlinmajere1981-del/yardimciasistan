@@ -67,6 +67,8 @@ export function createCurrentBusinessWebContext(database: DesktopDatabase): Busi
   const businessId = database.translations().businessId();
   return {
     ...context,
+    dealerApplicationEnabled: database.getSetupData().dealerPortalEnabled && database.getSetupData().dealerApplicationEnabled
+      && database.getEnabledBusinessCapabilities().includes("commerce.wholesale") && database.getEnabledBusinessCapabilities().includes("customer.requests"),
     localization: database.translations().localization([
       {kind: "business", id: businessId, fields: {description: profile.description, about_text: profile.aboutText ?? "", directions_note: profile.directionsNote, policy_note: profile.policyNote, payment_note: profile.paymentNote}},
       ...gallery.map(g => ({kind: "gallery" as const, id: g.id, fields: {title: g.title}}))

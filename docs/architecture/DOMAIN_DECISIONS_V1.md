@@ -672,12 +672,15 @@ Sale/fulfillment or new provider/sync outbox execution is introduced.
 **Status:** ACCEPTED (2026-10-04)
 
 Dealer Web Identity references canonical Customer + an active commercial dealer profile.
-Desktop owns `commerce_dealer_web_access`, eligibility, enabled state, invite generation
-and monotonically increasing access revisions. Wholesale owns the staged
+Desktop owns `commerce_dealer_web_access`, eligibility, invite generation and
+monotonically increasing access/invitation revisions. Active commercial dealer status,
+persisted Wholesale and the enabled dealer portal determine eligibility. The technical
+access row is prepared automatically by commercial-profile writes; its stored `enabled`
+field is bookkeeping, never a second operator permission. Wholesale owns the staged
 `dealerPortalEnabled` subfeature configuration (default OFF); this is neither a new
 sector/capability nor an alias of Online Sales. Disabling Wholesale/portal, removing or
 inactivating a dealer profile, or deleting its Customer invalidates access and clears
-invites. Re-enabling a capability never restores old access. Explicit backup restore
+invites. Re-enabling restores eligibility with a fresh generation, never old sessions or invites. Explicit backup restore
 preserves the backed-up desired access under a new publication epoch; normal hosting
 apply invalidates previous-epoch sessions and retains consumed-invite history (D-043).
 
@@ -688,8 +691,8 @@ name, revision, enabled state and private invite hash/expiry. Contact, tax, note
 buyer snapshots, pricing and internal Customer ids do not cross this boundary. Price
 group could later annotate identity, but never establishes price authority; C1 omits it.
 
-Immediate Customer Workspace operations enable access, issue/rotate an invite, revoke all
-sessions and disable access. They do not participate in the customer card draft; dirty
+Immediate Customer Workspace operations issue/rotate an invite or sign out all devices.
+The latter clears unused invitations and requires a short inline confirmation. They do not participate in the customer card draft; dirty
 cards must be saved/discarded first. Access status means Desktop-authorized access, not a
 claim that a hosting session is currently live. The durable versioned publication/outbox
 owns retries, idempotency and stale-publication rejection. Revocation takes effect on
@@ -702,7 +705,13 @@ only at generation and persist only as SHA-256 hashes. Links carry tokens in fra
 never query parameters; the portal removes the fragment before claim. Claim is explicit
 same-origin JSON POST, rate-limited with hashed IP counters and fail-closed storage.
 Generic failure is “Bağlantı geçersiz veya süresi dolmuş.” Consume + session creation is
-atomic. Rotation increments access revision, invalidating old invites and sessions.
+atomic. Rotation increments only `invite_revision`, invalidating the previous invitation
+while existing web and Android sessions remain usable concurrently. Signing out all
+devices and eligibility withdrawal increment `access_revision` and `invite_revision`.
+Hosting rejects regressing revisions and retains used/retired invite hashes, including
+across source epochs. V2 publications require hosting capability `dealer_access_v2`;
+V1 publications remain readable by upgraded hosting and old web/Android cookie clients
+continue to use the same session endpoints.
 
 Hosting sessions carry 256-bit opaque random tokens in HttpOnly, production Secure,
 SameSite=Strict cookies scoped to the module's `/api/dealer/` path, with an eight-hour
@@ -713,8 +722,28 @@ expiring its cookie. Strict JSON + a non-CORS custom header protect claim/logout
 cross-origin mutations. Hosting logs only stable allowlisted events/categories/opaque
 access ids. `/bayi/` renders public-safe identity and logout only.
 
-Dealer catalogs, prices, orders, payment, application/self-registration, OTP, messaging,
-password recovery and shipping selection remain outside C1.
+Online Dealer Application is a default-OFF preference in the existing dealer portal
+service. Public acceptance requires that preference plus portal, Wholesale and Requests.
+Widget and Dealer Android submit `dealer_application` through the guarded, idempotent
+public request endpoint without an account. Company, authorized person, email and tax
+facts are structured ingress fields; the optional note remains the request message.
+Submission creates no customer or access. Owner approval chooses retail/dealer_a/dealer_b
+and commits canonical Customer/profile, active status, price group, request linkage/status
+and access publication intent in one transaction. Matching conflicts fail without edits;
+replay uses the retained conversion link. Invitations are an explicit later operation.
+Generic request status updates cannot bypass conversion or undo its identity.
+
+Up to five optional PDF/JPEG/PNG documents (10 MiB each) accompany the same multipart
+submission. Hosting validates actual content and upload completion; files live outside
+HTTP document root with private permissions. Receipt lookup precedes file moves, and a
+failed submission removes its new files. Request manifests contain immutable id/name/kind,
+MIME/size/SHA-256 only. Authenticated sync streams bytes separately; Desktop verifies and
+persists them under durable `assets/request-documents` before importing/acknowledging the
+request. Only the unlocked Requests + Wholesale management boundary can open, preview or
+save documents. Customer history refers to that same request/manifest, without copies;
+its customer-specific read is independent of the dashboard's recent-request window.
+Documents never enter dealer catalogs, public URLs or Companion projections. Document
+presence has no approval meaning and adds no approval stage.
 
 
 ## D-034 — Authenticated dealer catalogs project prices; Desktop creates canonical dealer orders

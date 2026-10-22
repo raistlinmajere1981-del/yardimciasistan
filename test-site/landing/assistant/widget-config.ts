@@ -1,7 +1,7 @@
 import { ui } from "./site-language";
 export type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "market";
 export type PublicSurface = "accommodation" | "food_service" | "menu" | "qr_menu" | "catalog" | "directions";
-export type WidgetRequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
+export type WidgetRequestType = "pension_reservation" | "restaurant_reservation" | "general_info" | "dealer_application";
 
 export interface WidgetConfig {
   businessName: string;
@@ -15,6 +15,7 @@ export interface WidgetConfig {
   aiEnabled: boolean;
   whatsappEnabled: boolean;
   requestsEnabled: boolean;
+  dealerApplicationEnabled?: boolean;
   address: string;
   mapUrl: string;
 }
@@ -85,10 +86,11 @@ export function isWhatsAppAvailable(config: Pick<WidgetConfig, "whatsappEnabled"
 }
 
 export function isRequestTypeAvailable(
-  config: Pick<WidgetConfig, "requestsEnabled" | "profileId" | "publicSurfaces">,
+  config: Pick<WidgetConfig, "requestsEnabled" | "profileId" | "publicSurfaces" | "dealerApplicationEnabled">,
   requestType: WidgetRequestType
 ): boolean {
   if (!config.requestsEnabled) return false;
+  if (requestType === "dealer_application") return config.dealerApplicationEnabled === true;
   const surfaces = resolvePublicSurfaces(config);
   if (requestType === "pension_reservation") return surfaces.has("accommodation");
   if (requestType === "restaurant_reservation") return surfaces.has("food_service");

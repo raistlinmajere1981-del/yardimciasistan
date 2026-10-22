@@ -198,6 +198,22 @@ same-ID replay behavior are unchanged. Both browser request callers keep a key i
 per-form WeakMap through retry and discard it on successful completion; changed form
 intent gets a new key. No automatic reload retry or browser persistence is introduced.
 
+### Dealer application documents
+
+`dealer_application` extends the same public request receipt intent with structured
+company/contact/tax fields and document metadata/content hashes. Multipart files never
+enter JSON. Maximum five PDF/JPEG/PNG files, 10 MiB each; actual MIME/signatures, upload
+errors and sizes are checked before submission. Receipt replay does not move a second
+copy. Storage failure rolls back the queue/receipt and removes new files.
+
+Files live outside the HTTP root. `sync.php` action `request_document` requires the
+existing sync header and an exact request/document binding. Dealer cookies and uploaders
+cannot download them. Desktop downloads bounded binary data, verifies length/SHA-256 and
+persists immutable durable assets before advancing the normal request cursor or ACK.
+Interrupted transfer retries that same manifest. Backup/restore includes those assets;
+request replay preserves local customer linkage and approval decisions. Old requests
+without manifests retain their previous behavior.
+
 ## Deliberately not changed
 
 Restore full payload set and post-restore Marketing/AI reconciliation; QR semantics; resource catalog visibility;

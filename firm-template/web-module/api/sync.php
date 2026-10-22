@@ -11,6 +11,7 @@ require_once YA_BASE_DIR . '/lib/business-map.php';
 require_once YA_BASE_DIR . '/lib/online-catalog.php';
 require_once YA_BASE_DIR . '/lib/marketing.php';
 require_once YA_BASE_DIR . '/lib/dealer-access.php';
+require_once YA_BASE_DIR . '/lib/request-documents.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/android-companion-projection.php';
 require_once YA_BASE_DIR . '/lib/android-kbs-projection.php';
@@ -46,6 +47,7 @@ if (!$isAuthorized) {
 }
 
 try {
+    if ($action === 'request_document') ya_request_document_download($payload);
     if ($action === 'restore_sync_state') {
         $db = ya_storage_open();
         $db->beginTransaction();
@@ -1599,6 +1601,7 @@ function ya_sync_publish_business_context(array $payload): void
         'whatsapp_enabled' => ya_sync_bool($candidate['whatsapp_enabled'] ?? false),
         'email' => mb_substr(ya_sync_string($candidate['email'] ?? ''), 0, 160),
         'address' => mb_substr(ya_sync_string($candidate['address'] ?? ''), 0, 500),
+        'dealerApplicationEnabled' => ($candidate['dealerApplicationEnabled'] ?? false) === true,
         'mapDisplayMode' => ($candidate['mapDisplayMode'] ?? '') === 'google_maps_embed' ? 'google_maps_embed' : 'manual',
         'googleMapsEmbedUrl' => ya_business_google_maps_embed_url($candidate['googleMapsEmbedUrl'] ?? ''),
         'latitude' => $latitude,
@@ -1970,6 +1973,10 @@ function ya_sync_public_request(array $record): array
         $public[$field] = $record[$field] ?? '';
     }
 
+    if (($record['request_type'] ?? '') === 'dealer_application') {
+        $public['dealer_application'] = $record['dealer_application'] ?? null;
+        $public['documents'] = $record['documents'] ?? [];
+    }
     return $public;
 }
 

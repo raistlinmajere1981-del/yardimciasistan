@@ -1,6 +1,7 @@
 import type { ISODateString, Priority, RecordSource, SyncStatus, TimeString, TimestampedRecord } from "./common";
 
 export type RequestType =
+  | "dealer_application"
   | "general_info"
   | "pension_reservation"
   | "restaurant_reservation"
@@ -23,6 +24,9 @@ export type RequestStatus =
   | "archived";
 
 export interface CustomerRequest extends TimestampedRecord {
+  dealer_application?: DealerApplication;
+  dealer_customer_id?: string;
+  documents?: RequestDocument[];
   customer_id: string;
   source: RecordSource;
   request_type: RequestType;
@@ -43,4 +47,20 @@ export interface CustomerRequest extends TimestampedRecord {
   assigned_to: string;
   priority: Priority;
   sync_status: SyncStatus;
+}
+
+export interface DealerApplication {
+  company_name: string;
+  authorized_person: string;
+  email: string;
+  tax_office: string;
+  tax_number: string;
+}
+export interface RequestDocument {
+  id: string;
+  name: string;
+  kind: "tax_certificate" | "activity_certificate" | "authorization" | "other";
+  mime: "application/pdf" | "image/jpeg" | "image/png";
+  size: number;
+  sha256: string;
 }

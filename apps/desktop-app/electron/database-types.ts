@@ -552,6 +552,7 @@ export interface DesktopSetupData {
   whatsappCloud: import("@yardimci-asistan/shared").WhatsAppCloudConfiguration;
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
   dealerPortalEnabled: boolean;
+  dealerApplicationEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {
@@ -593,6 +594,7 @@ export interface SaveInitialSetupInput {
   whatsappCloud?: import("@yardimci-asistan/shared").WhatsAppCloudConfigurationInput;
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;
+  dealerApplicationEnabled?: boolean;
   onlineSalesDelivery?: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {

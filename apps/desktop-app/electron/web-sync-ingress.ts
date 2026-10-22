@@ -1,3 +1,4 @@
+import { cacheRequestDocuments } from "./request-document-store";
 import type { SyncTransport } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
@@ -107,6 +108,12 @@ export class WebSyncIngress {
       if (typeof result.next_cursor !== "number") {
         const message = "Web modülü geçerli bir talep cursor değeri döndürmedi.";
         this.logSyncFailure("requests-pull", { message, error: "invalid_response" }, { page, cursor });
+        return { count, error: message };
+      }
+      try { await cacheRequestDocuments(this.options.database.userDataPath, result.requests, transport); }
+      catch {
+        const message = "Başvuru belgeleri alınamadı. Sonraki eşitlemede yeniden denenecek.";
+        this.logSyncFailure("request-documents", { message, error: "document_transfer_failed" }, { page, cursor });
         return { count, error: message };
       }
       this.options.database.upsertRequests(result.requests, result.next_cursor);

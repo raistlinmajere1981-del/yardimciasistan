@@ -9,7 +9,7 @@ export const serviceSettingsFields = {
   'settings-marketing-sms': ['sms'],
   'settings-marketing-instagram': ['instagram'],
   'settings-whatsapp-business': ['whatsappCloud'],
-  'settings-dealer-portal': ['dealerPortalEnabled'],
+  'settings-dealer-portal': ['dealerPortalEnabled', 'dealerApplicationEnabled'],
   'settings-online-delivery': ['onlineSalesDeliveryEnabled', 'onlineSalesDelivery', 'arasShipping']
 } as const satisfies Record<string, readonly (keyof SetupFormState)[]>;
 export type SetupServiceId = keyof typeof serviceSettingsFields;

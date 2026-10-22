@@ -14,6 +14,7 @@ export interface ReservationDomainContext {
 }
 
 const REQUEST_TYPE_CAPABILITY_REQUIREMENTS: Partial<Record<RequestType, BusinessCapability>> = {
+  dealer_application: C.WHOLESALE,
   pension_reservation: C.ACCOMMODATION_RESERVATIONS,
   restaurant_reservation: C.FOOD_RESERVATIONS,
   breakfast_request: C.FOOD_RESERVATIONS,

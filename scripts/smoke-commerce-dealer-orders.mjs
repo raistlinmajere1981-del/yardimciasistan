@@ -83,7 +83,7 @@ try {
   const dealers = ["retail", "dealer_a", "dealer_b"].map((priceGroup, index) => {
     const result = database.saveCustomer({ fullName: `Canonical dealer ${index}`, phone: `0555000100${index}`, email: `private${index}@example.test`, notes: "PRIVATE_C2_NOTES", tags: [],
       commercialProfile: { companyName: `C2 Company ${index}`, dealerStatus: "active", priceGroup, taxNumber: `PRIVATE_C2_TAX_${index}` } });
-    assert.equal(result.ok, true, result.message); database.changeDealerWebAccess(result.savedId, "enable");
+    assert.equal(result.ok, true, result.message);
     const invite = database.changeDealerWebAccess(result.savedId, "invite"); const token = new URL(invite.inviteUrl).hash.slice(8); tokens.push(token);
     return { customerId: result.savedId, access: invite.access, token };
   });
@@ -266,7 +266,7 @@ try {
   await page.getByRole("button", { name: "Oturumu kapat" }).click(); await expect(page.getByRole("heading", { name: "Bayi erişimi gerekli" })).toBeVisible();
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0); assert.deepEqual(errors, []);
   // Current delivery allowlist is also enforced at Desktop create, independently of hosting.
-  database.changeDealerWebAccess(a.customerId, "enable"); const active = database.getDealerWebAccess(a.customerId);
+  const active = database.getDealerWebAccess(a.customerId);
   raw.exec("UPDATE settings SET online_sales_shipping_enabled = 0");
   assert.throws(() => database.createDealerWebOrder(active.accessId, active.accessRevision, { sourceReference: "bad-delivery", items: payload.items, deliverySnapshot: { method: "shipping", address } }), /teslimat yöntemi/);
   assert.equal(storage("echo json_encode($db->query('SELECT COUNT(*) FROM web_order_submission_receipts')->fetchColumn());") >= 3, true);

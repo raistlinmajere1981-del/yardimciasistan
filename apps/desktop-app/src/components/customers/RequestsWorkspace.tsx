@@ -1,3 +1,4 @@
+import { DealerApplicationReview, type ApproveDealerApplication } from "./DealerApplicationReview";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { PhoneInput } from "../ui/PhoneInput";
 import { useEffect, useState } from "react";
@@ -85,6 +86,7 @@ function formatCompactRequestDate(request: SyncedCustomerRequest) {
 }
 
 interface RequestsWorkspaceProps {
+  onApproveDealer?: ApproveDealerApplication;
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;
   aiEnabled: boolean;
@@ -110,6 +112,7 @@ interface RequestsWorkspaceProps {
 
 export function RequestsWorkspace({
   requests,
+  onApproveDealer,
   selectedRequest: externallySelectedRequest,
   aiEnabled,
   whatsappEnabled,
@@ -150,7 +153,7 @@ export function RequestsWorkspace({
     setAiCopyMessage("");
   }, [selectedRequest?.id, selectedRequest?.ai_suggested_reply]);
 
-  const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
+  const selectedActionMode = selectedRequest?.request_type === "dealer_application" && selectedRequest.dealer_customer_id ? "converted" : selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const selectedRequestSupportsReservation = selectedRequest
     ? canConvertRequestToReservation(enabledCapabilities, selectedRequest.request_type)
     : false;
@@ -240,7 +243,7 @@ export function RequestsWorkspace({
                   {formatRequestStatus(selectedRequest.status)}
                 </StatusBadge>
                 <div className="action-row request-detail-header-actions">
-                  {selectedActionMode === "open" && (
+                  {selectedActionMode === "open" && selectedRequest.request_type !== "dealer_application" && (
                     <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
                       <CheckCircle2 size={16} aria-hidden="true" />
                       Cevaplandı İşaretle
@@ -283,6 +286,7 @@ export function RequestsWorkspace({
                 <dd>{formatCustomerSource(selectedRequest.source)}</dd>
               </div>
             </dl>
+            {selectedRequest.request_type === "dealer_application" && <DealerApplicationReview key={selectedRequest.id} request={selectedRequest} onApprove={onApproveDealer} />}
             <div className="record-note">
               <span>Not</span>
               <p className="record-note__body">{selectedRequest.message || "Talep notu yok."}</p>

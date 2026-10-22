@@ -2,6 +2,7 @@ import type { DesktopDashboardData } from "../../electron/database";
 
 export function formatRequestType(value: string) {
   const labels: Record<string, string> = {
+    dealer_application: "Bayi Başvurusu",
     general_info: "Bilgi talebi",
     pension_reservation: "Pansiyon rezervasyonu",
     restaurant_reservation: "Masa rezervasyonu",

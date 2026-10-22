@@ -67,6 +67,7 @@ const SMOKE_FILES = [
   "scripts/smoke-business-messaging-ui.mjs",
   "scripts/smoke-commerce-dealer-orders.mjs",
   "scripts/smoke-commerce-dealer-access.mjs",
+  "scripts/smoke-dealer-applications.mjs",
   "scripts/smoke-web-dealer-portal.mjs",
   "scripts/smoke-web-storefront.mjs",
   "scripts/smoke-web-order-submission.mjs",
@@ -258,6 +259,9 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("dealer-android-tests", "Bayi Android birim testleri ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "lintDebug"], {
+    phase: 27, domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
+  }),
   check("dealer-android-build", "Bayi Android birim testleri, APK ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "assembleDebug", "lintDebug"], {
     phase: 27, presets: ["full"], domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
   }),
@@ -616,6 +620,7 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-instagram-staging.mjs" || file === "scripts/smoke-instagram-oauth-web.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
+  if (file === "scripts/smoke-dealer-applications.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-storefront.mjs") return ["build-demo", "php-lint"];
   if (file === "scripts/smoke-web-order-submission.mjs") return ["php-lint"];
@@ -673,7 +678,7 @@ function smokeDomainsForGeneralOwnership(file) {
   if (name === "marketing-log-privacy") domains.add("diagnostics");
   if (/messaging-dispatch/.test(name)) { domains.add("messaging-dispatch"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/messaging-campaigns/.test(name)) { domains.add("messaging-campaigns"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
-  if (/dealer-access|dealer-portal|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
+  if (/dealer-access|dealer-portal|dealer-applications|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
 
   if (/android/.test(name)) domains.add("android");
   if (/web|sync|public-room|connection/.test(name)) domains.add("web");

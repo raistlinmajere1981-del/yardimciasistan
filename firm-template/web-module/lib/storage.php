@@ -67,6 +67,8 @@ function ya_storage_capabilities(): array
             'web_orders_v1',
             'online_catalog_v1',
             'dealer_access_v1',
+            'dealer_access_v2',
+            'request_documents_v1',
             'dealer_catalog_v1',
             'dealer_orders_v1',
             'request_cursor',
@@ -92,6 +94,7 @@ function ya_storage_reset_runtime(): array
         'dealer_sessions',
         'dealer_consumed_invites',
         'dealer_catalogs',
+        'dealer_invite_versions',
         'dealer_access',
         'web_requests',
         'web_orders',
@@ -867,6 +870,10 @@ function ya_storage_create_schema(PDO $database): void
           source_epoch INTEGER NOT NULL DEFAULT 0
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_dealer_invite_hash ON dealer_access(invite_hash) WHERE invite_hash <> '';
+        CREATE TABLE IF NOT EXISTS dealer_invite_versions (
+          access_id TEXT PRIMARY KEY REFERENCES dealer_access(access_id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS dealer_consumed_invites (
           invite_hash TEXT PRIMARY KEY,
           consumed_at INTEGER NOT NULL

@@ -1,3 +1,4 @@
+import { getCustomer, saveCustomer } from "./database/customer-store";
 import type { DatabaseSync } from "node:sqlite";
 import {
   canConvertRequestToReservation,
@@ -482,7 +483,7 @@ export function upsertSyncedRequests(
       // Replay must not recreate a deleted/detached customer either.
       const existing = db.prepare("SELECT customer_id FROM requests WHERE id = ?").get(request.id) as { customer_id: string } | undefined;
       const customerId = existing ? existing.customer_id
-        : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
+        : request.request_type === "dealer_application" ? "" : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
       statement.run(
         request.id,
         customerId,
@@ -508,6 +509,10 @@ export function upsertSyncedRequests(
         request.updated_at,
         "synced"
       );
+      if (!existing && request.request_type === "dealer_application") {
+        db.prepare("UPDATE requests SET dealer_application_json = ?, documents_json = ? WHERE id = ?")
+          .run(JSON.stringify(request.dealer_application ?? null), JSON.stringify(request.documents ?? []), request.id);
+      }
     }
     if (nextCursor !== undefined) {
       const now = new Date().toISOString();
@@ -523,5 +528,63 @@ export function upsertSyncedRequests(
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+}
+
+/** Owner-only approval. Customer/profile/link/status and access outbox commit together.
+ * Invitation disclosure is a later operation and never the conversion's identity. */
+export function approveDealerApplication(db: DatabaseSync, requestId: string, priceGroup: string, capabilities: BusinessCapability[]):
+  { ok: true; message: string; customerId: string } | { ok: false; message: string } {
+  if (!isRequestTypeAvailable(capabilities, "dealer_application")) return { ok: false, message: "Talepler ve Bayi / Toptan Satış etkin olmalı." };
+  if (!["retail", "dealer_a", "dealer_b"].includes(priceGroup)) return { ok: false, message: "Fiyat grubunu seçin." };
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const request = db.prepare("SELECT * FROM requests WHERE id = ? AND request_type = 'dealer_application' AND deleted_at = ''").get(requestId);
+    if (!request) throw new Error("Bayi başvurusu bulunamadı.");
+    if (request.dealer_customer_id) {
+      const existing = getCustomer(db, String(request.dealer_customer_id));
+      if (!existing) throw new Error("Oluşturulan müşteri artık mevcut değil. Müşteri kaydını kontrol edin.");
+      db.exec("COMMIT");
+      return { ok: true, message: "Başvuru daha önce onaylandı.", customerId: existing.id };
+    }
+    if (!["new", "seen", "waiting_owner", "waiting_customer"].includes(String(request.status))) throw new Error("Başvuruyu onaylamak için önce yeniden açın.");
+    const application = JSON.parse(String(request.dealer_application_json)) as import("@yardimci-asistan/shared").DealerApplication | null;
+    if (!application?.company_name || !application.authorized_person || !application.email) throw new Error("Başvuru firma bilgileri eksik.");
+    const phoneResult = normalizePhone(String(request.customer_phone));
+    if (!phoneResult.ok) throw new Error(phoneResult.error);
+    const phone = phoneResult.e164;
+    const tax = application.tax_number.trim().replace(/\s+/g, "");
+    const matches = db.prepare(`SELECT c.id FROM customers c LEFT JOIN customer_commercial_profiles p ON p.customer_id = c.id
+      WHERE c.deleted_at = '' AND c.business_id = (SELECT business_id FROM settings WHERE deleted_at = '' LIMIT 1)
+      AND (c.id = ? OR c.phone = ? OR (? <> '' AND p.tax_number = ?))`).all(String(request.customer_id), phone, tax, tax);
+    if (matches.length > 1) throw new Error("Telefon, vergi numarası veya bağlı müşteri farklı kartları gösteriyor. Müşteri kayıtlarını kontrol edin.");
+    const existing = matches[0] ? getCustomer(db, String(matches[0].id)) : null;
+    if (existing && ((existing.phone && existing.phone !== phone)
+      || (existing.commercialProfile?.taxNumber && tax && existing.commercialProfile.taxNumber !== tax))) {
+      throw new Error("Başvuru ile müşteri kartının telefon / vergi bilgileri çelişiyor. Müşteri kartını kontrol edin.");
+    }
+    const result = saveCustomer(db, {
+      ...(existing ?? {}), id: existing?.id ?? "", fullName: existing?.fullName || application.authorized_person,
+      phone: existing?.phone || phone, email: existing?.email || application.email, notes: existing?.notes || "",
+      identityType: existing?.identityType || "", identityNumber: existing?.identityNumber || "", nationality: existing?.nationality || "",
+      documentSerialNumber: existing?.documentSerialNumber || "", documentExpiryDate: existing?.documentExpiryDate || "",
+      birthPlace: existing?.birthPlace || "", motherName: existing?.motherName || "", fatherName: existing?.fatherName || "", issuingAuthority: existing?.issuingAuthority || "",
+      birthDate: existing?.birthDate || "", gender: existing?.gender || "", address: existing?.address || "",
+      commercialProfile: { companyName: application.company_name, authorizedPerson: application.authorized_person,
+        taxOffice: application.tax_office, taxNumber: tax || existing?.commercialProfile?.taxNumber || "", dealerStatus: "active",
+        priceGroup: priceGroup as import("@yardimci-asistan/shared").CommercePriceGroup,
+        paymentTermDays: existing?.commercialProfile?.paymentTermDays ?? 0 }
+    });
+    if (!result.ok) throw new Error(result.message);
+    const now = new Date().toISOString();
+    db.prepare("UPDATE requests SET customer_id = ?, dealer_customer_id = ?, status = 'approved', updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(result.savedId, result.savedId, now, requestId);
+    insertDatabaseEvent(db, { type: "request.dealer_approved", entityType: "request", entityId: requestId,
+      payload: { customer_id: result.savedId, price_group: priceGroup }, now });
+    db.exec("COMMIT");
+    return { ok: true, message: "Başvuru onaylandı. Bayi daveti oluşturabilirsiniz.", customerId: result.savedId };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    return { ok: false, message: error instanceof Error ? error.message : "Başvuru onaylanamadı." };
   }
 }

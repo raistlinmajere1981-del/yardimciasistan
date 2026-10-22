@@ -246,7 +246,7 @@ export function createCommerceOrder(
           JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id
           JOIN customer_commercial_profiles p ON p.customer_id = c.id AND p.business_id = a.business_id
           JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = ''
-          WHERE a.id = ? AND a.business_id = ? AND a.enabled = 1 AND a.access_revision = ?
+          WHERE a.id = ? AND a.business_id = ? AND a.access_revision = ?
             AND c.deleted_at = '' AND p.dealer_status = 'active' AND s.dealer_portal_enabled = 1`)
           .get(access.accessId, businessId, access.accessRevision);
         if (!dealer || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.WHOLESALE)) {

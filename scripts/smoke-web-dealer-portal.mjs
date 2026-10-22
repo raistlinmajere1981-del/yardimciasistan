@@ -200,7 +200,6 @@ try {
       commercialProfile: { companyName: "Canonical company", dealerStatus: "active", priceGroup: "dealer_a" } });
     assert.equal(customer.ok, true, customer.message);
     const id = customer.savedId;
-    database.changeDealerWebAccess(id, "enable");
     const invite = database.changeDealerWebAccess(id, "invite");
     const actualToken = new URL(invite.inviteUrl).hash.slice(8); tokens.push(actualToken);
     const coordinator = new SyncCoordinator({ database, getSyncConfig: () => ({ baseUrl, syncSecret: secret }),
@@ -221,7 +220,8 @@ try {
     const replacement = database.changeDealerWebAccess(id, "invite"); const replacementToken = new URL(replacement.inviteUrl).hash.slice(8); tokens.push(replacementToken);
     assert.equal((await coordinator.runNow()).ok, true);
     const activeSession = await post("claim", { invite_token: replacementToken }); assert.equal(activeSession.status, 200);
-    database.changeDealerWebAccess(id, "disable"); assert.equal((await coordinator.runNow()).ok, true);
+    const deactivate = database.getCustomer(id);
+    assert.equal(database.saveCustomer({ ...deactivate, commercialProfile: { ...deactivate.commercialProfile, dealerStatus: "inactive" } }).ok, true); assert.equal((await coordinator.runNow()).ok, true);
     assert.equal((await session(activeSession.cookie.split(";")[0])).status, 401);
     genericFailure(await post("claim", { invite_token: replacementToken }));
   } finally { desktop.cleanup(); }

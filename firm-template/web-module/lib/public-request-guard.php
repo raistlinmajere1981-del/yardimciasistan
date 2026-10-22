@@ -16,7 +16,7 @@ const YA_PUBLIC_ORDER_MAX_BODY_BYTES = 16384;
  * because a defensive counter could not be written. Normal endpoint storage
  * still performs its own error handling afterwards.
  */
-function ya_public_guard_enforce(string $bucket): void
+function ya_public_guard_enforce(string $bucket, int $maxBodyBytes = YA_PUBLIC_GUARD_MAX_BODY_BYTES): void
 {
     if ($bucket === 'order') {
         ya_public_guard_apply_cors();
@@ -42,7 +42,7 @@ function ya_public_guard_enforce(string $bucket): void
     if (!in_array($bucket, ['dealer_claim', 'dealer_order'], true)) ya_public_guard_apply_cors();
 
     $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
-    if ($contentLength > YA_PUBLIC_GUARD_MAX_BODY_BYTES) {
+    if ($contentLength > $maxBodyBytes) {
         ya_public_guard_reject(413, 'Gönderilen veri çok büyük. Lütfen daha kısa bir içerikle tekrar deneyin.', 0);
     }
 

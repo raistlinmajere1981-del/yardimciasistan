@@ -11,7 +11,7 @@ Uygulama görsel başına 10 MB sınır uygular; multipart ek yükü için öner
 
 ```ini
 upload_max_filesize = 10M
-post_max_size = 12M
+post_max_size = 52M
 ```
 
 ## 1. Kopyalanacak Dosyalar
@@ -383,3 +383,9 @@ AI sohbetinden talep oluşmuyor:
 - `customer_name` ve Türkiye cep telefonu formatında `customer_phone` gönderildiğini kontrol edin.
 - Mesajda rezervasyon, oda, masa, kahvaltı, fiyat veya benzeri açık talep niyeti bulunmalı ya da `create_request=true` gönderilmelidir.
 - `data/` klasörü SQLite ve `data/ai-conversations.json` için hosting kullanıcısı tarafından yazılabilir olmalıdır.
+
+Online Bayi Başvurusu belgeleri için PHP kullanıcısı HTTP belge kökünün üst dizininde
+özel bir klasör oluşturabilmelidir. Dosyalar bu klasörde 0600, klasör 0700 izinleriyle
+saklanır; web URL'si üretilmez. Modülün `.user.ini` dosyası yükleme sınırlarını tanımlar;
+hosting panelindeki daha düşük PHP sınırları da yukarıdaki değerlere yükseltilmelidir.
+Beş dosyanın toplamı için `post_max_size` en az 52M olmalıdır.
