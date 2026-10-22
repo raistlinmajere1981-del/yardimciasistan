@@ -19,6 +19,8 @@ let businessMessagingAuthority;
 let businessMessagingDrain = () => Promise.resolve();
 let androidIngress, androidIngressOptions, coordinatorOptions;
 let menuGuardFixture = null;
+let requestDocumentFixture = null;
+const dealerApprovalInputs = [], openedDocuments = [];
 const durable = createTemporaryDesktopDatabase("sync-finalize-intent-");
 durable.database.initialize();
 const dashboard = { revision: 1, kbsOverview: { enabled: false }, hospitalityNotifications: [] };
@@ -47,6 +49,9 @@ const database = new Proxy({}, { get: (_target, key) => {
   if (key === "getDashboardData") return read("database.getDashboardData", dashboard);
   if (key === "getSyncRuntimeStatus") return () => ({ clientId: "fixture" });
   if (key === "getReservationById") return read("database.getReservationById", { reservationType: "room", roomIds: ["room"], tableIds: [] });
+  if (key === "getCustomerRequests") return (customerId) => { calls.push("database.getCustomerRequests"); return [{ id: "request-fixture", customer_id: customerId }]; };
+  if (key === "approveDealerApplication") return (...args) => { calls.push("database.approveDealerApplication"); dealerApprovalInputs.push(args); return result(); };
+  if (key === "getRequestById" && requestDocumentFixture) return read("database.getRequestById", requestDocumentFixture);
   return record(`database.${String(key)}`);
 } });
 const app = {
@@ -58,10 +63,11 @@ const app = {
 const electron = { app, BrowserWindow: { getAllWindows: () => [] }, powerMonitor: { on() {} },
   ipcMain: { handle: (channel, action) => { assert.ok(!handlers.has(channel), channel); handlers.set(channel, action); },
     on: (channel, action) => events.set(channel, action), removeHandler: (channel) => handlers.delete(channel) },
-  shell: { openExternal: record("shell.openExternal") } };
+  shell: { openExternal: record("shell.openExternal"), openPath: async (path) => { calls.push("shell.openPath"); openedDocuments.push(path); return ""; } } };
 const real = new Set([
   "main", "main-entry", "desktop-ipc-registry", "app-lock-service", "app-lock", "preload", "business-messaging/provider-error",
   "desktop-dictation-service", "desktop-dictation-contract", "sync-config",
+  "request-document-store",
   "finance-ipc", "room-folio-ipc", "business-capability-ipc", "business-layout-ipc",
   "business-public-profile-ipc", "business-location-geocode-ipc", "google-reviews-settings-ipc",
   "kbs-settings-ipc", "kbs-webview-ipc", "room-media-ipc", "table-media-ipc",
@@ -135,7 +141,7 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 287, "all production invoke registrations must execute, including product activation, customer pagination and data transfer");
+assert.equal(handlers.size, 290, "all production invoke registrations must execute, including dealer approval, request history and documents");
 assert.ok(handlers.has("commerce:product:activate"), "product activation must be included in the production lock sweep");
 for (const action of ["pick", "upload", "preview", "apply", "rows", "summary", "export", "report", "release"]) {
   assert.ok(handlers.has(`dataTransfer:${action}`), `dataTransfer:${action}: included in the production lock sweep`);
@@ -146,7 +152,8 @@ for (const action of ["settings", "saveSettings", "get", "list", "save", "start"
 }
 for (const [channel, module] of [
   ["sync:probeConnection", "web-connection-ipc"],
-  ["marketingProviders:cancelInstagramOAuth", "ipc/marketing-provider-ipc"]
+  ["marketingProviders:cancelInstagramOAuth", "ipc/marketing-provider-ipc"],
+  ...["request:customerHistory", "request:approveDealer", "request:document"].map(channel => [channel, "ipc/request-ipc"])
 ]) {
   assert.ok(modules.has(resolve(root, module)), `${channel}: actual production registration module must execute`);
   assert.ok(handlers.has(channel), `${channel}: production handler must be included in the locked invocation sweep`);
@@ -190,6 +197,21 @@ for (const [channel, input] of representatives) {
   assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
 }
+const beforeHistory = calls.length;
+assert.deepEqual(await invoke("request:customerHistory", "customer-fixture"), [{ id: "request-fixture", customer_id: "customer-fixture" }]);
+assert.ok(calls.slice(beforeHistory).includes("database.getCustomerRequests"), "unlocked customer history delegates to its canonical reader");
+const beforeApproval = calls.length;
+assert.equal((await invoke("request:approveDealer", "request-fixture", "dealer_b")).ok, true);
+assert.deepEqual(dealerApprovalInputs, [["request-fixture", "dealer_b"]], "approval preserves request identity and the owner's price-group choice");
+assert.ok(calls.slice(beforeApproval).includes("database.approveDealerApplication"), "unlocked approval delegates to its transactional owner");
+requestDocumentFixture = { request_type: "dealer_application", documents: [{ id: "a".repeat(32), mime: "application/pdf", size: 4, sha256: "b".repeat(64) }] };
+try {
+  const beforeDocument = calls.length;
+  assert.equal(await invoke("request:document", "request-fixture", "a".repeat(32), "open"), "");
+  assert.deepEqual(openedDocuments, ["/tmp/opencode/runtime-boundary-fixture/assets/request-documents/" + "a".repeat(32) + ".pdf"]);
+  assert.ok(calls.slice(beforeDocument).includes("database.getRequestById"), "document open resolves the owning request");
+  assert.ok(calls.slice(beforeDocument).includes("shell.openPath"), "unlocked document open reaches the platform boundary");
+} finally { requestDocumentFixture = null; }
 const beforeActivation = calls.length;
 assert.equal((await invoke("commerce:product:activate", "product-fixture")).ok, true);
 assert.ok(calls.slice(beforeActivation).includes("commerce-catalog-presentation-store.activateCatalogProduct"),
@@ -270,6 +292,18 @@ runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}
       }
       return invoke(channel, ...args);
     } } }) });
+await invoke("appLock:lock");
+// Finish the lock transition's background-service lifecycle before measuring IPC effects.
+await modules.get(resolve(root, "main")).reconcileOptionalBackgroundServices();
+for (const [method, args] of [
+  ["getCustomerRequests", ["customer-fixture"]],
+  ["approveDealerApplication", ["request-fixture", "dealer_b"]],
+  ["requestDocument", ["request-fixture", "a".repeat(32), "open"]]
+]) {
+  const before = calls.length;
+  await assert.rejects(bridge[method](...args), /Uygulama kilitli/);
+  assert.deepEqual(calls.slice(before), [], `${method}: actual preload cannot bypass the main session gate`);
+}
 for (const method of ["saveManualFinanceEntry", "addRoomFolioPayment", "collectRoomFolioPayment", "assignReservationRoom", "checkoutStayWithSettlement"]) {
   await invoke("appLock:unlock", "");
   beforeHandler = undefined;

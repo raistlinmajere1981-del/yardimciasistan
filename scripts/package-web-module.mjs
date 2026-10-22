@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 import process from "node:process";
 import { readProductVersion } from "./product-version.mjs";
 
-const API_PACKAGE_FILE = /^(?:api\/.*\.php|lib\/.*\.(?:php|json)|config\/(?:\.htaccess|ai\.php|business\.json|version\.json)|data\/(?:\.htaccess|ai-conversations\.json)|knowledge\/(?:\.htaccess|[^/]+\.md)|media\/\.htaccess|README\.md)$/;
+const API_PACKAGE_FILE = /^(?:\.user\.ini|api\/.*\.php|lib\/.*\.(?:php|json)|config\/(?:\.htaccess|ai\.php|business\.json|version\.json)|data\/(?:\.htaccess|ai-conversations\.json)|knowledge\/(?:\.htaccess|[^/]+\.md)|media\/\.htaccess|README\.md)$/;
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "firm-template", "web-module");
@@ -16,6 +16,7 @@ const manifestPath = join(outputRoot, "manifest.json");
 const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
 const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
+  ".user.ini",
   "api/marketing.php",
   "api/marketing-media.php",
   "api/instagram-media.php",
@@ -63,6 +64,7 @@ const requiredFiles = [
   "lib/google-reviews.php",
   "lib/public-request-guard.php",
   "lib/public-request-submission.php",
+  "lib/request-documents.php",
   "lib/public-room-availability.php",
   "lib/public-room-availability-intent.php",
   "lib/public-room-availability-storage.php",
@@ -179,7 +181,7 @@ function validateSource() {
   assert.ok(aiConfig.includes("public-request-guard.php") && aiConfig.includes("ya_public_guard_enforce('chat')"), "Web AI public abuse guard üzerinden geçmeli.");
 
   const requestEndpoint = readFileSync(join(sourceRoot, "api", "request.php"), "utf8");
-  assert.ok(requestEndpoint.includes("public-request-guard.php") && requestEndpoint.includes("ya_public_guard_enforce('request')"), "Web talep endpoint'i public abuse guard üzerinden geçmeli.");
+  assert.ok(requestEndpoint.includes("public-request-guard.php") && /\bya_public_guard_enforce\(\s*'request'\s*[,)]/.test(requestEndpoint), "Web talep endpoint'i public abuse guard üzerinden geçmeli.");
 
   const publicGuard = readFileSync(join(sourceRoot, "lib", "public-request-guard.php"), "utf8");
   assert.ok(publicGuard.includes("hash_hmac('sha256'"), "Public guard ham istemci adresi yerine HMAC özeti kullanmalı.");

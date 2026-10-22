@@ -30,6 +30,9 @@ try {
   assert.ok(paths.includes("api/dealer/order.php"));
   assert.ok(paths.includes("api/whatsapp-webhook.php"));
   assert.ok(paths.includes("api/business-gallery-media.php"));
+  assert.ok(paths.includes(".user.ini"), "Document upload limits must ship with the API service");
+  assert.ok(paths.includes("lib/request-documents.php"), "Document handling must ship with the request endpoint");
+  assert.equal(readFileSync(join(hosting, ".user.ini"), "utf8"), readFileSync(join(source, ".user.ini"), "utf8"));
   assert.ok(paths.every(path => !/\.(?:js|css|html|png|webp|tsx?)$/.test(path)));
   assert.ok(paths.every(path => !/^(?:magaza|duyurular|bayi|assets)\//.test(path)));
   assert.ok(!paths.includes("data/fixture-private.local.php"));
@@ -41,7 +44,7 @@ try {
     const files = listing.stdout.trim().split("\n").filter(path => !path.endsWith("/")).map(path => path.replace(/^yardimci-asistan\//, "")).sort();
     assert.deepEqual(files, [...paths].sort(), "Archive must contain exactly the verified backend files");
   }
-  for (const name of ["index.php", "lib/site.css", "widget.js"]) {
+  for (const name of ["index.php", "lib/site.css", "widget.js", ".other.ini", "config/.user.ini"]) {
     writeFileSync(join(source, name), "presentation fixture");
     const rejected = pack();
     assert.notEqual(rejected.status, 0, `${name} must not enter the backend package`);
