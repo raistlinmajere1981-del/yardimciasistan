@@ -99,6 +99,26 @@
         "backupDir": "/home/yardimciasistantoptanci/backups",
         "stageParent": "/home/yardimciasistantoptanci"
       }
+    },
+    "gundogdu": {
+      "id": "gundogdu",
+      "title": "Gündoğdu Pansiyon & Restoran · Gideros",
+      "kind": "customer-site",
+      "siteUrl": "https://yardimciasistangunduodu.alwaysdata.net",
+      "webModuleUrl": "https://yardimciasistangunduodu.alwaysdata.net/yardimci-asistan",
+      "versionEndpoint": "https://yardimciasistangunduodu.alwaysdata.net/yardimci-asistan/api/version.php",
+      "credentialRef": "alwaysdata-gundogdu",
+      "externalRepo": {
+        "env": "GUNDOGDU_REPO",
+        "defaultSibling": "gundogdu_web"
+      },
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistangunduodu@ssh-yardimciasistangunduodu.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistangunduodu/www/yardimci-asistan",
+        "backupDir": "/home/yardimciasistangunduodu/backups",
+        "stageParent": "/home/yardimciasistangunduodu"
+      }
     }
   }
 }

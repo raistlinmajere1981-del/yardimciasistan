@@ -62,6 +62,15 @@ function resolveBlackSeaRoot(repoRoot: string) {
   return sibling ? resolve(repoRoot, "..", sibling) : "";
 }
 
+function resolveGundogduRoot(repoRoot: string) {
+  const registry = readRegistry(repoRoot);
+  const config = registry.installations?.gundogdu?.externalRepo;
+  const fromEnv = config?.env ? process.env[config.env]?.trim() : "";
+  if (fromEnv) return resolve(fromEnv);
+  const sibling = config?.defaultSibling?.trim();
+  return sibling ? resolve(repoRoot, "..", sibling) : "";
+}
+
 function rootScriptExists(repoRoot: string, path: string) {
   return existsSync(join(repoRoot, path));
 }
@@ -166,6 +175,59 @@ const TARGETS: TargetDefinition[] = [
         ? "Teknikel'e özel korumalı deploy scripti hazır."
         : "Teknikel deploy scripti bulunamadı."
     })
+  },
+  {
+    id: "gundogdu-web",
+    installationId: "gundogdu",
+    title: "Gündoğdu · Yardımcı Asistan modülü",
+    description: "Gündoğdu Alwaysdata hesabına ayrı modül kurar veya mevcut modülü günceller; tanıtım sitesine dokunmaz.",
+    confirmText: "Yalnız Gündoğdu web modülü yayımlanacak. İlk kurulumda bağımsız bağlantı anahtarı oluşturulur.",
+    impact: [
+      "Diğer site ve kurulumlara dokunulmaz.",
+      "Yeni modül ilk kez kurulur; sonraki yayınlar runtime verilerini korur.",
+      "SSH yetkisi ön kontrolde doğrulanır."
+    ],
+    preflight: (repoRoot) => [{
+      label: "Gündoğdu modülü SSH ön kontrolü",
+      command: npmCommand(), args: ["run", "deploy:gundogdu-web", "--", "--dry-run"], cwd: repoRoot
+    }],
+    deploy: (repoRoot) => [{
+      label: "Gündoğdu modülü kurulumu / güncellemesi",
+      command: npmCommand(), args: ["run", "deploy:gundogdu-web", "--", "--yes"], cwd: repoRoot
+    }],
+    availability: (repoRoot) => ({
+      available: rootScriptExists(repoRoot, "scripts/deploy-gundogdu-web-module.sh"),
+      note: "Gündoğdu web modülü deploy scripti hazır. SSH erişimi ön kontrolde doğrulanır."
+    })
+  },
+  {
+    id: "gundogdu-site",
+    installationId: "gundogdu",
+    title: "Gündoğdu · Tanıtım sitesi",
+    description: "Bağımsız Gündoğdu reposundan tanıtım sitesini yayımlar; web modülüne dokunmaz.",
+    confirmText: "Yalnız Gündoğdu site dosyaları yayımlanacak; Yardımcı Asistan modülü korunur.",
+    impact: [
+      "Gündoğdu site köküne yalnız tasarımdan gelen izinli dosyalar aktarılır.",
+      "www/yardimci-asistan dizini korunur.",
+      "Canlı indeks yalnız Gündoğdu sitesine aitse veya Alwaysdata varsayılan sayfasıysa değiştirilir."
+    ],
+    preflight: (repoRoot) => [{
+      label: "Gündoğdu site ön kontrolü",
+      command: "bash", args: ["scripts/deploy-site.sh", "--dry-run"], cwd: resolveGundogduRoot(repoRoot)
+    }],
+    deploy: (repoRoot) => [{
+      label: "Gündoğdu site yayını",
+      command: "bash", args: ["scripts/deploy-site.sh", "--yes"], cwd: resolveGundogduRoot(repoRoot)
+    }],
+    availability: (repoRoot) => {
+      const cwd = resolveGundogduRoot(repoRoot);
+      const ready = Boolean(cwd) && existsSync(join(cwd, "scripts", "deploy-site.sh")) &&
+        existsSync(join(cwd, "index.php"));
+      return {
+        available: ready,
+        note: ready ? cwd : "Proje klasörü hazır; tasarım index.php tamamlanınca site yayını açılacak."
+      };
+    }
   },
   {
     id: "support-endpoint",
