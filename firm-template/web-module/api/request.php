@@ -68,7 +68,7 @@ if ($errors !== []) {
 
 $phone = ya_normalize_phone(ya_string($payload['customer_phone'] ?? ''));
 $now = date(DATE_ATOM);
-$whatsappMessage = ya_string($payload['whatsapp_message'] ?? '');
+$whatsappMessage = $isApplication ? '' : ya_string($payload['whatsapp_message'] ?? '');
 
 if ($whatsappMessage === '') {
     $whatsappMessage = ya_build_whatsapp_message($businessConfig, $payload);
@@ -390,6 +390,20 @@ function ya_request_context(mixed $value): array
 function ya_build_whatsapp_message(array $businessConfig, array $payload): string
 {
     $businessName = ya_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? 'İşletme');
+    if (ya_string($payload['request_type'] ?? '') === 'dealer_application') {
+        $lines = [
+            'Merhaba, ' . $businessName . ' için bayi başvurusunda bulunmak istiyorum.',
+            'Talep türü: Bayi başvurusu',
+            'Firma: ' . ya_string($payload['company_name'] ?? ''),
+            'Yetkili: ' . ya_string($payload['authorized_person'] ?? ''),
+            'Telefon: ' . ya_string($payload['customer_phone'] ?? ''),
+            'E-posta: ' . ya_string($payload['email'] ?? ''),
+        ];
+        $note = ya_string($payload['message'] ?? '');
+        if ($note !== '') $lines[] = 'Not: ' . $note;
+        $lines[] = 'Başvurumun değerlendirilmesini rica ederim.';
+        return implode("\n", $lines);
+    }
     $requestTypeLabels = [
         'general_info' => 'Bilgi talebi',
         'pension_reservation' => 'Pansiyon rezervasyonu',

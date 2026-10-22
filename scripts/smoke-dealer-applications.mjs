@@ -58,6 +58,11 @@ try {
   const docs = [{name:"vergi.pdf",bytes:pdf,kind:"tax_certificate"},{name:"faaliyet.png",bytes:png,kind:"activity_certificate"}];
   const key=randomUUID(), created=await submit(key,docs); assert.equal(created.status,201,JSON.stringify(created));
   const id=created.body.request_id;
+  assert.match(created.body.whatsapp_message,/Talep türü: Bayi başvurusu/);
+  assert.match(created.body.whatsapp_message,/Firma: Yeni Bayi Ltd/);
+  assert.match(created.body.whatsapp_message,/Yetkili: Başvuru Yetkilisi/);
+  assert.match(created.body.whatsapp_message,/E-posta: yetkili@example\.test/);
+  assert.doesNotMatch(created.body.whatsapp_message,/(?:Tarih:|Kişi sayısı:|Bilgi talebi|1234567890)/);
   const replay=await submit(key,docs); assert.equal(replay.body.request_id,id);
   assert.equal((await submit(key,docs,{company_name:"Değişen Firma"})).status,409);
   assert.equal(webDb.prepare("SELECT COUNT(*) n FROM web_requests").get().n,1);
