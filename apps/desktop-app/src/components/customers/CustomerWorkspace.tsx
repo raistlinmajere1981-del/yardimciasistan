@@ -34,6 +34,7 @@ export interface CustomerWorkspaceProps {
   accommodationFolioEnabled?: boolean;
   customerCreditEnabled: boolean;
   wholesaleEnabled?: boolean;
+  dealerPortalEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
@@ -52,6 +53,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     accommodationFolioEnabled = false,
     customerCreditEnabled,
     wholesaleEnabled = false,
+    dealerPortalEnabled,
     onPreparedCreditWhatsApp,
     onWhatsApp,
     onSave,
@@ -259,7 +261,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         {customer && <>
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
-        {wholesaleEnabled && customer.commercialProfile && <DealerWebAccessPanel key={customer.id} customerId={customerId} active={customer.commercialProfile.dealerStatus === "active"} disabled={dirty || saveState === "loading"} />}
+        {wholesaleEnabled && dealerPortalEnabled && customer.commercialProfile && <DealerWebAccessPanel key={customer.id} customerId={customerId} active={customer.commercialProfile.dealerStatus === "active"} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <DetailSectionCard className="customer-operation-card form-stack" title="Konaklama"
           actions={activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}>
           {activeStay ? <>

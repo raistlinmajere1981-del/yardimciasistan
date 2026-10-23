@@ -22,6 +22,7 @@ type WholesaleFixtureControl = typeof window & {
   __whInitial: DesktopDashboardData;
   __whCall: (method: string, args: unknown[]) => Promise<unknown>;
   __whToggle?: (enabled: boolean) => void;
+  __whTogglePortal?: (enabled: boolean) => void;
 };
 
 const control = window as WholesaleFixtureControl;
@@ -29,10 +30,12 @@ const control = window as WholesaleFixtureControl;
 function Harness() {
   const [dashboardData, setDashboardData] = useState(control.__whInitial);
   const [wholesaleEnabled, setWholesaleEnabled] = useState(true);
+  const [dealerPortalEnabled, setDealerPortalEnabled] = useState(true);
 
   useEffect(() => {
     control.__whToggle = setWholesaleEnabled;
-    return () => { delete control.__whToggle; };
+    control.__whTogglePortal = setDealerPortalEnabled;
+    return () => { delete control.__whToggle; delete control.__whTogglePortal; };
   }, []);
 
   const saveCustomer = async (input: SaveCustomerInput): Promise<DesktopCustomerMutationResult> => {
@@ -82,6 +85,7 @@ function Harness() {
             accommodationFolioEnabled: false,
             customerCreditEnabled: false,
             wholesaleEnabled,
+            dealerPortalEnabled,
             onWhatsApp: () => undefined,
             onSave: saveCustomer,
             onAnalyzeIdentity: analyzeIdentity,
