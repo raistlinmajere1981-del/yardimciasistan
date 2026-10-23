@@ -19,6 +19,8 @@ Bu test sırasında güvenlik anahtarını veya API anahtarlarını sohbet ekran
 - `Ayarlar → Gelişmiş Ayarlar → Bu Bilgisayar` bölümünde yerel kayıt dosyası ve yedek klasörünün oluştuğunu kontrol edin.
 - Veritabanı, log, asset ve `backups` klasörlerinin uygulama EXE'sinin yanında değil kullanıcı veri alanında bulunduğunu doğrulayın. Program Files içindeki kurulum klasörü runtime tarafından yazılabilir veri alanı olarak kullanılmamalıdır.
 
+Güncelleme kurulumu için ayrıca [Windows updater doğrulama dizisini](architecture/DESKTOP_WINDOWS_UPDATE_V1.md#verification-boundary-and-next-release-windows-sequence) uygulayın; Linux kontrolleri WPF/UAC/NSIS kanıtı değildir.
+
 ## 2. Web Modülü Bağlantısı
 
 `Ayarlar → Gelişmiş Ayarlar → Web Bağlantısı` bölümünü açın.

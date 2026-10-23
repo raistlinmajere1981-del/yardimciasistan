@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-desktop-visible-updater.mjs",
   "scripts/smoke-entity-single-card.mjs",
   "scripts/smoke-data-transfer.mjs",
   "scripts/smoke-data-transfer-ui.mjs",
@@ -660,6 +661,7 @@ function smokeDomains(file) {
 }
 
 function smokeDomainsForGeneralOwnership(file) {
+  if (file === "scripts/smoke-desktop-visible-updater.mjs") return ["desktop", "settings", "platform"];
   if (file.includes("desktop-tts")) return ["voice", "settings", "desktop", "platform"];
   if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");

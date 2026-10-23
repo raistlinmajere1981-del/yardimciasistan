@@ -131,28 +131,34 @@ function installDevelopmentRelaunchBridge() {
 
 installDevelopmentRelaunchBridge();
 
-// The packaged Windows process doubles as the lightweight launcher. A verified
-// installer staged by the previous run is applied before SQLite or the renderer
-// are opened, then the silent NSIS installer relaunches the updated app.
-if (applyPendingDesktopUpdateAtStartup(userDataPath())) {
-  desktopLog.info({ scope: "update", event: "update.installer.handoff", message: "Başlangıç başlatıcısı denetimi güncelleme kurucusuna devretti." });
-  process.exit(0);
+// The updater's early singleton check must use the same data override main.ts
+// applies during normal composition, including isolated Windows field tests.
+if (app.isPackaged && process.platform === "win32" && process.env.YA_DESKTOP_DATA_DIR) {
+  app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
 }
 
-// Restore/reset operations are intentionally applied before main.ts opens the
-// long-lived SQLite connection. This keeps WAL state and live database handles
-// out of destructive maintenance operations.
-const deferPendingMaintenance = shouldDeferPendingMaintenanceToCleanStart();
-if (deferPendingMaintenance) {
-  desktopLog.warn({
-    scope: "startup",
-    event: "startup.maintenance.deferred-for-clean-start",
-    message: "Eski veri bakımı temiz başlangıç kararı verilene kadar ertelendi."
-  });
-} else {
-  applyPendingDataMaintenanceAtStartup(userDataPath());
+// Defer domain startup until the independent, visible installer has either
+// acknowledged readiness or declined the handoff. SQLite is still unopened.
+async function loadMainProcess() {
+  if (await applyPendingDesktopUpdateAtStartup(userDataPath())) {
+    desktopLog.info({ scope: "update", event: "update.installer.handoff", message: "Başlangıç başlatıcısı denetimi görünür kurulum yardımcısına devretti." });
+    process.exit(0);
+  }
+
+  // Restore/reset operations precede the long-lived SQLite connection.
+  const deferPendingMaintenance = shouldDeferPendingMaintenanceToCleanStart();
+  if (deferPendingMaintenance) {
+    desktopLog.warn({
+      scope: "startup",
+      event: "startup.maintenance.deferred-for-clean-start",
+      message: "Eski veri bakımı temiz başlangıç kararı verilene kadar ertelendi."
+    });
+  } else {
+    applyPendingDataMaintenanceAtStartup(userDataPath());
+  }
+  return import("./main");
 }
-const mainProcessReady = import("./main");
+const mainProcessReady = loadMainProcess();
 
 // Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
@@ -312,4 +318,7 @@ void mainProcessReady.then(async ({
     });
 
   });
+}).catch((error: unknown) => {
+  desktopLog.error({ scope: "startup", event: "app.startup.failed", message: "Masaüstü başlangıcı tamamlanamadı.", error });
+  app.exit(1);
 });

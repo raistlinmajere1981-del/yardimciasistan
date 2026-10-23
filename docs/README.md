@@ -54,6 +54,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `ANDROID_DISTRIBUTION.md`
 - `PILOT_FIELD_TEST.md`
 - `WINDOWS_HOSTING_FIELD_TEST.md`
+- [Windows update handoff](architecture/DESKTOP_WINDOWS_UPDATE_V1.md) — independent native installation window, result reconciliation and Windows validation.
 - `dev/LOCAL_COMPANION_NETWORK.md`
 - `dev/ADMIN_CONSOLE_TARGET.md` — mevcut Electron Admin Control Center'ın operasyon, secret ve paketleme sınırları.
 
