@@ -127,7 +127,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
       commercialProfile: { companyName: 'Restore dealer', dealerStatus: 'active', priceGroup: 'dealer_a' } });
     assert.equal(customer.ok, true, customer.message);
     const invite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
-    const token = new URL(invite.inviteUrl).hash.slice(8);
+    const token = new URLSearchParams(new URL(invite.inviteUrl).hash.slice(1)).get("invite");
     const asset = f.media.importBytes(imageBytes, 'upload');
     const content = f.service.saveContent(editorialInput({ mediaAssetIds: [asset.id] }));
     let pub = f.service.savePublication({ contentId: content.content.id, channel: 'website', placement: 'homepage_feature', title: 'Restore A', text: 'Backup A', mediaAssetIds: [asset.id] });
@@ -163,11 +163,11 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     // Current remote access is ahead of backup, with a different consumed invite.
     // Restoring the lower revision must use new epoch authority, not resurrect T1's invite.
     const newerInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
-    const newerClaim = await post('dealer/claim', { invite_token: new URL(newerInvite.inviteUrl).hash.slice(8) }, { 'X-YA-Dealer': '1' });
+    const newerClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(newerInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
     // The new invite must be published before claim.
     assert.notEqual(newerClaim.status, 200);
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
-    const liveClaim = await post('dealer/claim', { invite_token: new URL(newerInvite.inviteUrl).hash.slice(8) }, { 'X-YA-Dealer': '1' });
+    const liveClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(newerInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
     assert.equal(liveClaim.status, 200); const liveCookie = liveClaim.cookie.split(';')[0];
     f.db.queueSyncJob('marketing_website_publish');
     f.db.prepareSyncPublication('marketing_website_publish', { projection: { version: 1, enabled: false, publications: [] }, sent: [] });
@@ -277,7 +277,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     mutate("UPDATE customer_commercial_profiles SET dealer_status = 'active'");
     const offRaceInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
-    const offRaceClaim = await post('dealer/claim', { invite_token: new URL(offRaceInvite.inviteUrl).hash.slice(8) }, { 'X-YA-Dealer': '1' });
+    const offRaceClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(offRaceInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
     assert.equal(offRaceClaim.status, 200); const offRaceCookie = offRaceClaim.cookie.split(';')[0];
     await restore(off); coordinator = makeCoordinator();
     result = await coordinator.run(false); assert.equal(result.ok, true, result.message);

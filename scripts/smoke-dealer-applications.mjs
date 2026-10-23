@@ -45,7 +45,7 @@ async function submit(key, docs = [], extra = {}) {
   return {status:response.status, body:await response.json()};
 }
 async function sync() { const result = await coordinator.runNow(); assert.equal(result.ok,true,result.message); }
-async function claim(invite) { clearGuard(); const result = await fetch(`${baseUrl}/api/dealer/claim.php`,{method:"POST",headers:{"Content-Type":"application/json","X-YA-Dealer":"1"},body:JSON.stringify({invite_token:new URL(invite).hash.slice(8)})}); return {status:result.status,cookie:result.headers.get("set-cookie")?.split(";")[0]}; }
+async function claim(invite) { clearGuard(); const result = await fetch(`${baseUrl}/api/dealer/claim.php`,{method:"POST",headers:{"Content-Type":"application/json","X-YA-Dealer":"1"},body:JSON.stringify({invite_token:new URLSearchParams(new URL(invite).hash.slice(1)).get("invite")})}); return {status:result.status,cookie:result.headers.get("set-cookie")?.split(";")[0]}; }
 async function session(cookie) { return (await fetch(`${baseUrl}/api/dealer/session.php`,{headers:{Cookie:cookie}})).status; }
 try {
   for (let i=0;;i++) { try { if ((await fetch(`${baseUrl}/api/business.php`)).ok) break; } catch {} if(i>100)throw new Error("PHP did not start"); await new Promise(resolve=>setTimeout(resolve,30)); }

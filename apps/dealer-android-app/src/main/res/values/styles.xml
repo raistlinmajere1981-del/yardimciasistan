@@ -1,9 +1,17 @@
 <resources>
     <style name="DealerTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#0F766E</item>
+        <item name="android:colorAccent">#1869CC</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#F4F6F8</item>
+        <item name="android:windowBackground">#F4F7FA</item>
     </style>
+    <style name="DealerThemeDark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#78B9FF</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#0C1523</item>
+    </style>
+    <color name="dealer_icon_background">#03256C</color>
 </resources>

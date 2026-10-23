@@ -3,7 +3,9 @@ import { WhatsAppBusinessSettingsSection } from "../components/settings/WhatsApp
 import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
 import { ServiceSettingsCard } from "../components/settings/ServiceSettingsCard";
 import { COMMERCE_SHIPPING_PROVIDERS, isArasShippingConfigurationReady } from "@yardimci-asistan/shared";
-import type { ReactNode, SetStateAction } from "react";
+import { useState, type ReactNode, type SetStateAction } from "react";
+import { ActionButton } from "../components/ui/ActionButton";
+import { reportAppStatus } from "./runtime-state";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { settingsFieldOwners } from "./settings-draft-model";
@@ -66,6 +68,7 @@ const stagedSettingsContributions = {
         disabled={busy} onEnabledChange={dealerPortalEnabled => onChange({ dealerPortalEnabled })}>
         <label className="settings-service-toggle"><input type="checkbox" checked={draft.dealerApplicationEnabled} disabled={busy}
           onChange={event => onChange({ dealerApplicationEnabled: event.target.checked })} /><span>Online Bayi Başvurusu</span></label>
+        <DealerApplicationLinkButton disabled={busy || !draft.dealerApplicationEnabled} />
       </ServiceSettingsCard>
     )
   }, {
@@ -91,6 +94,34 @@ const stagedSettingsContributions = {
     ); }
   }]
 } satisfies StagedSettingsContributions;
+
+function DealerApplicationLinkButton({ disabled }: { disabled: boolean }) {
+  const [copying, setCopying] = useState(false);
+  async function copy() {
+    setCopying(true);
+    try {
+      const saved = await window.yardimciDesktop?.getSetupData();
+      if (!saved?.dealerPortalEnabled || !saved.dealerApplicationEnabled) {
+        reportAppStatus("error", "Önce Bayi Web Erişimi ve Online Bayi Başvurusu ayarlarını kaydedin.");
+        return;
+      }
+      const module = new URL(saved.webModuleUrl);
+      if (module.protocol !== "https:" || module.username || module.password || module.search || module.hash) {
+        reportAppStatus("error", "Web bağlantısı ayarlarına geçerli HTTPS modül adresini kaydedin.");
+        return;
+      }
+      const moduleUrl = `${module.href.replace(/\/+$/, "")}/`;
+      const link = `${new URL("../bayi/", moduleUrl).href}#${new URLSearchParams({ application: "dealer", module: moduleUrl })}`;
+      await navigator.clipboard.writeText(link);
+      reportAppStatus("success", "Bayi başvuru bağlantısı kopyalandı. Bayi uygulamasında açılabilir.");
+    } catch {
+      reportAppStatus("error", "Başvuru bağlantısı kopyalanamadı. Web bağlantısı ayarlarını kontrol edin.");
+    } finally { setCopying(false); }
+  }
+  return <ActionButton variant="secondary" disabled={disabled || copying} onClick={() => void copy()}>
+    Başvuru bağlantısını kopyala
+  </ActionButton>;
+}
 
 interface StagedSettingsContributionSlotProps<C extends StagedSettingsCategoryId> {
   category: C;

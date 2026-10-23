@@ -5,6 +5,8 @@ import type { MarketingWebsitePublicationService } from "./marketing/website-pub
 import { DESKTOP_PUBLICATIONS } from "./desktop-publication-registry";
 import { publishDesktopProjection } from "./desktop-publication-service";
 import { calculateNextAttempt } from "./sync-network-policy";
+import { prepareDealerProductMedia } from "./dealer-product-media-publication";
+import type { DealerAccessProjection } from "@yardimci-asistan/shared";
 
 export interface SyncOutboxPublisherOptions {
   database: DesktopDatabase;
@@ -127,6 +129,16 @@ export class SyncOutboxPublisher {
         continue;
       }
       const config = this.options.getSyncConfig();
+      let dealerProjection: DealerAccessProjection | undefined;
+      if (job.jobType === "dealer_access_publish") {
+        const prepared = await prepareDealerProductMedia(this.options.database, config, job.sourceRevision);
+        if (!prepared.ok) {
+          this.options.database.failSyncJob(job.jobKey, job.sourceRevision, prepared.message, calculateNextAttempt(job.attemptCount));
+          errors.push(prepared.message);
+          continue;
+        }
+        dealerProjection = prepared.value;
+      }
       const result = job.jobType === "menu_publish"
         ? await this.publishMenuJob(job)
         : job.jobType === "online_catalog_publish"
@@ -134,9 +146,9 @@ export class SyncOutboxPublisher {
               (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }),
               { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
         : job.jobType === "dealer_access_publish"
-          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createDealerAccessProjection(),
+          ? await publishDesktopProjection(this.options.database, config, job.jobType, dealerProjection!,
               (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }),
-              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
+              { expectedRevision: job.sourceRevision, nextAttemptAt: calculateNextAttempt(job.attemptCount) })
         : await this.publishAndroidSnapshotJob(job);
       if (!result) continue;
       if (result.ok) {

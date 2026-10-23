@@ -45,7 +45,7 @@ export interface DealerCatalogProjection {
     product_id: string; name: string; description: string; sku: string;
     category_id?: string; category_name?: string; brand?: string;
     unit: import("./commerce").CommerceUnit; price: number; currency: string;
-    tax_rate: number; image_url: string; availability: "available";
+    tax_rate: number; image_url: string; image_urls?: string[]; availability: "available";
   }>;
 }
 

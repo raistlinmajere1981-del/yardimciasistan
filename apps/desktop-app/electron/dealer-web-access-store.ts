@@ -39,7 +39,8 @@ export function changeDealerWebAccess(db: DatabaseSync, customerId: string, acti
       const base = new URL(String(settings?.web_module_url ?? ""));
       if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw new Error("Bayi daveti için geçerli HTTPS web modülü adresi gerekli.");
       const token = randomBytes(32).toString("base64url");
-      inviteUrl = `${new URL("../bayi/", `${base.href.replace(/\/+$/, "")}/`).href}#invite=${token}`;
+      const moduleUrl = `${base.href.replace(/\/+$/, "")}/`;
+      inviteUrl = `${new URL("../bayi/", moduleUrl).href}#${new URLSearchParams({ invite: token, module: moduleUrl })}`;
       db.prepare(`UPDATE commerce_dealer_web_access SET invite_revision = invite_revision + 1,
         invite_hash = ?, invite_issued_at = ?, invite_expires_at = ?, updated_at = ? WHERE customer_id = ?`)
         .run(createHash("sha256").update(token).digest("hex"), now, new Date(Date.now() + 72 * 3600_000).toISOString(), now, customerId);

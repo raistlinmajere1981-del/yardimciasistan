@@ -27,9 +27,15 @@ APK debug imzalı pilot yapıdır; genel mağaza/release dağıtımı için imza
 ## İlk bağlantı
 
 Firma yöneticisi masaüstünde aktif bayinin web erişimini açar, davet üretir ve mevcut
-özel bayi yayınını sunucuya eşitler. Bayi, **web modülünün tam HTTPS adresini** ve aynı
-origin'e ait davet bağlantısını girer. Örnek adres yalnız yer tutucudur; uygulamada
-varsayılan bir firma yoktur. Davet fragment'i yalnız claim gövdesinde taşınır; saklanmaz.
+özel bayi yayınını sunucuya eşitler. Bayi yalnız **Bayi davet bağlantısı** alanına
+bağlantıyı yapıştırır; sunucu adresi istenmez. Yeni bağlantı fragment'indeki `module`
+tam HTTPS modül adresini taşır; istemci portal yolu/origin/port ve token biçimini
+doğrular. Eski eksik linkte yeni davet istenir, dizin tahmin edilmez. VIEW/SEND alanı
+doldurur; davet yalnız kullanıcı giriş dediğinde tüketilir. Token saklanmaz.
+
+Başvuru bağlantısı masaüstü Bayi Web Erişimi ayarlarında, kaydedilmiş etkin servis
+ve modül adresinden kopyalanır. Aynı tek alan `#application=dealer&module=...` linkini
+mevcut public request/multipart formuna yönlendirir. İstemci yayın anahtarı istemez.
 
 Web modülünde `api/dealer/orders.php` ve `receipt.php` dahil bu sürümün API dosyaları,
 masaüstünde genişletilmiş bayi yayını bulunmalıdır. Bu çalışma sunucuya deploy yapmaz.
@@ -39,12 +45,18 @@ mevcut mekanizmayla üretilir. Uygulama publication/sync anahtarı istemez.
 ## Kullanım ve çevrimdışı davranış
 
 - Katalog: görseller, kategori/marka filtreleri, stok kodu ve Türkçe arama; favori filtresi.
-- Ürün detayı: açıklama, bayiye çözümlenmiş fiyat ve kesirli miktar desteği.
-- Sepet: çoklu ürün, miktarı uygulama/çıkarma, para birimi kontrolü; elden teslim veya
+- Ürün detayı: açıklama, bayiye çözümlenmiş fiyat ve kesirli miktar desteği. Fotoğrafı
+  incele: pinch/pan/çift dokunma, 90° dönüş, sığdır, çoklu fotoğrafta kaydırma.
+  Normal/Detay/Kod okuma/Negatif/Kenar modları özgün dosyayı değiştirmez.
+  Kamera veya galeriden yalnız cihazda yan yana/üst üste karşılaştırma, bağımsız
+  zoom/dönüş/hizalama ve saydamlık. Karşılaştırma dosyaları özel geçici cache'tedir;
+  API/AI isteğine girmez ve kapatınca temizlenir.
+- Sepet: çoklu ürün, miktarı anında değiştirme/çıkarma, para birimi kontrolü; elden teslim veya
   mevcut allowlist'e göre adrese gönderim; adres ve not cihazda korunur.
 - Siparişler: aktarım bekleyen talep ile canonical alındı/onaylandı/tamamlandı/iptal
   durumları ayrıdır. Geçmiş ürünleri güncel katalog fiyatlarıyla yeniden sepete ekler.
-- Hesabım: bayi firma adı/sunucu, sistem/açık/koyu görünüm ve sunucuda oturum kapatma.
+- Ayarlar: Sistem/Açık/Koyu, dört renk tonu, %90–150 yazı, Normal/Yüksek kontrast,
+  görünümü sıfırla ve hesap/oturumu kapat. Tercihler cihazda kalır; çıkışta korunur.
 
 Son katalog ve görseller (indirildiyse), sepet, favoriler ve son sipariş görünümü cihazda
 kullanılabilir. Ekranlar son yenileme zamanını gösterir; offline bilgi güncel sunucu
@@ -64,7 +76,17 @@ verir ve veriyi temizlemez.
 
 Cihaz verisi Android Keystore AES-GCM ile `noBackupFilesDir` içinde şifreli, atomik
 saklanır. Backup/cihaz transferi kapalıdır. Görseller public HTTPS kaynaklarından ayrı,
-cookiesiz ve boyut sınırıyla alınır; indirilemezse yer tutucu gösterilir.
+cookiesiz ve boyut sınırıyla alınır; indirilemezse yer tutucu ve inceleyicide yeniden
+dene gösterilir. İndirme 30 MiB, kaynak 100 MP, thumbnail cache 6 MiB, disk cache
+64 MiB/120 dosya, iki decode işi ve ekran bitmap'i cihaz heap'ine göre en fazla
+1024/1440/2048 piksel uzun kenarla sınırlıdır. Efektler tek arka plan işçisi ve son
+istek nesliyle çalışır. EXIF yönü uygulanır; önceki bitmap'ler kapanışta bırakılır.
+
+Sıralı `image_urls`, canonical ürün özgün arşivinden aynı `dealer_access` yayınıyla
+gider. `api/product-media.php`, bu sürümün shared/PHP alanları ve masaüstü hazırlığı
+birlikte güncellenmelidir. Yükleme onayları ürün/hash/hedef metadata'sıdır; yeni
+galeri veya bağımsız senkronizasyon hattı değildir. Eksik yerel dosya fotoğrafsız
+yayınlanabilir; bozuk hash veya başarısız yükleme mevcut işi tekrar denemeye bırakır.
 
 ## Otomatik cihaz fixture testi
 
@@ -76,13 +98,18 @@ Tek bağlı cihazı veya `ANDROID_SERIAL` seçimini kullanır. Üretim paketleri
 `com.yardimciasistan.dealer.fixture` kurar; sentetik, şifreli katalog/sepet/sipariş
 önbelleğiyle native ekranları çalıştırır. Geçerli oturum/sunucu yoktur. Ürün detayı,
 favori, miktar/toplam, tekrar sipariş, çevrimdışı yeniden açma ve başarısız gönderimde
-sabit retry JSON'u sınanır. Fixture sonunda kaldırılır, cihazın uyku durumu geri alınır.
+sabit retry JSON'u sınanır. Native pinch/pan/çift dokunma/kaydırma, beş filtre, büyük
+örneklemeli görsel, EXIF, FileProvider kamera sonucu/iptali, bağımsız karşılaştırma,
+overlay/alpha/reset, Activity yeniden oluşması ve 20 aç/kapat döngüsünde bitmap
+bırakma sınanır. Kamera sonucu fixture tarafından simüle edilir; gerçek sensör kanıtı
+değildir. Aynı kontrol API 27 (Android 8.1) emülatörü ve fiziksel cihazda çalışabilir. Fixture sonunda kaldırılır, cihazın uyku durumu geri alınır.
 Bu test gerçek bayi erişimi veya canlı fiyat/sipariş senkronizasyonu kanıtı değildir.
-Sonuç `artifacts/dealer-android/native-fixture.txt` altına yazılır.
+Sonuç `artifacts/dealer-android/native-fixture-sdk<SDK>.txt`, native ekran görüntüleri
+`artifacts/dealer-android/sdk<SDK>/` altına yazılır. Görseller sentetik TEST verisidir.
 
 ## Fiziksel pilot akışı
 
-1. Companion ve Bayi APK'larını birlikte görün; Bayi'yi açıp web adresi+davetle giriş yapın.
+1. Companion ve Bayi APK'larını birlikte görün; Bayi'yi açıp tek davet bağlantısıyla giriş yapın.
 2. İki ayrı bayiyle fiyat izolasyonunu ve kategori/marka/stok kodu aramasını kontrol edin.
 3. Ürün detayı, favori, iki ürünlü sepet, miktar ve adres/not girişini 320–360dp genişlikte
    ve büyük yazı/açık-koyu temalarda deneyin.

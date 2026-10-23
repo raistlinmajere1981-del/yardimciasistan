@@ -155,6 +155,13 @@ export function prepareSyncPublication<T>(db: DatabaseSync, jobType: DesktopSync
   } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
+/** Read only; async media preparation must reuse an already-frozen retry body verbatim. */
+export function readPreparedSyncPublication<T>(db: DatabaseSync, jobType: DesktopSyncJobType, revision: number): T | null {
+  const row = db.prepare("SELECT payload FROM sync_publication_payloads WHERE job_key=? AND source_revision=?")
+    .get(jobType.replace(/_publish$/, ""), revision);
+  return row ? JSON.parse(decodePublicationPayload(String(row.payload))) as T : null;
+}
+
 export function completeSyncJob(db: DatabaseSync, jobKey: string, sourceRevision: number, sourceEpoch?: number) {
   db.exec("BEGIN IMMEDIATE");
   try {

@@ -31,6 +31,7 @@ function assertAccess(db: DatabaseSync, entity: TransferEntity, preferences?: Tr
   const caps = new Set(readEnabledBusinessCapabilities(db));
   const require = (capability: typeof C[keyof typeof C]) => { if (!caps.has(capability)) throw new Error("Bu aktarım işlemi için gerekli özellik etkin değil."); };
   require(entity === "customers" ? C.CUSTOMERS : C.CATALOG);
+  if (entity === "menu") require(C.FOOD_MENU);
   if (preferences?.publish) require(C.ONLINE_SALES);
   if (preferences?.menuCategoryId) require(C.FOOD_MENU);
   if (preferences?.applyStock) require(C.INVENTORY);
@@ -123,7 +124,8 @@ export async function resolveTransferImages(document: TransferDocument, mapping:
 }
 export function createTransferPlan(databasePath: string, entity: TransferEntity, document: TransferDocument, mapping: Record<string,string>, preferences: TransferPreferences, images: TransferImageOwner): TransferPlan {
   if (!["skip","update"].includes(preferences.conflicts) || !["without","skip"].includes(preferences.missingImages) || [preferences.activate,preferences.publish,preferences.applyStock,preferences.fallbackCategory].some(v=>typeof v !== "boolean")) throw new Error("Aktarım tercihleri geçersiz.");
-  const fields = entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS;
+  if (entity === "menu" && !preferences.menuCategoryId) throw new Error("Menü aktarımı için dosyadaki menü kategorilerini veya bir hedef kategori seçin.");
+  const fields = entity === "customers" ? CUSTOMER_TRANSFER_FIELDS : PRODUCT_TRANSFER_FIELDS;
   for (const [field, header] of Object.entries(mapping)) if (!fields[field] || !document.headers.includes(header)) throw new Error("Kolon eşlemesi geçersiz.");
   if (new Set(Object.values(mapping)).size !== Object.values(mapping).length) throw new Error("Bir kolon iki alana eşlenemez.");
   const db = openTransferDatabase(databasePath);
@@ -140,11 +142,18 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
         const row: PreparedRow = { identity:{...values}, baseline:"", existingId: "", newId: "", view: { row:index+2, name:values.name || values.fullName || `Satır ${index+2}`, status:"new", reasons:[], warnings:[], before:{}, after:values, publishable:false } };
         rows.push(row); db.exec("SAVEPOINT transfer_row");
         try {
-          if (entity === "products") {
+          if (entity !== "customers") {
             const old = matchProduct(db,values); row.existingId = String(old?.id ?? ""); row.baseline=old?String(old.updated_at):""; row.newId = row.existingId || `product_${randomUUID()}`;
             row.view.status = old ? preferences.conflicts === "skip" ? "skip" : "update" : "new";
             row.view.before = old ? stringifyRecord({id:old.id,name:old.name,category:db.prepare("SELECT name FROM catalog_categories WHERE id=?").get(String(old.category_id))?.name,brand:old.brand,sku:old.sku,barcode:old.barcode,description:old.description,salePrice:old.sale_price,purchasePrice:old.purchase_price,dealerPriceA:old.dealer_price_a,dealerPriceB:old.dealer_price_b,currency:old.currency,unit:old.unit,taxRate:old.tax_rate,trackInventory:Number(old.track_inventory)===1,minimumQuantity:old.minimum_quantity,sourceProductUrl:old.source_product_url}) : {};
             if (row.view.status === "skip") row.view.reasons.push("Eşleşen kayıt korundu.");
+            const oldMenu = old ? db.prepare(`SELECT m.*, c.name menu_category FROM menu_product_entries m
+              JOIN menu_categories c ON c.id=m.category_id WHERE m.product_id=? AND m.deleted_at=''`).get(row.existingId) : undefined;
+            if (oldMenu) Object.assign(row.view.before, stringifyRecord({menuCategory:oldMenu.menu_category,menuPriceOverride:oldMenu.price_override,
+              allergens:(JSON.parse(String(oldMenu.allergens_json)) as string[]).join("|"),tags:(JSON.parse(String(oldMenu.tags_json)) as string[]).join("|"),
+              menuAvailable:Number(oldMenu.is_available)===1,menuFeatured:Number(oldMenu.is_featured)===1,menuHideOutOfStock:Number(oldMenu.hide_when_out_of_stock)===1,
+              menuConsumption:oldMenu.stock_consumption_quantity,menuSortOrder:oldMenu.sort_order}));
+            if (entity === "menu" && preferences.menuCategoryId === "__source__" && !values.menuCategory?.trim()) throw new Error("Menü kategorisi eksik; soldan bir hedef kategori seçin veya Menü kategorisi kolonunu eşleyin.");
             const numeric: Record<string,number|undefined> = {};
             for (const key of ["salePrice","purchasePrice","dealerPriceA","dealerPriceB","taxRate","minimumQuantity","stockQuantity"]) {
               numeric[key] = transferNumber(values[key] ?? "");
@@ -164,6 +173,7 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
             if (!categoryPath) throw new Error("Kategori eksik. Diğer'e yönlendirmeyi seçin.");
             if (!old || values.category !== undefined || values.categoryPath !== undefined) row.categoryPath = categoryPath;
             row.view.after = {...values, category:categoryPath};
+            if (preferences.menuCategoryId && preferences.menuCategoryId !== "__source__") row.view.after.menuCategory = String(db.prepare("SELECT name FROM menu_categories WHERE id=?").get(preferences.menuCategoryId)?.name ?? "");
             if (!values.category && !values.categoryPath) row.view.warnings.push("Kategori eksik: Diğer'e yönlendirilecek.");
             if (!preferences.menuCategoryId) row.view.warnings.push("Yalnız kataloğa kaydedilecek; restoran menüsüne eklenmeyecek.");
             const unitAliases: Record<string,string> = { adet:"piece", paket:"pack", kutu:"box", metre:"meter", litre:"l" };
@@ -239,7 +249,7 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
           }
           if (row.view.status !== "skip") {
             applyRow(db,plan,row);
-            if(entity === "products" && row.existingId && db.prepare("SELECT is_published FROM commerce_product_publications WHERE product_id=? AND channel='online_sales'").get(row.existingId)?.is_published===1) plan.preview.existingPublished++;
+            if(entity !== "customers" && row.existingId && db.prepare("SELECT is_published FROM commerce_product_publications WHERE product_id=? AND channel='online_sales'").get(row.existingId)?.is_published===1) plan.preview.existingPublished++;
           }
           db.exec("RELEASE transfer_row");
         } catch (error) {
@@ -291,9 +301,9 @@ export function collectTransferExport(databasePath: string, options: TransferExp
   try {
     const caps = assertAccess(db,options.entity), businessId = business(db);
     if (options.template) {
-      let headers = Object.keys(options.entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS);
+      let headers = Object.keys(options.entity === "customers" ? CUSTOMER_TRANSFER_FIELDS : PRODUCT_TRANSFER_FIELDS);
       if (!options.includeIdentity) headers = headers.filter(h=>!IDENTITY_TRANSFER_FIELDS.includes(h));
-      if (options.template === "basic") headers = options.entity === "products" ? ["name","category","sku","barcode","salePrice","currency","unit","taxRate","trackInventory"] : ["fullName","phone","email","address","notes"];
+      if (options.template === "basic") headers = options.entity === "customers" ? ["fullName","phone","email","address","notes"] : ["name","category","sku","barcode","salePrice","currency","unit","taxRate","trackInventory",...(options.entity === "menu" ? ["menuCategory","menuPriceOverride","allergens","tags","menuAvailable"] : [])];
       if (options.template === "ideasoft" && options.entity === "products") headers = ["Ürün Adı","Stok Kodu","Barkod","Kategori","Marka","Satış Fiyatı","KDV Oranı","Para Birimi","Birim","Stok Takibi","Görsel URL"];
       return { headers,records:[] as TransferRecord[],images:0 };
     }
@@ -321,7 +331,10 @@ export function collectTransferExport(databasePath: string, options: TransferExp
         LEFT JOIN commerce_product_publications pub ON pub.product_id=p.id AND pub.channel='online_sales'
         LEFT JOIN menu_product_entries m ON m.product_id=p.id AND m.deleted_at=''
         LEFT JOIN menu_categories mc ON mc.id=m.category_id
-        WHERE p.business_id=? AND p.deleted_at='' AND (?=0 OR p.quick_access_enabled=1) AND instr(transfer_search_text(p.name || ' ' || p.brand || ' ' || p.sku || ' ' || p.barcode),?)>0 ORDER BY p.id`).all(businessId,options.scope === "filtered" && options.quickAccessOnly ? 1 : 0,search);
+        WHERE p.business_id=? AND p.deleted_at='' AND (?=0 OR p.quick_access_enabled=1)
+        AND (?=0 OR (m.id IS NOT NULL AND mc.deleted_at='')) AND (?='' OR m.category_id=?)
+        AND instr(transfer_search_text(p.name || ' ' || p.brand || ' ' || p.sku || ' ' || p.barcode),?)>0 ORDER BY p.id`).all(businessId,options.scope === "filtered" && options.quickAccessOnly ? 1 : 0,
+          options.entity === "menu" ? 1 : 0,options.entity === "menu" && options.scope === "filtered" ? options.menuCategoryId ?? "" : "",options.entity === "menu" && options.scope === "filtered" ? options.menuCategoryId ?? "" : "",search);
       const categories = db.prepare("SELECT id,parent_id,name FROM catalog_categories WHERE business_id=? AND deleted_at=''").all(businessId);
       const paths = new Map(categories.map(c=>[String(c.id),c]));
       const categoryPath = (id:string) => { const names:string[] = [], seen=new Set<string>();let current=paths.get(id);while(current && !seen.has(String(current.id))){seen.add(String(current.id));names.unshift(String(current.name));current=paths.get(String(current.parent_id));}return names.join(" > "); };
@@ -340,7 +353,7 @@ export function collectTransferExport(databasePath: string, options: TransferExp
         records.push(record);
       }
     }
-    const fields = options.entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS;
+    const fields = options.entity === "customers" ? CUSTOMER_TRANSFER_FIELDS : PRODUCT_TRANSFER_FIELDS;
     const headers = Object.keys(fields).filter(h=>(options.entity !== "customers" || options.includeIdentity || !IDENTITY_TRANSFER_FIELDS.includes(h)) && (caps.has(C.WHOLESALE) || !["dealerPriceA","dealerPriceB","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays"].includes(h)));
     return { headers,records,images:records.reduce((sum,r)=>{const originals=JSON.parse(r._originalAssets || "[]") as unknown[];return sum+(originals.length || (r._assetPath || r.imageSourceUrl ? 1 : 0));},0) };
   } finally { db.close(); }

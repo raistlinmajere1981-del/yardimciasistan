@@ -51,6 +51,19 @@ app.whenReady().then(async()=>{
   transferImageOwner.validate(images[0]);assert.throws(()=>transferImageOwner.validate(Buffer.from([0xff,0xd8,0xff,0,0,0])),/çözümlenemedi/);
   const pilotManifest="/home/raistlin/teknikel_catalog_prep/image-manifest.json";
   if(fs.existsSync(pilotManifest))for(const item of JSON.parse(fs.readFileSync(pilotManifest,"utf8")).images)transferImageOwner.validate(fs.readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`));
-  console.log("data-transfer-native-smoke-ok: real decoder/original archives, IPC lock/owner/revision/busy/retry guards, local save gate, 68 pilot image decodes");
+  // Menu scope is guarded at IPC even for reads and source selection.
+  const menuOptions={entity:"menu",format:"zip",scope:"all",includeImages:false,includeIdentity:false};
+  await assert.rejects(()=>invoke("upload","menu","test.zip",archive),/özellik|etkin/i);
+  assert.throws(()=>invoke("summary",menuOptions),/özellik|etkin/i);
+  await assert.rejects(()=>invoke("export",menuOptions),/özellik|etkin/i);
+  db.exec("UPDATE business SET profile_id='restaurant'; INSERT INTO business_capabilities(business_id,capability_id,is_enabled,created_at,updated_at) VALUES('b','food_service.menu',1,'t','t')");
+  const menuSource=await invoke("upload","menu","menu.csv",Buffer.from("name;sku;menuCategory\nMenü kahvesi;COFFEE;İçecekler\n"));
+  const menuPreview=await invoke("preview",menuSource.token,menuSource.mapping,{...P,menuCategoryId:"__source__"});
+  assert.equal(menuPreview.counts.new,1);
+  db.exec("UPDATE business_capabilities SET is_enabled=0 WHERE capability_id='food_service.menu'");
+  assert.throws(()=>invoke("rows",menuSource.token,"all",0),/özellik|etkin/i);
+  await assert.rejects(()=>invoke("apply",menuSource.token,menuPreview.revision),/özellik|etkin/i);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE sku='COFFEE'").get().n,0);
+  console.log("data-transfer-native-smoke-ok: real decoder/original archives, IPC lock/owner/revision/busy/retry/menu-capability guards, local save gate, 68 pilot image decodes");
  }finally{db.close();fs.rmSync(root,{recursive:true,force:true});}
 }).then(()=>app.exit(0)).catch(error=>{console.error(error);app.exit(1);});

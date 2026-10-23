@@ -84,7 +84,7 @@ try {
     const result = database.saveCustomer({ fullName: `Canonical dealer ${index}`, phone: `0555000100${index}`, email: `private${index}@example.test`, notes: "PRIVATE_C2_NOTES", tags: [],
       commercialProfile: { companyName: `C2 Company ${index}`, dealerStatus: "active", priceGroup, taxNumber: `PRIVATE_C2_TAX_${index}` } });
     assert.equal(result.ok, true, result.message);
-    const invite = database.changeDealerWebAccess(result.savedId, "invite"); const token = new URL(invite.inviteUrl).hash.slice(8); tokens.push(token);
+    const invite = database.changeDealerWebAccess(result.savedId, "invite"); const token = new URLSearchParams(new URL(invite.inviteUrl).hash.slice(1)).get("invite"); tokens.push(token);
     return { customerId: result.savedId, access: invite.access, token };
   });
   const projection = database.createDealerAccessProjection();
@@ -221,7 +221,7 @@ try {
   assert.equal((await transport.pullWebOrders({ afterSeq: 0 })).orders.length, 0);
   assert.equal((await history(b.cookie)).status, 401); assert.equal((await catalog(b.cookie)).status, 401); assert.equal((await post("order", payload, b.cookie)).status, 401);
   const reInvite = database.changeDealerWebAccess(b.customerId, "invite"); await sync();
-  const reClaim = await post("claim", { invite_token: new URL(reInvite.inviteUrl).hash.slice(8) });
+  const reClaim = await post("claim", { invite_token: new URLSearchParams(new URL(reInvite.inviteUrl).hash.slice(1)).get("invite") });
   const refreshedB = reClaim.cookie.split(";")[0];
   const recovered = await post("receipt", { idempotencyKey: payload.idempotencyKey }, refreshedB);
   assert.equal(recovered.body.receipt.order_id, shipped.body.order_id, "a renewed session recovers its original receipt without resubmission");
@@ -234,7 +234,7 @@ try {
   browser = await launchChromiumForSmoke(chromium);
   const context = await browser.newContext({ locale: "tr-TR", viewport: { width: 375, height: 812 } });
   const page = await context.newPage(); const errors = []; page.on("pageerror", error => errors.push(error.message));
-  const replacement = database.changeDealerWebAccess(a.customerId, "invite"); const uiToken = new URL(replacement.inviteUrl).hash.slice(8); tokens.push(uiToken);
+  const replacement = database.changeDealerWebAccess(a.customerId, "invite"); const uiToken = new URLSearchParams(new URL(replacement.inviteUrl).hash.slice(1)).get("invite"); tokens.push(uiToken);
   await sync(); await page.goto(`${siteUrl}/bayi/#invite=${uiToken}`);
   await page.getByRole("button", { name: "Daveti kullan" }).click();
   await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();

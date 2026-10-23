@@ -1,424 +1,1205 @@
 package com.yardimciasistan.dealer;
 
 import android.app.AlertDialog;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
-import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.TextWatcher;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import java.text.NumberFormat;
 import java.util.*;
 import java.util.concurrent.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-/** Four native destinations. No Companion permissions, device actions or publication credentials. */
+/**
+ * Independent native dealer client; server sessions, prices and order operations retain ownership.
+ */
 public final class DealerActivity extends ComponentActivity {
   private DealerApplicationForm application;
   private DealerState state;
-  private LinearLayout shell, body, navigation;
-  private final ExecutorService network = Executors.newSingleThreadExecutor();
+  private DealerUi ui;
   private DealerImages images;
-  private String tab = "Katalog", detail = "", message = "", query = "", category = "Tüm kategoriler", brand = "Tüm markalar";
-  private String loginBase = "", loginInvite = "";
-  private boolean busy, favoritesOnly, storageFailed;
-  private int page;
+  private DealerPhotoViewer photos;
+  private LinearLayout shell, body, footer, navigation, results;
+  private ScrollView scroll;
+  private ProgressBar progress;
+  private TextView notice, catalogTime, cartTotal, detailPrice;
+  private Button refreshButton, loginButton, sendButton;
+  private final ExecutorService network = Executors.newSingleThreadExecutor();
   private final Map<String, EditText> cartFields = new LinkedHashMap<>();
-  private int background, surface, ink, muted, accent, border;
+  private final Map<String, TextView> cartPrices = new LinkedHashMap<>();
+  private final Map<String, String> quantityDrafts = new LinkedHashMap<>();
+  private final Map<String, Integer> positions = new HashMap<>();
+  private String tab = "Katalog", detail = "", renderedKey = "", message = "", query = "",
+                 category = "Tüm kategoriler", brand = "Tüm markalar", loginInvite = "";
+  private boolean busy, favoritesOnly, storageFailed, applicationLink;
+  private int page;
   private final Locale locale = new Locale("tr", "TR");
-  interface Action { void run() throws Exception; }
-  interface Job { JSONObject run() throws Exception; }
-  interface Success { void run(JSONObject result) throws Exception; }
+  private enum Task { REFRESH, CLAIM, VERIFY, SUBMIT, LOGOUT }
+  interface Action {
+    void run() throws Exception;
+  }
+  interface Job {
+    JSONObject run() throws Exception;
+  }
+  interface Success {
+    void run(JSONObject result) throws Exception;
+  }
 
-  @Override public void onCreate(Bundle saved) {
+  @Override
+  protected void attachBaseContext(Context base) {
+    Configuration configuration = new Configuration(base.getResources().getConfiguration());
+    configuration.fontScale =
+        DealerAppearance.fontScale(configuration.fontScale, DealerUi.appearance(base).fontPercent);
+    super.attachBaseContext(base.createConfigurationContext(configuration));
+  }
+  @Override
+  public void onCreate(Bundle saved) {
+    ui = new DealerUi(this);
+    setTheme(ui.dark ? R.style.DealerThemeDark : R.style.DealerTheme);
     super.onCreate(saved);
     try {
-      DealerDisk disk = new DealerDisk(this); state = new DealerState(disk.read(), disk);
+      DealerDisk disk = new DealerDisk(this);
+      state = new DealerState(disk.read(), disk);
+      images = new DealerImages(this);
       application = new DealerApplicationForm(this, network, this::render, saved);
-      applyTheme(); images = new DealerImages(this);
-      if (saved != null) { tab = saved.getString("tab", "Katalog"); detail = saved.getString("detail", ""); }
+      photos = new DealerPhotoViewer(this, images, this::render, saved);
+      if (saved != null) {
+        tab = saved.getString("tab", "Katalog");
+        detail = saved.getString("detail", "");
+        query = saved.getString("query", "");
+        category = saved.getString("category", category);
+        brand = saved.getString("brand", brand);
+        page = saved.getInt("page");
+        favoritesOnly = saved.getBoolean("favorites");
+        Bundle draft = saved.getBundle("quantities");
+        if (draft != null)
+          for (String id : draft.keySet()) quantityDrafts.put(id, draft.getString(id, ""));
+        Bundle offsets = saved.getBundle("positions");
+        if (offsets != null)
+          for (String key : offsets.keySet()) positions.put(key, offsets.getInt(key));
+      }
+      getWindow().getDecorView().setSystemUiVisibility(ui.dark
+              ? 0
+              : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+      getWindow().setStatusBarColor(ui.background);
+      getWindow().setNavigationBarColor(ui.surface);
       getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
         public void handleOnBackPressed() {
-          if (application.active()) { application.close(); }
-          else if (!detail.isEmpty()) { detail = ""; render(); }
-          else if (!tab.equals("Katalog")) { tab = "Katalog"; render(); }
-          else { setEnabled(false); getOnBackPressedDispatcher().onBackPressed(); setEnabled(true); }
+          if (photos.active())
+            photos.close();
+          else if (application.active())
+            application.close();
+          else if (!detail.isEmpty()) {
+            detail = "";
+            render();
+          } else if (!tab.equals("Katalog"))
+            navigate("Katalog");
+          else {
+            setEnabled(false);
+            getOnBackPressedDispatcher().onBackPressed();
+            setEnabled(true);
+          }
         }
       });
+      receiveLink(getIntent());
       render();
-      if (!state.text("claim_cookie").isEmpty()) verifyClaim(state.text("claim_base"), state.text("claim_cookie"));
-      else if (!state.text("cookie").isEmpty()) refresh();
-    } catch (Exception error) { fatalStorage(); }
+      if (!state.text("claim_cookie").isEmpty())
+        verifyClaim(state.text("claim_base"), state.text("claim_cookie"));
+      else if (!state.text("cookie").isEmpty())
+        refresh();
+    } catch (Exception error) {
+      fatalStorage();
+    }
   }
-  @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putString("tab", tab); out.putString("detail", detail); if (application != null) application.save(out); }
-  @Override protected void onDestroy() { network.shutdownNow(); if (images != null) images.close(); super.onDestroy(); }
-  private void applyTheme() {
-    String mode = state.text("theme"); boolean dark = mode.equals("dark") || (!mode.equals("light") && (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
-    setTheme(dark ? android.R.style.Theme_Material_NoActionBar : android.R.style.Theme_Material_Light_NoActionBar);
-    background = Color.parseColor(dark ? "#0B1220" : "#F4F6F8"); surface = Color.parseColor(dark ? "#172332" : "#FFFFFF");
-    ink = Color.parseColor(dark ? "#F1F5F9" : "#152536"); muted = Color.parseColor(dark ? "#B5C2D0" : "#536577");
-    accent = Color.parseColor(dark ? "#5EEAD4" : "#0F766E"); border = Color.parseColor(dark ? "#334155" : "#DCE4EA");
-    getWindow().getDecorView().setSystemUiVisibility(dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-    getWindow().setStatusBarColor(background); getWindow().setNavigationBarColor(surface);
+  @Override
+  protected void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    setIntent(intent);
+    receiveLink(intent);
+  }
+  private void receiveLink(Intent intent) {
+    if (intent == null)
+      return;
+    String input = Intent.ACTION_VIEW.equals(intent.getAction()) ? intent.getDataString()
+        : Intent.ACTION_SEND.equals(intent.getAction()) ? intent.getStringExtra(Intent.EXTRA_TEXT)
+                                                        : null;
+    intent.setData(null);
+    intent.removeExtra(Intent.EXTRA_TEXT);
+    if (input == null)
+      return;
+    if (!state.text("cookie").isEmpty() || !state.text("claim_cookie").isEmpty()) {
+      Toast
+          .makeText(this, "Hesabınız açık. Farklı bağlantı için önce Ayarlar’dan oturumu kapatın.",
+              Toast.LENGTH_LONG)
+          .show();
+      return;
+    }
+    try {
+      DealerLink link = DealerLink.parse(input);
+      loginInvite = input.trim();
+      applicationLink = link.application;
+      message = "";
+    } catch (IllegalArgumentException error) {
+      message = error.getMessage();
+    }
+    if (shell != null)
+      render();
+  }
+  @Override
+  protected void onSaveInstanceState(Bundle out) {
+    super.onSaveInstanceState(out);
+    rememberPosition();
+    out.putString("tab", tab);
+    out.putString("detail", detail);
+    out.putString("query", query);
+    out.putString("category", category);
+    out.putString("brand", brand);
+    out.putInt("page", page);
+    out.putBoolean("favorites", favoritesOnly);
+    Bundle drafts = new Bundle();
+    for (Map.Entry<String, String> entry : quantityDrafts.entrySet())
+      drafts.putString(entry.getKey(), entry.getValue());
+    out.putBundle("quantities", drafts);
+    Bundle offsets = new Bundle();
+    for (Map.Entry<String, Integer> entry : positions.entrySet())
+      offsets.putInt(entry.getKey(), entry.getValue());
+    out.putBundle("positions", offsets);
+    if (application != null)
+      application.save(out);
+    if (photos != null)
+      photos.save(out);
+  }
+  @Override
+  protected void onDestroy() {
+    network.shutdownNow();
+    if (photos != null)
+      photos.destroy(isChangingConfigurations());
+    if (images != null)
+      images.close();
+    super.onDestroy();
   }
   private void fatalStorage() {
     storageFailed = true;
-    TextView text = new TextView(this); text.setPadding(dp(24), dp(48), dp(24), dp(24));
+    TextView text = new TextView(this);
+    text.setPadding(dp(24), dp(48), dp(24), dp(24));
     text.setText(R.string.storage_failure);
     setContentView(text);
   }
   private void safely(Action action) {
-    if (storageFailed || busy) return;
-    try { action.run(); }
-    catch (IllegalArgumentException | IllegalStateException error) { message = error.getMessage(); render(); }
-    catch (Exception error) { fatalStorage(); }
+    if (storageFailed)
+      return;
+    try {
+      action.run();
+    } catch (IllegalArgumentException | IllegalStateException error) {
+      showMessage(error.getMessage());
+    } catch (Exception error) {
+      fatalStorage();
+    }
   }
-  private void task(Job job, Success success, boolean submission) {
-    if (busy || storageFailed) return;
-    busy = true;
-    ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal); progress.setIndeterminate(true);
-    shell.addView(progress, 0, new LinearLayout.LayoutParams(-1, dp(4)));
-    enableTree(shell, false);
+  private void showMessage(String value) {
+    message = value == null ? "İşlem tamamlanamadı." : value;
+    if (notice != null) {
+      notice.setText(message);
+      notice.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+  }
+  private void loading(boolean value) {
+    busy = value;
+    if (progress != null)
+      progress.setVisibility(value ? View.VISIBLE : View.GONE);
+    if (refreshButton != null)
+      refreshButton.setEnabled(!value);
+    if (loginButton != null)
+      loginButton.setEnabled(!value);
+    if (sendButton != null)
+      sendButton.setEnabled(!value);
+  }
+  private void task(Job job, Success success, Task kind) {
+    if (busy || storageFailed || isDestroyed() || isFinishing())
+      return;
+    loading(true);
     network.execute(() -> {
-      JSONObject result = null; Exception failure = null;
-      try { result = job.run(); } catch (Exception error) { failure = error; }
-      final JSONObject value = result; final Exception problem = failure;
+      JSONObject result = null;
+      Exception failure = null;
+      try {
+        result = job.run();
+      } catch (Exception error) {
+        failure = error;
+      }
+      final JSONObject value = result;
+      final Exception problem = failure;
       runOnUiThread(() -> {
-        if (isDestroyed()) return;
-        busy = false;
+        if (isDestroyed())
+          return;
+        loading(false);
         try {
-          if (problem == null) success.run(value);
-          else if (problem instanceof DealerApi.Failure) {
-            DealerApi.Failure apiError = (DealerApi.Failure) problem;
-            if (apiError.status == 401) { state.invalidateSession(); state.data.remove("claim_cookie"); state.data.remove("claim_base"); state.save(); message = "Oturumunuz sona erdi veya erişiminiz kapatıldı. Firmanızdan yeni davet isteyin. Sepet taslağınız bu cihazda saklanıyor."; }
-            else {
-              if (submission && apiError.status == 422) { state.data.remove("pending"); state.save(); }
-              message = apiError.getMessage();
+          if (problem == null) {
+            success.run(value);
+            if (kind != Task.REFRESH)
+              render();
+          } else if (problem instanceof DealerApi.Failure) {
+            DealerApi.Failure error = (DealerApi.Failure) problem;
+            if (kind == Task.CLAIM) {
+              showMessage(error.status == 400 || error.status == 401 || error.status == 404
+                          || error.status == 410
+                      ? "Davet geçersiz, kullanılmış veya süresi dolmuş. Firmanızdan yeni davet "
+                          + "isteyin."
+                      : error.getMessage());
+            } else if (error.status == 401) {
+              state.invalidateSession();
+              state.data.remove("claim_cookie");
+              state.data.remove("claim_base");
+              state.save();
+              if (photos.active())
+                photos.close();
+              message = "Oturumunuz sona erdi. Firmanızdan yeni davet isteyin. Sepetiniz bu "
+                  + "cihazda saklanıyor.";
+              render();
+            } else {
+              if (kind == Task.SUBMIT && error.status == 422) {
+                state.data.remove("pending");
+                state.save();
+                message = error.getMessage();
+                render();
+              } else
+                showMessage(error.getMessage());
             }
-          } else message = submission ? "Gönderim doğrulanamadı. Siparişiniz cihazda kayıtlı; aynı siparişi tekrar deneyin." : "Bağlantı kurulamadı. Son kayıtlı veriler gösteriliyor. Yenile ile tekrar deneyin.";
-          render(); if (busy) enableTree(shell, false);
-        } catch (Exception error) { fatalStorage(); }
+          } else
+            showMessage(kind == Task.SUBMIT
+                    ? "Gönderim doğrulanamadı. Aynı siparişi tekrar deneyin."
+                    : kind == Task.CLAIM || kind == Task.VERIFY
+                    ? "Bağlantı kurulamadı. Giriş işlemini yeniden deneyin."
+                    : "Bağlantı kurulamadı. Son kayıtlı bilgiler gösteriliyor.");
+        } catch (Exception error) {
+          fatalStorage();
+        }
       });
     });
   }
   private void refresh() {
-    safely(() -> {
-      String base = state.text("base"), cookie = state.text("cookie");
-      task(() -> {
-        DealerApi api = new DealerApi(base);
-        JSONObject session = api.call("session", null, cookie).body;
-        JSONObject result = new JSONObject().put("dealer", session.getJSONObject("dealer"));
-        // A valid session can still read history while its catalog/delivery is unavailable.
-        try { result.put("catalog", api.call("catalog", null, cookie).body.getJSONObject("catalog")); }
-        catch (DealerApi.Failure error) { if (error.status == 401) throw error; result.put("catalog_error", error.getMessage()); }
-        result.put("history", api.call("orders", null, cookie).body); return result;
-      }, result -> {
-        state.data.put("dealer", result.getJSONObject("dealer"));
-        if (result.has("catalog")) state.data.put("catalog", result.getJSONObject("catalog")).put("catalog_at", now());
-        else state.data.remove("catalog");
-        state.data.put("orders", result.getJSONObject("history").getJSONArray("orders")).put("orders_at", now()); state.save();
-        message = result.has("catalog_error") ? result.getString("catalog_error") : "Katalog ve siparişler güncellendi.";
-      }, false);
-    });
+    if (state.text("cookie").isEmpty())
+      return;
+    String base = state.text("base"), cookie = state.text("cookie");
+    task(
+        ()
+            -> {
+          DealerApi api = new DealerApi(base);
+          JSONObject session = api.call("session", null, cookie).body;
+          JSONObject result = new JSONObject().put("dealer", session.getJSONObject("dealer"));
+          try {
+            result.put("catalog", api.call("catalog", null, cookie).body.getJSONObject("catalog"));
+          } catch (DealerApi.Failure error) {
+            if (error.status == 401)
+              throw error;
+            result.put("catalog_error", error.getMessage());
+          }
+          result.put("history", api.call("orders", null, cookie).body);
+          return result;
+        },
+        result
+        -> {
+          JSONObject old = state.object("catalog");
+          String previousProducts =
+              old.optJSONArray("products") == null ? "" : old.optJSONArray("products").toString();
+          String previousMethods = String.valueOf(old.optJSONArray("delivery_methods"));
+          String previousOrders = state.array("orders").toString();
+          state.data.put("dealer", result.getJSONObject("dealer"));
+          if (result.has("catalog"))
+            state.data.put("catalog", result.getJSONObject("catalog")).put("catalog_at", now());
+          else
+            state.data.remove("catalog");
+          state.data.put("orders", result.getJSONObject("history").getJSONArray("orders"))
+              .put("orders_at", now());
+          state.save();
+          showMessage(result.has("catalog_error") ? result.getString("catalog_error") : "");
+          if (catalogTime != null)
+            catalogTime.setText(getString(
+                R.string.last_updated, fallback(state.text("catalog_at"), "Henüz alınmadı")));
+          JSONObject next = state.object("catalog");
+          boolean productsChanged =
+              !previousProducts.equals(String.valueOf(next.optJSONArray("products")));
+          boolean methodsChanged =
+              !previousMethods.equals(String.valueOf(next.optJSONArray("delivery_methods")));
+          if (result.has("catalog_error") && tab.equals("Katalog")) {
+            if (photos.active())
+              photos.close();
+            detail = "";
+            render();
+            return;
+          }
+          if (tab.equals("Katalog") && detail.isEmpty() && productsChanged && results != null) {
+            int offset = scroll.getScrollY();
+            renderProducts(results);
+            scroll.post(() -> scroll.scrollTo(0, offset));
+          }
+          if (!detail.isEmpty() && detailPrice != null) {
+            JSONObject product = state.product(detail);
+            detailPrice.setText(product == null ? "Ürün artık sunulmuyor" : price(product));
+          }
+          if (tab.equals("Sepet")) {
+            if (methodsChanged) {
+              render();
+            } else {
+              for (Map.Entry<String, TextView> entry : cartPrices.entrySet()) {
+                JSONObject product = state.product(entry.getKey());
+                entry.getValue().setText(
+                    product == null ? "Ürün artık sunulmuyor" : price(product));
+              }
+              updateCartTotal();
+            }
+          }
+          if (tab.equals("Siparişler") && !previousOrders.equals(state.array("orders").toString()))
+            render();
+        },
+        Task.REFRESH);
+  }
+  private void rememberPosition() {
+    if (scroll != null && !renderedKey.isEmpty())
+      positions.put(renderedKey, scroll.getScrollY());
+  }
+  private void navigate(String destination) {
+    rememberPosition();
+    hideKeyboard();
+    tab = destination;
+    detail = "";
+    message = "";
+    render();
+  }
+  private void hideKeyboard() {
+    View view = getCurrentFocus();
+    if (view != null)
+      ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+          .hideSoftInputFromWindow(view.getWindowToken(), 0);
   }
   private void render() {
-    if (storageFailed) return;
-    if (application != null && application.active()) { application.show(); return; }
-    shell = column(); shell.setBackgroundColor(background); setContentView(shell);
-    ViewCompat.setOnApplyWindowInsetsListener(shell, (view, insets) -> {
-      androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.ime());
-      view.setPadding(bars.left, bars.top, bars.right, bars.bottom); return insets;
-    });
-    if (state.text("cookie").isEmpty()) { login(); return; }
-    LinearLayout header = column(); header.setPadding(dp(20), dp(14), dp(20), dp(10)); shell.addView(header);
-    label(header, "YARDIMCI ASİSTAN · BAYİ", 11, muted);
-    LinearLayout line = row(); header.addView(line);
-    TextView title = label(line, detail.isEmpty() ? tab : "Ürün detayı", 25, ink); title.setTypeface(null, Typeface.BOLD); title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1));
-    button(line, "Yenile", this::refresh, false);
-    label(header, state.object("dealer").optString("display_name") + " · " + host(), 12, muted);
-    if (!message.isEmpty()) { TextView status = label(header, message, 13, accent); status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); }
-    if (state.data.has("pending")) label(header, "Gönderimi doğrulanmamış sipariş var. Sepet’ten aynı siparişi tekrar deneyin.", 13, accent);
-    ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-    body = column(); body.setPadding(dp(16), dp(4), dp(16), dp(20)); scroll.addView(body);
-    switch (tab) {
-      case "Sepet": cart(); break;
-      case "Siparişler": orders(); break;
-      case "Hesabım": account(); break;
-      default: if (detail.isEmpty()) catalog(); else productDetail();
+    if (storageFailed)
+      return;
+    rememberPosition();
+    if (photos != null && photos.active()) {
+      photos.show();
+      return;
     }
-    navigation = row(); navigation.setBackgroundColor(surface); navigation.setPadding(dp(4), dp(6), dp(4), dp(6)); shell.addView(navigation);
-    for (String destination : new String[]{"Katalog", "Sepet", "Siparişler", "Hesabım"}) {
-      String caption = destination.equals("Sepet") && state.object("cart").length() > 0 ? "Sepet (" + state.object("cart").length() + ")" : destination;
-      Button item = button(navigation, caption, () -> { tab = destination; detail = ""; message = ""; render(); }, false);
-      item.setTextSize(12); item.setPadding(0, 0, 0, 0); item.setTextColor(tab.equals(destination) ? accent : muted);
-      item.setSelected(tab.equals(destination)); item.setLayoutParams(new LinearLayout.LayoutParams(0, dp(52), 1));
-      if (tab.equals(destination)) item.setTypeface(null, Typeface.BOLD);
+    if (application != null && application.active()) {
+      application.show();
+      return;
+    }
+    renderedKey = tab + "|" + detail;
+    shell = ui.column();
+    shell.setBackgroundColor(ui.background);
+    shell.setFocusableInTouchMode(true);
+    setContentView(shell);
+    ui.insets(shell);
+    shell.requestFocus();
+    cartFields.clear();
+    cartPrices.clear();
+    cartTotal = null;
+    catalogTime = null;
+    detailPrice = null;
+    results = null;
+    refreshButton = null;
+    loginButton = null;
+    sendButton = null;
+    scroll = null;
+    progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+    progress.setIndeterminate(true);
+    progress.setVisibility(busy ? View.VISIBLE : View.GONE);
+    shell.addView(progress, new LinearLayout.LayoutParams(-1, dp(3)));
+    if (state.text("cookie").isEmpty()) {
+      login();
+      return;
+    }
+    LinearLayout header = ui.row();
+    header.setPadding(dp(16), dp(8), dp(16), dp(8));
+    shell.addView(header);
+    if (!detail.isEmpty())
+      ui.button(header, "‹ Katalog", () -> {
+        detail = "";
+        render();
+      }, false);
+    else {
+      header.addView(ui.logo(32));
+      LinearLayout copy = ui.column();
+      copy.setPadding(dp(12), 0, 0, 0);
+      header.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+      ui.label(copy, tab, 24, ui.ink).setTypeface(null, Typeface.BOLD);
+      if (tab.equals("Katalog"))
+        ui.label(copy, state.object("dealer").optString("display_name"), 12, ui.muted);
+      if (!tab.equals("Ayarlar"))
+        refreshButton = ui.button(header, "Yenile", this::refresh, false);
+    }
+    notice = ui.label(shell, message, 13, ui.accent);
+    notice.setPadding(dp(16), dp(6), dp(16), dp(6));
+    notice.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
+    notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+    scroll = new ScrollView(this);
+    scroll.setFillViewport(true);
+    shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    body = ui.column();
+    body.setPadding(dp(16), dp(4), dp(16), dp(20));
+    scroll.addView(body);
+    footer = ui.column();
+    shell.addView(footer);
+    switch (tab) {
+      case "Sepet":
+        cart();
+        break;
+      case "Siparişler":
+        orders();
+        break;
+      case "Ayarlar":
+        account();
+        break;
+      default:
+        if (detail.isEmpty())
+          catalog();
+        else
+          productDetail();
+    }
+    if (detail.isEmpty())
+      navigation();
+    int offset = positions.getOrDefault(renderedKey, 0);
+    ScrollView current = scroll;
+    current.post(() -> current.scrollTo(0, offset));
+    loading(busy);
+  }
+  private void navigation() {
+    navigation = ui.row();
+    navigation.setPadding(dp(4), dp(4), dp(4), dp(4));
+    navigation.setBackgroundColor(ui.surface);
+    shell.addView(navigation);
+    for (String destination : new String[] {"Katalog", "Sepet", "Siparişler", "Ayarlar"}) {
+      String label = destination.equals("Sepet") && state.object("cart").length() > 0
+          ? "Sepet (" + state.object("cart").length() + ")"
+          : destination;
+      Button button = ui.button(label, () -> navigate(destination), false);
+      button.setTextSize(12);
+      button.setPadding(dp(3), dp(8), dp(3), dp(8));
+      button.setMinHeight(dp(64));
+      button.setSelected(tab.equals(destination));
+      button.setTextColor(tab.equals(destination) ? ui.accent : ui.muted);
+      int icon = destination.equals("Katalog") ? R.drawable.nav_catalog
+          : destination.equals("Sepet")        ? R.drawable.nav_cart
+          : destination.equals("Siparişler")   ? R.drawable.nav_orders
+                                               : R.drawable.nav_settings;
+      android.graphics.drawable.Drawable symbol = getDrawable(icon).mutate();
+      symbol.setTint(tab.equals(destination) ? ui.accent : ui.muted);
+      symbol.setBounds(0, 0, dp(22), dp(22));
+      button.setCompoundDrawables(null, symbol, null, null);
+      button.setCompoundDrawablePadding(dp(3));
+      button.setBackground(ui.shape(tab.equals(destination) ? ui.soft : ui.surface, 0, 12));
+      button.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1));
+      navigation.addView(button);
     }
   }
   private void login() {
-    ScrollView scroll = new ScrollView(this); shell.addView(scroll); LinearLayout form = column(); form.setPadding(dp(24), dp(36), dp(24), dp(24)); scroll.addView(form);
-    label(form, "Yardımcı Asistan", 15, accent); TextView title = label(form, "Bayi hesabınıza\nhoş geldiniz", 30, ink); title.setTypeface(null, Typeface.BOLD);
-    label(form, "Toptancınızın web modülü adresini ve size özel bayi davet bağlantısını girin.", 15, muted);
-    if (!message.isEmpty()) label(form, message, 14, accent);
-    if (!state.text("claim_cookie").isEmpty()) button(form, "Girişi tamamla", () -> verifyClaim(state.text("claim_base"), state.text("claim_cookie")), true);
-    EditText server = field(form, "Web modülü adresi", loginBase.isEmpty() ? state.text("base") : loginBase, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, value -> loginBase = value, 2048);
-    server.setHint("https://firmaniz.com/web-modulu/");
-    EditText invitation = field(form, "Bayi davet bağlantısı", loginInvite, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, value -> loginInvite = value, 2048);
-    button(form, "Davetle giriş yap", () -> safely(() -> {
-      String base = DealerApi.normalizeBase(server.getText().toString()); String token = DealerApi.inviteToken(invitation.getText().toString(), base);
-      task(() -> {
-        DealerApi api = new DealerApi(base); DealerApi.Reply claim = api.call("claim", new JSONObject().put("invite_token", token), "");
-        if (claim.cookie.isEmpty()) throw new IllegalStateException("Oturum oluşturulamadı.");
-        // Persist the consumed invite's cookie before any follow-up request can fail.
-        return new JSONObject().put("cookie", claim.cookie);
-      }, result -> {
-        loginInvite = "";
-        state.data.put("claim_base", base).put("claim_cookie", result.getString("cookie")); state.save();
-        message = "Oturum açıldı. Hesap doğrulanıyor…";
-        // Hide any old account's cached data until identity has been revalidated.
-        verifyClaim(base, result.getString("cookie"));
-      }, false);
-    }), true);
-    button(form, "Bayi Başvurusu Yap", () -> application.open(server.getText().toString()), false);
-    label(form, "Davet tek kullanımlıktır. Süresi dolduysa firmanızdan yeni davet isteyin. Kaydedilmiş sepet yalnız aynı bayi hesabıyla yeniden giriş yaptığınızda açılır.", 13, muted);
+    ScrollView container = new ScrollView(this);
+    shell.addView(container, new LinearLayout.LayoutParams(-1, -1));
+    LinearLayout form = ui.column();
+    form.setPadding(dp(16), dp(36), dp(16), dp(24));
+    container.addView(form);
+    form.addView(ui.logo(72));
+    ui.label(form, "Yardımcı Asistan Bayi", 14, ui.muted);
+    ui.label(form, "Bayi hesabınıza\nbağlanın", 28, ui.ink).setTypeface(null, Typeface.BOLD);
+    EditText invitation =
+        field(form, applicationLink ? "Başvuru bağlantısı" : "Bayi davet bağlantısı", loginInvite,
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI,
+            value -> loginInvite = value, 4096);
+    invitation.setSaveEnabled(false);
+    invitation.setHint("https://…");
+    invitation.setAutofillHints((String[]) null);
+    invitation.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+    invitation.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+    ui.button(form, "Yapıştır", () -> {
+      try {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (!clipboard.hasPrimaryClip() || clipboard.getPrimaryClip() == null
+            || clipboard.getPrimaryClip().getItemCount() == 0) {
+          showMessage("Panoda bağlantı yok. Gönderilen bağlantıyı kopyalayın.");
+          return;
+        }
+        CharSequence text = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
+        invitation.setText(text == null ? "" : text.toString().trim());
+        invitation.setSelection(invitation.length());
+      } catch (Exception error) {
+        showMessage("Bağlantıyı alana uzun basarak yapıştırabilirsiniz.");
+      }
+    }, false);
+    ui.label(form,
+        applicationLink ? "İşletmenin gönderdiği başvuru bağlantısı."
+                        : "Firmanızın gönderdiği bağlantıyı yapıştırın.",
+        13, ui.muted);
+    notice = ui.label(form, message, 14, ui.danger);
+    notice.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
+    notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+    if (!state.text("claim_cookie").isEmpty())
+      loginButton = ui.button(form, "Girişi tamamla",
+          () -> verifyClaim(state.text("claim_base"), state.text("claim_cookie")), true);
+    else
+      loginButton = ui.button(form, applicationLink ? "Formu aç" : "Giriş yap",
+          () -> safely(() -> connect(invitation.getText().toString())), true);
+    ui.button(form, applicationLink ? "Girişe dön" : "Bayi başvurusu", () -> {
+      applicationLink = !applicationLink;
+      message = "";
+      render();
+    }, false);
+    loading(busy);
+  }
+  private void connect(String input) throws Exception {
+    DealerLink link = DealerLink.parse(input);
+    if (link.application) {
+      hideKeyboard();
+      application.open(link.base);
+      return;
+    }
+    if (applicationLink)
+      throw new IllegalArgumentException("İşletmenin gönderdiği başvuru bağlantısını yapıştırın.");
+    task(
+        ()
+            -> {
+          DealerApi.Reply claim = new DealerApi(link.base).call(
+              "claim", new JSONObject().put("invite_token", link.token), "");
+          if (claim.cookie.isEmpty())
+            throw new IllegalStateException();
+          return new JSONObject().put("cookie", claim.cookie);
+        },
+        result
+        -> {
+          loginInvite = "";
+          state.data.put("claim_base", link.base).put("claim_cookie", result.getString("cookie"));
+          state.save();
+          message = "Hesabınız doğrulanıyor…";
+          verifyClaim(link.base, result.getString("cookie"));
+        },
+        Task.CLAIM);
   }
   private void verifyClaim(String base, String cookie) {
     task(() -> new DealerApi(base).call("session", null, cookie).body, result -> {
       state.authenticate(base, cookie, result.getJSONObject("dealer"));
-      state.data.remove("claim_cookie"); state.data.remove("claim_base"); state.save();
-      message = "Giriş yapıldı. Katalog alınıyor…";
+      state.data.remove("claim_cookie");
+      state.data.remove("claim_base");
+      state.save();
+      message = "";
+      hideKeyboard();
       new android.os.Handler(getMainLooper()).post(this::refresh);
-    }, false);
+    }, Task.VERIFY);
   }
   private void catalog() {
-    label(body, "Son katalog: " + fallback(state.text("catalog_at"), "Henüz indirilmedi") + "\nÇevrimdışıyken fiyatlar değişmiş olabilir.", 12, muted);
-    EditText search = field(body, "Ürün, stok kodu veya marka ara", query, InputType.TYPE_CLASS_TEXT, null, 180);
-    LinearLayout filters = column(); body.addView(filters);
-    Set<String> categories = new TreeSet<>(), brands = new TreeSet<>(); JSONArray products = state.object("catalog").optJSONArray("products");
-    if (products != null) for (int i = 0; i < products.length(); i++) {
-      JSONObject product = products.optJSONObject(i); if (product == null) continue;
-      if (!product.optString("category_name").isEmpty()) categories.add(product.optString("category_name"));
-      if (!product.optString("brand").isEmpty()) brands.add(product.optString("brand"));
-    }
-    LinearLayout results = column();
-    selector(filters, "Kategori", withAll("Tüm kategoriler", categories), category, value -> { category = value; page = 0; renderProducts(results); });
-    selector(filters, "Marka", withAll("Tüm markalar", brands), brand, value -> { brand = value; page = 0; renderProducts(results); });
-    Switch favorites = new Switch(this); favorites.setText(R.string.favorites_only); favorites.setTextColor(ink); favorites.setMinHeight(dp(48)); favorites.setChecked(favoritesOnly); filters.addView(favorites);
-    favorites.setOnCheckedChangeListener((view, checked) -> { favoritesOnly = checked; page = 0; renderProducts(results); });
-    body.addView(results); renderProducts(results);
-    watch(search, value -> { query = value; page = 0; renderProducts(results); });
+    EditText search = field(body, "Ürün veya kod ara", query, InputType.TYPE_CLASS_TEXT, null, 180);
+    search.setHint("Ürün, kod veya marka");
+    Set<String> categories = new TreeSet<>(), brands = new TreeSet<>();
+    JSONArray products = state.object("catalog").optJSONArray("products");
+    if (products != null)
+      for (int i = 0; i < products.length(); i++) {
+        JSONObject p = products.optJSONObject(i);
+        if (p == null)
+          continue;
+        if (!p.optString("category_name").isEmpty())
+          categories.add(p.optString("category_name"));
+        if (!p.optString("brand").isEmpty())
+          brands.add(p.optString("brand"));
+      }
+    HorizontalScrollView filters = new HorizontalScrollView(this);
+    filters.setHorizontalScrollBarEnabled(false);
+    LinearLayout options = ui.row();
+    filters.addView(options);
+    body.addView(filters);
+    filter(options, withAll("Tüm kategoriler", categories), category, "Kategori", true);
+    filter(options, withAll("Tüm markalar", brands), brand, "Marka", false);
+    Button favorite = ui.choice(options, "Favoriler", favoritesOnly, () -> {
+      favoritesOnly = !favoritesOnly;
+      page = 0;
+      renderProducts(results);
+    });
+    favorite.setOnClickListener(v -> {
+      favoritesOnly = !favoritesOnly;
+      favorite.setSelected(favoritesOnly);
+      favorite.setContentDescription(favoritesOnly ? "Favoriler, seçili" : "Favoriler");
+      favorite.setBackground(ui.shape(
+          favoritesOnly ? ui.soft : ui.surface, favoritesOnly ? ui.accent : ui.border, 12));
+      page = 0;
+      renderProducts(results);
+    });
+    catalogTime = ui.label(body,
+        getString(R.string.last_updated, fallback(state.text("catalog_at"), "Henüz alınmadı")), 12,
+        ui.muted);
+    results = ui.column();
+    body.addView(results);
+    renderProducts(results);
+    watch(search, value -> {
+      query = value;
+      page = 0;
+      renderProducts(results);
+    });
   }
-  private void renderProducts(LinearLayout results) {
-    results.removeAllViews(); JSONArray products = state.object("catalog").optJSONArray("products"); int count = 0;
-    if (products != null) for (int i = 0; i < products.length(); i++) {
-      JSONObject product = products.optJSONObject(i); if (product == null) continue;
-      String searchable = (product.optString("name") + " " + product.optString("sku") + " " + product.optString("brand") + " " + product.optString("category_name")).toLowerCase(locale);
-      if (!searchable.contains(query.toLowerCase(locale)) || (favoritesOnly && !state.object("favorites").has(product.optString("product_id")))
-          || (!category.equals("Tüm kategoriler") && !category.equals(product.optString("category_name")))
-          || (!brand.equals("Tüm markalar") && !brand.equals(product.optString("brand")))) continue;
-      count++; if (count > (page + 1) * 30) continue;
-      LinearLayout card = card(results); LinearLayout top = row(); card.addView(top);
-      ImageView image = new ImageView(this); image.setScaleType(ImageView.ScaleType.CENTER_INSIDE); image.setContentDescription(product.optString("name") + " görseli");
-      image.setImageResource(R.drawable.ic_dealer); top.addView(image, new LinearLayout.LayoutParams(dp(72), dp(72))); images.load(image, product.optString("image_url"));
-      LinearLayout texts = column(); texts.setPadding(dp(12), 0, 0, 0); top.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
-      label(texts, product.optString("name"), 17, ink).setTypeface(null, Typeface.BOLD);
-      label(texts, join(product.optString("brand"), product.optString("category_name")), 12, muted);
-      label(texts, "Stok kodu: " + fallback(product.optString("sku"), "—"), 12, muted);
-      label(card, money(product.optDouble("price"), product.optString("currency")) + " / " + unit(product.optString("unit")), 19, accent);
-      Button inspect = button(card, "Ürünü incele", () -> { detail = product.optString("product_id"); render(); }, false);
-      inspect.setContentDescription(product.optString("name") + " ürününü incele");
-    }
-    if (count == 0) label(results, products == null ? "Kataloğu indirmek için Yenile’ye dokunun." : "Aramanıza uygun ürün bulunamadı.", 15, muted);
-    if (count > (page + 1) * 30) button(results, "Daha fazla ürün (" + count + ")", () -> { page++; renderProducts(results); }, false);
+  private void filter(LinearLayout parent, List<String> values, String selected, String caption,
+      boolean isCategory) {
+    Button view = ui.button(parent, selected, () -> {}, false);
+    view.setContentDescription(caption + ": " + selected);
+    view.setOnClickListener(v
+        -> new AlertDialog.Builder(this)
+            .setTitle(caption)
+            .setItems(values.toArray(new String[0]),
+                (dialog, index) -> {
+                  String next = values.get(index);
+                  if (isCategory)
+                    category = next;
+                  else
+                    brand = next;
+                  view.setText(next);
+                  view.setContentDescription(caption + ": " + next);
+                  page = 0;
+                  renderProducts(results);
+                })
+            .show());
+  }
+  private void renderProducts(LinearLayout target) {
+    if (target == null)
+      return;
+    target.removeAllViews();
+    JSONArray products = state.object("catalog").optJSONArray("products");
+    int count = 0;
+    if (products != null)
+      for (int i = 0; i < products.length(); i++) {
+        JSONObject p = products.optJSONObject(i);
+        if (p == null)
+          continue;
+        String searchable = (p.optString("name") + " " + p.optString("sku") + " "
+            + p.optString("brand") + " " + p.optString("category_name"))
+                                .toLowerCase(locale);
+        if (!searchable.contains(query.toLowerCase(locale))
+            || favoritesOnly && !state.object("favorites").has(p.optString("product_id"))
+            || !category.equals("Tüm kategoriler") && !category.equals(p.optString("category_name"))
+            || !brand.equals("Tüm markalar") && !brand.equals(p.optString("brand")))
+          continue;
+        count++;
+        if (count > (page + 1) * 30)
+          continue;
+        LinearLayout card = ui.card(target), row = ui.row();
+        card.addView(row);
+        ImageView image = productImage(p, 72);
+        row.addView(image, new LinearLayout.LayoutParams(dp(72), dp(72)));
+        LinearLayout copy = ui.column();
+        copy.setPadding(dp(12), 0, 0, 0);
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        ui.label(copy, p.optString("name"), 17, ui.ink).setTypeface(null, Typeface.BOLD);
+        if (!p.optString("sku").isEmpty())
+          ui.label(copy, p.optString("sku"), 13, ui.muted);
+        ui.label(copy, price(p), 18, ui.accent).setTypeface(null, Typeface.BOLD);
+        card.setContentDescription(p.optString("name") + " ürününü incele");
+        card.setFocusable(true);
+        card.setClickable(true);
+        card.setOnClickListener(v -> {
+          hideKeyboard();
+          detail = p.optString("product_id");
+          render();
+        });
+      }
+    if (count == 0)
+      ui.label(target,
+          products == null ? "Kataloğunuz henüz alınmadı. Yenile’ye dokunun."
+                           : "Aramanıza uygun ürün yok.",
+          16, ui.muted);
+    if (count > (page + 1) * 30)
+      ui.button(target, "Daha fazla ürün", () -> {
+        page++;
+        int offset = scroll.getScrollY();
+        renderProducts(target);
+        scroll.post(() -> scroll.scrollTo(0, offset));
+      }, false);
+  }
+  private ImageView productImage(JSONObject product, int height) {
+    ImageView view = new ImageView(this);
+    view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+    view.setImageResource(R.drawable.ic_no_photo);
+    view.setContentDescription(product.optString("name") + " fotoğrafı");
+    view.setBackground(ui.shape(ui.surface, ui.border, 12));
+    view.setMinimumHeight(dp(height));
+    ArrayList<String> sources = DealerPhotoViewer.sources(product);
+    images.load(view, sources.isEmpty() ? "" : sources.get(0));
+    return view;
   }
   private void productDetail() {
-    button(body, "‹ Kataloğa dön", () -> { detail = ""; render(); }, false);
-    JSONObject product = state.product(detail); if (product == null) { label(body, "Ürün güncel katalogda bulunamadı.", 16, ink); return; }
-    ImageView image = new ImageView(this); image.setImageResource(R.drawable.ic_dealer); image.setScaleType(ImageView.ScaleType.CENTER_INSIDE); image.setContentDescription(product.optString("name")); body.addView(image, new LinearLayout.LayoutParams(-1, dp(200))); images.load(image, product.optString("image_url"));
-    label(body, product.optString("name"), 25, ink).setTypeface(null, Typeface.BOLD);
-    label(body, join(product.optString("brand"), product.optString("category_name")), 14, muted);
-    label(body, "Stok kodu: " + fallback(product.optString("sku"), "—"), 13, muted);
-    label(body, fallback(product.optString("description"), "Bu ürün için açıklama eklenmemiş."), 16, ink);
-    label(body, "Bayi fiyatınız · " + money(product.optDouble("price"), product.optString("currency")) + " / " + unit(product.optString("unit")), 21, accent);
-    EditText quantity = field(body, "Eklenecek miktar (" + unit(product.optString("unit")) + ")", "1", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL, null, 12);
-    button(body, "Sepete ekle", () -> safely(() -> { state.quantity(detail, state.object("cart").optDouble(detail, 0) + amount(quantity)); message = "Ürün sepetinize eklendi."; render(); }), true);
-    button(body, state.object("favorites").has(detail) ? "Favorilerimden çıkar" : "Favorilerime ekle", () -> safely(() -> { state.favorite(detail); render(); }), false);
+    JSONObject product = state.product(detail);
+    if (product == null) {
+      ui.label(body, "Ürün artık katalogda bulunmuyor.", 18, ui.ink);
+      return;
+    }
+    ImageView image = productImage(product, 220);
+    body.addView(image, new LinearLayout.LayoutParams(-1, dp(240)));
+    ArrayList<String> photoSources = DealerPhotoViewer.sources(product);
+    if (photoSources.isEmpty())
+      ui.label(body, "Fotoğraf yok", 13, ui.muted);
+    else {
+      image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+      image.setOnClickListener(v -> photos.open(product));
+      ui.button(body,
+          "Fotoğrafı incele" + (photoSources.size() > 1 ? " (" + photoSources.size() + ")" : ""),
+          () -> photos.open(product), false);
+    }
+    ui.label(body, product.optString("name"), 26, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(body, join(product.optString("brand"), product.optString("sku")), 14, ui.muted);
+    detailPrice =
+        ui.label(body, price(product) + " / " + unit(product.optString("unit")), 24, ui.accent);
+    if (!product.optString("description").isEmpty())
+      ui.label(body, product.optString("description"), 16, ui.ink);
+    Button favorite = ui.button(body,
+        state.object("favorites").has(detail) ? "Favorilerimden çıkar" : "Favorilerime ekle",
+        () -> {}, false);
+    favorite.setOnClickListener(v -> safely(() -> {
+      state.favorite(detail);
+      favorite.setText(
+          state.object("favorites").has(detail) ? "Favorilerimden çıkar" : "Favorilerime ekle");
+    }));
+    footer.setPadding(dp(16), dp(8), dp(16), dp(12));
+    footer.setBackgroundColor(ui.surface);
+    EditText quantity = quantityControl(
+        footer, "Eklenecek miktar (" + unit(product.optString("unit")) + ")", "1", null);
+    ui.button(footer, "Sepete ekle",
+        ()
+            -> safely(() -> {
+          state.quantity(detail, state.object("cart").optDouble(detail, 0) + amount(quantity));
+          quantityDrafts.remove(detail);
+          showMessage("Ürün sepetinize eklendi.");
+        }),
+        true);
+  }
+  private EditText quantityControl(
+      LinearLayout parent, String caption, String value, TextChange change) {
+    ui.label(parent, caption, 13, ui.muted);
+    LinearLayout row = ui.row();
+    parent.addView(row);
+    final EditText[] holder = new EditText[1];
+    Button minus = ui.button(row, "−",
+        () -> safely(() -> holder[0].setText(number(Math.max(0, amount(holder[0]) - 1)))), false);
+    EditText input = new EditText(this);
+    input.setContentDescription(caption);
+    input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    input.setTextColor(ui.ink);
+    input.setTextSize(16);
+    input.setSingleLine(true);
+    input.setMinHeight(dp(52));
+    input.setPadding(dp(10), dp(8), dp(10), dp(8));
+    input.setBackground(ui.shape(ui.surface, ui.border, 12));
+    input.setFilters(
+        new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(12)});
+    input.setText(value);
+    row.addView(input, new LinearLayout.LayoutParams(0, -2, 1));
+    holder[0] = input;
+    Button plus = ui.button(row, "+",
+        () -> safely(() -> input.setText(number(Math.min(1000, amount(input) + 1)))), false);
+    minus.setContentDescription(caption + " azalt");
+    plus.setContentDescription(caption + " artır");
+    if (change != null)
+      watch(input, change);
+    return input;
   }
   private void cart() {
-    cartFields.clear();
     JSONObject cart = state.object("cart");
-    if (cart.length() == 0) { label(body, "Sepetiniz boş", 23, ink); label(body, "Katalogdan ürün seçerek başlayın.", 15, muted); return; }
+    if (cart.length() == 0) {
+      ui.label(body, "Sepetiniz boş", 24, ui.ink);
+      ui.button(body, "Katalogdan ürün seç", () -> navigate("Katalog"), true);
+      return;
+    }
     boolean pending = state.data.has("pending");
     for (Iterator<String> it = cart.keys(); it.hasNext();) {
-      String id = it.next(); JSONObject product = state.product(id); String name = product == null ? "Artık sunulmayan ürün · " + id : product.optString("name");
-      LinearLayout card = card(body); label(card, name, 17, ink).setTypeface(null, Typeface.BOLD);
-      if (product != null) label(card, money(product.optDouble("price"), product.optString("currency")) + " / " + unit(product.optString("unit")), 14, muted);
-      EditText quantity = field(card, name + " miktarı", number(cart.optDouble(id)), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL, null, 12); quantity.setEnabled(!pending); cartFields.put(id, quantity);
-      LinearLayout actions = row(); card.addView(actions);
-      Button update = button(actions, "Miktarı uygula", () -> safely(() -> { state.quantity(id, amount(quantity)); render(); }), false); update.setEnabled(!pending); update.setContentDescription(name + " miktarını uygula");
-      Button remove = button(actions, "Çıkar", () -> safely(() -> { state.quantity(id, 0); render(); }), false); remove.setEnabled(!pending); remove.setContentDescription(name + " sepetten çıkar");
+      String id = it.next();
+      JSONObject product = state.product(id);
+      String name = product == null ? "Artık sunulmayan ürün" : product.optString("name");
+      LinearLayout card = ui.card(body);
+      ui.label(card, name, 17, ui.ink).setTypeface(null, Typeface.BOLD);
+      cartPrices.put(id,
+          ui.label(card, product == null ? "Ürün artık sunulmuyor" : price(product), 15, ui.muted));
+      EditText quantity = quantityControl(card, name + " miktarı",
+          quantityDrafts.getOrDefault(id, number(cart.optDouble(id))), value -> {
+            quantityDrafts.put(id, value);
+            if (state.data.has("pending"))
+              return;
+            try {
+              double amount = Double.parseDouble(value.trim().replace(',', '.'));
+              state.quantity(id, amount);
+              updateCartTotal();
+            } catch (IllegalArgumentException ignored) { /* Keep incomplete typing until submit; do
+                                                            not replace the field or its focus. */
+            } catch (Exception error) {
+              fatalStorage();
+            }
+          });
+      quantity.setEnabled(!pending && product != null);
+      cartFields.put(id, quantity);
+      LinearLayout controls = (LinearLayout) quantity.getParent();
+      for (int i = 0; i < controls.getChildCount(); i++)
+        controls.getChildAt(i).setEnabled(!pending && product != null);
+      Button remove = ui.button(card, "Çıkar",
+          ()
+              -> safely(() -> {
+            state.quantity(id, 0);
+            quantityDrafts.remove(id);
+            render();
+          }),
+          false);
+      remove.setContentDescription(name + " sepetten çıkar");
+      remove.setEnabled(!pending);
     }
-    try {
-      String currency = ""; Iterator<String> it = cart.keys(); if (it.hasNext()) { JSONObject p = state.product(it.next()); if (p != null) currency = p.optString("currency"); }
-      label(body, "Tahmini toplam  " + money(state.total().doubleValue(), currency), 23, accent);
-    } catch (Exception error) { label(body, error.getMessage(), 14, accent); }
-    label(body, "Sunucu tutarı bayi kataloğunuzdan hesaplar. Kesin sipariş tutarı masaüstünde güncel fiyatlarla belirlenir; sipariş geçmişinde görünür.", 12, muted);
-    JSONArray methods = state.object("catalog").optJSONArray("delivery_methods"); List<String> options = new ArrayList<>();
-    if (methods != null) for (int i = 0; i < methods.length(); i++) options.add(methods.optString(i).equals("shipping") ? "Adrese gönderim" : "Elden teslim");
-    String currentMethod = state.text("delivery");
-    if (!pending && methods != null && methods.length() > 0) {
-      boolean allowed = false; for (int i = 0; i < methods.length(); i++) if (methods.optString(i).equals(currentMethod)) allowed = true;
-      if (!allowed) { currentMethod = methods.optString(0); persist("delivery", currentMethod); }
+    cartTotal = ui.label(body, "", 23, ui.accent);
+    updateCartTotal();
+    ui.label(body, "Fiyatlar işletme onayında güncellenebilir.", 12, ui.muted);
+    JSONArray methods = state.object("catalog").optJSONArray("delivery_methods");
+    List<String> options = new ArrayList<>();
+    if (methods != null)
+      for (int i = 0; i < methods.length(); i++)
+        options.add(methods.optString(i).equals("shipping") ? "Adrese gönderim" : "Elden teslim");
+    String method = state.text("delivery");
+    boolean allowed = false;
+    if (methods != null)
+      for (int i = 0; i < methods.length(); i++)
+        if (methods.optString(i).equals(method))
+          allowed = true;
+    if (!pending && !allowed && methods != null && methods.length() > 0) {
+      method = methods.optString(0);
+      persist("delivery", method);
     }
-    String selected = currentMethod.equals("shipping") ? "Adrese gönderim" : "Elden teslim";
-    Spinner method = selector(body, "Teslimat tercihi", options, selected, value -> safely(() -> {
-      state.put("delivery", value.equals("Adrese gönderim") ? "shipping" : "pickup"); render();
-    })); method.setEnabled(!pending);
-    if (selected.equals("Adrese gönderim")) {
-      String[] keys = {"recipientName", "addressLine1", "district", "city", "postalCode", "countryCode"};
-      String[] captions = {"Teslim alacak kişi *", "Açık adres *", "İlçe *", "İl *", "Posta kodu", "Ülke kodu (TR) *"};
+    String selected = method.equals("shipping") ? "Adrese gönderim" : "Elden teslim";
+    Spinner delivery =
+        ui.selector(body, "Teslimat tercihi", options, selected, value -> safely(() -> {
+          state.put("delivery", value.equals("Adrese gönderim") ? "shipping" : "pickup");
+          render();
+        }));
+    delivery.setEnabled(!pending);
+    if (method.equals("shipping")) {
+      String[] keys = {
+          "recipientName", "addressLine1", "district", "city", "postalCode", "countryCode"};
+      String[] captions = {"Teslim alacak kişi", "Açık adres", "İlçe", "İl",
+          "Posta kodu (isteğe bağlı)", "Ülke kodu"};
       int[] limits = {160, 300, 120, 120, 32, 2};
       for (int i = 0; i < keys.length; i++) {
-        final String key = keys[i];
-        EditText field = field(body, captions[i], state.object("address").optString(key, key.equals("countryCode") ? "TR" : ""), InputType.TYPE_CLASS_TEXT, value -> persistAddress(key, value), limits[i]); field.setEnabled(!pending);
-        if (key.equals("countryCode") && !state.object("address").has(key)) persistAddress(key, "TR");
+        String key = keys[i];
+        EditText field = field(body, captions[i],
+            state.object("address").optString(key, key.equals("countryCode") ? "TR" : ""),
+            InputType.TYPE_CLASS_TEXT, value -> persistAddress(key, value), limits[i]);
+        field.setEnabled(!pending);
+        if (key.equals("countryCode") && !state.object("address").has(key))
+          persistAddress(key, "TR");
       }
     }
-    EditText note = field(body, "Sipariş notu (isteğe bağlı)", state.text("note"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE, value -> persist("note", value), 2000); note.setEnabled(!pending);
-    if (pending) label(body, "Gönderim bekliyor. Sipariş içeriği tekrar deneme bitene kadar korunur; uygulamayı kapatsanız da kaybolmaz.", 14, accent);
-    button(body, pending ? "Aynı siparişi tekrar dene" : "Siparişi gönder", () -> safely(this::submit), true);
+    EditText note = field(body, "Sipariş notu (isteğe bağlı)", state.text("note"),
+        InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+        value -> persist("note", value), 2000);
+    note.setEnabled(!pending);
+    if (pending)
+      ui.label(body, "Gönderim doğrulanamadı. Sipariş içeriğiniz korunuyor.", 14, ui.accent);
+    sendButton = ui.button(body, pending ? "Aynı siparişi tekrar dene" : "Siparişi gönder",
+        () -> safely(this::submit), true);
+  }
+  private void updateCartTotal() {
+    if (cartTotal == null)
+      return;
+    try {
+      JSONObject cart = state.object("cart");
+      String currency = "";
+      Iterator<String> it = cart.keys();
+      if (it.hasNext()) {
+        JSONObject p = state.product(it.next());
+        if (p != null)
+          currency = p.optString("currency");
+      }
+      cartTotal.setText(
+          getString(R.string.estimated_total, money(state.total().doubleValue(), currency)));
+    } catch (Exception error) {
+      cartTotal.setText(error.getMessage());
+    }
   }
   private void submit() throws Exception {
-    if (!state.data.has("pending")) for (Map.Entry<String, EditText> entry : cartFields.entrySet()) state.quantity(entry.getKey(), amount(entry.getValue()));
-    JSONObject request = state.prepareOrder(); String cookie = state.text("cookie"), base = state.text("base");
+    if (busy) {
+      showMessage("Yenileme bitince siparişinizi gönderebilirsiniz.");
+      return;
+    }
+    if (!state.data.has("pending"))
+      for (Map.Entry<String, EditText> entry : cartFields.entrySet()) {
+        double value = amount(entry.getValue());
+        if (value <= 0)
+          throw new IllegalArgumentException(
+              "Miktar sıfırdan büyük olmalı. İstemediğiniz ürünü Çıkar ile kaldırın.");
+        state.quantity(entry.getKey(), value);
+      }
+    JSONObject request = state.prepareOrder();
+    String base = state.text("base"), cookie = state.text("cookie");
+    hideKeyboard();
+    render();
     task(() -> new DealerApi(base).submit(request, cookie), receipt -> {
-      state.accepted(receipt); tab = "Siparişler";
-      message = receipt.has("quoted_total")
-          ? "Talebiniz alındı. Sunucu toplamı: " + money(receipt.optDouble("quoted_total"), receipt.optString("currency")) + ". Masaüstü onayı için siparişleri yenileyin."
-          : "Talebiniz alındı. Kesin tutar ve durum için siparişleri yenileyin.";
-      // Local acceptance is a transport fact; canonical state arrives only from orders.php.
-    }, true);
+      state.accepted(receipt);
+      quantityDrafts.clear();
+      tab = "Siparişler";
+      detail = "";
+      message = "Talebiniz alındı. İşletme onayı bekleniyor.";
+    }, Task.SUBMIT);
   }
   private void orders() {
-    label(body, "Son kontrol: " + fallback(state.text("orders_at"), "Henüz alınmadı"), 12, muted);
-    JSONObject receipt = state.object("last_receipt");
-    if (receipt.has("order_id")) label(body, "Son gönderilen talep: " + receipt.optString("order_id") + "\n" + receipt.optString("accepted_at"), 12, muted);
+    ui.label(
+        body, "Son kontrol: " + fallback(state.text("orders_at"), "Henüz alınmadı"), 12, ui.muted);
     JSONArray orders = state.array("orders");
-    if (orders.length() == 0) label(body, "Henüz sipariş görünmüyor. Yeni talepler için Yenile’ye dokunun.", 16, ink);
+    if (orders.length() == 0)
+      ui.label(body,
+          state.object("last_receipt").has("order_id")
+              ? "Talebiniz alındı. İşletmeye iletiliyor; durumu görmek için yenileyin."
+              : "Henüz siparişiniz yok.",
+          16, ui.muted);
     for (int i = 0; i < orders.length(); i++) {
-      JSONObject order = orders.optJSONObject(i); if (order == null) continue;
-      LinearLayout card = card(body); label(card, status(order.optString("status")), 18, accent).setTypeface(null, Typeface.BOLD);
-      label(card, order.optString("created_at").replace('T', ' ') + "\n" + order.optString("order_id"), 12, muted);
-      if (!order.isNull("total")) label(card, money(order.optDouble("total"), order.optString("currency")), 20, ink);
-      JSONArray items = order.optJSONArray("items"); if (items == null) continue;
+      JSONObject order = orders.optJSONObject(i);
+      if (order == null)
+        continue;
+      LinearLayout card = ui.card(body);
+      ui.label(card, status(order.optString("status")), 18, ui.accent)
+          .setTypeface(null, Typeface.BOLD);
+      ui.label(card, order.optString("created_at").replace('T', ' '), 13, ui.muted);
+      if (!order.isNull("total"))
+        ui.label(card, money(order.optDouble("total"), order.optString("currency")), 22, ui.ink);
+      JSONArray items = order.optJSONArray("items");
+      if (items == null)
+        continue;
+      LinearLayout lines = ui.column();
+      card.addView(lines);
       for (int j = 0; j < items.length(); j++) {
-        JSONObject item = items.optJSONObject(j); if (item == null) continue;
+        JSONObject item = items.optJSONObject(j);
+        if (item == null)
+          continue;
         JSONObject product = state.product(item.optString("product_id"));
-        label(card, number(item.optDouble("quantity")) + " × " + fallback(item.optString("name"), product == null ? item.optString("product_id") : product.optString("name")), 14, ink);
+        ui.label(lines,
+            number(item.optDouble("quantity")) + " × "
+                + fallback(
+                    item.optString("name"), product == null ? "Ürün" : product.optString("name")),
+            15, ui.ink);
       }
       if (items.length() > 0) {
-        Button reorder = button(card, "Ürünleri tekrar sepete ekle", () -> safely(() -> {
-        int missing = state.reorder(items);
-        tab = "Sepet"; message = missing == 0 ? "Ürünler güncel bayi fiyatlarıyla sepete eklendi." : missing + " ürün artık katalogda yok; diğer ürünler eklendi."; render();
-      }), false);
-        reorder.setContentDescription(order.optString("order_id") + " ürünlerini tekrar sepete ekle");
+        Button reorder = ui.button(card, "Tekrar sepete ekle",
+            ()
+                -> safely(() -> {
+              int missing = state.reorder(items);
+              quantityDrafts.clear();
+              tab = "Sepet";
+              message = missing == 0 ? "Ürünler güncel fiyatlarla sepete eklendi."
+                                     : missing + " ürün artık sunulmuyor; diğerleri eklendi.";
+              render();
+            }),
+            false);
+        reorder.setContentDescription(
+            order.optString("order_id") + " ürünlerini tekrar sepete ekle");
       }
     }
   }
   private void account() {
-    LinearLayout card = card(body); label(card, "Firma hesabı", 21, ink).setTypeface(null, Typeface.BOLD);
-    label(card, state.object("dealer").optString("display_name"), 18, ink); label(card, state.text("base"), 13, muted);
-    label(card, "Bu cihazdaki katalog, sepet ve favoriler yalnız bu bayi hesabına aittir. Oturum kapatılınca cihazdan temizlenir.", 13, muted);
-    selector(body, "Görünüm", Arrays.asList("Sistem", "Açık", "Koyu"), state.text("theme").equals("dark") ? "Koyu" : state.text("theme").equals("light") ? "Açık" : "Sistem", value -> safely(() -> {
-      state.put("theme", value.equals("Koyu") ? "dark" : value.equals("Açık") ? "light" : "system"); recreate();
-    }));
-    button(body, "Oturumu kapat", () -> new AlertDialog.Builder(this).setTitle("Oturum kapatılsın mı?")
-        .setMessage(state.data.has("pending") ? "Gönderimi doğrulanmamış siparişiniz var. Önce Sepet’ten aynı siparişi tekrar deneyin; taslağınız kaybolmasın." : "Cihazdaki sepet, favoriler ve katalog temizlenecek. Yeniden giriş için yeni davet gerekir.")
-        .setNegativeButton("Vazgeç", null).setPositiveButton(state.data.has("pending") ? "Sepete dön" : "Oturumu kapat", (dialog, which) -> {
-          if (state.data.has("pending")) { tab = "Sepet"; render(); return; }
-          safely(() -> {
-            String cookie = state.text("cookie"), base = state.text("base");
-            task(() -> new DealerApi(base).call("logout", new JSONObject(), cookie).body, result -> { state.logout(); tab = "Katalog"; message = "Oturumunuz kapatıldı."; }, false);
-          });
-        }).show(), false);
-    label(body, "Oturum kapatma sunucuya ulaşmayı gerektirir. Erişim iptali, masaüstündeki değişiklik sunucuya yayınlandığında uygulanır.", 12, muted);
+    DealerAppearance selected = ui.appearance;
+    choices(body, "Tema", new String[] {"Sistem", "Açık", "Koyu"},
+        new String[] {"system", "light", "dark"}, selected.theme,
+        value
+        -> appearance(new DealerAppearance(
+            value, selected.accent, selected.fontPercent, selected.highContrast)));
+    String[] sizes = new String[DealerAppearance.FONT_OPTIONS.length];
+    for (int i = 0; i < sizes.length; i++) sizes[i] = "%" + DealerAppearance.FONT_OPTIONS[i];
+    choices(body, "Yazı boyutu", sizes, sizes, "%" + selected.fontPercent,
+        value
+        -> appearance(new DealerAppearance(selected.theme, selected.accent,
+            Integer.parseInt(value.substring(1)), selected.highContrast)));
+    choices(body, "Renk tonu", new String[] {"Mavi", "Yeşil", "Sıcak", "Mor"},
+        DealerAppearance.ACCENTS, selected.accent,
+        value
+        -> appearance(new DealerAppearance(
+            selected.theme, value, selected.fontPercent, selected.highContrast)));
+    choices(body, "Kontrast", new String[] {"Normal", "Yüksek"}, new String[] {"normal", "high"},
+        selected.highContrast ? "high" : "normal",
+        value
+        -> appearance(new DealerAppearance(
+            selected.theme, selected.accent, selected.fontPercent, value.equals("high"))));
+    LinearLayout preview = ui.card(body);
+    ui.label(preview, "Önizleme", 13, ui.muted);
+    ui.label(preview, "Ürün adı", 18, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(preview, "Seçtiğiniz görünüm", 15, ui.muted);
+    ui.button(preview, "Örnek düğme", () -> {}, true);
+    ui.button(body, "Görünümü sıfırla", () -> appearance(DealerAppearance.defaults()), false);
+    LinearLayout identity = ui.card(body);
+    ui.label(identity, state.object("dealer").optString("display_name"), 18, ui.ink);
+    ui.label(identity, host(), 13, ui.muted);
+    ui.button(body, "Oturumu kapat",
+        ()
+            -> new AlertDialog.Builder(this)
+                .setTitle("Oturum kapatılsın mı?")
+                .setMessage(state.data.has("pending")
+                        ? "Önce Sepet’ten bekleyen siparişinizi tekrar deneyin."
+                        : "Yeniden giriş için firmanızdan yeni davet gerekir.")
+                .setNegativeButton("Vazgeç", null)
+                .setPositiveButton(state.data.has("pending") ? "Sepete dön" : "Oturumu kapat",
+                    (dialog, which) -> {
+                      if (state.data.has("pending")) {
+                        navigate("Sepet");
+                        return;
+                      }
+                      String cookie = state.text("cookie"), base = state.text("base");
+                      task(()
+                               -> new DealerApi(base).call("logout", new JSONObject(), cookie).body,
+                          result
+                          -> {
+                            state.logout();
+                            quantityDrafts.clear();
+                            positions.clear();
+                            tab = "Katalog";
+                            message = "Oturumunuz kapatıldı.";
+                          },
+                          Task.LOGOUT);
+                    })
+                .show(),
+        false);
   }
-  private void persist(String key, String value) { try { state.put(key, value); } catch (Exception error) { fatalStorage(); } }
-  private void persistAddress(String key, String value) { try { JSONObject address = state.object("address"); address.put(key, value); state.put("address", address); } catch (Exception error) { fatalStorage(); } }
-  interface TextChange { void changed(String value); }
-  private EditText field(LinearLayout parent, String caption, String value, int type, TextChange change, int limit) {
-    label(parent, caption, 13, muted); EditText field = new EditText(this); field.setTextColor(ink); field.setHintTextColor(muted); field.setTextSize(16);
-    field.setInputType(type); field.setSingleLine((type & InputType.TYPE_TEXT_FLAG_MULTI_LINE) == 0);
-    field.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(limit)}); field.setText(value); field.setContentDescription(caption); field.setMinHeight(dp(52));
-    field.setPadding(dp(12), dp(8), dp(12), dp(8)); field.setBackground(shape(surface, border, 10));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.setMargins(0, dp(3), 0, dp(10)); parent.addView(field, params);
-    if (change != null) watch(field, change); return field;
-  }
-  private void watch(EditText field, TextChange change) { field.addTextChangedListener(new TextWatcher() {
-    public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
-    public void onTextChanged(CharSequence text, int start, int before, int count) { change.changed(text.toString()); }
-    public void afterTextChanged(Editable text) {}
-  }); }
-  private Spinner selector(LinearLayout parent, String caption, List<String> options, String selected, TextChange change) {
-    label(parent, caption, 13, muted); Spinner spinner = new Spinner(this); spinner.setContentDescription(caption);
-    List<String> values = options.isEmpty() ? Collections.singletonList("Şu anda sunulmuyor") : options;
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, values); spinner.setAdapter(adapter);
-    int position = values.indexOf(selected); spinner.setSelection(Math.max(0, position)); parent.addView(spinner, new LinearLayout.LayoutParams(-1, dp(48)));
-    final String[] previous = {values.get(Math.max(0, position))};
-    spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-      public void onNothingSelected(AdapterView<?> view) {}
-      public void onItemSelected(AdapterView<?> view, View item, int index, long id) {
-        String next = values.get(index); if (next.equals(previous[0])) return; previous[0] = next; change.changed(next);
+  private void choices(LinearLayout parent, String title, String[] captions, String[] values,
+      String selected, TextChange change) {
+    ui.label(parent, title, 16, ui.ink).setTypeface(null, Typeface.BOLD);
+    LinearLayout line = null;
+    for (int i = 0; i < captions.length; i++) {
+      if (i % 2 == 0) {
+        line = ui.row();
+        parent.addView(line);
       }
-    }); return spinner;
+      String value = values[i];
+      Button choice =
+          ui.choice(line, captions[i], value.equals(selected), () -> change.changed(value));
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+      params.setMargins(0, dp(4), dp(8), dp(4));
+      choice.setLayoutParams(params);
+    }
   }
-  private Button button(LinearLayout parent, String caption, Runnable action, boolean primary) {
-    Button button = new Button(this); button.setText(caption); button.setTextSize(14); button.setAllCaps(false); button.setMinHeight(dp(48));
-    button.setTextColor(primary ? background : accent); button.setBackground(shape(primary ? accent : surface, primary ? accent : border, 10));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(parent.getOrientation() == LinearLayout.HORIZONTAL ? -2 : -1, -2); params.setMargins(dp(2), dp(5), dp(2), dp(5)); parent.addView(button, params);
-    button.setOnClickListener(view -> { if (!busy && !storageFailed) action.run(); }); return button;
+  private void appearance(DealerAppearance next) {
+    if (!DealerUi.save(this, next)) {
+      showMessage("Görünüm kaydedilemedi. Yeniden deneyin.");
+      return;
+    }
+    rememberPosition();
+    recreate();
   }
-  private TextView label(LinearLayout parent, String text, int size, int color) {
-    TextView label = new TextView(this); label.setText(text); label.setTextSize(size); label.setTextColor(color); label.setPadding(0, dp(4), 0, dp(4)); parent.addView(label); return label;
+  private void persist(String key, String value) {
+    try {
+      state.put(key, value);
+    } catch (Exception error) {
+      fatalStorage();
+    }
   }
-  private LinearLayout card(LinearLayout parent) {
-    LinearLayout card = column(); card.setPadding(dp(16), dp(12), dp(16), dp(12)); card.setBackground(shape(surface, border, 14));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.setMargins(0, dp(8), 0, dp(8)); parent.addView(card, params); return card;
+  private void persistAddress(String key, String value) {
+    try {
+      JSONObject address = state.object("address");
+      address.put(key, value);
+      state.put("address", address);
+    } catch (Exception error) {
+      fatalStorage();
+    }
   }
-  private GradientDrawable shape(int fill, int stroke, int radius) { GradientDrawable shape = new GradientDrawable(); shape.setColor(fill); shape.setCornerRadius(dp(radius)); shape.setStroke(dp(1), stroke); return shape; }
-  private LinearLayout column() { LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); return layout; }
-  private LinearLayout row() { LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.HORIZONTAL); layout.setGravity(android.view.Gravity.CENTER_VERTICAL); return layout; }
-  private void enableTree(View view, boolean enabled) { view.setEnabled(enabled); if (view instanceof android.view.ViewGroup) { android.view.ViewGroup group = (android.view.ViewGroup) view; for (int i = 0; i < group.getChildCount(); i++) enableTree(group.getChildAt(i), enabled); } }
-  private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-  private String money(double value, String currency) { NumberFormat format = NumberFormat.getNumberInstance(locale); format.setMinimumFractionDigits(2); format.setMaximumFractionDigits(2); return format.format(value) + " " + currency; }
-  private String number(double value) { return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString(); }
-  private double amount(EditText field) { try { return Double.parseDouble(field.getText().toString().trim().replace(',', '.')); } catch (NumberFormatException error) { throw new IllegalArgumentException("Geçerli bir miktar girin."); } }
-  private String host() { try { return new java.net.URI(state.text("base")).getHost(); } catch (Exception error) { return ""; } }
-  private String fallback(String text, String replacement) { return text.isEmpty() ? replacement : text; }
-  private String join(String first, String second) { return first.isEmpty() ? second : second.isEmpty() ? first : first + " · " + second; }
-  private String now() { return new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", locale).format(new Date()); }
-  private List<String> withAll(String all, Set<String> options) { List<String> result = new ArrayList<>(); result.add(all); result.addAll(options); return result; }
+  interface TextChange {
+    void changed(String value);
+  }
+  private EditText field(
+      LinearLayout parent, String caption, String value, int type, TextChange change, int max) {
+    EditText input = ui.field(parent, caption, value, type, max);
+    if (change != null)
+      watch(input, change);
+    return input;
+  }
+  private void watch(EditText field, TextChange change) {
+    field.addTextChangedListener(new TextWatcher() {
+      public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      public void afterTextChanged(Editable s) {}
+      public void onTextChanged(CharSequence s, int start, int before, int count) {
+        change.changed(s.toString());
+      }
+    });
+  }
+  private int dp(int value) {
+    return ui.dp(value);
+  }
+  private String price(JSONObject product) {
+    return money(product.optDouble("price"), product.optString("currency"));
+  }
+  private String money(double amount, String currency) {
+    NumberFormat format = NumberFormat.getNumberInstance(locale);
+    format.setMinimumFractionDigits(2);
+    format.setMaximumFractionDigits(2);
+    return format.format(amount) + " " + (currency.equals("TRY") ? "TL" : currency);
+  }
+  private String number(double value) {
+    return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+  }
+  private double amount(EditText input) {
+    try {
+      double value = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+      if (!Double.isFinite(value) || value < 0 || value > 1000)
+        throw new NumberFormatException();
+      return value;
+    } catch (NumberFormatException error) {
+      input.setError("Geçerli bir miktar girin.");
+      throw new IllegalArgumentException("Geçerli bir miktar girin.");
+    }
+  }
+  private String host() {
+    try {
+      return new java.net.URI(state.text("base")).getHost();
+    } catch (Exception error) {
+      return "";
+    }
+  }
+  private String fallback(String value, String replacement) {
+    return value.isEmpty() ? replacement : value;
+  }
+  private String join(String a, String b) {
+    return a.isEmpty() ? b : b.isEmpty() ? a : a + " · " + b;
+  }
+  private String now() {
+    return new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", locale).format(new Date());
+  }
+  private List<String> withAll(String all, Set<String> options) {
+    List<String> result = new ArrayList<>();
+    result.add(all);
+    result.addAll(options);
+    return result;
+  }
   private String unit(String value) {
-    switch (value) { case "piece": return "adet"; case "pack": return "paket"; case "box": return "kutu"; case "meter": return "metre"; case "other": return "birim"; default: return value; }
+    switch (value) {
+      case "piece":
+        return "adet";
+      case "pack":
+        return "paket";
+      case "box":
+        return "kutu";
+      case "meter":
+        return "metre";
+      case "other":
+        return "birim";
+      default:
+        return value;
+    }
   }
   static String status(String value) {
     switch (value) {
-      case "placed": return "Sipariş alındı";
-      case "confirmed": return "Onaylandı";
-      case "fulfilled": return "Tamamlandı";
-      case "cancelled": return "İptal edildi";
-      case "rejected": return "Erişim iptali nedeniyle işlenemedi";
-      case "awaiting_desktop": return "Talep alındı · Masaüstüne aktarım bekleniyor";
-      default: return "Durum alınamadı";
+      case "placed":
+        return "Sipariş alındı";
+      case "confirmed":
+        return "Onaylandı";
+      case "fulfilled":
+        return "Tamamlandı";
+      case "cancelled":
+        return "İptal edildi";
+      case "rejected":
+        return "Erişim iptali nedeniyle işlenemedi";
+      case "awaiting_desktop":
+        return "İşletmeye iletiliyor";
+      default:
+        return "Durum alınamadı";
     }
   }
 }

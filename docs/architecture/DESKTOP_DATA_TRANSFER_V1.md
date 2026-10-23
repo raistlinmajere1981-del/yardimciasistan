@@ -1,8 +1,12 @@
-# Desktop ürün ve müşteri veri aktarımı
+# Desktop ürün, müşteri ve menü veri aktarımı
 
 Veri sahibi Desktop'tır. Ortak aktarım işlemi MarketProductsWorkspace ve
-CustomersWorkspace başlıklarındaki ikonlardan açılır. Tek ModalSurface içinde
-hazırlık/önizleme, açık onay ve kalıcı sonuç görünümü vardır. Yayın veya stok
+CustomersWorkspace ile Menü sayfasının ürün başlığındaki ikonlardan açılır.
+Tek ModalSurface içinde solda araçlar ve tercihler, sağda dosya/eşleme,
+hazırlık/önizleme, açık onay ve kalıcı sonuç görünümü vardır. İki panel kendi
+kaydırmasını sahiplenir; dar görünümde aynı durum korunarak tek kolona geçilir.
+Araç geçişi içe aktarma önizlemesini ve sonucunu korur; tercih/eşleme değişikliği
+yeniden analiz gerektirir. Yayın veya stok
 sayımı varsayılan olarak yapılmaz; yeni ürünler pasif taslaktır. Aktarım listesi
 entity editörünün veya sipariş/finans işlemlerinin ikinci sahibi değildir.
 
@@ -33,6 +37,24 @@ birim, para birimi, aktiflik ve gerektiğinde onaylı stok sayımı gerekir.
 Yayınlanabilir/engelli sayısı ve satır nedenleri onaydan önce gösterilir.
 Menü ilişkisi açık tercih gerektirir; kaynak menü ilişkileri seçilirse kategori,
 fiyat override, alerjen, etiket ve tüketim alanları mevcut menü yazarından geçer.
+
+`menu` aktarım türü aynı katalog ürününün menü kapsamıdır; ikinci ürün modeli
+veya yazarı değildir. CATALOG ve FOOD_MENU yetenekleri kaynak seçimi, okuma,
+dışa aktarma ve uygulamada yeniden denetlenir. Menüden açılan işlem seçili
+kategoriyi hedef olarak önerir; kategori seçilmediyse dosyadaki menü kategorileri
+kullanılır. Menü kapsamı hedef kategori gerektirir; kaynak kategori seçeneğinde
+kategorisi olmayan satır hatalıdır ve yalnız kataloğa sessizce yazılmaz.
+Yeni menü kategorileri pasiftir; ürünün taslak/aktivasyon kuralları korunur.
+Ortak ürün alanlarının güncellenmesi diğer satış kanallarını da etkileyebilir;
+bu etki panelde açıklanır. Menü alanlarının eski ve yeni değerleri önizlenir.
+
+Menü dışa aktarımı yalnız silinmemiş menü ilişkisi ve kategorisi bulunan ürünleri
+alır; pasif taslakları da içerir. Filtreli kapsam sayfada seçili menü kategorisiyle
+başlar ve aktarım panelinden değiştirilebilir; tüm kapsam kategori filtresini
+kaldırır. Temel menü şablonu da menü kategorisi,
+fiyatı, alerjen, etiket ve mevcutluk alanlarını içerir. Ürün ve menü ZIP'leri aynı
+katalog kayıt modelini taşıdığından iki girişten de okunabilir; müşteri arşivleri
+ayrı kayıt türü olarak kalır.
 
 ## Görseller ve arşiv
 

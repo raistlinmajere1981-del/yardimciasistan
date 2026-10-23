@@ -36,12 +36,7 @@ function ya_online_catalog_projection(array $candidate): array
                 throw new InvalidArgumentException('invalid_online_product');
             }
             $imageUrl = is_string($raw['image_url'] ?? null) ? $raw['image_url'] : '';
-            $image = parse_url($imageUrl);
-            if (!is_array($image) || ($image['scheme'] ?? '') !== 'https'
-                || isset($image['user']) || isset($image['pass']) || isset($image['query']) || isset($image['fragment'])
-                || !str_contains($image['host'] ?? '', '.')
-                || preg_match('/^[\d.:\[\]]+$/', $image['host'] ?? '') === 1
-                || preg_match('/\.(local|localhost|internal|test)$/', $image['host'] ?? '') === 1) $imageUrl = '';
+            $imageUrl = ya_online_catalog_image_url($imageUrl);
             $products[$id] = [
                 'product_id' => $id, 'category_id' => mb_substr(is_string($raw['category_id'] ?? null) ? $raw['category_id'] : '', 0, 180),
                 'brand' => mb_substr(is_string($raw['brand'] ?? null) ? $raw['brand'] : '', 0, 160), 'name' => $name,
@@ -71,4 +66,16 @@ function ya_online_catalog_projection(array $candidate): array
         'updated_at' => mb_substr(is_string($candidate['updated_at'] ?? null) ? $candidate['updated_at'] : '', 0, 64),
         'products' => $products
     ];
+}
+
+/** Shared publishable picture policy for public and private catalogs. */
+function ya_online_catalog_image_url(string $imageUrl): string
+{
+    $image = parse_url($imageUrl);
+    if (!is_array($image) || ($image['scheme'] ?? '') !== 'https'
+        || isset($image['user']) || isset($image['pass']) || isset($image['query']) || isset($image['fragment'])
+        || !str_contains($image['host'] ?? '', '.')
+        || preg_match('/^[\d.:\[\]]+$/', $image['host'] ?? '') === 1
+        || preg_match('/\.(local|localhost|internal|test)$/', $image['host'] ?? '') === 1) return '';
+    return $imageUrl;
 }

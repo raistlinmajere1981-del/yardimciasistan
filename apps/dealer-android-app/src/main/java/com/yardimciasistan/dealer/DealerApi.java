@@ -29,16 +29,6 @@ final class DealerApi {
         || uri.getRawQuery() != null || uri.getRawFragment() != null) throw new IllegalArgumentException("Web modülü için geçerli bir HTTPS adresi girin.");
     return uri.toASCIIString().replaceAll("/+$", "") + "/";
   }
-  static String inviteToken(String link, String base) throws Exception {
-    URI uri = new URI(link.trim()); URI server = new URI(normalizeBase(base));
-    if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null || uri.getRawQuery() != null
-        || !server.getHost().equalsIgnoreCase(uri.getHost() == null ? "" : uri.getHost()) || effectivePort(uri) != effectivePort(server))
-      throw new IllegalArgumentException("Davet ile sunucu adresi aynı firmaya ait olmalı.");
-    String fragment = uri.getRawFragment();
-    if (fragment == null || !fragment.matches("invite=[A-Za-z0-9_-]{43}")) throw new IllegalArgumentException("Geçerli bayi davet bağlantısını yapıştırın.");
-    return fragment.substring(7);
-  }
-  private static int effectivePort(URI uri) { return uri.getPort() == -1 ? 443 : uri.getPort(); }
   JSONObject submit(JSONObject request, String cookie) throws Exception {
     JSONObject recovery = call("receipt", new JSONObject().put("idempotencyKey", request.getString("idempotencyKey")), cookie).body;
     JSONObject previous = recovery.optJSONObject("receipt");
@@ -65,7 +55,7 @@ final class DealerApi {
         try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); }
       }
       int status = connection.getResponseCode();
-      if (status >= 300 && status < 400) throw new Failure(status, "Sunucu adresi yönlendiriliyor. Doğrudan web modülü adresini kullanın.");
+      if (status >= 300 && status < 400) throw new Failure(status, "Bu bağlantı yönlendiriliyor. Firmanızdan güncel bayi bağlantısı isteyin.");
       String body;
       try (InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream()) { body = readBounded(stream, 16 * 1024 * 1024); }
       JSONObject json;

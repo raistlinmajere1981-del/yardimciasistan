@@ -2,7 +2,8 @@ import type { TransferPreferences } from "@yardimci-asistan/shared";
 export { DEFAULT_TRANSFER_PREFERENCES, PRODUCT_TRANSFER_FIELDS, CUSTOMER_TRANSFER_FIELDS, IDENTITY_TRANSFER_FIELDS } from "@yardimci-asistan/shared";
 export type { TransferPreferences } from "@yardimci-asistan/shared";
 import type { CustomerListQuery } from "./database/customer-store";
-export type TransferEntity = "products" | "customers";
+/** Menu is a transfer scope of canonical catalog products, with their menu relations. */
+export type TransferEntity = "products" | "customers" | "menu";
 export type TransferFormat = "csv" | "xlsx" | "zip";
 export type TransferStatus = "new" | "update" | "skip" | "error";
 export interface TransferRow {
@@ -17,7 +18,7 @@ export interface TransferSource { token: string; name: string; format: string; h
 export interface TransferResult { added: number; updated: number; skipped: number; errors: number; rows: TransferRow[] }
 export interface TransferExportOptions {
   entity: TransferEntity; format: TransferFormat; scope: "all" | "filtered";
-  search?: string; quickAccessOnly?: boolean; customerFilter?: CustomerListQuery["filter"]; includeImages: boolean;
+  search?: string; quickAccessOnly?: boolean; customerFilter?: CustomerListQuery["filter"]; menuCategoryId?: string; includeImages: boolean;
   includeIdentity: boolean; template?: "full" | "basic" | "ideasoft";
 }
 export interface TransferExportSummary { records: number; images: number }

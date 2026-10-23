@@ -189,7 +189,11 @@ try {
   await expect(accessPanel).toBeVisible();
   await accessPanel.getByRole("button", { name: "Davet oluştur", exact: true }).click();
   const inviteOne = await accessPanel.getByLabel("Davet bağlantısı").inputValue();
-  assert.match(inviteOne, /\/bayi\/#invite=[A-Za-z0-9_-]{43}$/);
+  const invitation = new URL(inviteOne), fragment = new URLSearchParams(invitation.hash.slice(1));
+  assert.equal(invitation.origin, "https://example.test"); assert.equal(invitation.pathname, "/bayi/");
+  assert.equal(invitation.search, ""); assert.match(fragment.get("invite"), /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(fragment.get("module"), "https://example.test/yardimci-asistan/");
+  assert.deepEqual([...fragment.keys()].sort(), ["invite", "module"]);
   await accessPanel.getByRole("button", { name: "Yeni davet oluştur" }).click();
   await expect(accessPanel.getByLabel("Davet bağlantısı")).not.toHaveValue(inviteOne);
   await accessPanel.getByRole("button", { name: "Tüm cihazlardan çıkış yap" }).click();

@@ -31,6 +31,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FeatureWorkspacePage } from "../workspace/FeatureWorkspacePage";
 import { PageWorkSurface } from "../layout/PageWorkSurface";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import { DataTransferLauncher } from "../data-transfer/DataTransferOverlay";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -352,6 +353,11 @@ export function MenuManager({
                   <Plus size={16} aria-hidden="true" />
                   Ürün ekle
                 </ActionButton>
+                <DataTransferLauncher entity="menu" menuCategoryId={selectedCategoryId} onChanged={async () => {
+                  const data = await window.yardimciDesktop!.getDashboardData();
+                  onDashboardDataChanged(data);
+                  await onCatalogReload();
+                }} />
               </div>
             </div>
 

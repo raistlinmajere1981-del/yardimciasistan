@@ -52,6 +52,11 @@ function ya_dealer_projection(array $input): array
             'delivery_methods' => $safe['delivery_methods'], 'products' => array_map(static function (array $product) use ($rawProducts): array {
                 $raw = $rawProducts[$product['product_id']];
                 foreach (['brand', 'category_name'] as $field) $product[$field] = mb_substr(is_string($raw[$field] ?? null) ? $raw[$field] : '', 0, 180);
+                $images = $raw['image_urls'] ?? ($product['image_url'] !== '' ? [$product['image_url']] : []);
+                if (!is_array($images) || !array_is_list($images) || count($images) > 12) throw new InvalidArgumentException('dealer_images_invalid');
+                foreach ($images as $image) if (!is_string($image) || $image === '' || strlen($image) > 2048 || ya_online_catalog_image_url($image) !== $image) throw new InvalidArgumentException('dealer_images_invalid');
+                if (($images[0] ?? '') !== $product['image_url']) throw new InvalidArgumentException('dealer_images_invalid');
+                $product['image_urls'] = array_values(array_unique($images, SORT_STRING));
                 return $product;
             }, $safe['products'])];
     }

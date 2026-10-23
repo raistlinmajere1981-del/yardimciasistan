@@ -23,6 +23,13 @@ try {
   const output = resolve("artifacts/dealer-android"); mkdirSync(output, { recursive: true });
   writeFileSync(join(output, "native-fixture.txt"), `Device SDK: ${sdk}\nSynthetic cache only; no live server or real account.\n${result}`);
   assert.match(result, /dealer-native-device-ok:/); assert.match(result, /INSTRUMENTATION_CODE: -1/);
+  writeFileSync(join(output, `native-fixture-sdk${sdk}.txt`), `Device SDK: ${sdk}\nSynthetic cache only; no live server or real account.\n${result}`);
+  const shots = join(output, `sdk${sdk}`); mkdirSync(shots, { recursive: true });
+  for (const file of adb(["shell", "run-as", packageName, "ls", "files/ui-evidence"]).trim().split(/\s+/)) {
+    assert.match(file, /^[a-z-]+\.png$/);
+    const picture = spawnSync("adb", ["-s", serial, "exec-out", "run-as", packageName, "cat", `files/ui-evidence/${file}`], { maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(picture.status, 0); writeFileSync(join(shots, file), picture.stdout);
+  }
   console.log(result.trim());
 } finally {
   try { if (installed) adb(["uninstall", packageName]); }

@@ -29,9 +29,7 @@ final class DealerState {
         for (String key : draftFields) if (data.has(key)) previous.put(key, data.get(key));
         drafts.put(text("owner"), new JSONObject(previous.toString()));
       }
-      String theme = text("theme");
       for (String key : new String[]{"catalog", "orders", "cart", "favorites", "pending", "last_receipt", "note", "address", "delivery", "catalog_at", "orders_at"}) data.remove(key);
-      data.put("theme", theme);
       JSONObject restored = drafts.optJSONObject(owner);
       if (restored != null) for (String key : draftFields) if (restored.has(key)) data.put(key, restored.get(key));
       drafts.remove(owner);
@@ -116,10 +114,8 @@ final class DealerState {
   }
   void logout() throws Exception {
     JSONObject drafts = object("saved_drafts");
-    String theme = text("theme");
     java.util.List<String> keys = new java.util.ArrayList<>(); data.keys().forEachRemaining(keys::add);
     for (String key : keys) data.remove(key);
-    data.put("theme", theme);
     if (drafts.length() > 0) data.put("saved_drafts", drafts);
     save();
   }

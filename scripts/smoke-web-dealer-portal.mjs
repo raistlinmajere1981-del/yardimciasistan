@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { installDemoSite } from "./test-helpers/demo-site.mjs";
 import { activateFixtureSource } from "./test-helpers/publication-protocol.mjs";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import http from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { chromium, expect } from "@playwright/test";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
@@ -17,6 +18,9 @@ const { PhpHostingSyncTransport } = require("../packages/sync-core/dist/index.js
 const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
 const { createAndroidOperationsSnapshot } = require("../apps/desktop-app/dist-electron/android-operations-snapshot.js");
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
+const { saveRuntimeCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { prepareDealerProductMedia } = require("../apps/desktop-app/dist-electron/dealer-product-media-publication.js");
+const { publishDesktopProjection } = require("../apps/desktop-app/dist-electron/desktop-publication-service.js");
 const root = mkdtempSync(join(tmpdir(), "ya-web-dealer-"));
 const hosting = installDemoSite(root);
 for (const file of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) rmSync(join(hosting, "data", file), { force: true });
@@ -78,6 +82,28 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 30));
   }
   const capabilities = await transport.getCapabilities(); assert.equal(capabilities.ok, true); assert.ok(capabilities.features.includes("dealer_access_v1"));
+  // Actual multipart route: secret gate, immutable hash path, original bytes, bounded raster types.
+  const picture = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=", "base64");
+  const pictureHash = createHash("sha256").update(picture).digest("hex");
+  const uploadPicture = async ({ auth = secret, hash = pictureHash, bytes = picture, product = "fixture-product" } = {}) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries({ client_id: "desktop-media-fixture", product_id: product, media_id: hash, content_hash: hash, kind: "photo" })) form.set(key, value);
+    form.set("file", new Blob([bytes], { type: "image/png" }), "original.png");
+    const response = await fetch(`${baseUrl}/api/product-media.php`, { method: "POST", headers: { "X-YA-Sync-Secret": auth }, body: form });
+    return { status: response.status, body: await response.json() };
+  };
+  assert.equal((await fetch(`${baseUrl}/api/product-media.php`)).status, 405);
+  assert.equal((await uploadPicture({ auth: "wrong" })).status, 401);
+  assert.equal((await uploadPicture({ hash: "0".repeat(64) })).status, 422);
+  assert.equal((await uploadPicture({ bytes: Buffer.from("not a raster") })).status, 422);
+  assert.equal((await uploadPicture({ product: "../outside" })).status, 422);
+  const uploadedPicture = await uploadPicture(); assert.equal(uploadedPicture.status, 200);
+  assert.equal(uploadedPicture.body.url, `/yardimci-asistan/media/products/fixture-product/${pictureHash}.png`);
+  assert.equal(uploadedPicture.body.content_hash, pictureHash);
+  assert.deepEqual(await uploadPicture(), uploadedPicture, "same hash is an idempotent upload");
+  const originalResponse = await fetch(siteUrl + uploadedPicture.body.url);
+  assert.equal(originalResponse.status, 200);
+  assert.ok(Buffer.from(await originalResponse.arrayBuffer()).equals(picture), "published image bytes remain unchanged");
   assert.deepEqual(await session(), { status: 401, body: { authenticated: false } });
   assert.equal((await post("claim", {}, { method: "GET" })).status, 405);
   assert.equal((await post("logout", {}, { method: "GET" })).status, 405);
@@ -138,7 +164,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "tr-TR" });
   const page = await context.newPage(); page.setDefaultTimeout(10000); const errors = []; const urls = [];
   page.on("pageerror", (error) => errors.push(error.message)); page.on("request", (request) => urls.push(request.url()));
-  await page.goto(`${siteUrl}/bayi/#invite=${token}`);
+  await page.goto(`${siteUrl}/bayi/#${new URLSearchParams({ invite: token, module: `${baseUrl}/` })}`);
   await expect(page.getByRole("button", { name: "Daveti kullan" })).toBeVisible(); assert.equal(new URL(page.url()).hash, "");
   await page.getByRole("button", { name: "Daveti kullan" }).click();
   await expect(page.getByRole("heading", { name: "Bayi paneli" })).toBeVisible();
@@ -164,6 +190,8 @@ try {
     profileId: "market",
     profileOptions: [C.WHOLESALE],
     dealerPortalEnabled: true,
+    onlineSalesDeliveryEnabled: true,
+    onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
     phone: "",
     whatsapp: "",
     email: "",
@@ -201,7 +229,7 @@ try {
     assert.equal(customer.ok, true, customer.message);
     const id = customer.savedId;
     const invite = database.changeDealerWebAccess(id, "invite");
-    const actualToken = new URL(invite.inviteUrl).hash.slice(8); tokens.push(actualToken);
+    const actualToken = new URLSearchParams(new URL(invite.inviteUrl).hash.slice(1)).get("invite"); tokens.push(actualToken);
     const coordinator = new SyncCoordinator({ database, getSyncConfig: () => ({ baseUrl, syncSecret: secret }),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(database, database.getDashboardData()),
       onDashboardChanged() {}, onStatusChanged() {} });
@@ -213,11 +241,49 @@ try {
     assert.equal(identity.status, 200); assert.equal(identity.body.dealer.access_id, invite.access.accessId);
     const storedProjection = storage("echo json_encode($db->query(\"SELECT payload_json FROM publications WHERE name = 'dealer_access_private'\")->fetchColumn());");
     for (const privateValue of [id, "+905550004321", "PRIVATE_CUSTOMER_NOTES_SENTINEL", actualToken]) assert.equal(storedProjection.includes(privateValue), false);
+    // Canonical ordered originals -> same durable private publication -> authenticated PHP catalog.
+    const product = saveRuntimeCatalogProduct(database.databasePath, { name: "Gallery contract fixture", sku: "GALLERY-1", brand: "",
+      categoryId: "", salePrice: 10, dealerPriceA: 8, dealerPriceB: null, purchasePrice: 2,
+      currency: "TRY", unit: "piece", taxRate: 20, trackInventory: false, isActive: true });
+    const productRoot = join(dirname(database.databasePath), "assets", "products", product.id);
+    mkdirSync(productRoot, { recursive: true });
+    const originals = [picture, Buffer.concat([picture, Buffer.from("another original")])].map((bytes, index) => {
+      writeFileSync(join(productRoot, `${index}.png`), bytes);
+      return { assetPath: `assets/products/${product.id}/${index}.png`, hash: createHash("sha256").update(bytes).digest("hex"), format: "png" };
+    });
+    const raw = new DatabaseSync(database.databasePath);
+    try { raw.prepare("UPDATE catalog_products SET image_original_assets_json=? WHERE id=?").run(JSON.stringify(originals), product.id); }
+    finally { raw.close(); }
+    const photoJob = database.getPendingSyncJobs().find(job => job.jobType === "dealer_access_publish");
+    const prepared = await prepareDealerProductMedia(database, { baseUrl: "https://media.example/module", syncSecret: secret }, photoJob.sourceRevision,
+      async (config, client, endpoint, field, absolute, asset) => ({ ok: true, status: 200, message: "fixture",
+        url: `${config.baseUrl}/media/products/${asset.resourceId}/${asset.contentHash}.png` }));
+    assert.equal(prepared.ok, true);
+    const publishedMedia = await publishDesktopProjection(database, { baseUrl, syncSecret: secret }, "dealer_access_publish", prepared.value,
+      (identity, value) => new PhpHostingSyncTransport({ baseUrl, syncSecret: secret, ...identity }).publishDealerAccess({
+        sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }), { expectedRevision: photoJob.sourceRevision });
+    assert.equal(publishedMedia.ok, true, publishedMedia.message);
+    const galleryResponse = await fetch(`${baseUrl}/api/dealer/catalog.php`, { headers: { Cookie: actualCookie } });
+    assert.equal(galleryResponse.status, 200);
+    const projectedProduct = (await galleryResponse.json()).catalog.products.find(row => row.product_id === product.id);
+    assert.deepEqual(projectedProduct.image_urls, originals.map(asset => `https://media.example/module/media/products/${product.id}/${asset.hash}.png`));
+    assert.equal(projectedProduct.image_url, projectedProduct.image_urls[0]);
+    assert.equal(JSON.stringify(projectedProduct).includes("assets/products/"), false);
+    for (const images of [["file:///private/photo.png"], ["https://media.example/p.png?token=private"], Array(13).fill("https://media.example/p.png"), ["https://media.example/wrong-cover.png"]]) {
+      const invalid = structuredClone(prepared.value); invalid.catalogs[0].products[0].image_urls = images;
+      const parsed = spawnSync("php", ["-r", "require $argv[1]; try { ya_dealer_projection(json_decode(stream_get_contents(STDIN), true)); exit(1); } catch (InvalidArgumentException $e) { echo 'rejected'; }", join(hosting, "lib/dealer-access.php")], { encoding: "utf8", input: JSON.stringify(invalid) });
+      assert.equal(parsed.status, 0, parsed.stderr); assert.equal(parsed.stdout, "rejected");
+    }
+    // Retire this synthetic image product before the HTTP-only identity fixture resumes.
+    // Production media acknowledgements require HTTPS; this local PHP server intentionally uses HTTP.
+    const cleanupProduct = new DatabaseSync(database.databasePath);
+    try { cleanupProduct.prepare("UPDATE catalog_products SET is_active=0 WHERE id=?").run(product.id); }
+    finally { cleanupProduct.close(); }
     database.changeDealerWebAccess(id, "revoke_sessions");
     assert.equal((await session(actualCookie)).status, 200, "offline local revocation cannot claim remote completion");
     const revoked = await coordinator.runNow(); assert.equal(revoked.ok, true, revoked.message);
     assert.equal((await session(actualCookie)).status, 401); genericFailure(await post("claim", { invite_token: actualToken }));
-    const replacement = database.changeDealerWebAccess(id, "invite"); const replacementToken = new URL(replacement.inviteUrl).hash.slice(8); tokens.push(replacementToken);
+    const replacement = database.changeDealerWebAccess(id, "invite"); const replacementToken = new URLSearchParams(new URL(replacement.inviteUrl).hash.slice(1)).get("invite"); tokens.push(replacementToken);
     assert.equal((await coordinator.runNow()).ok, true);
     const activeSession = await post("claim", { invite_token: replacementToken }); assert.equal(activeSession.status, 200);
     const deactivate = database.getCustomer(id);

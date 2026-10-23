@@ -26,12 +26,6 @@ public class DealerApiTest {
     for (String url : new String[]{"http://firma.example", "https://u:p@firma.example", "https://firma.example/?secret=key", "https://firma.example/#token", "file:///tmp/f"})
       assertThrows(Exception.class, () -> DealerApi.normalizeBase(url));
   }
-  @Test public void inviteMustMatchOriginAndFragmentContract() throws Exception {
-    String token = "a".repeat(43); String base = "https://firma.example/module/";
-    assertEquals(token, DealerApi.inviteToken("https://firma.example/bayi/#invite=" + token, base));
-    for (String link : new String[]{"https://other.example/bayi/#invite=" + token, "https://firma.example:444/bayi/#invite=" + token, "https://firma.example/bayi/?invite=" + token, "https://firma.example/bayi/#invite=short"})
-      assertThrows(Exception.class, () -> DealerApi.inviteToken(link, base));
-  }
   @Test public void requestsUseExistingCookieAndPostHeaderNoSyncCredentials() throws Exception {
     Connection connection = new Connection(new URL("https://firma.example/"));
     DealerApi api = new DealerApi("https://firma.example/module/", url -> { assertEquals("https://firma.example/module/api/dealer/order.php", url.toString()); return connection; });

@@ -69,8 +69,8 @@ public class DealerStateTest {
     assertEquals("shipping", state.prepareOrder().getJSONObject("delivery").getString("method"));
   }
   @Test public void logoutClearsSessionAndPrivateState() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 2); state.favorite("p"); state.put("theme", "dark"); state.logout();
-    assertEquals("{\"theme\":\"dark\"}", disk);
+    DealerState state = signedIn(); state.quantity("p", 2); state.favorite("p"); state.logout();
+    assertEquals("{}", disk);
   }
 
   @Test public void reorderUsesCurrentCatalogAndSkipsUnavailableProducts() throws Exception {

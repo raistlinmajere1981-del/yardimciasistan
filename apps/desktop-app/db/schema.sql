@@ -173,6 +173,16 @@ CREATE TABLE catalog_products (
   deleted_at TEXT NOT NULL DEFAULT ''
 );
 
+-- Transport acknowledgements only. Image identity/order/bytes remain in catalog_products.
+CREATE TABLE catalog_product_media_publications (
+  product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+  content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+  target TEXT NOT NULL,
+  public_url TEXT NOT NULL,
+  published_at TEXT NOT NULL,
+  PRIMARY KEY (product_id, content_hash, target)
+);
+
 CREATE TABLE commerce_sale_draft_items (
   id TEXT PRIMARY KEY,
   draft_id TEXT NOT NULL,

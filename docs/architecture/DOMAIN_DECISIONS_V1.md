@@ -713,6 +713,16 @@ across source epochs. V2 publications require hosting capability `dealer_access_
 V1 publications remain readable by upgraded hosting and old web/Android cookie clients
 continue to use the same session endpoints.
 
+Self-contained Android invites use the same portal with fragment
+`#invite=TOKEN&module=ENCODED_EXACT_HTTPS_MODULE_URL`. The extra field does not change
+claim/session identity or token storage. The client validates the portal's sibling path,
+origin and effective port against the exact module; it never guesses a module directory.
+Legacy links without module information remain usable on the web; Android asks for a new
+link. `#application=dealer&module=...` opens the existing public application flow without
+consuming an invite. Desktop copies it from persisted enabled service settings and module
+configuration; neither link contains a publication secret. Appearance preferences are
+device-only and independent of the encrypted account/session state.
+
 Hosting sessions carry 256-bit opaque random tokens in HttpOnly, production Secure,
 SameSite=Strict cookies scoped to the module's `/api/dealer/` path, with an eight-hour
 absolute lifetime. Only hashes persist in `dealer_sessions`. Every authenticated read
@@ -720,7 +730,8 @@ joins enabled access and matching revision; session tokens never enter renderer 
 browser storage. Logout is same-origin POST and revokes the stored session before
 expiring its cookie. Strict JSON + a non-CORS custom header protect claim/logout from
 cross-origin mutations. Hosting logs only stable allowlisted events/categories/opaque
-access ids. `/bayi/` renders public-safe identity and logout only.
+access ids. `/bayi/` renders sanitized session-scoped identity, catalog/order projections
+and logout; it never exposes canonical customer/contact records.
 
 Online Dealer Application is a default-OFF preference in the existing dealer portal
 service. Public acceptance requires that preference plus portal, Wholesale and Requests.
@@ -768,6 +779,20 @@ fresh derived catalogs. The per-access catalog revision hashes projected content
 the durable private publication generation, not a price lock. Every invalidation renews
 it, including profile changes that resolve to identical prices; no private profile fields
 are included in the published revision.
+
+The same private catalog carries `image_url` (cover) and optional ordered `image_urls`
+(at most 12 distinct public HTTPS URLs). Canonical `image_original_assets_json` owns the
+archive order; the normalized cover is used when no originals exist. No second product
+gallery owner is introduced. The existing `dealer_access` outbox prepares immutable
+JPEG/PNG/WebP originals through secret-gated `api/product-media.php` before freezing its
+body. Local product path confinement, SHA-256, actual MIME and image bounds are validated;
+only completed same-origin hosting URLs enter the projection. The current-schema
+`catalog_product_media_publications` table caches upload acknowledgements by product,
+content hash and target; metadata writes do not allocate or invalidate publications.
+Async preparation retains the expected revision, frozen retries reuse the exact body,
+and target changes require target-specific upload receipts. Documents never use this
+public route. Android samples remote images into bounded bitmaps; photo modes and local
+camera/gallery comparison never alter originals or upload personal photos.
 
 Only enabled, eligible dealer access receives a sanitized per-access private catalog.
 D-033's durable versioned access publication atomically carries access state plus catalogs;

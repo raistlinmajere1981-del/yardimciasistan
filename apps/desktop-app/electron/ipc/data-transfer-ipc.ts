@@ -13,8 +13,9 @@ export function registerDataTransferIpc(options: { databasePath:()=>string; asse
   const running=new Set<number>();
   const guard=(entity:TransferEntity,path?:string)=>{
     options.assertUnlocked();if(path!==undefined && path!==options.databasePath())throw new Error("Aktif veritabanı değişti.");
-    if(!["products","customers"].includes(entity))throw new Error("Aktarım türü geçersiz.");
-    assertPersistedBusinessCapability(path ?? options.databasePath(),entity==="products"?C.CATALOG:C.CUSTOMERS);
+    if(!["products","customers","menu"].includes(entity))throw new Error("Aktarım türü geçersiz.");
+    assertPersistedBusinessCapability(path ?? options.databasePath(),entity==="customers"?C.CUSTOMERS:C.CATALOG);
+    if(entity==="menu")assertPersistedBusinessCapability(path ?? options.databasePath(),C.FOOD_MENU);
   };
   const get=(token:string,owner:number)=>{
     options.assertUnlocked();
@@ -40,7 +41,7 @@ export function registerDataTransferIpc(options: { databasePath:()=>string; asse
     if(running.has(event.sender.id))throw new Error("Aktarım zaten sürüyor.");
     running.add(event.sender.id);
     try {
-    if(s.entity === "products") await resolveTransferImages(s.document,mapping,transferImageOwner,()=>guard(s.entity,s.path),p=>{if(!event.sender.isDestroyed())event.sender.send("dataTransfer:progress",p);});
+    if(s.entity !== "customers") await resolveTransferImages(s.document,mapping,transferImageOwner,()=>guard(s.entity,s.path),p=>{if(!event.sender.isDestroyed())event.sender.send("dataTransfer:progress",p);});
     guard(s.entity,s.path);
     s.plan=createTransferPlan(s.path,s.entity,s.document,mapping,preferences,transferImageOwner);return s.plan.preview;
     } finally { running.delete(event.sender.id); }

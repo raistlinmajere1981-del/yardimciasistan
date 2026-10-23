@@ -32,6 +32,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
 dependencies {
   implementation "androidx.activity:activity:1.13.0"
   implementation "androidx.core:core:1.19.1"
+  implementation "androidx.exifinterface:exifinterface:1.4.2"
   testImplementation "junit:junit:4.13.2"
   testImplementation "org.json:json:20240303"
 }

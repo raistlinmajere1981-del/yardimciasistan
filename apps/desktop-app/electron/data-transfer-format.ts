@@ -47,7 +47,7 @@ export function readTransferArchive(bytes: Uint8Array): Record<string, Uint8Arra
 }
 const heading = (s: string) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").toLowerCase().replace(/[^a-z0-9]/g, "");
 export function suggestTransferMapping(headers: string[], entity: TransferEntity) {
-  const fields = entity === "products" ? PRODUCT_TRANSFER_FIELDS : CUSTOMER_TRANSFER_FIELDS;
+  const fields = entity === "customers" ? CUSTOMER_TRANSFER_FIELDS : PRODUCT_TRANSFER_FIELDS;
   const aliases: Record<string, string[]> = {
     name: ["urunadi", "productname", "title"], sku: ["stockcode", "stokkodu", "stok kodu", "productcode"], category: ["categoryname", "kategoriadi", "category_name"],
     salePrice: ["sale_price_gross_try", "satis fiyati", "fiyat", "price", "sale_price"], taxRate: ["kdv", "tax_rate", "kdv orani"],
@@ -97,7 +97,8 @@ export async function parseTransferFile(name: string, bytes: Uint8Array, entity:
     if (files["manifest.json"]) {
       format = "zip";
       const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString("utf8")) as {format?:string;entity?:string;assets?:TransferAsset[]};
-      if (manifest.format !== "yardimci-asistan-transfer-v1" || manifest.entity !== entity || !Array.isArray(manifest.assets)) throw new Error("Aktarım manifesti veya kayıt türü geçersiz.");
+      const sameRecordType = manifest.entity === entity || (entity !== "customers" && ["products", "menu"].includes(manifest.entity ?? ""));
+      if (manifest.format !== "yardimci-asistan-transfer-v1" || !sameRecordType || !Array.isArray(manifest.assets)) throw new Error("Aktarım manifesti veya kayıt türü geçersiz.");
       if (!files["records.csv"]) throw new Error("Arşivde records.csv eksik.");
       assets = {};
       assetManifest = manifest.assets;

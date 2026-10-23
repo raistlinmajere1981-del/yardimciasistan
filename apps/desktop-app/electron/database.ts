@@ -23,6 +23,7 @@ import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegis
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type ShippingSecretWrite } from "./shipping-configuration-store";
 import { getDealerWebAccess, changeDealerWebAccess, createDealerAccessProjection } from "./dealer-web-access-store";
 import type { DealerAccessAction } from "@yardimci-asistan/shared";
+import { dealerProductImageArchives, publishedDealerProductImage, acknowledgeDealerProductImage } from "./dealer-product-media-store";
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
 import * as instagramOAuthStore from "./marketing/instagram-oauth-store";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
@@ -875,6 +876,9 @@ export class DesktopDatabase {
   prepareSyncPublication<T>(jobType: DesktopSyncJobType, value: T, refresh = false, expectedRevision?: number) {
     return prepareStoredSyncPublication(this.db, jobType, value, refresh, expectedRevision);
   }
+  readPreparedSyncPublication<T>(jobType: DesktopSyncJobType, revision: number): T | null {
+    return readStoredPreparedSyncPublication<T>(this.db, jobType, revision);
+  }
 
   ensurePublicationTarget(target: string) {
     ensureStoredPublicationTarget(this.db, target);
@@ -945,6 +949,9 @@ export class DesktopDatabase {
   createDealerAccessProjection() {
     return createDealerAccessProjection(this.db);
   }
+  getDealerProductImageArchives(productIds: readonly string[]) { return dealerProductImageArchives(this.db, productIds); }
+  getPublishedDealerProductImage(productId: string, hash: string, target: string) { return publishedDealerProductImage(this.db, productId, hash, target); }
+  acknowledgeDealerProductImage(productId: string, hash: string, target: string, url: string) { acknowledgeDealerProductImage(this.db, productId, hash, target, url); }
 
   createCommerceOnlineCatalog() {
     return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities());
@@ -1302,6 +1309,7 @@ import {
   savePublicationSourceEpoch as saveStoredPublicationSourceEpoch,
   replacePublicationSourceEpoch as replaceStoredPublicationSourceEpoch,
   prepareSyncPublication as prepareStoredSyncPublication,
+  readPreparedSyncPublication as readStoredPreparedSyncPublication,
   ensurePublicationTarget as ensureStoredPublicationTarget,
   completeSyncJob as completeStoredSyncJob,
   failSyncJob as failStoredSyncJob,

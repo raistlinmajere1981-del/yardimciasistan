@@ -78,6 +78,67 @@ try{
   assert.equal(productDb.db.prepare("SELECT price_override FROM menu_product_entries m JOIN catalog_products p ON p.id=m.product_id WHERE p.sku='MENU'").get().price_override,65.5);
   const menuOut=collectTransferExport(productDb.path,{entity:"products",format:"zip",scope:"filtered",search:"Menü çayı",includeImages:false,includeIdentity:false});assert.equal(menuOut.records[0].menuCategory,"İçecekler");assert.equal(menuOut.records[0].allergens,"süt|fındık");
   const menuTarget=database("menu-roundtrip");open.push(menuTarget.db);const menuBytes=await encodeTransferFile("zip","products",menuOut.headers,menuOut.records);const menuDecoded=await parseTransferFile("menu.zip",menuBytes,"products");assert.equal((await apply(menuTarget,plan(menuTarget,"products",menuDecoded,{...P,menuCategoryId:"__source__"}))).added,1);assert.equal(menuTarget.db.prepare("SELECT price_override FROM menu_product_entries").get().price_override,65.5);
+  // Menu is a scope of the same products, never a parallel product writer.
+  const menuOptions={entity:"menu",format:"zip",scope:"all",includeImages:false,includeIdentity:false};
+  assert.equal(collectTransferExport(productDb.path,menuOptions).records.length,1,"catalog-only products must not leak into menu exports");
+  assert.throws(()=>plan(productDb,"menu",menuSource),/kategori seçin/);
+  const missingMenu=source(["name","sku"],[{name:"Kategorisiz",sku:"NO-MENU"}]);
+  const missingPlan=plan(productDb,"menu",missingMenu,{...P,menuCategoryId:"__source__"});
+  assert.equal(missingPlan.preview.counts.error,1);assert.match(missingPlan.preview.rows[0].reasons.join(" "),/Menü kategorisi eksik/);
+  assert.equal((await apply(productDb,missingPlan)).added,0);
+  const secondMenu=source(menuSource.headers,[{...menuSource.records[0],sku:"MENU-FOOD",name:"Menü yemeği",menuCategory:"Yemekler",trackInventory:"false",menuAvailable:"false"}]);
+  const secondPlan=plan(productDb,"menu",secondMenu,{...P,menuCategoryId:"__source__"});
+  assert.equal(secondPlan.preview.counts.new,1,JSON.stringify(secondPlan.preview.rows));
+  assert.equal((await apply(productDb,secondPlan)).added,1);
+  const drinksId=String(productDb.db.prepare("SELECT id FROM menu_categories WHERE name='İçecekler'").get().id);
+  const filteredMenu=collectTransferExport(productDb.path,{...menuOptions,scope:"filtered",menuCategoryId:drinksId});
+  assert.deepEqual(filteredMenu.records.map(r=>r.sku),["MENU"]);
+  assert.equal(collectTransferExport(productDb.path,{...menuOptions,scope:"all",menuCategoryId:drinksId}).records.length,2);
+  assert.equal(collectTransferExport(productDb.path,{...menuOptions,scope:"filtered",menuCategoryId:"missing"}).records.length,0);
+  assert(collectTransferExport(productDb.path,{...menuOptions,template:"basic"}).headers.includes("menuCategory"));
+  for(const format of ["csv","xlsx","zip"]){
+    const out=await createTransferExport(productDb.path,{...menuOptions,format},images,()=>{},()=>{});
+    const decoded=await parseTransferFile(`menu.${format}`,out.bytes,"menu");
+    const target=database(`menu-scope-${format}`);open.push(target.db);
+    const importPlan=plan(target,"menu",decoded,{...P,menuCategoryId:"__source__"});
+    assert.equal(importPlan.preview.counts.new,2,JSON.stringify(importPlan.preview.rows));
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM menu_categories").get().n,0,"menu preview must roll back categories too");
+    assert.equal((await apply(target,importPlan)).added,2);
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM menu_product_entries").get().n,2);
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE is_active=0").get().n,2);
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM menu_categories WHERE is_active=0").get().n,2);
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM inventory_movements").get().n,0);
+    assert.equal(target.db.prepare("SELECT COUNT(*) n FROM commerce_product_publications WHERE is_published=1").get().n,0);
+    const menuValues=collectTransferExport(target.path,menuOptions).records;
+    assert.equal(menuValues.find(r=>r.sku==="MENU").menuPriceOverride,"65.5");
+    assert.equal(menuValues.find(r=>r.sku==="MENU").allergens,"süt|fındık");
+    assert.equal(menuValues.find(r=>r.sku==="MENU-FOOD").menuAvailable,"false");
+    assert.equal(plan(target,"menu",decoded,{...P,menuCategoryId:"__source__"}).preview.counts.skip,2);
+    if(format==="zip") {
+      assert.equal((await parseTransferFile("menu.zip",out.bytes,"products")).records.length,2,"menu archives use catalog product records");
+      await assert.rejects(()=>parseTransferFile("menu.zip",out.bytes,"customers"),/kayıt türü/);
+    }
+  }
+  assert.equal((await parseTransferFile("products.zip",menuBytes,"menu")).records.length,1,"existing product archives remain usable from menu");
+  const menuEdit=source(["sku","menuCategory","menuPriceOverride"],[{sku:"MENU",menuCategory:"İçecekler",menuPriceOverride:"70"}]);
+  const menuEditPlan=plan(productDb,"menu",menuEdit,{...P,conflicts:"update",menuCategoryId:"__source__"});
+  assert.equal(menuEditPlan.preview.counts.update,1,JSON.stringify(menuEditPlan.preview.rows));
+  assert.equal(menuEditPlan.preview.rows[0].before.menuPriceOverride,"65.5");
+  assert.equal(menuEditPlan.preview.rows[0].after.menuPriceOverride,"70");
+  assert.equal((await apply(productDb,menuEditPlan)).updated,1);
+  assert.equal(productDb.db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE sku='MENU'").get().n,1);
+  // A category chosen by the operator also handles files without menu columns.
+  const targeted=plan(productDb,"menu",missingMenu,{...P,menuCategoryId:drinksId});
+  assert.equal(targeted.preview.rows[0].after.menuCategory,"İçecekler");
+  const productsBefore=productDb.db.prepare("SELECT COUNT(*) n FROM catalog_products").get().n;
+  productDb.db.exec("UPDATE business_capabilities SET is_enabled=0 WHERE capability_id='food_service.menu'");
+  assert.throws(()=>collectTransferExport(productDb.path,menuOptions),/özellik/);
+  assert.throws(()=>plan(productDb,"menu",menuSource,{...P,menuCategoryId:"__source__"}),/özellik/);
+  await assert.rejects(()=>apply(productDb,targeted),/özellik/);
+  assert.equal(productDb.db.prepare("SELECT COUNT(*) n FROM catalog_products").get().n,productsBefore);
+  productDb.db.exec("UPDATE business_capabilities SET is_enabled=1 WHERE capability_id='food_service.menu'");
+  assert.equal((await apply(productDb,plan(productDb,"menu",missingMenu,{...P,menuCategoryId:drinksId}))).added,1);
+  console.log("menu-transfer: menu-only/category exports, CSV/XLSX/ZIP roundtrips, canonical identity, menu before/after, missing category and capability revocation guards");
   const identitySource=source(["name","description"],[{name:"Aynı ad",description:"Bir"},{name:"Aynı ad",description:"İki"}]);assert.equal((await apply(productDb,plan(productDb,"products",identitySource))).added,2);assert.equal(plan(productDb,"products",identitySource).preview.counts.skip,2,"never merge by name");
   const formula=await encodeTransferFile("csv","customers",["fullName"],[{fullName:"=SUM(1,1)"}]);assert(formula.toString().includes("'=SUM"));
   await assert.rejects(()=>parseTransferFile("bad.csv",Buffer.from('name;sku\n"unfinished'),"products"));
