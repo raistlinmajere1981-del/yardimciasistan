@@ -36,6 +36,11 @@ extraMetadata:
 win:
   icon: assets/app-icon.ico
   requestedExecutionLevel: asInvoker
+  extraResources:
+    - from: resources/updater
+      to: updater
+      filter:
+        - windows-install.ps1
   target:
     - target: nsis
       arch:
@@ -43,6 +48,7 @@ win:
   artifactName: YardimciAsistan-Setup-${version}.${ext}
 
 nsis:
+  include: resources/updater/installer.nsh
   oneClick: false
   # Per-machine Program Files install is intentional. Packaged runtime data,
   # logs, assets and backups must stay under Electron userData, never beside the exe.

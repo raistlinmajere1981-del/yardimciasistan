@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, net } from "electron";
+import { app, BrowserWindow, ipcMain, net, dialog } from "electron";
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createUpdateSafetyBackup } from "./data-maintenance";
@@ -104,7 +104,19 @@ interface PendingDesktopUpdate {
 interface InstallingDesktopUpdate extends PendingDesktopUpdate {
   installStartedAt: string;
   safetyBackupFolderName?: string;
+  helperSession?: string;
+  helperPid?: number;
 }
+
+interface InstallHelperStatus {
+  session: string;
+  phase: string;
+  installerPid?: number;
+  outcome?: string;
+}
+
+const HELPER_READY_TIMEOUT_MS = 90_000;
+let installationPreparation: Promise<boolean> | null = null;
 
 interface UpdatePaths {
   root: string;
@@ -205,7 +217,7 @@ function writePersistedState(paths: UpdatePaths, state: PersistedUpdateState) {
 function readPendingUpdate(paths: UpdatePaths): PendingDesktopUpdate | null {
   const pending = readJsonFile<PendingDesktopUpdate>(paths.pending);
   if (!pending || pending.version !== 1) return null;
-  if (!isValidVersion(pending.targetVersion)) return null;
+  if (!isValidVersion(pending.targetVersion) || typeof pending.installerPath !== "string") return null;
   if (!/^[a-f0-9]{64}$/i.test(pending.sha256)) return null;
   if (!Number.isSafeInteger(pending.size) || pending.size <= 0) return null;
   return pending;
@@ -215,6 +227,7 @@ function readInstallingUpdate(paths: UpdatePaths): InstallingDesktopUpdate | nul
   const installing = readJsonFile<InstallingDesktopUpdate>(paths.installing);
   if (!installing || installing.version !== 1) return null;
   if (!isValidVersion(installing.targetVersion)) return null;
+  if (installing.helperSession !== undefined && !/^[a-f0-9-]{36}$/.test(installing.helperSession)) return null;
   return installing;
 }
 
@@ -719,6 +732,9 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
 }
 
 async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
+  if (installationPreparation || readInstallingUpdate(resolveUpdatePaths(userDataPath))) {
+    return publishStatus(buildStatus(userDataPath, { message: "Güncelleme kurulumu hazırlanıyor; indirme başlatılmadı." }));
+  }
   if (updateOperation?.kind === "download") return updateOperation.promise;
   if (updateOperation?.kind === "check") {
     await updateOperation.promise;
@@ -772,27 +788,26 @@ function saveDesktopUpdatePreferences(
   }
 }
 
-function restartForPendingDesktopUpdate(userDataPath: string): DesktopUpdateActionResult {
+async function restartForPendingDesktopUpdate(userDataPath: string): Promise<DesktopUpdateActionResult> {
   const paths = resolveUpdatePaths(userDataPath);
-  const pending = readPendingUpdate(paths);
-  if (!pending) {
+  if (!readPendingUpdate(paths) && !readInstallingUpdate(paths)) {
     const status = publishStatus(buildStatus(userDataPath, {
-      phase: "error",
-      message: "Kurulmaya hazır bir güncelleme bulunmuyor."
+      phase: "error", message: "Kurulmaya hazır bir güncelleme bulunmuyor."
     }));
     return { ok: false, message: status.message, status };
   }
-
+  const started = await preparePendingDesktopUpdate(userDataPath);
   const status = publishStatus(buildStatus(userDataPath, {
-    phase: "ready",
-    message: `Yardımcı Asistan ${pending.targetVersion} kurulmak üzere yeniden başlatılıyor.`
+    phase: started ? "ready" : "error",
+    message: started
+      ? "Kurulum penceresi hazır. Yardımcı Asistan kapatılıyor."
+      : "Kurulum başlatılamadı. Uygulama açık bırakıldı; güncelleme tekrar denenebilir."
   }));
-  const timer = setTimeout(() => {
-    app.relaunch();
-    app.quit();
-  }, 250);
-  timer.unref();
-  return { ok: true, message: status.message, status };
+  if (started) {
+    const timer = setTimeout(() => app.quit(), 250);
+    timer.unref();
+  }
+  return { ok: started, message: status.message, status };
 }
 
 function recordInstallResult(
@@ -814,18 +829,24 @@ function recordInstallResult(
   });
 }
 
-function verifyPendingInstaller(paths: UpdatePaths, pending: PendingDesktopUpdate) {
-  if (!isPathInside(pending.installerPath, paths.downloads)) {
+async function verifyPendingInstaller(paths: UpdatePaths, pending: PendingDesktopUpdate) {
+  if (typeof pending.installerPath !== "string"
+      || !path.isAbsolute(pending.installerPath)
+      || !/^[A-Za-z0-9._-]+\.exe$/i.test(path.basename(pending.installerPath))
+      || !isPathInside(pending.installerPath, paths.downloads)) {
     throw new Error("Bekleyen güncelleme paketi güvenli indirme klasörünün dışında.");
   }
   if (!fs.existsSync(pending.installerPath)) {
     throw new Error("Bekleyen güncelleme paketi bulunamadı.");
   }
+  if (!isPathInside(fs.realpathSync(pending.installerPath), fs.realpathSync(paths.downloads))) {
+    throw new Error("Bekleyen güncelleme paketi güvenli indirme klasörünün dışında.");
+  }
   const stat = fs.statSync(pending.installerPath);
-  if (stat.size !== pending.size) {
+  if (!stat.isFile() || stat.size !== pending.size) {
     throw new Error("Bekleyen güncelleme paketinin boyutu değişmiş.");
   }
-  const hash = createHash("sha256").update(fs.readFileSync(pending.installerPath)).digest("hex");
+  const hash = await sha256File(pending.installerPath);
   if (hash !== pending.sha256) {
     throw new Error("Bekleyen güncelleme paketi SHA-256 doğrulamasından geçemedi.");
   }
@@ -834,113 +855,199 @@ function verifyPendingInstaller(paths: UpdatePaths, pending: PendingDesktopUpdat
 function cleanupInstallArtifacts(paths: UpdatePaths, installerPath?: string) {
   removeIfExists(paths.pending);
   removeIfExists(paths.installing);
-  if (installerPath && isPathInside(installerPath, paths.downloads)) {
+  if (typeof installerPath === "string" && isPathInside(installerPath, paths.downloads)) {
     removeIfExists(installerPath);
   }
 }
 
-export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolean {
+function helperDirectory(paths: UpdatePaths, session: string): string {
+  if (!/^[a-f0-9-]{36}$/.test(session)) throw new Error("Güncelleme oturumu geçersiz.");
+  return path.join(paths.root, "sessions", session);
+}
+
+function isProcessRunning(pid: number | undefined): boolean {
+  if (!Number.isSafeInteger(pid) || !pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0); // Probe only. Never terminate another app/session.
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function helperStillInstalling(paths: UpdatePaths, installing: InstallingDesktopUpdate): boolean {
+  if (!installing.helperSession) return false;
+  const directory = helperDirectory(paths, installing.helperSession);
+  const status = readJsonFile<InstallHelperStatus>(path.join(directory, "status.json"));
+  // The UI can fail while its elevated child is still running. Do not open SQLite,
+  // delete the installer or start another installation in that case.
+  if (status?.session === installing.helperSession && isProcessRunning(status.installerPid)) return true;
+  return isProcessRunning(installing.helperPid)
+    && (!status || status.session !== installing.helperSession
+      || !["error", "unverified"].includes(status.phase));
+}
+
+async function startPendingDesktopUpdate(userDataPath: string): Promise<boolean> {
+  const paths = resolveUpdatePaths(userDataPath);
+  const pending = readPendingUpdate(paths);
+  if (!pending || !installSupported()) return false;
+  const existing = readInstallingUpdate(paths);
+  if (existing) return helperStillInstalling(paths, existing);
+  let directory: string | undefined;
+  try {
+    await verifyPendingInstaller(paths, pending); // Size, path and SHA BEFORE any helper invocation.
+    if (compareVersions(pending.targetVersion, app.getVersion()) <= 0) return false;
+    const source = path.join(process.resourcesPath, "updater", "windows-install.ps1");
+    const powershell = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    if (!fs.existsSync(source) || !fs.existsSync(powershell)) {
+      throw new Error("Windows kurulum penceresi kullanılamıyor (PowerShell veya yardımcı dosya eksik).");
+    }
+    const safetyBackup = createUpdateSafetyBackup(userDataPath, pending.targetVersion);
+    const session = randomUUID();
+    directory = helperDirectory(paths, session);
+    fs.mkdirSync(directory, { recursive: true });
+    // Copy trusted packaged source out of the install directory. The helper must
+    // keep no script/exe/cwd handle in the directory NSIS replaces.
+    const script = path.join(directory, "windows-install.ps1");
+    fs.copyFileSync(source, script, fs.constants.COPYFILE_EXCL);
+    const request = path.join(directory, "request.json");
+    writeJsonAtomic(request, {
+      protocol: 1, session, targetVersion: pending.targetVersion,
+      installerPath: pending.installerPath, sha256: pending.sha256, size: pending.size,
+      parentPid: process.pid, appPath: process.execPath, backupCreated: Boolean(safetyBackup)
+    });
+    const installingState: InstallingDesktopUpdate = {
+      ...pending, installStartedAt: new Date().toISOString(), helperSession: session,
+      ...(safetyBackup ? { safetyBackupFolderName: safetyBackup.folderName } : {})
+    };
+    writeJsonAtomic(paths.installing, installingState);
+    const child = spawn(powershell, [
+      "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass",
+      "-WindowStyle", "Hidden", "-File", script, "-RequestPath", request
+    ], { detached: true, stdio: "ignore", windowsHide: true, cwd: directory, shell: false });
+    let launchError: Error | undefined;
+    child.on("error", (error) => { launchError = error; });
+    child.unref();
+    if (child.pid !== undefined) installingState.helperPid = child.pid;
+    writeJsonAtomic(paths.installing, installingState);
+    const deadline = Date.now() + HELPER_READY_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (launchError) throw launchError;
+      if (!isProcessRunning(child.pid)) break;
+      const status = readJsonFile<InstallHelperStatus>(path.join(directory, "status.json"));
+      if (status?.session === session && status.phase === "ready") {
+        desktopLog.info({ scope: "update", event: "update.install.started",
+          message: "Görünür Windows kurulum yardımcısı hazır.",
+          meta: { targetVersion: pending.targetVersion, safetyBackupFolderName: safetyBackup?.folderName } });
+        // Authorization is the final fallible step. A late helper after a
+        // readiness timeout never receives permission to run an installer.
+        writeJsonAtomic(path.join(directory, "proceed.json"), { session });
+        removeIfExists(paths.pending);
+        return true;
+      }
+      if (status?.phase === "error") break;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    throw new Error("Windows kurulum penceresinin açıldığı doğrulanamadı. Kurulum başlatılmadı.");
+  } catch (error) {
+    // No proceed authorization exists on a failed handshake. Keep the verified
+    // pending download and safety backup available for a deliberate retry.
+    if (directory) {
+      try { writeJsonAtomic(path.join(directory, "cancel.json"), { cancel: true }); } catch { /* No proceed authorization exists. */ }
+    }
+    removeIfExists(paths.installing);
+    const message = error instanceof Error ? error.message : "Kurulum penceresi açılamadı.";
+    try { recordInstallResult(paths, "error", pending.targetVersion, message); } catch { /* Still notify if storage is unavailable. */ }
+    desktopLog.error({ scope: "update", event: "update.install.failed", message: "Görünür kurulum başlatılamadı.", error });
+    await app.whenReady();
+    await dialog.showMessageBox({ type: "error", title: "Yardımcı Asistan güncellemesi",
+      message: "Güncelleme başlatılmadı. Uygulama açık bırakıldı.", detail: message, buttons: ["Tamam"] });
+    return false;
+  }
+}
+
+async function withPreparationLock(userDataPath: string, retryStaleLock = true): Promise<boolean> {
+  const paths = resolveUpdatePaths(userDataPath);
+  fs.mkdirSync(paths.root, { recursive: true });
+  const lock = path.join(paths.root, "preparing.json");
+  let descriptor: number;
+  try {
+    descriptor = fs.openSync(lock, "wx");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    if (!retryStaleLock) return false; // A competing launcher won the retry.
+    const owner = readJsonFile<{ pid: number }>(lock);
+    // Another launcher may still be verifying/creating its backup before the
+    // installing marker exists. A fresh empty lock also belongs to that writer.
+    if (isProcessRunning(owner?.pid) || (!owner && Date.now() - fs.statSync(lock).mtimeMs < 90_000)) return false;
+    removeIfExists(lock);
+    return withPreparationLock(userDataPath, false);
+  }
+  try {
+    fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid }));
+    return await startPendingDesktopUpdate(userDataPath);
+  } finally {
+    fs.closeSync(descriptor);
+    removeIfExists(lock);
+  }
+}
+
+function preparePendingDesktopUpdate(userDataPath: string): Promise<boolean> {
+  if (installationPreparation) return installationPreparation;
+  const promise = withPreparationLock(userDataPath);
+  installationPreparation = promise;
+  void promise.finally(() => { installationPreparation = null; }).catch(() => {});
+  return promise;
+}
+
+export async function applyPendingDesktopUpdateAtStartup(userDataPath: string): Promise<boolean> {
   const paths = resolveUpdatePaths(userDataPath);
   const currentVersion = app.getVersion();
+  const preparing = readJsonFile<{ pid: number }>(path.join(paths.root, "preparing.json"));
+  if (preparing?.pid !== process.pid && isProcessRunning(preparing?.pid)) return true;
   const installing = readInstallingUpdate(paths);
-
+  const pending = readPendingUpdate(paths);
+  // A duplicate shortcut launch must never stage an update while the original
+  // UI owns the singleton. main.ts requests this same process lock normally.
+  if (installSupported() && (installing || pending) && !app.requestSingleInstanceLock()) return true;
   if (installing) {
     if (compareVersions(currentVersion, installing.targetVersion) >= 0) {
       const message = `Yardımcı Asistan ${currentVersion} güncellemesi başarıyla kuruldu.`;
       recordInstallResult(paths, "success", installing.targetVersion, message);
-      desktopLog.info({
-        scope: "update",
-        event: "update.install.completed",
-        message,
-        meta: { targetVersion: installing.targetVersion }
-      });
+      // Only the target (or newer) app startup can acknowledge success. Installer
+      // exit 0 and a spawn event are never success acknowledgements.
+      if (installing.helperSession) {
+        writeJsonAtomic(path.join(helperDirectory(paths, installing.helperSession), "success.json"), {
+          session: installing.helperSession, version: currentVersion, targetVersion: installing.targetVersion
+        });
+      }
+      desktopLog.info({ scope: "update", event: "update.install.completed", message,
+        meta: { targetVersion: installing.targetVersion } });
       cleanupInstallArtifacts(paths, installing.installerPath);
+    } else if (helperStillInstalling(paths, installing)) {
+      return true; // Exit before main.ts/SQLite: do not lock files during upgrade.
     } else {
-      const message = `Yardımcı Asistan ${installing.targetVersion} güncellemesi tamamlanamadı; mevcut ${currentVersion} sürümü açıldı.`;
+      const helperStatus = installing.helperSession
+        ? readJsonFile<InstallHelperStatus>(path.join(helperDirectory(paths, installing.helperSession), "status.json"))
+        : null;
+      const cancelled = helperStatus?.session === installing.helperSession && helperStatus?.outcome === "permission-cancelled";
+      const message = cancelled
+        ? `Windows yönetici izni iptal edildi. Yardımcı Asistan ${installing.targetVersion} güncellemesi kurulmadı.`
+        : `Yardımcı Asistan ${installing.targetVersion} güncellemesi tamamlanamadı; mevcut ${currentVersion} sürümü açıldı. Kurulum penceresindeki bilgileri kontrol edin.`;
       recordInstallResult(paths, "error", installing.targetVersion, message);
-      desktopLog.warn({
-        scope: "update",
-        event: "update.install.incomplete",
-        message,
-        meta: { targetVersion: installing.targetVersion, currentVersion }
-      });
+      desktopLog.warn({ scope: "update", event: "update.install.incomplete", message,
+        meta: { targetVersion: installing.targetVersion, currentVersion } });
       cleanupInstallArtifacts(paths, installing.installerPath);
     }
     return false;
   }
-
-  const pending = readPendingUpdate(paths);
   if (!pending) return false;
-
   if (compareVersions(pending.targetVersion, currentVersion) <= 0) {
     cleanupInstallArtifacts(paths, pending.installerPath);
     return false;
   }
-
-  if (!installSupported()) {
-    const message = "Bekleyen güncelleme bu ortamda otomatik kurulamadı.";
-    recordInstallResult(paths, "error", pending.targetVersion, message);
-    desktopLog.warn({
-      scope: "update",
-      event: "update.install.unsupported",
-      message,
-      meta: { targetVersion: pending.targetVersion }
-    });
-    cleanupInstallArtifacts(paths, pending.installerPath);
-    return false;
-  }
-
-  try {
-    verifyPendingInstaller(paths, pending);
-    const safetyBackup = createUpdateSafetyBackup(userDataPath, pending.targetVersion);
-    const installingState: InstallingDesktopUpdate = {
-      ...pending,
-      installStartedAt: new Date().toISOString(),
-      ...(safetyBackup?.folderName !== undefined ? { safetyBackupFolderName: safetyBackup.folderName } : {})
-    };
-    writeJsonAtomic(paths.installing, installingState);
-
-    // Per-machine NSIS installs live under Program Files and require elevation.
-    // electron-builder packages elevate.exe for this purpose; keep the same
-    // invocation contract as electron-updater and let NSIS relaunch the app
-    // only after the update transaction has completed.
-    const installerArgs = ["--updated", "/S", "--force-run"];
-    const elevationHelperPath = path.join(process.resourcesPath, "elevate.exe");
-    const useElevationHelper = fs.existsSync(elevationHelperPath);
-    const child = spawn(
-      useElevationHelper ? elevationHelperPath : pending.installerPath,
-      useElevationHelper ? [pending.installerPath, ...installerArgs] : installerArgs,
-      {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: true
-      }
-    );
-    child.unref();
-    removeIfExists(paths.pending);
-    desktopLog.info({
-      scope: "update",
-      event: "update.install.started",
-      message: `Yardımcı Asistan ${pending.targetVersion} kurucusu başlatıldı.`,
-      meta: {
-        targetVersion: pending.targetVersion,
-        ...(safetyBackup ? { safetyBackupFolderName: safetyBackup.folderName } : {})
-      }
-    });
-    return true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Bekleyen güncelleme başlatılamadı.";
-    recordInstallResult(paths, "error", pending.targetVersion, message);
-    desktopLog.error({
-      scope: "update",
-      event: "update.install.failed",
-      message: "Bekleyen güncelleme uygulanamadı.",
-      meta: { targetVersion: pending.targetVersion },
-      error
-    });
-    cleanupInstallArtifacts(paths, pending.installerPath);
-    return false;
-  }
+  if (!installSupported()) return false; // Never invoke Windows launchers on Linux/dev.
+  return preparePendingDesktopUpdate(userDataPath);
 }
 
 export function registerDesktopUpdateIpcHandlers(userDataPath: () => string, assertUnlocked: () => void) {
