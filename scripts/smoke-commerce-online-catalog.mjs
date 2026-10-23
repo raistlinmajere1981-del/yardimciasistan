@@ -95,7 +95,7 @@ try {
   assert.throws(() => database.saveCommerceProductPublication({ productId: product.id, channel: "dealer", isPublished: true }), /geçersiz/);
   database.saveCommerceProductPublication({ productId: inactive.id, isPublished: true });
   database.saveCommerceProductPublication({ productId: unpublished.id, isPublished: false });
-  raw.prepare("UPDATE catalog_products SET image_asset_path = '/private/local.jpg', image_source_url = 'https://images.example.com/product.jpg' WHERE id = ?").run(product.id);
+  raw.prepare("UPDATE catalog_products SET image_source_url = 'https://images.example.com/product.jpg' WHERE id = ?").run(product.id);
   const catalog = database.createCommerceOnlineCatalog();
   assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
@@ -120,8 +120,14 @@ try {
   assert.deepEqual(multiImageRequest.online_catalog.products[0].image_urls, projected.products[0].imageUrls);
   assert.equal(multiImageRequest.online_catalog.products[0].image_url, projected.products[0].imageUrls[0]);
   const pendingCover = createCommerceOnlineCatalog(raw, ["channel.online_sales"], () => ["", "https://images.example.com/second.webp"]);
-  assert.deepEqual(pendingCover.products[0].imageUrls, [catalog.products[0].imageUrl], "pending cover uses remote source fallback, never a secondary upload");
+  assert.deepEqual(pendingCover.products[0].imageUrls, [catalog.products[0].imageUrl], "source-only product retains safe remote fallback");
   assert.deepEqual(database.createCommerceOnlineCatalog(), catalog, "stable projection timestamps");
+  raw.prepare("UPDATE catalog_products SET image_asset_path = 'assets/products/' || id || '/missing.jpg' WHERE id = ?").run(product.id);
+  assert.deepEqual(createCommerceOnlineCatalog(raw, ["channel.online_sales"], () => ["", "https://images.example.com/second.webp"]).products[0].imageUrls,
+    [], "a missing local cover cannot promote a secondary or fall back to a different source");
+  assert.equal((await coordinator.runNow()).ok, false, "missing legacy original keeps publication pending");
+  assert.equal(readCatalog().payload.enabled, false, "failed media preparation sends no retail payload");
+  raw.prepare("UPDATE catalog_products SET image_asset_path = '' WHERE id = ?").run(product.id);
   for (const imageUrl of ["/private/local.jpg", "https://127.0.0.1/local.jpg", "https://user:secret@images.example.com/product.jpg", "https://images.example.com/product.jpg?token=secret"]) {
     raw.prepare("UPDATE catalog_products SET image_source_url = ? WHERE id = ?").run(imageUrl, product.id);
     assert.equal(database.createCommerceOnlineCatalog().products[0].imageUrl, "");

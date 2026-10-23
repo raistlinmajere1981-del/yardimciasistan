@@ -74,6 +74,7 @@ const SMOKE_FILES = [
   "scripts/smoke-web-storefront.mjs",
   "scripts/smoke-web-order-submission.mjs",
   "scripts/smoke-commerce-online-catalog.mjs",
+  "scripts/smoke-commerce-product-media-publication.mjs",
   "scripts/smoke-commerce-online-catalog-ui.mjs",
   "scripts/smoke-web-orders-storage.php",
   "scripts/smoke-commerce-online-order-ingress.mjs",

@@ -41,35 +41,46 @@ covers. The storefront offers an expandable detail gallery with labelled native
 thumbnail buttons, arrow/Home/End keyboard navigation and failed-image fallback.
 List cards continue to use the primary cover.
 
-Local archive files do **not** have public URLs in this branch. The default retail
-projection safely uses the existing public `image_source_url`, or an empty image
-list when no such URL is available. Local paths, bytes and private URLs never enter
-the retail payload.
+`product-media-publication.ts` prepares the same canonical originals for retail
+and dealer publication through the existing `product-media.php` uploader. The
+existing `catalog_product_media_publications` table stores acknowledgements by
+target, product and SHA256; there is no channel copy. Concurrent transfers share
+the same upload, completed transfers survive restart, and retries upload only
+unacknowledged hashes. Channel changes never delete these reusable receipts.
 
-After the dealer media branch is committed and merged by its owner, wire its
-existing `dealer-product-media-publication.ts` / `dealer-product-media-store.ts`
-and `product-media.php` upload/acknowledgement pipeline to the optional
-`RetailProductImageResolver` argument of `createCommerceOnlineCatalog`. Resolve
-acknowledged URLs using product identity and the ordered original hashes. Preserve
-an empty first slot while the cover upload is pending; the retail adapter then
-uses the safe source fallback instead of promoting a secondary photo. Run media
-preparation inside the existing publication preparation lifecycle, before freezing
-the retail payload, with the expected outbox revision intact. Do not add another
-uploader or direct publication path. The resolver is an integration seam, not a
-claim that local-to-HTTPS publication is complete.
+Preparation checks canonical product paths without symlinks, the 5 MB byte limit,
+decoded JPEG/PNG/WebP content, MIME/extension agreement, pixel bounds and SHA256.
+The uploader sends those exact verified bytes without reopening their path.
+Receipts must identify the configured public HTTPS origin and exact module path,
+product, hash and image extension. Cached receipts are validated again on read.
+The retail resolver projects acknowledged URLs in original order; the first is
+always the cover. Missing/corrupt originals, including secondary photos, fail the
+whole preparation and leave the existing job retryable. Safe public source URLs
+are fallback only for products with no original or legacy local cover reference.
+The default synchronous projection does not guess public URLs for local files.
 
-The dealer branch's shared type/transfer edits need a normal merge review against
-the small `commerce.ts`, `hosting-transport.ts` and transfer changes here. No merge
-is performed by this implementation. The separate Teknikel website and Dealer
-Android require their own later consumers; neither is changed here.
+Preparation runs inside the existing `online_catalog` / `dealer_access` outbox
+lifecycle before freezing, with the expected revision preserved. Photo mutations
+use existing catalog triggers to invalidate both applicable jobs. A mutation,
+capability withdrawal, target change or maintenance suspension during preparation
+prevents the superseded body from being sent. Frozen retries reuse their exact
+body without reading the archive again. Online Sales OFF uploads nothing; retail
+prepares only explicitly published, active, nondeleted products. Local paths,
+bytes and private URLs never enter the public projection. The separate Teknikel
+website and Dealer Android consumers have independent owners.
 
 ## Focused verification
 
 Registry checks: `product-photos`, `product-photos-ui`, `commerce-product-media`,
-`data-transfer`, `commerce-online-catalog`, `commerce-online-catalog-ui`, and
+`data-transfer`, `commerce-online-catalog`, `commerce-product-media-publication`, `commerce-online-catalog-ui`, and
 `web-storefront`. Native photo checks use real Electron, SQLite and isolated image
 files. Browser checks exercise the real ProductWorkspace/storefront with bounded
 fixture transport; they do not prove native file dialogs or live media uploads.
+The media publication smoke uses real SQLite/reopen and the outbox with a bounded
+upload adapter, plus a multipart writer test with fixture HTTP streams for verified byte identity. It
+covers channel cache reuse, gallery ordering/limits, partial and frozen retries,
+invalid archives/URLs and revision/target/capability fencing; it does not contact
+a live hosting service.
 
 In an environment that cannot start Electron, direct
 `node scripts/smoke-product-photos.mjs --node-codec` and

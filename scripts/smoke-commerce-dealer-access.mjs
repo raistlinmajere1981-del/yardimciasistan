@@ -8,6 +8,7 @@ import { join } from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
+const { Transformer } = require("@napi-rs/image");
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { saveRuntimeCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
@@ -86,13 +87,13 @@ try {
     const product = saveRuntimeCatalogProduct(database.databasePath, { name: "Photo fixture", sku: "PHOTO-1", brand: "",
       categoryId: "", salePrice: 100, dealerPriceA: 80, dealerPriceB: null, purchasePrice: 20,
       currency: "TRY", unit: "piece", taxRate: 20, trackInventory: false, isActive: true });
-    const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWQAAAAASUVORK5CYII=", "base64");
+    const image = Transformer.fromRgbaPixels(Buffer.from([80, 120, 200, 255]), 1, 1).pngSync();
     const bytes = [image, Buffer.concat([image, Buffer.from("second-original")])];
     const originals = bytes.map((buffer, index) => {
       const assetPath = `assets/products/${product.id}/original-${index}.png`;
       mkdirSync(join(dataDir, "assets", "products", product.id), { recursive: true });
       writeFileSync(join(dataDir, assetPath), buffer);
-      return { assetPath, hash: createHash("sha256").update(buffer).digest("hex"), format: "png" };
+      return { assetPath, hash: createHash("sha256").update(buffer).digest("hex"), format: "image/png" };
     });
     raw.prepare("UPDATE catalog_products SET image_original_assets_json=? WHERE id=?").run(JSON.stringify(originals), product.id);
     const revision = () => database.getPendingSyncJobs().find(job => job.jobType === "dealer_access_publish").sourceRevision;
@@ -139,9 +140,9 @@ try {
     writeFileSync(join(dataDir, originals[0].assetPath), Buffer.from("corrupt"));
     assert.equal((await prepareDealerProductMedia(database, mediaConfig, failRevision, upload)).ok, false);
     writeFileSync(join(dataDir, originals[0].assetPath), bytes[0]);
-    assert.throws(() => database.acknowledgeDealerProductImage(product.id, originals[0].hash, mediaConfig.baseUrl,
+    assert.throws(() => database.acknowledgeProductImage(product.id, originals[0].hash, mediaConfig.baseUrl,
       `https://other.example/module/media/products/${product.id}/${originals[0].hash}.png`));
-    assert.throws(() => database.acknowledgeDealerProductImage(product.id, originals[0].hash, mediaConfig.baseUrl,
+    assert.throws(() => database.acknowledgeProductImage(product.id, originals[0].hash, mediaConfig.baseUrl,
       `https://user:password@media.example/module/media/products/${product.id}/${originals[0].hash}.png`));
     assert.equal(database.getSetupData().dealerPortalEnabled, true);
     assert.equal(database.getDealerWebAccess(id).enabled, true);

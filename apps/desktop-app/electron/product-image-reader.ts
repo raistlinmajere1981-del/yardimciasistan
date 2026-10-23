@@ -29,7 +29,15 @@ export function readProductImageBytes(databasePath: string, relativePath: string
   try {
     const stat = fs.fstatSync(descriptor);
     if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_PRODUCT_PHOTO_BYTES) throw new Error("Ürün görseli boş veya izin verilen boyuttan büyük.");
-    const bytes = fs.readFileSync(descriptor);
+    // Bound the read itself, even if an external process grows a file after stat.
+    const bounded = Buffer.alloc(stat.size + 1);
+    let size = 0, count = 0;
+    do {
+      count = fs.readSync(descriptor, bounded, size, bounded.length - size, null);
+      size += count;
+    } while (count && size < bounded.length);
+    if (size !== stat.size) throw new Error("Ürün görseli okunurken değişti.");
+    const bytes = bounded.subarray(0, size);
     productImageFormat(bytes);
     return bytes;
   } finally { fs.closeSync(descriptor); }
