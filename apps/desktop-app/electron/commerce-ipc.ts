@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import { registerProductPhotoIpcHandlers } from "./ipc/product-photo-ipc";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
@@ -72,6 +73,7 @@ export function registerCommerceIpcHandlers(options: {
   assertUnlocked: () => void;
   onMutation?: () => void;
 }) {
+  registerProductPhotoIpcHandlers(options);
   const databasePath = () => options.databasePath();
   const read = <T>(operation: () => T): T => {
     options.assertUnlocked();

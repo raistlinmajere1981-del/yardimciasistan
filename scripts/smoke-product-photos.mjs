@@ -1,0 +1,10 @@
+import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+import { getLocalElectronExecutable } from "./test-helpers/local-electron.mjs";
+const env = { ...process.env };
+delete env.ELECTRON_RUN_AS_NODE;
+const nodeCodec = process.argv.includes("--node-codec");
+if (nodeCodec) env.PRODUCT_PHOTO_NODE_CODEC = "1";
+const fixture = resolve("apps/desktop-app/scripts/fixtures/product-photos.cjs");
+const child = spawn(nodeCodec ? process.execPath : getLocalElectronExecutable(), nodeCodec ? [fixture] : ["--no-sandbox", fixture], { stdio: "inherit", env });
+process.exitCode = await new Promise((done, reject) => { child.once("error", reject); child.once("exit", code => done(code ?? 1)); });

@@ -60,3 +60,5 @@ export * from "./utils/cloudflare-ai";
 export * from "./types/public-translations";
 
 export * from "./types/data-transfer";
+
+export * from "./types/product-photos";

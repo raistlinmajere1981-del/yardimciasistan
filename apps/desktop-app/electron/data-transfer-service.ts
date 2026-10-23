@@ -203,6 +203,8 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
             if (imageKey && document.assets[imageKey]) { row.image = document.assets[imageKey]; images.validate(row.image);
               const linked = (document.assetManifest ?? []).filter(a=>(values.id && a.productId===values.id) || (values.sku && a.sku===values.sku));
               row.originals = [...new Set([imageKey,...linked.map(a=>a.path)])].map(path=>document.assets[path]!).filter(Boolean);
+              row.originals = row.originals.filter((bytes,index,all)=>all.findIndex(other=>transferHash(other)===transferHash(bytes))===index);
+              if (row.originals.length > 12) throw new Error("Ürün başına en fazla 12 fotoğraf aktarılabilir.");
               row.originals.forEach(bytes=>images.validate(bytes)); }
             else if (values.image || values.imageSourceUrl) {
               row.view.warnings.push("Görsel arşivde yok; yerel arşivden getirilemedi.");

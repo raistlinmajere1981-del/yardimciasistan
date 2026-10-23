@@ -86,7 +86,7 @@ try{
   const oversized=zipSync({"oversized":new Uint8Array(129*1024*1024)},{level:1});assert.throws(()=>readTransferArchive(oversized),/boyut/);
   // Teknikel demo import uses the exact external CSV shipped to the pilot operator.
   let demoCsv;
-  try { demoCsv=readFileSync("/home/raistlin/teknikel_web/data-import/teknikel-demo-musteriler-30.csv"); }
+  try { if (process.argv.includes("--external-pilots")) demoCsv=readFileSync("/home/raistlin/teknikel_web/data-import/teknikel-demo-musteriler-30.csv"); }
   catch (error) { if (error.code!=="ENOENT") throw error; }
   if (demoCsv) {
     const demoDb=database("teknikel-demo-customers");open.push(demoDb.db);
@@ -104,7 +104,7 @@ try{
     console.log("teknikel-demo-customers: 30 created, 10 retail, 10 inactive dealers, 10 active dealers, notes searchable, reimport skipped");
   }
   // Real pilot is optional on other machines, read-only when present.
-  let pilot=null;try{pilot=JSON.parse(readFileSync("/home/raistlin/teknikel_catalog_prep/import-review-catalog.json","utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
+  let pilot=null;try{if (process.argv.includes("--external-pilots")) pilot=JSON.parse(readFileSync("/home/raistlin/teknikel_catalog_prep/import-review-catalog.json","utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
   if(pilot){const pilotDb=database("pilot");open.push(pilotDb.db);const assets={},assetManifest=[];for(const item of JSON.parse(readFileSync("/home/raistlin/teknikel_catalog_prep/image-manifest.json","utf8")).images){const bytes=readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`);assert.equal(transferHash(bytes),item.sha256);const path=`assets/${item.archive_filename}`;assets[path]=bytes;assetManifest.push({path,hash:item.sha256,format:imageMime(bytes),productId:"",sku:item.associated_skus[0]});}assert.equal(Object.keys(assets).length,68);
     const pilotRecords=pilot.products.map(p=>({name:p.name,sku:p.sku,category:p.category,brand:p.brand??"",salePrice:p.sale_price_gross_try??"",taxRate:p.tax_rate??"",trackInventory:"",purchasePrice:p.purchase_price??"",sourceId:p.idempotent_external_key,sourceProductUrl:p.source_url,image:p.image_files[0]?`assets/${p.image_files[0]}`:""}));
     const archive=await encodeTransferFile("zip","products",Object.keys(pilotRecords[0]),pilotRecords,assets,assetManifest);const decoded=await parseTransferFile("teknikel.zip",archive,"products");assert.equal(Object.keys(decoded.assets).length,68);
@@ -118,6 +118,11 @@ try{
 }finally{for(const db of open)db.close();rmSync(root,{recursive:true,force:true});}
 
 const nativeEnv={...process.env};delete nativeEnv.ELECTRON_RUN_AS_NODE;
-const native=spawn(getLocalElectronExecutable(),["--no-sandbox","apps/desktop-app/scripts/fixtures/data-transfer.cjs"],{env:nativeEnv,stdio:"inherit"});
+const nodeCodec=process.argv.includes("--node-codec");
+if(nodeCodec)nativeEnv.PRODUCT_PHOTO_NODE_CODEC="1";
+const nativeArgs=nodeCodec?["--require","./scripts/test-helpers/product-photo-node-codec.cjs"]:["--no-sandbox"];
+nativeArgs.push("apps/desktop-app/scripts/fixtures/data-transfer.cjs");
+if(process.argv.includes("--external-pilots"))nativeArgs.push("--external-pilots");
+const native=spawn(nodeCodec?process.execPath:getLocalElectronExecutable(),nativeArgs,{env:nativeEnv,stdio:"inherit"});
 const nativeExit=await new Promise((resolve,reject)=>{native.once("error",reject);native.once("exit",resolve);});
 assert.equal(nativeExit,0,"native data transfer fixture");

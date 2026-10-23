@@ -29,8 +29,13 @@
       || typeof raw.name !== 'string' || !raw.name.trim() || raw.name.length > 360
       || !Number.isFinite(raw.price) || raw.price < 0 || raw.price > Number.MAX_SAFE_INTEGER / 10000 || !/^[A-Z]{3}$/.test(raw.currency) || !Object.hasOwn(units, raw.unit)
       || raw.availability !== 'available') throw new Error('invalid_catalog');
+    const cover = safeImage(raw.image_url);
+    const urls = raw.image_urls === undefined ? (cover ? [cover] : []) : raw.image_urls;
+    if (!Array.isArray(urls) || urls.length > 12 || urls.some(url => !safeImage(url))) throw new Error('invalid_product_images');
+    const images = [...new Set(urls.map(safeImage))];
+    if ((images[0] || '') !== cover) throw new Error('invalid_product_image_cover');
     return { product_id: raw.product_id, name: raw.name, description: typeof raw.description === 'string' ? raw.description.slice(0, 2000) : '',
-      price: raw.price, currency: raw.currency, unit: raw.unit, image_url: typeof raw.image_url === 'string' ? raw.image_url : '', availability: 'available' };
+      price: raw.price, currency: raw.currency, unit: raw.unit, image_url: cover, image_urls: images, availability: 'available' };
   }
   function quantity(value, unit) {
     if (!/^\d+(?:[.,]\d{1,4})?$/.test(String(value))) return null;
@@ -76,10 +81,44 @@
     try {
       if (!value || value.length > 2048) return '';
       const url = new URL(value);
-      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash
+      if (url.protocol !== 'https:' || url.hostname.endsWith('.') || url.username || url.password || url.search || url.hash
         || !url.hostname.includes('.') || /^[\d.:[\]]+$/.test(url.hostname) || /\.(local|localhost|internal|test)$/.test(url.hostname)) return '';
       return url.href;
     } catch { return ''; }
+  }
+  function productGallery(product) {
+    const detail = el('details', undefined, 'product-photo-detail');
+    detail.append(el('summary', ui('Fotoğraflar ({0})', {0: product.image_urls.length})));
+    const media = el('div', undefined, 'product-photo-preview');
+    const image = el('img'); image.referrerPolicy = 'no-referrer'; image.loading = 'lazy';
+    const fallback = el('span', ui('Fotoğraf yüklenemedi')); fallback.hidden = true;
+    media.append(image, fallback);
+    image.addEventListener('error', () => { image.hidden = true; fallback.hidden = false; });
+    image.addEventListener('load', () => { image.hidden = false; fallback.hidden = true; });
+    const thumbnails = el('div', undefined, 'product-photo-thumbnails');
+    thumbnails.setAttribute('role', 'group'); thumbnails.setAttribute('aria-label', ui('Ürün fotoğrafları'));
+    const buttons = product.image_urls.map((url, index) => {
+      const thumbnail = button('', () => select(index), 'secondary');
+      thumbnail.setAttribute('aria-label', ui('{0}. fotoğrafı göster', {0: index + 1}));
+      const small = el('img'); small.src = url; small.alt = ''; small.loading = 'lazy'; small.referrerPolicy = 'no-referrer';
+      small.addEventListener('error', () => { thumbnail.replaceChildren(String(index + 1)); }, {once: true});
+      thumbnail.append(small);
+      thumbnail.addEventListener('keydown', event => {
+        const target = event.key === 'Home' ? 0 : event.key === 'End' ? product.image_urls.length - 1
+          : event.key === 'ArrowRight' ? (index + 1) % product.image_urls.length
+          : event.key === 'ArrowLeft' ? (index + product.image_urls.length - 1) % product.image_urls.length : null;
+        if (target === null) return;
+        event.preventDefault(); select(target); buttons[target].focus();
+      });
+      return thumbnail;
+    });
+    function select(index) {
+      image.hidden = false; fallback.hidden = true;
+      image.alt = ui('{0}, fotoğraf {1}', {0: product.name, 1: index + 1});
+      image.src = product.image_urls[index];
+      buttons.forEach((node, i) => node.setAttribute('aria-pressed', String(i === index)));
+    }
+    thumbnails.append(...buttons); select(0); detail.append(media, thumbnails); return detail;
   }
   function renderProducts() {
     $('product-grid').replaceChildren();
@@ -96,6 +135,7 @@
       }
       const body = el('div', undefined, 'product-body'); body.append(el('h3', product.name));
       if (product.description) body.append(el('p', product.description, 'description'));
+      if (product.image_urls.length > 1) body.append(productGallery(product));
       body.append(el('div', `${money(product.price, product.currency)} / ${units[product.unit]}`, 'price'), el('span', ui("Satışta"), 'availability'));
       const add = button(ui("Sepete ekle"), () => addProduct(product), ''); add.disabled = !deliveryMethods.length || Boolean(pending) || busy;
       body.append(add); card.append(media, body); $('product-grid').append(card);

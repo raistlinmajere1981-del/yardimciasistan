@@ -20,6 +20,8 @@ import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { ProductFormFields } from "./ProductFormFields";
+import { ProductPhotoGallery } from "./ProductPhotoGallery";
+import type { ProductPhotoCollection } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { MenuProductEntryFields } from "../menu/MenuProductEntryFields";
 import { toItemForm, type ItemFormState } from "../menu/menu-model";
@@ -85,6 +87,7 @@ export function ProductWorkspace({
   const [countedQuantity, setCountedQuantity] = useState("");
   const [countNote, setCountNote] = useState("");
   const [fieldsBusy, setFieldsBusy] = useState(false);
+  const [photosBusy, setPhotosBusy] = useState(false);
   const [stockBusy, setStockBusy] = useState(false);
   const stockLock = useRef(false);
   const saveLock = useRef(false);
@@ -99,6 +102,7 @@ export function ProductWorkspace({
   const [publicationMessage, setPublicationMessage] = useState("");
   const beginPublicationRequest = useRequestGeneration();
   const beginResourceRequest = useRequestGeneration();
+  const beginPhotoChangeRequest = useRequestGeneration();
   const beginSaveRequest = useRequestGeneration();
   const beginMenuRequest = useRequestGeneration();
   const menuEntry = menuData?.menu.items.find(item => item.product_id === intent.entityId && (!intent.menuEntryId || item.id === intent.menuEntryId));
@@ -110,8 +114,9 @@ export function ProductWorkspace({
   const menuDirty = JSON.stringify(menuForm) !== JSON.stringify(menuBaseline);
   const [createPublished, setCreatePublished] = useState(onlineSalesEnabled);
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || (creating && createPublished !== onlineSalesEnabled);
+  const showPhotoGallery = onlineSalesEnabled && Boolean(productId) && imageDraftMode === "keep" && resourceState === "success";
   const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockConfirm);
-  const mutationBusy = busy || fieldsBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
+  const mutationBusy = busy || fieldsBusy || photosBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"
     ? manualImageDataUrl
     : imageDraftMode === "keep"
@@ -121,6 +126,17 @@ export function ProductWorkspace({
     busy: mutationBusy || resourceState === "loading",
     dirty: dirty || menuDirty || stockDraftDirty
   });
+  useEffect(() => { beginPhotoChangeRequest(); }, [beginPhotoChangeRequest, productId]);
+  const photosChanged = useCallback(async (collection: ProductPhotoCollection) => {
+    const isCurrent = beginPhotoChangeRequest();
+    // Only image provenance changes. Keep all unsaved product metadata and its baseline.
+    setForm(current => ({ ...current, imageSourceUrl: collection.sourceUrl, imageLicense: collection.sourceLicense }));
+    setBaseline(current => ({ ...current, imageSourceUrl: collection.sourceUrl, imageLicense: collection.sourceLicense }));
+    const preview = await bridge!.getProductImageDataUrl(collection.productId);
+    if (!isCurrent()) return;
+    setLocalImageDataUrl(preview);
+    await onReload();
+  }, [beginPhotoChangeRequest, bridge, onReload]);
   useEffect(() => {
     if (menuDirty || menuBusy) return;
     const next = toItemForm(menuEntry, menuData?.menu.categories[0]?.id ?? "");
@@ -514,7 +530,14 @@ export function ProductWorkspace({
         {resourceState === "error" ? <DetailWorkspaceLayout railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={stockPanel}><div className="empty-state"><strong>Ürün kartı güvenli biçimde yüklenemedi.</strong><p>{saveMessage}</p><ActionButton variant="secondary" onClick={() => void loadProductResources()}>Tekrar Dene</ActionButton></div>{menuPanel}</DetailWorkspaceLayout> :
           <ProductFormFields
             renderSections={({ status, details, media }) => <DetailWorkspaceLayout
-              railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>{media}{status}{stockPanel}</>}
+              railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>
+                {showPhotoGallery ? <ProductPhotoGallery key={productId} productId={productId}
+                  disabled={busy || fieldsBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading" || stockDraftDirty || resourceState !== "success"}
+                  onBusyChange={setPhotosBusy} onChanged={photosChanged} /> : <>{media}
+                    {onlineSalesEnabled && creating && <small>İlk kayıttan sonra en fazla 12 fotoğrafı sıralayıp kapak seçebilirsiniz.</small>}
+                    {onlineSalesEnabled && productId && imageDraftMode !== "keep" && <small>Galeriyi açmak için seçili kapak değişikliğini kaydedin veya geri alın.</small>}
+                  </>}
+                {status}{stockPanel}</>}
             >{details}{menuPanel}</DetailWorkspaceLayout>}
             {...(creating && intent.lookupSeed ? { lookupSeed: intent.lookupSeed } : {})}
             onBusyChange={setFieldsBusy}
@@ -541,10 +564,12 @@ export function ProductWorkspace({
               setImageDraftMode("clear");
             }}
             onExternalImageSelected={() => {
+              if (showPhotoGallery) return;
               setManualImageDataUrl("");
               setImageDraftMode("external");
             }}
-            onChange={setForm}
+            onChange={next => setForm(current => showPhotoGallery
+              ? { ...next, imageSourceUrl: current.imageSourceUrl, imageLicense: current.imageLicense } : next)}
             onStateChange={onStateChange}
           />}
       </> : <section className="form-stack" aria-label="Stok hareketleri">

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
+import { exactFixtureReceipt, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -99,12 +99,28 @@ try {
   const catalog = database.createCommerceOnlineCatalog();
   assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
-  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "brand", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
+  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "brand", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "imageUrls", "availability", "sortOrder"].sort());
   assert.equal(catalog.products[0].brand, "Teknikel Marka");
   assert.equal(catalog.products[0].price, 25, "resolved retail price, never dealer/cost");
   assert.equal(catalog.products[0].name, "Public title");
   assert.equal(catalog.products[0].description, "Public override");
   assert.equal(catalog.products[0].imageUrl, "https://images.example.com/product.jpg");
+  assert.deepEqual(catalog.products[0].imageUrls, [catalog.products[0].imageUrl]);
+  const { createCommerceOnlineCatalog } = require("../apps/desktop-app/dist-electron/commerce-online-catalog-publication.js");
+  const projected = createCommerceOnlineCatalog(raw, ["channel.online_sales"], () => ["https://images.example.com/product.jpg", "https://images.example.com/second.webp", "https://images.example.com/second.webp", "file:///private/original.jpg"]);
+  assert.deepEqual(projected.products[0].imageUrls, ["https://images.example.com/product.jpg", "https://images.example.com/second.webp"], "shared upload integration seam retains safe canonical order and dedups");
+  const { pushOnlineCatalog } = require("../packages/sync-core/dist/hosting-transport.js");
+  let multiImageRequest;
+  const transportResult = await pushOnlineCatalog({ baseUrl: "https://catalog.example.test", syncSecret: secret, clientId: "media-transport-fixture", sourceEpoch: 1,
+    sourceRevision: 1, idempotencyKey: "multi-images", catalog: projected, fetchImpl: async (_url, init) => {
+      multiImageRequest = JSON.parse(init.body);
+      return Response.json({ ok: true, ...exactFixtureReceipt(multiImageRequest) });
+    } });
+  assert.equal(transportResult.ok, true);
+  assert.deepEqual(multiImageRequest.online_catalog.products[0].image_urls, projected.products[0].imageUrls);
+  assert.equal(multiImageRequest.online_catalog.products[0].image_url, projected.products[0].imageUrls[0]);
+  const pendingCover = createCommerceOnlineCatalog(raw, ["channel.online_sales"], () => ["", "https://images.example.com/second.webp"]);
+  assert.deepEqual(pendingCover.products[0].imageUrls, [catalog.products[0].imageUrl], "pending cover uses remote source fallback, never a secondary upload");
   assert.deepEqual(database.createCommerceOnlineCatalog(), catalog, "stable projection timestamps");
   for (const imageUrl of ["/private/local.jpg", "https://127.0.0.1/local.jpg", "https://user:secret@images.example.com/product.jpg", "https://images.example.com/product.jpg?token=secret"]) {
     raw.prepare("UPDATE catalog_products SET image_source_url = ? WHERE id = ?").run(imageUrl, product.id);
@@ -124,6 +140,20 @@ try {
   assert.equal(published.products[0].price, 25);
   assert.equal(published.products[0].product_id, product.id);
   const request = calls.find((call) => call.action === "publish_online_catalog");
+  assert.deepEqual(request.online_catalog.products[0].image_urls, [request.online_catalog.products[0].image_url], "retail transport sends ordered image_urls");
+  const validateImages = (patch) => spawnSync("php", ["-r", `require $argv[1]; try { echo json_encode(ya_online_catalog_projection(json_decode($argv[2], true))); } catch (InvalidArgumentException $e) { echo $e->getMessage(); exit(42); }`,
+    join(hosting, "lib/online-catalog.php"), JSON.stringify({ ...request.online_catalog, products: [{ ...request.online_catalog.products[0], ...patch }] })], { encoding: "utf8" });
+  const coverUrl = request.online_catalog.products[0].image_url, secondUrl = "https://images.example.com/second.webp";
+  const manyImages = validateImages({ image_urls: [coverUrl, secondUrl, secondUrl] });
+  assert.equal(manyImages.status, 0, manyImages.stderr);
+  assert.deepEqual(JSON.parse(manyImages.stdout).products[0].image_urls, [coverUrl, secondUrl]);
+  const twelveUrls = [coverUrl, ...Array.from({ length: 11 }, (_, i) => `https://images.example.com/${i}.png`)];
+  assert.equal(validateImages({ image_urls: twelveUrls }).status, 0);
+  for (const images of [[secondUrl, coverUrl], [], [...twelveUrls, secondUrl], "not-an-array", [coverUrl, "http://images.example.com/a.jpg"], [coverUrl, "file:///etc/passwd"], [coverUrl, "https://127.0.0.1/a.jpg"], [coverUrl, "https://user:secret@images.example.com/a.jpg"], [coverUrl, "https://images.example.com/a.jpg?token=secret"], [coverUrl, "https://images.internal/a.jpg"], [coverUrl, "https://images.local./a.jpg"], [coverUrl, 42]]) {
+    const invalid = validateImages({ image_urls: images });
+    assert.equal(invalid.status, 42, invalid.stdout + invalid.stderr);
+    assert.match(invalid.stdout, /invalid_online_product_image/);
+  }
   assert.ok(request.source_revision > 0);
   assert.equal(request.idempotency_key, `${database.getSyncRuntimeStatus().clientId}:${request.source_epoch}:online_catalog:${request.source_revision}`);
   assert.equal(endpoint("sync.php", request).payload.deduplicated, true);

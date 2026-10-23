@@ -463,6 +463,8 @@ export interface PublishedCommerceProduct {
   currency: string;
   taxRate: number;
   imageUrl: string;
+  /** Ordered public HTTPS photos; the first URL is imageUrl. Local paths never publish. */
+  imageUrls?: string[];
   /** Listing eligibility only; does not promise stock or reserve inventory. */
   availability: "available";
   sortOrder: number;

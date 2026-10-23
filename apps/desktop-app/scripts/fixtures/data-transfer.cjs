@@ -50,7 +50,7 @@ app.whenReady().then(async()=>{
   assert.throws(()=>transferImageOwner.validate(Buffer.from("RIFF1234WEBPbad-data")),/WEBP.*çözümlenemedi/);
   transferImageOwner.validate(images[0]);assert.throws(()=>transferImageOwner.validate(Buffer.from([0xff,0xd8,0xff,0,0,0])),/çözümlenemedi/);
   const pilotManifest="/home/raistlin/teknikel_catalog_prep/image-manifest.json";
-  if(fs.existsSync(pilotManifest))for(const item of JSON.parse(fs.readFileSync(pilotManifest,"utf8")).images)transferImageOwner.validate(fs.readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`));
-  console.log("data-transfer-native-smoke-ok: real decoder/original archives, IPC lock/owner/revision/busy/retry guards, local save gate, 68 pilot image decodes");
+  if(process.argv.includes("--external-pilots") && fs.existsSync(pilotManifest))for(const item of JSON.parse(fs.readFileSync(pilotManifest,"utf8")).images)transferImageOwner.validate(fs.readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`));
+  console.log(`${process.env.PRODUCT_PHOTO_NODE_CODEC === "1" ? "data-transfer-node-codec-service-ok (Electron encoder unproved)" : "data-transfer-native-smoke-ok"}: decoder/original archives, IPC lock/owner/revision/busy/retry guards, local save gate`);
  }finally{db.close();fs.rmSync(root,{recursive:true,force:true});}
 }).then(()=>app.exit(0)).catch(error=>{console.error(error);app.exit(1);});

@@ -2,20 +2,11 @@ import { PublicTranslationStore } from "./database/public-translation-store";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability, type CommerceOnlineCatalog, type CommerceOrderDeliveryMethod, type CommerceUnit } from "@yardimci-asistan/shared";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
+import { retailProductImageUrls, type RetailProductImageResolver } from "./retail-product-image-projection";
 
-export function publicImageUrl(value: unknown): string {
-  try {
-    const url = new URL(String(value ?? ""));
-    // A2 does not publish local media. Project only public HTTPS source images;
-    // credentials, query parameters and local/private hosts never leave Desktop.
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash
-        || !url.hostname.includes(".") || /^[\d.:[\]]+$/.test(url.hostname)
-        || /\.(local|localhost|internal|test)$/.test(url.hostname)) return "";
-    return url.href;
-  } catch { return ""; }
-}
+export { publicImageUrl } from "./retail-product-image-projection";
 
-export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iterable<BusinessCapability>): CommerceOnlineCatalog {
+export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iterable<BusinessCapability>, imageResolver?: RetailProductImageResolver): CommerceOnlineCatalog {
   if (!hasBusinessCapability(capabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
     return { version: 1, enabled: false, updatedAt: "", deliveryMethods: [], products: [] };
   }
@@ -31,7 +22,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     if (deliveryEnabled && Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
     if (deliveryEnabled && !deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
     const rows = db.prepare(`
-      SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
+      SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url, p.image_original_assets_json,
              p.updated_at AS product_updated_at, publication.title_override,
              publication.description_override, publication.sort_order, publication.updated_at
       FROM commerce_product_publications publication
@@ -42,11 +33,12 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     `).all(businessId);
     const products = rows.map((row) => {
       const price = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id) }, false);
+      const imageUrls = retailProductImageUrls(db, row, imageResolver);
       return {
         categoryId: String(row.category_id), brand: String(row.brand ?? ""), productId: String(row.id), name: String(row.title_override || row.name),
         description: String(row.description_override || row.description), sku: String(row.sku),
         unit: String(row.unit) as CommerceUnit, price: price.unitPrice, currency: price.currency,
-        taxRate: Number(row.tax_rate), imageUrl: publicImageUrl(row.image_source_url),
+        taxRate: Number(row.tax_rate), imageUrl: imageUrls[0] ?? "", imageUrls,
         availability: "available" as const, sortOrder: Number(row.sort_order)
       };
     });
