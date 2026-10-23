@@ -37,7 +37,8 @@ export async function uploadPublicResourceMediaFile(
     connectionFailure: string;
     readFailure: string;
     fallbackFileName: string;
-  }
+  },
+  verifiedBytes?: Buffer
 ): Promise<
   | { ok: true; message: string; url: string; status: number }
   | { ok: false; message: string; status?: number }
@@ -62,8 +63,10 @@ export async function uploadPublicResourceMediaFile(
 
   const prefix = Buffer.from(prefixParts.join(""), "utf8");
   const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
-  const stat = fs.statSync(absolutePath);
-  const contentLength = prefix.length + stat.size + suffix.length;
+  // Product photos pass the exact bounded bytes whose MIME and SHA were checked.
+  // Do not reopen their path after asynchronous preparation.
+  const size = verifiedBytes ? verifiedBytes.length : fs.statSync(absolutePath).size;
+  const contentLength = prefix.length + size + suffix.length;
 
   return new Promise((resolve) => {
     const transport = endpoint.protocol === "http:" ? http : https;
@@ -128,6 +131,11 @@ export async function uploadPublicResourceMediaFile(
     });
 
     request.write(prefix);
+    if (verifiedBytes) {
+      request.write(verifiedBytes);
+      request.end(suffix);
+      return;
+    }
     const stream = fs.createReadStream(absolutePath);
     stream.on("error", () => {
       request.destroy();

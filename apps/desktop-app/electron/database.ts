@@ -23,7 +23,8 @@ import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegis
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type ShippingSecretWrite } from "./shipping-configuration-store";
 import { getDealerWebAccess, changeDealerWebAccess, createDealerAccessProjection } from "./dealer-web-access-store";
 import type { DealerAccessAction } from "@yardimci-asistan/shared";
-import { dealerProductImageArchives, publishedDealerProductImage, acknowledgeDealerProductImage } from "./dealer-product-media-store";
+import { productImageArchives, publishedProductImage, acknowledgeProductImage } from "./product-media-publication-store";
+import type { RetailProductImageResolver } from "./retail-product-image-projection";
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
 import * as instagramOAuthStore from "./marketing/instagram-oauth-store";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
@@ -949,12 +950,12 @@ export class DesktopDatabase {
   createDealerAccessProjection() {
     return createDealerAccessProjection(this.db);
   }
-  getDealerProductImageArchives(productIds: readonly string[]) { return dealerProductImageArchives(this.db, productIds); }
-  getPublishedDealerProductImage(productId: string, hash: string, target: string) { return publishedDealerProductImage(this.db, productId, hash, target); }
-  acknowledgeDealerProductImage(productId: string, hash: string, target: string, url: string) { acknowledgeDealerProductImage(this.db, productId, hash, target, url); }
+  getProductImageArchives(productIds: readonly string[]) { return productImageArchives(this.db, productIds); }
+  getPublishedProductImage(productId: string, hash: string, target: string) { return publishedProductImage(this.db, productId, hash, target); }
+  acknowledgeProductImage(productId: string, hash: string, target: string, url: string) { acknowledgeProductImage(this.db, productId, hash, target, url); }
 
-  createCommerceOnlineCatalog() {
-    return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities());
+  createCommerceOnlineCatalog(imageResolver?: RetailProductImageResolver) {
+    return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities(), imageResolver);
   }
 
   getCommerceOrder(orderId: string) { return getRuntimeOrder(this.databasePath, orderId); }

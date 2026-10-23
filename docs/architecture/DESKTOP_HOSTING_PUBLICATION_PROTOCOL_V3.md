@@ -47,13 +47,19 @@ atomically invalidates prepared aggregates, even for unchanged completed payload
 or when returning to a previously used target after restart. Target epochs stay
 independent; this does not implicitly replace an existing hosting source.
 
-Async Marketing and dealer product media preparation carry the original expected outbox revision.
+Async Marketing and shared retail/dealer product media preparation carry the original expected outbox revision.
 If a mutation committed during preparation, the older body is not attached to the
 newer revision. Projection and exact sent publication metadata freeze together.
-Dealer media preparation first reuses any frozen body for that revision. Original
+Product media preparation first reuses any frozen body for that revision. Original
 product archive order stays canonical; per-target/hash media acknowledgements are only
 transport metadata and never allocate their own outbox job. Secret-gated product media
-uploads complete before their public URLs enter the same private dealer projection.
+uploads complete before acknowledged public HTTPS URLs enter the retail or private
+dealer projection. Both channels share the existing target/product/hash receipt
+cache and uploader; channel withdrawal retains that media. Unpublished retail
+products and disabled Online Sales do not initiate retail uploads. Missing or
+corrupt originals fail preparation without promoting a secondary cover or guessing
+a source fallback. Revision/target/suspension checks fence asynchronous media and
+source activation before send. See [canonical product photos](PRODUCT_PHOTOS_V2.md).
 
 Manual Menu/Android publication makes durable intent due immediately and executes
 this same lifecycle, without running unrelated ingress operations. No separate

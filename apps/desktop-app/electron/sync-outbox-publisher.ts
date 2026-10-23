@@ -6,7 +6,7 @@ import { DESKTOP_PUBLICATIONS } from "./desktop-publication-registry";
 import { publishDesktopProjection } from "./desktop-publication-service";
 import { calculateNextAttempt } from "./sync-network-policy";
 import { prepareDealerProductMedia } from "./dealer-product-media-publication";
-import type { DealerAccessProjection } from "@yardimci-asistan/shared";
+import { prepareOnlineProductMedia } from "./product-media-publication";
 
 export interface SyncOutboxPublisherOptions {
   database: DesktopDatabase;
@@ -129,26 +129,30 @@ export class SyncOutboxPublisher {
         continue;
       }
       const config = this.options.getSyncConfig();
-      let dealerProjection: DealerAccessProjection | undefined;
-      if (job.jobType === "dealer_access_publish") {
-        const prepared = await prepareDealerProductMedia(this.options.database, config, job.sourceRevision);
-        if (!prepared.ok) {
-          this.options.database.failSyncJob(job.jobKey, job.sourceRevision, prepared.message, calculateNextAttempt(job.attemptCount));
-          errors.push(prepared.message);
-          continue;
-        }
-        dealerProjection = prepared.value;
-      }
       const result = job.jobType === "menu_publish"
         ? await this.publishMenuJob(job)
-        : job.jobType === "online_catalog_publish"
-          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createCommerceOnlineCatalog(),
-              (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }),
-              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
-        : job.jobType === "dealer_access_publish"
-          ? await publishDesktopProjection(this.options.database, config, job.jobType, dealerProjection!,
-              (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }),
-              { expectedRevision: job.sourceRevision, nextAttemptAt: calculateNextAttempt(job.attemptCount) })
+        : job.jobType === "online_catalog_publish" || job.jobType === "dealer_access_publish"
+          ? await this.publishSerializedOutboxJob(job, async current => {
+              const database = this.options.database;
+              database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
+              const isCurrent = () => !this.isSuspended()
+                && this.options.getSyncConfig().baseUrl.trim().replace(/\/+$/, "") === config.baseUrl.trim().replace(/\/+$/, "")
+                && database.getPendingSyncJobs().some(pending => pending.jobKey === current.jobKey && pending.sourceRevision === current.sourceRevision);
+              if (!isCurrent()) return null;
+              const options = { expectedRevision: current.sourceRevision, nextAttemptAt: calculateNextAttempt(current.attemptCount), isCurrent };
+              if (current.jobType === "online_catalog_publish") {
+                const prepared = await prepareOnlineProductMedia(database, config, current.sourceRevision, undefined, isCurrent);
+                if (!isCurrent()) return null;
+                if (!prepared.ok) { database.failSyncJob(current.jobKey, current.sourceRevision, prepared.message, options.nextAttemptAt); return prepared; }
+                return publishDesktopProjection(database, config, current.jobType, prepared.value,
+                  (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }), options);
+              }
+              const prepared = await prepareDealerProductMedia(database, config, current.sourceRevision, undefined, isCurrent);
+              if (!isCurrent()) return null;
+              if (!prepared.ok) { database.failSyncJob(current.jobKey, current.sourceRevision, prepared.message, options.nextAttemptAt); return prepared; }
+              return publishDesktopProjection(database, config, current.jobType, prepared.value,
+                (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }), options);
+            })
         : await this.publishAndroidSnapshotJob(job);
       if (!result) continue;
       if (result.ok) {

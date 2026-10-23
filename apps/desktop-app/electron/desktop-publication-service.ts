@@ -13,13 +13,16 @@ export async function publishDesktopProjection<T, R extends PublicationReceipt &
   jobType: DesktopSyncJobType,
   value: T,
   send: (identity: PublicationIdentity, frozen: T) => Promise<R | SyncFailure>,
-  options: { refresh?: boolean; expectedRevision?: number; nextAttemptAt?: string; acknowledge?: (sent: T, result: R) => void } = {}
+  options: { refresh?: boolean; expectedRevision?: number; nextAttemptAt?: string; isCurrent?: () => boolean; acknowledge?: (sent: T, result: R) => void } = {}
 ): Promise<R | SyncFailure | null> {
   database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
   const prepared = database.prepareSyncPublication(jobType, value, options.refresh, options.expectedRevision);
   if (!prepared) return null;
   if (!options.refresh && !database.getPendingSyncJobs().some((job) => job.jobKey === prepared.jobKey && job.sourceRevision === prepared.sourceRevision)) return null;
   const source = await ensurePublicationSource(database, config);
+  // Media preparation/activation can outlive a capability, target or photo edit.
+  // Retain reusable uploads, but do not send the superseded frozen revision.
+  if (options.isCurrent && !options.isCurrent()) return null;
   let result = source.ok ? await send({ clientId: source.clientId, sourceEpoch: source.sourceEpoch,
     sourceRevision: prepared.sourceRevision,
     idempotencyKey: publicationIdempotencyKey(source.clientId, source.sourceEpoch, prepared.jobKey, prepared.sourceRevision)
