@@ -214,7 +214,8 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
         product_id: product.productId, ...("categoryId" in product ? {category_id: product.categoryId} : {}),
         ...(typeof product.brand === "string" ? {brand: product.brand} : {}), name: product.name, description: product.description,
         sku: product.sku, unit: product.unit, price: product.price, currency: product.currency,
-        tax_rate: product.taxRate, image_url: product.imageUrl,
+        tax_rate: product.taxRate, image_url: product.imageUrls === undefined ? product.imageUrl : product.imageUrls[0] ?? "",
+        image_urls: product.imageUrls ?? (product.imageUrl ? [product.imageUrl] : []),
         availability: product.availability, sort_order: product.sortOrder
       }))
     }

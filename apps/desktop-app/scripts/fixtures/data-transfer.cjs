@@ -50,7 +50,7 @@ app.whenReady().then(async()=>{
   assert.throws(()=>transferImageOwner.validate(Buffer.from("RIFF1234WEBPbad-data")),/WEBP.*çözümlenemedi/);
   transferImageOwner.validate(images[0]);assert.throws(()=>transferImageOwner.validate(Buffer.from([0xff,0xd8,0xff,0,0,0])),/çözümlenemedi/);
   const pilotManifest="/home/raistlin/teknikel_catalog_prep/image-manifest.json";
-  if(fs.existsSync(pilotManifest))for(const item of JSON.parse(fs.readFileSync(pilotManifest,"utf8")).images)transferImageOwner.validate(fs.readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`));
+  if(process.argv.includes("--external-pilots") && fs.existsSync(pilotManifest))for(const item of JSON.parse(fs.readFileSync(pilotManifest,"utf8")).images)transferImageOwner.validate(fs.readFileSync(`/home/raistlin/teknikel_catalog_prep/images-original/${item.archive_filename}`));
   // Menu scope is guarded at IPC even for reads and source selection.
   const menuOptions={entity:"menu",format:"zip",scope:"all",includeImages:false,includeIdentity:false};
   await assert.rejects(()=>invoke("upload","menu","test.zip",archive),/özellik|etkin/i);
@@ -64,6 +64,6 @@ app.whenReady().then(async()=>{
   assert.throws(()=>invoke("rows",menuSource.token,"all",0),/özellik|etkin/i);
   await assert.rejects(()=>invoke("apply",menuSource.token,menuPreview.revision),/özellik|etkin/i);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM catalog_products WHERE sku='COFFEE'").get().n,0);
-  console.log("data-transfer-native-smoke-ok: real decoder/original archives, IPC lock/owner/revision/busy/retry/menu-capability guards, local save gate, 68 pilot image decodes");
+  console.log(`${process.env.PRODUCT_PHOTO_NODE_CODEC === "1" ? "data-transfer-node-codec-service-ok (Electron encoder unproved)" : "data-transfer-native-smoke-ok"}: decoder/original archives, IPC lock/owner/revision/busy/retry/menu-capability guards, local save gate`);
  }finally{db.close();fs.rmSync(root,{recursive:true,force:true});}
 }).then(()=>app.exit(0)).catch(error=>{console.error(error);app.exit(1);});

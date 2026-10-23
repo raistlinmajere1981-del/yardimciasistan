@@ -3,10 +3,11 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID, createHash } from "node:crypto";
 import { app } from "electron";
-import { decodeProductImageBytes } from "./product-image-codec";
+import { decodeProductImageBytes, productImageFormat } from "./product-image-codec";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import {
   normalizeBarcodeIdentity,
+  MAX_PRODUCT_PHOTOS,
   createId,
   type ProductDataProviderId,
   type ProductLookupMode,
@@ -18,7 +19,7 @@ import {
 } from "./data-paths.js";
 import { attachCatalogProductImageInTransaction, findCatalogProductByBarcode, type SaveCatalogProductInput, type CatalogProductImageMutation } from "./commerce-store";
 import { desktopLog } from "./desktop-logger";
-import { readProductImageAsset } from "./product-image-reader.js";
+import { assertProductAssetPath, readProductImageAsset, readProductImageBytes, readProductOriginalAssets } from "./product-image-reader.js";
 
 const OPEN_FOOD_FACTS_PROVIDER: ProductDataProviderId = "open_food_facts";
 const OPEN_FOOD_FACTS_API = "https://world.openfoodfacts.org/api/v2/product";
@@ -264,7 +265,7 @@ async function fetchNormalizedProductImage(
   }
 }
 
-function normalizeProductImageBytes(bytes: Buffer): Buffer {
+export function normalizeProductImageBytes(bytes: Buffer): Buffer {
   if (bytes.length === 0 || bytes.length > IMAGE_MAX_BYTES) {
     throw new Error("Ürün görseli boş veya izin verilen boyuttan büyük.");
   }
@@ -286,21 +287,25 @@ function normalizeProductImageBytes(bytes: Buffer): Buffer {
   return encoded;
 }
 
-function normalizedManualProductImage(dataUrlInput: string): Buffer {
+export function productImageBytesFromDataUrl(dataUrlInput: string): Buffer {
+  if (typeof dataUrlInput !== "string" || dataUrlInput.length > 7 * 1024 * 1024) throw new Error("Ürün görseli en fazla 5 MB olabilir.");
   const dataUrl = String(dataUrlInput ?? "").trim();
   const match = /^data:image\/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(dataUrl);
   if (!match) {
     throw new Error("Manuel ürün görseli JPEG, PNG veya WEBP olmalı.");
   }
   const bytes = Buffer.from(match[1] ?? "", "base64");
-  return normalizeProductImageBytes(bytes);
+  if (`image/${/^data:image\/([^;]+)/i.exec(dataUrl)?.[1]?.toLowerCase().replace("jpg", "jpeg")}` !== productImageFormat(bytes)) throw new Error("Ürün görselinin biçimi içeriğiyle eşleşmiyor.");
+  decodeProductImageBytes(bytes);
+  return bytes;
 }
 
-function writeProductImageAsset(databasePath: string, productId: string, encoded: Buffer): string {
+export function writeProductImageAsset(databasePath: string, productId: string, encoded: Buffer): string {
   const dataRoot = path.dirname(databasePath);
   const fileName = `image_${randomUUID()}.jpg`;
   const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, fileName);
   const relativePath = resolveProductAssetRelativePath(productId, fileName);
+  assertProductAssetPath(databasePath, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   const tempPath = `${absolutePath}.tmp`;
   try {
@@ -328,11 +333,20 @@ function writeProductImageAsset(databasePath: string, productId: string, encoded
 /** Preserve original transfer bytes beside the primary normalized display asset. Metadata
  * commits with CatalogProduct; existing originals are immutable and never overwritten. */
 export function prepareOriginalProductImageAssets(databasePath: string, productId: string, originals: Array<{bytes: Uint8Array; format: string}>) {
-  return originals.map(({bytes,format}) => {
+  const seen = new Set<string>();
+  const unique = originals.filter(item => {
+    const hash = createHash("sha256").update(item.bytes).digest("hex");
+    if (seen.has(hash)) return false;
+    seen.add(hash); return true;
+  });
+  if (unique.length > MAX_PRODUCT_PHOTOS) throw new Error("Ürün başına en fazla 12 fotoğraf eklenebilir.");
+  return unique.map(({bytes,format}) => {
     const extension = format === "image/png" ? "png" : format === "image/webp" ? "webp" : "jpg";
-    normalizedManualProductImage(`data:${format};base64,${Buffer.from(bytes).toString("base64")}`);
+    if (productImageFormat(Buffer.from(bytes)) !== format) throw new Error("Ürün görselinin biçimi içeriğiyle eşleşmiyor.");
+    decodeProductImageBytes(Buffer.from(bytes));
     const fileName = `original_${randomUUID()}.${extension}`;
     const absolutePath = resolveProductAssetAbsolutePath(path.dirname(databasePath),productId,fileName);
+    assertProductAssetPath(databasePath, resolveProductAssetRelativePath(productId,fileName));
     fs.mkdirSync(path.dirname(absolutePath), { recursive:true });
     fs.writeFileSync(absolutePath,bytes,{flag:"wx",mode:0o600});
     return {assetPath:resolveProductAssetRelativePath(productId,fileName),hash:createHash("sha256").update(bytes).digest("hex"),format};
@@ -343,13 +357,29 @@ export function prepareOriginalProductImageAssets(databasePath: string, productI
  * keeps the current asset; product validation/commit still owns success or failure. */
 export async function prepareProductImageForSave(databasePath: string, input: SaveCatalogProductInput): Promise<CatalogProductImageMutation | undefined> {
   const productId = String(input.id ?? "").trim() || createId("product_");
-  if (input.clearImage) return { productId, assetPath: "", sourceUrl: "", license: "" };
   const sourceUrl = String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
-  if (!input.manualImageDataUrl && !sourceUrl) return undefined;
+  if (!input.clearImage && !input.manualImageDataUrl && !sourceUrl) return undefined;
   try {
+    const database = openDatabase(databasePath);
+    let originals: ReturnType<typeof readProductOriginalAssets>;
+    let expectedOriginalAssetsJson = "[]";
+    try {
+      const row = database.prepare("SELECT image_asset_path, image_original_assets_json FROM catalog_products WHERE id=? AND deleted_at=''").get(productId);
+      originals = row ? readProductOriginalAssets(databasePath, productId, row) : [];
+      expectedOriginalAssetsJson = String(row?.image_original_assets_json ?? "[]");
+    } finally { database.close(); }
+    if (input.clearImage) {
+      const remaining = originals.slice(1);
+      const assetPath = remaining[0] ? writeProductImageAsset(databasePath, productId, normalizeProductImageBytes(readProductImageBytes(databasePath, remaining[0].assetPath))) : "";
+      return { productId, assetPath, sourceUrl: "", license: "", originalAssets: remaining, expectedOriginalAssetsJson };
+    }
     let encoded: Buffer;
+    let original: Buffer | undefined;
     let license = String(input.imageLicense ?? "").trim().slice(0, 80);
-    if (input.manualImageDataUrl) encoded = normalizedManualProductImage(input.manualImageDataUrl);
+    if (input.manualImageDataUrl) {
+      original = productImageBytesFromDataUrl(input.manualImageDataUrl);
+      encoded = normalizeProductImageBytes(original);
+    }
     else {
       const settings = productDataSettings(databasePath);
       if (!settings.enabled || !settings.includeImages) return undefined;
@@ -364,9 +394,11 @@ export async function prepareProductImageForSave(databasePath: string, input: Sa
       encoded = await fetchNormalizedProductImage(providerId, sourceUrl);
     }
     const assetPath = writeProductImageAsset(databasePath, productId, encoded);
+    const first = prepareOriginalProductImageAssets(databasePath, productId, [{ bytes: original ?? encoded, format: productImageFormat(original ?? encoded) }])[0]!;
     return { productId, assetPath, sourceUrl: input.manualImageDataUrl ? "" : sourceUrl,
-      license: input.manualImageDataUrl ? "" : license };
+      license: input.manualImageDataUrl ? "" : license, originalAssets: [first, ...originals.slice(1).filter(item => item.hash !== first.hash)], expectedOriginalAssetsJson };
   } catch (error) {
+    if (input.clearImage) throw error;
     desktopLog.warn({ scope: "product-data", event: input.manualImageDataUrl ? "product-data.manual-image-archive.failed" : "product-data.image-archive.failed",
       message: input.manualImageDataUrl ? "Manuel ürün görseli arşivlenemedi." : "Ürün görseli arşivlenemedi.", meta: { productId }, error });
     return undefined;

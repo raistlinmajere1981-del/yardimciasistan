@@ -89,6 +89,7 @@ export interface CatalogProductImageMutation {
   sourceUrl: string;
   license: string;
   originalAssets?: Array<{ assetPath: string; hash: string; format: string }>;
+  expectedOriginalAssetsJson?: string;
 }
 
 export interface ApplyInventoryMovementInput {
@@ -543,6 +544,7 @@ export function saveCatalogProductInTransaction(
   if (image && image.productId !== id) throw new Error("Ürün görsel kimliği eşleşmedi.");
   const existing = getProductRow(database, businessId, id);
   if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
+  if (image?.expectedOriginalAssetsJson !== undefined && image.expectedOriginalAssetsJson !== String(existing?.image_original_assets_json ?? "[]")) throw new Error("Ürün fotoğrafları değişti; galeriyi yenileyip tekrar deneyin.");
   if (existing && ((input.trackInventory !== false) !== (Number(existing.track_inventory) === 1)
       || normalizeUnit(input.unit) !== existing.unit)) {
     const openConsumption = database.prepare(`SELECT 1 FROM table_order_items i JOIN table_orders o ON o.id = i.order_id
@@ -650,7 +652,7 @@ export function saveCatalogProductInTransaction(
 
     if (image || input.clearImage) {
       database.prepare("UPDATE catalog_products SET image_original_assets_json=? WHERE id=? AND business_id=?")
-        .run(JSON.stringify(input.clearImage ? [] : image?.originalAssets ?? []), id, businessId);
+        .run(JSON.stringify(image?.originalAssets ?? []), id, businessId);
     }
 
   if (input.quickAccessEnabled !== undefined) {

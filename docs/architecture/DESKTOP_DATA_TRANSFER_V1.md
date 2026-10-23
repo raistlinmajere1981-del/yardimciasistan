@@ -73,7 +73,9 @@ Görüntüleme için birincil normalize görsel üretilir; ZIP orijinal baytlar�
 Electron nativeImage WebP çözemeyen platformlarda `@napi-rs/image` WebP
 çözücüsünün boyut kontrollü PNG çıktısı aynı normalizasyon sahibine verilir;
 hem önizleme hem arşiv kabulü gerçek decode gerektirir.
-Görsel değiştirme/temizleme aynı ürün yazımında bu referansları da değiştirir.
+Sıralı 1–12 fotoğraf işlemleri ve kapak sözleşmesi
+[Product Photos V2](PRODUCT_PHOTOS_V2.md) sahibinde tanımlıdır. Tek kapak editörü
+diğer orijinalleri korur; ZIP canonical sırayı ve SHA256 değerlerini taşır.
 Arşiv temizliği referanslı orijinalleri korur. Şema yalnız güncel baseline'dadır;
 geçmiş migration, başlangıç backfill'i veya gerçek DB'ye otomatik import yoktur.
 
@@ -103,8 +105,9 @@ müşteriyi aynı canonical CustomerWorkspace'e getirir. Export veritabanından
 sayfalarla tüm kapsamı okur; renderer listesini kaynak almaz.
 
 Registry kontrolleri: `data-transfer`, `data-transfer-ui`. İlk kontrol izole
-SQLite, biçim/güvenlik, sayfalama, kanonik yazımlar, geri okuma ve bulunuyorsa
-salt okunur Teknikel kaynaklarını doğrular. UI kontrolü gerçek React bileşenlerini
+SQLite, biçim/güvenlik, sayfalama, kanonik yazımlar ve geri okumayı doğrular.
+Harici Teknikel kaynakları yalnız açık `--external-pilots` tercihiyle okunur.
+UI kontrolü gerçek React bileşenlerini
 ve gerçek izole DB işlemlerini transport adaptörüyle çalıştırır; native dosya
 seç/kaydet diyaloğu ve canlı uzak görsel servisi bu tarayıcı kontrolünün kanıtı
 değildir. Görseller `artifacts/screenshots/data-transfer/` altında tutulur.

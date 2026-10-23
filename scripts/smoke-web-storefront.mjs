@@ -69,6 +69,22 @@ try {
   const html = await fetch(`${siteUrl}/magaza/`);
   assert.equal(html.status, 200); assert.ok((await html.text()).includes('/assets/js/storefront.js'));
   browser = await launchChromiumForSmoke(chromium);
+  const galleryProduct = { ...product, image_urls: [product.image_url, 'https://images.example.com/second.webp'] };
+  await publish(true, [galleryProduct]);
+  const galleryPage = await freshPage();
+  await ready(galleryPage);
+  await galleryPage.locator('summary').filter({ hasText: 'Fotoğraflar (2)' }).click();
+  const thumbnails = galleryPage.getByRole('group', { name: 'Ürün fotoğrafları' });
+  const firstPhoto = thumbnails.getByRole('button', { name: '1. fotoğrafı göster' });
+  const secondPhoto = thumbnails.getByRole('button', { name: '2. fotoğrafı göster' });
+  await expect(firstPhoto).toHaveAttribute('aria-pressed', 'true');
+  await firstPhoto.focus(); await galleryPage.keyboard.press('ArrowRight');
+  await expect(secondPhoto).toBeFocused(); await expect(secondPhoto).toHaveAttribute('aria-pressed', 'true');
+  await expect(galleryPage.locator('.product-photo-preview img')).toHaveAttribute('src', galleryProduct.image_urls[1]);
+  await expect(galleryPage.locator('.product-photo-preview')).toContainText('Fotoğraf yüklenemedi');
+  await galleryPage.keyboard.press('Home'); await expect(firstPhoto).toBeFocused();
+  await expect(firstPhoto).toHaveAttribute('aria-pressed', 'true');
+  await galleryPage.close();
   // Visual contract: a single product stays compact and its purchase controls
   // remain accessible within the site shell; empty-cart checkout cannot open by pointer/keyboard.
   const compactProduct = { ...product, name: 'UzunÜrünAdı'.repeat(18).slice(0, 180), description: 'Uzun açıklama '.repeat(90), image_url: '' };

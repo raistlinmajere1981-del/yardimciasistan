@@ -2,6 +2,8 @@ const SMOKE_FILES = [
   "scripts/smoke-entity-single-card.mjs",
   "scripts/smoke-data-transfer.mjs",
   "scripts/smoke-data-transfer-ui.mjs",
+  "scripts/smoke-product-photos.mjs",
+  "scripts/smoke-product-photos-ui.mjs",
   "scripts/smoke-dealer-android-device.mjs",
   "scripts/smoke-market-pilot-web.mjs",
   "scripts/smoke-desktop-ui-family.mjs",
@@ -634,6 +636,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file.startsWith("scripts/smoke-product-photos")) return ["desktop", "commerce", "web", "product-identity"];
   if (file === "scripts/smoke-entity-single-card.mjs") return ["desktop", "commerce", "customers", "hospitality"];
   if (file.startsWith("scripts/smoke-data-transfer")) return ["desktop", "customers", "commerce", "product-identity"];
   if (file.startsWith("scripts/smoke-public-translations")) return ["translations", "settings", "web", "desktop"];

@@ -96,6 +96,12 @@ export interface DesktopCommerceBridge {
   lookupExternalProductByBarcode: (barcode: string, mode?: ProductLookupMode) => Promise<ProductLookupResponse>;
   previewExternalProductImage: (provider: string, imageUrl: string) => Promise<string>;
   getProductImageDataUrl: (productId: string) => Promise<string>;
+  listProductPhotos: (productId: string) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
+  previewProductPhoto: (productId: string, photoId: string) => Promise<string>;
+  addProductPhotos: (input: import("@yardimci-asistan/shared").AddProductPhotosInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
+  removeProductPhoto: (input: import("@yardimci-asistan/shared").SelectProductPhotoInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
+  reorderProductPhotos: (input: import("@yardimci-asistan/shared").ReorderProductPhotosInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
+  setProductPhotoCover: (input: import("@yardimci-asistan/shared").SelectProductPhotoInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
 
   getInventoryBalance: (productId: string, locationId?: string) => Promise<InventoryBalance>;
   listInventoryMovements: (options?: ListInventoryMovementsOptions) => Promise<InventoryMovement[]>;

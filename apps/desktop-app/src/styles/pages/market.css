@@ -370,6 +370,38 @@ button.market-list-row {
   color: var(--color-accent);
 }
 
+.product-photo-list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.product-photo-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.product-photo-list .action-row { gap: var(--space-1); flex-wrap: wrap; }
+
+.product-photo-thumbnail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  color: var(--color-text-muted);
+  background: var(--color-bg-field);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.product-photo-thumbnail[aria-pressed="true"] { border-color: var(--color-accent); }
+.product-photo-thumbnail img { width: 44px; height: 44px; object-fit: contain; }
+
 .market-product-source {
   display: grid;
   gap: var(--space-1);
