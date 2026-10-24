@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+// Per-install account credentials remain outside the package and are protected by config/.htaccess.
+$accountLocal = __DIR__ . '/../config/account.local.php';
+if (is_file($accountLocal)) require_once $accountLocal;
+unset($accountLocal);
 require_once __DIR__ . '/storage.php';
 require_once __DIR__ . '/customer-account-store.php';
 require_once __DIR__ . '/customer-account-mail.php';

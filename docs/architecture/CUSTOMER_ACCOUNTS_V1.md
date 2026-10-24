@@ -98,6 +98,8 @@ client code, source control or command-line logs:
 
 | Variable | Meaning |
 | --- | --- |
+Canlı kurulumlarda aynı değişkenler, web modülünün HTTP erişimine kapalı `config/account.local.php` dosyasında PHP `putenv()` çağrılarıyla da ayarlanabilir. Dosya pakete dahil edilmez ve normal deploy sırasında korunur. Şifreleri Git deposuna veya herkese açık PHP/HTML çıktısına koyma.
+
 | `YA_ACCOUNT_SITE_URL` | Exact HTTPS account page, e.g. `https://host/hesabim/` |
 | `YA_ACCOUNT_MODULE_URL` | Exact HTTPS module root on the same origin |
 | `YA_ACCOUNT_SMTP_HOST`, `YA_ACCOUNT_SMTP_PORT` | Real SMTP host and port |
