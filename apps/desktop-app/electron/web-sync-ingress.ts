@@ -13,6 +13,20 @@ export class WebSyncIngress {
     private readonly operationId: () => string,
     private readonly logSyncFailure: (stage: string, failure: { status?: number; message?: string; error?: string }, meta?: Record<string, unknown>) => void) {}
 
+  async pullCustomerAccountPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
+    if (!transport.pullCustomerAccounts) return { count: 0, error: "" };
+    let count = 0;
+    try {
+      for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
+        const result = await transport.pullCustomerAccounts({ afterSeq: this.options.database.getCustomerAccountCursor(), limit: 100 });
+        if (!result.ok) { this.logSyncFailure("customer-accounts-pull", result); return { count, error: result.message }; }
+        for (const account of result.accounts) { this.options.database.importCustomerAccount(account); count += 1; }
+        if (!result.has_more) break;
+      }
+      return { count, error: "" };
+    } catch { return { count, error: "Müşteri hesapları alınamadı. Sonraki eşitlemede yeniden denenecek." }; }
+  }
+
   async pullWebOrderPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
     const ingress = this.options.onlineOrderIngress ?? new OnlineOrderIngressService(this.options.database);
     let cursor = this.options.database.getSyncRuntimeStatus().webOrderCursor;

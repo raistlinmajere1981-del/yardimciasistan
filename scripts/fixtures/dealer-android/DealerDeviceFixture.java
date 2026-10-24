@@ -19,10 +19,11 @@ import java.util.function.BooleanSupplier;
 import org.json.*;
 
 /**
- * Synthetic private fixtures. No live supplier, valid session, real camera image or order success.
+ * Real local account APIs plus synthetic private UI/media fixtures; no production account, provider or camera proof.
  */
 public final class DealerDeviceFixture extends Instrumentation {
   private DealerActivity activity;
+  private Bundle accountArguments;
   private DealerDisk disk;
   private ClipData previousClipboard;
   private ClipboardManager clipboard;
@@ -31,6 +32,7 @@ public final class DealerDeviceFixture extends Instrumentation {
   private ActivityMonitor mediaMonitor;
   @Override
   public void onCreate(Bundle arguments) {
+    accountArguments=arguments;
     super.onCreate(arguments);
     start();
   }
@@ -46,11 +48,12 @@ public final class DealerDeviceFixture extends Instrumentation {
       check(DealerUi.save(getTargetContext(), new DealerAppearance("light", "blue", 100, false)),
           "Fixture appearance not initialized");
       loginBoundary();
+      DealerAccountDeviceChecks.run(accountArguments);
       JSONObject seed =
           new JSONObject()
               .put("base", "https://dealer-fixture.invalid/module/")
               .put("owner", "https://dealer-fixture.invalid/module/|fixture-dealer")
-              .put("cookie", "ya_dealer_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+              .put("cookie", "ya_account_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
               .put("dealer",
                   new JSONObject()
                       .put("access_id", "fixture-dealer")
@@ -100,6 +103,7 @@ public final class DealerDeviceFixture extends Instrumentation {
                             .put("quantity", 1))));
       seed.put("orders", orders);
       disk.write(seed.toString());
+      mockAccountAuthorization = true;
       DealerImages fixtureImages = new DealerImages(getTargetContext());
       try {
         for (int i = 0; i < 3; i++)
@@ -192,7 +196,7 @@ public final class DealerDeviceFixture extends Instrumentation {
                    "Uncertain submission cart must be frozen"));
       appearance();
       result.putString("stream",
-          "dealer-native-device-ok: single-link VIEW/SEND/clipboard and private storage; large "
+          "dealer-native-device-ok: real local TLS/PHP shared login, refresh, independent web logout, canonical dealer prices/order retry, demotion, Online Sales and revocation; business connection VIEW/SEND and synthetic account authorization; private storage; large "
               + "sampled gallery; native pinch/pan/double-tap/rotation/paging; five filters; "
               + "gallery "
               + "EXIF, simulated camera FileProvider result/cancel; independent "
@@ -212,51 +216,20 @@ public final class DealerDeviceFixture extends Instrumentation {
   }
   private void loginBoundary() throws Exception {
     disk.write("{}");
-    String link = "https://dealer-fixture.invalid/bayi/#invite=" + repeat(43)
-        + "&module=" + URLEncoder.encode("https://dealer-fixture.invalid/module/", "UTF-8");
-    activity = (DealerActivity) startActivitySync(
-        new Intent(Intent.ACTION_VIEW, Uri.parse(link), getTargetContext(), DealerActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    String link = "https://dealer-fixture.invalid/module/";
+    activity = (DealerActivity) startActivitySync(new Intent(Intent.ACTION_VIEW, Uri.parse(link), getTargetContext(), DealerActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     waitForIdleSync();
     main(() -> {
-      List<EditText> inputs = views(EditText.class);
-      check(inputs.size() == 1, "Login must contain one field");
-      check(inputs.get(0).getText().toString().equals(link), "VIEW did not prefill invite");
-      check(activity.getIntent().getData() == null, "Consumed intent retained token");
-      clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-      previousClipboard = clipboard.getPrimaryClip();
-      ClipData clip = ClipData.newPlainText("Fixture", link);
-      PersistableBundle sensitive = new PersistableBundle();
-      sensitive.putBoolean("android.content.extra.IS_SENSITIVE", true);
-      clip.getDescription().setExtras(sensitive);
-      clipboard.setPrimaryClip(clip);
-      inputs.get(0).setText("");
+      check(views(EditText.class).size() == 1, "Initial setup must contain one business connection field");
+      check(views(EditText.class).get(0).getText().toString().equals(link), "VIEW did not prefill the business connection");
+      check(activity.getIntent().getData() == null, "Consumed intent retained data");
     });
-    click("Yapıştır");
-    main(()
-             -> check(views(EditText.class).get(0).getText().toString().equals(link),
-                 "Clipboard paste failed"));
-    setText("Bayi davet bağlantısı", "invalid");
-    click("Giriş yap");
-    requireText("Geçerli bayi bağlantısını yapıştırın.");
-    check(!disk.read().contains(repeat(43)), "Invite token persisted");
-    setText("Bayi davet bağlantısı", "");
-    Thread.sleep(4000); // Let the OS clipboard preview dismiss before capturing the native UI.
-    screenshot("login-light");
-    String application = "https://dealer-fixture.invalid/bayi/#application=dealer&module="
-        + URLEncoder.encode("https://dealer-fixture.invalid/module/", "UTF-8");
-    main(()
-             -> activity.onNewIntent(
-                 new Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, application)));
+    setText("İşletme bağlantısı", "invalid"); click("İşletmeye bağlan");
+    requireText("İşletme için geçerli bir HTTPS bağlantısı girin.");
+    setText("İşletme bağlantısı", ""); screenshot("login-light");
+    main(() -> activity.onNewIntent(new Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, link)));
     waitForIdleSync();
-    main(() -> {
-      check(views(EditText.class).size() == 1, "SEND added a technical field");
-      check(((EditText) findDescription("Başvuru bağlantısı"))
-                .getText()
-                .toString()
-                .equals(application),
-          "SEND link not captured");
-    });
+    main(() -> check(views(EditText.class).get(0).getText().toString().equals(link), "SEND business connection not captured"));
     // Render the existing form from synthetic local state; server acceptance is covered separately.
     main(() -> {
       DealerApplicationForm form = (DealerApplicationForm) field(activity, "application");
@@ -430,10 +403,18 @@ public final class DealerDeviceFixture extends Instrumentation {
     clickDescription("Fixture Parça ürününü incele");
   }
   private volatile Activity resumed;
+  private boolean mockAccountAuthorization;
   @Override
   public void callActivityOnResume(Activity activity) {
     super.callActivityOnResume(activity);
     resumed = activity;
+    if (mockAccountAuthorization && activity instanceof DealerActivity) {
+      try {
+        Field authorization = DealerActivity.class.getDeclaredField("accessVerified"); authorization.setAccessible(true); authorization.setBoolean(activity, true);
+        ((android.os.Handler)field(activity,"accountTimer")).removeCallbacksAndMessages(null);
+        java.lang.reflect.Method render = DealerActivity.class.getDeclaredMethod("render"); render.setAccessible(true); render.invoke(activity);
+      } catch (Exception error) { throw new AssertionError(error); }
+    }
   }
   private Activity lastActivity() {
     return resumed;

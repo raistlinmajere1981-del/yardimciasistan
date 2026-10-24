@@ -16,7 +16,6 @@ final class DealerUi {
   final DealerAppearance appearance;
   final boolean dark;
   final int background, surface, ink, muted, accent, onAccent, soft, border, danger;
-  private android.graphics.Bitmap logoBitmap;
   DealerUi(Context context) {
     this.context = context;
     appearance = appearance(context);
@@ -193,14 +192,8 @@ final class DealerUi {
   }
   ImageView logo(int size) {
     ImageView view = new ImageView(context);
-    if (logoBitmap == null) {
-      android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
-      options.inSampleSize = 4;
-      logoBitmap = android.graphics.BitmapFactory.decodeResource(
-          context.getResources(), R.drawable.dealer_mascot, options);
-    }
-    view.setImageBitmap(logoBitmap);
-    view.setContentDescription("Yardımcı Asistan Bayi");
+    view.setImageResource(R.drawable.dealer_portal_mark);
+    view.setContentDescription("Bayi Portalı");
     view.setScaleType(ImageView.ScaleType.FIT_CENTER);
     view.setLayoutParams(new LinearLayout.LayoutParams(dp(size), dp(size)));
     view.setClipToOutline(true);

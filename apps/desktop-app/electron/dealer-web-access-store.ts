@@ -1,76 +1,56 @@
-import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type DealerAccessAction, type DealerAccessProjection, type DealerAccessResult, type DealerWebAccess } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, type DealerAccessAction, type DealerAccessProjection, type DealerAccessResult, type DealerWebAccess } from "@yardimci-asistan/shared";
 import { desktopLog } from "./desktop-logger";
 import { readEnabledBusinessCapabilities } from "./business-capability-store";
 import { createDealerOrderHistory } from "./dealer-order-publication";
 import { createDealerCatalogs } from "./dealer-catalog-publication";
 
-function accessFromRow(row: Record<string, unknown>): DealerWebAccess {
-  return { accessId: String(row.id), customerId: String(row.customer_id), enabled: Number(row.eligible) === 1,
-    accessRevision: Number(row.access_revision), inviteRevision: Number(row.invite_revision), inviteIssuedAt: String(row.invite_issued_at),
-    inviteExpiresAt: String(row.invite_expires_at), revokedAt: String(row.revoked_at), updatedAt: String(row.updated_at) };
-}
 export function getDealerWebAccess(db: DatabaseSync, customerId: string): DealerWebAccess | null {
   const row = db.prepare(`SELECT a.*, (p.dealer_status = 'active' AND c.deleted_at = '' AND s.dealer_portal_enabled = 1
-    AND EXISTS (SELECT 1 FROM business_capabilities b WHERE b.business_id = a.business_id AND b.capability_id = 'commerce.wholesale' AND b.is_enabled = 1)) AS eligible
-    FROM commerce_dealer_web_access a LEFT JOIN customer_commercial_profiles p ON p.customer_id = a.customer_id AND p.business_id = a.business_id
+    AND EXISTS (SELECT 1 FROM business_capabilities b WHERE b.business_id = a.business_id AND b.capability_id = 'commerce.wholesale' AND b.is_enabled = 1)
+    AND EXISTS (SELECT 1 FROM business_capabilities b WHERE b.business_id = a.business_id AND b.capability_id = 'channel.online_sales' AND b.is_enabled = 1)) AS eligible
+    FROM customer_web_access a LEFT JOIN customer_commercial_profiles p ON p.customer_id = a.customer_id AND p.business_id = a.business_id
     JOIN customers c ON c.id = a.customer_id JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = '' WHERE a.customer_id = ?`).get(customerId);
-  return row ? accessFromRow(row) : null;
+  if (!row) return null;
+  const candidates = db.prepare(`SELECT account_id, email, full_name FROM web_customer_accounts WHERE status = 'conflict'
+    AND lower(email) = (SELECT lower(trim(email)) FROM customers WHERE id = ?) ORDER BY account_id`).all(customerId);
+  return { accessId: String(row.id), customerId, accountId: String(row.account_id), enabled: Number(row.eligible) === 1,
+    accessRevision: Number(row.access_revision), sessionRevision: Number(row.session_revision), revokedAt: String(row.revoked_at), updatedAt: String(row.updated_at),
+    linkCandidates: candidates.map(candidate => ({ accountId: String(candidate.account_id), email: String(candidate.email), fullName: String(candidate.full_name) })) };
 }
 export function changeDealerWebAccess(db: DatabaseSync, customerId: string, action: DealerAccessAction): DealerAccessResult {
-  if (!["invite", "revoke_sessions"].includes(action)) throw new Error("Bayi erişim işlemi geçersiz.");
   const now = new Date().toISOString();
-  let inviteUrl: string | undefined;
   db.exec("BEGIN IMMEDIATE");
   try {
-    if (!hasBusinessCapability(readEnabledBusinessCapabilities(db), BUSINESS_CAPABILITIES.WHOLESALE)) {
-      throw new Error("Bayi / Toptan Satış bu işletmede etkin değil.");
-    }
-    const settings = db.prepare("SELECT business_id, dealer_portal_enabled, web_module_url FROM settings WHERE deleted_at = '' LIMIT 1").get();
-    const businessId = String(settings?.business_id ?? "");
-    const eligible = db.prepare(`SELECT 1 FROM customers c JOIN customer_commercial_profiles p ON p.customer_id = c.id
-      WHERE c.id = ? AND c.business_id = ? AND p.business_id = ? AND c.deleted_at = '' AND p.dealer_status = 'active'`).get(customerId, businessId, businessId);
-    if (!eligible) throw new Error("Web erişimi yalnız aktif bayi için kullanılabilir.");
-    if (Number(settings?.dealer_portal_enabled) !== 1) throw new Error("Bayi portalını Servisler ayarlarından etkinleştirin.");
     const current = getDealerWebAccess(db, customerId);
-    if (!current) throw new Error("Bayi web erişimi henüz oluşturulmadı.");
-    if (action === "invite") {
-      const base = new URL(String(settings?.web_module_url ?? ""));
-      if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw new Error("Bayi daveti için geçerli HTTPS web modülü adresi gerekli.");
-      const token = randomBytes(32).toString("base64url");
-      const moduleUrl = `${base.href.replace(/\/+$/, "")}/`;
-      inviteUrl = `${new URL("../bayi/", moduleUrl).href}#${new URLSearchParams({ invite: token, module: moduleUrl })}`;
-      db.prepare(`UPDATE commerce_dealer_web_access SET invite_revision = invite_revision + 1,
-        invite_hash = ?, invite_issued_at = ?, invite_expires_at = ?, updated_at = ? WHERE customer_id = ?`)
-        .run(createHash("sha256").update(token).digest("hex"), now, new Date(Date.now() + 72 * 3600_000).toISOString(), now, customerId);
-    } else {
-      db.prepare(`UPDATE commerce_dealer_web_access SET access_revision = access_revision + 1, invite_revision = invite_revision + 1,
-        invite_hash = '', invite_issued_at = '', invite_expires_at = '', revoked_at = ?, updated_at = ? WHERE customer_id = ?`)
-        .run(now, now, customerId);
-    }
+    if (!current) throw new Error("Müşteri web hesabı bulunamadı.");
+    if (action === "revoke_sessions") {
+      db.prepare("UPDATE customer_web_access SET session_revision = session_revision + 1, revoked_at = ?, updated_at = ? WHERE customer_id = ?").run(now, now, customerId);
+    } else if (action && typeof action === "object" && action.type === "link" && typeof action.accountId === "string") {
+      if (current.accountId || !current.linkCandidates.some(candidate => candidate.accountId === action.accountId)) throw new Error("Hesap eşleştirmesi çakışıyor.");
+      db.prepare("UPDATE customer_web_access SET account_id = ?, updated_at = ? WHERE customer_id = ? AND account_id = ''").run(action.accountId, now, customerId);
+      db.prepare("UPDATE web_customer_accounts SET customer_id = ?, status = 'linked' WHERE account_id = ? AND status = 'conflict'").run(customerId, action.accountId);
+    } else throw new Error("Hesap erişim işlemi geçersiz.");
     db.exec("COMMIT");
   } catch (error) { db.exec("ROLLBACK"); throw error; }
-  const access = getDealerWebAccess(db, customerId)!;
-  desktopLog.info({ scope: "dealer-access", event: action === "invite" ? "dealer.access.invite.created" : "dealer.access.revoked",
-    message: "Bayi web erişimi güncellendi.", meta: { accessId: access.accessId, action } });
-  return { access, ...(inviteUrl ? { inviteUrl } : {}) };
+  desktopLog.info({ scope: "customer-accounts", event: action === "revoke_sessions" ? "account.sessions.revoked" : "account.customer.linked", message: "Müşteri hesap erişimi güncellendi." });
+  return { access: getDealerWebAccess(db, customerId)! };
 }
 export function createDealerAccessProjection(db: DatabaseSync): DealerAccessProjection {
   db.exec("SAVEPOINT dealer_access_projection");
   try {
-    const wholesaleEnabled = hasBusinessCapability(readEnabledBusinessCapabilities(db), BUSINESS_CAPABILITIES.WHOLESALE);
+    const caps = readEnabledBusinessCapabilities(db);
+    const online = hasBusinessCapability(caps, C.ONLINE_SALES);
     const settings = db.prepare("SELECT business_id, dealer_portal_enabled FROM settings WHERE deleted_at = '' LIMIT 1").get();
-    const enabled = wholesaleEnabled && Number(settings?.dealer_portal_enabled) === 1;
-    const rows = db.prepare(`SELECT a.*, p.company_name, p.dealer_status, c.deleted_at FROM commerce_dealer_web_access a
+    const enabled = online && hasBusinessCapability(caps, C.WHOLESALE) && Number(settings?.dealer_portal_enabled) === 1;
+    const rows = db.prepare(`SELECT a.*, p.company_name, p.dealer_status, c.deleted_at FROM customer_web_access a
       LEFT JOIN customer_commercial_profiles p ON p.customer_id = a.customer_id AND p.business_id = a.business_id
-      LEFT JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id WHERE a.business_id = ? ORDER BY a.id`).all(String(settings?.business_id ?? ""));
-    const projection: DealerAccessProjection = { version: 2, enabled, dealers: rows.map((row) => {
-      const eligible = enabled && row.dealer_status === "active" && row.deleted_at === "";
-      return { access_id: String(row.id), customer_ref: String(row.customer_ref), display_name: Array.from(String(row.company_name ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")).slice(0, 160).join(""),
-        access_revision: Number(row.access_revision), invite_revision: Number(row.invite_revision), enabled: eligible, invite_hash: eligible ? String(row.invite_hash) : "",
-        invite_expires_at: eligible && row.invite_expires_at ? Math.floor(Date.parse(String(row.invite_expires_at)) / 1000) : 0 };
-    }) };
+      JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id WHERE a.business_id = ? ORDER BY a.id`).all(String(settings?.business_id ?? ""));
+    const projection: DealerAccessProjection = { version: 3, online_sales_enabled: online, enabled, dealers: rows.map(row => ({
+      access_id: String(row.id), customer_ref: String(row.customer_ref), account_id: String(row.account_id),
+      display_name: Array.from(String(row.company_name ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")).slice(0, 160).join(""),
+      access_revision: Number(row.access_revision), session_revision: Number(row.session_revision), enabled: enabled && row.dealer_status === "active" && row.deleted_at === ""
+    })) };
     return { ...projection, catalogs: createDealerCatalogs(db, projection), order_history: createDealerOrderHistory(db, projection) };
   } finally { db.exec("RELEASE dealer_access_projection"); }
 }

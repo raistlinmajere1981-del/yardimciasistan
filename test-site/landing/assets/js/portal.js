@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const endpoint = file => new URL(`/yardimci-asistan/api/dealer/${file}.php`, window.location.origin);
   const headers = { "Content-Type": "application/json", "X-YA-Dealer": "1" };
-  let invite = "", accessId = "", catalog = null, cart = [], pending = null, busy = false, retryUntil = 0, timer, generation = 0;
+  let accessId = "", catalog = null, cart = [], pending = null, busy = false, retryUntil = 0, timer, generation = 0;
   const cartKey = () => `ya:dealer:${window.location.pathname}:${accessId}:cart:v1`;
   const attemptKey = () => `${cartKey()}:attempt`;
   const read = (storage, key) => { try { return JSON.parse(window[storage].getItem(key)); } catch { return null; } };
@@ -11,11 +11,6 @@
   const money = (value, currency) => new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(value);
   const element = (tag, text, className = "") => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
   const button = (text, action) => { const node = element("button", text, "quiet"); node.type = "button"; node.addEventListener("click", action); return node; };
-  function captureInvite() {
-    if (!window.location.hash) return;
-    invite = new URLSearchParams(window.location.hash.slice(1)).get("invite") || "";
-    window.history.replaceState(null, "", window.location.pathname);
-  }
   function clearPrivateState() {
     generation += 1;
     if (accessId) { write("localStorage", cartKey(), null); write("sessionStorage", attemptKey(), null); }
@@ -23,7 +18,7 @@
     $("checkout-form").reset(); $("product-grid").replaceChildren(); $("cart-lines").replaceChildren();
     $("dealer-store").hidden = true; $("success").hidden = true; $("reference").textContent = "";
     $("dealer-name").textContent = ""; $("dealer-name").hidden = true; $("logout").hidden = true;
-    $("portal-title").textContent = "Bayi erişimi gerekli";
+    $("portal-title").textContent = "Hesabım";
   }
   function restoreCart() {
     const stored = read("localStorage", cartKey());
@@ -97,7 +92,7 @@
     try {
       const response = await fetch(endpoint("catalog"), { cache: "no-store", credentials: "same-origin" });
       if (started !== generation || owner !== accessId) return;
-      if (response.status === 401) { clearPrivateState(); $("portal-message").textContent = "Bayi erişimi gerekli."; return; }
+      if ((response.status === 401 || response.status === 403)) { clearPrivateState(); $("portal-message").textContent = "Bayi erişimi gerekli."; return; }
       const result = await response.json(); if (!response.ok) throw new Error("unavailable");
       if (started !== generation || owner !== accessId) return;
       catalog = result.catalog;
@@ -110,44 +105,65 @@
       render();
     } catch { if (started === generation) $("portal-message").textContent = "Bayi kataloğu alınamadı. Lütfen yeniden deneyin."; }
   }
+  const accountEndpoint = file => new URL(`/yardimci-asistan/api/account/${file}.php`, window.location.origin);
+  const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
+  const tokenAction = new URLSearchParams(window.location.search).get("action");
+  if (window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  let account = null;
+  async function accountRequest(file, body) {
+    const response = await fetch(accountEndpoint(file), {cache:"no-store", credentials:"same-origin", ...(body === undefined ? {} : {method:"POST",headers:{"Content-Type":"application/json","X-YA-Account":"1"},body:JSON.stringify(body)})});
+    const value = await response.json();
+    if (!response.ok) { const error = new Error(value.code || "account_unavailable"); error.status = response.status; throw error; }
+    return value;
+  }
   async function session() {
     const started = generation;
     try {
-      const response = await fetch(endpoint("session"), { cache: "no-store", credentials: "same-origin" });
-      if (response.status !== 401 && !response.ok) throw new Error("unavailable");
-      const data = await response.json();
+      const config = await accountRequest("config");
       if (started !== generation) return;
-      if (data.authenticated === true && data.dealer) {
-        if (accessId && accessId !== data.dealer.access_id) clearPrivateState();
-        accessId = data.dealer.access_id; restoreCart();
-        $("portal-title").textContent = "Bayi paneli"; $("dealer-name").textContent = data.dealer.display_name;
-        $("dealer-name").hidden = false; $("logout").hidden = false; $("claim").hidden = true;
-        $("portal-message").textContent = "Bayi panelinize hoş geldiniz."; $("dealer-store").hidden = false; render(); await loadCatalog();
-      } else {
-        clearPrivateState(); $("claim").hidden = !invite;
-        $("portal-message").textContent = invite ? "Tek kullanımlık davetinizi kullanarak giriş yapın." : "İşletmeden bayi davet bağlantısı isteyin.";
+      $("account-forms").hidden = true; $("account-profile").hidden = true; $("account-orders").hidden = true; $("account-logout-all").hidden = true; $("account-providers").replaceChildren();
+      if (!config.enabled) { clearPrivateState(); $("logout").hidden = false; $("portal-message").textContent = "Online Satış kapalı. Hesap erişimi şu anda kullanılamıyor."; return; }
+      if (token && ["verify","reset"].includes(tokenAction)) { $("account-token").hidden=false; return; }
+      try { account = (await accountRequest("session")).account; }
+      catch(error) { if(error.status!==401)throw error; try { await accountRequest("refresh",{}); account=(await accountRequest("session")).account; } catch {account=null;} }
+      if (started !== generation) return;
+      for (const provider of config.providers || []) {
+        if (account?.methods.includes(provider)) continue;
+        const social = button((provider === "google" ? "Google" : "Facebook") + (account ? " hesabını bağla" : " ile giriş"), async () => {
+          try { const value = await accountRequest("oauth",{provider,link:Boolean(account)}); location.assign(value.url); } catch(error) { $("portal-message").textContent=error.message; }
+        }); $("account-providers").append(social);
       }
-    } catch { $("portal-message").textContent = "Erişim durumu alınamadı. Lütfen yeniden deneyin."; }
+      if (account) {
+        $("logout").hidden=false; $("account-logout-all").hidden=false; $("account-profile").hidden=false;
+        $("account-email").textContent=account.email; $("account-profile").elements.fullName.value=account.fullName;
+        $("account-orders").hidden=false; $("account-order-list").replaceChildren();
+        const history=await accountRequest("orders");
+        for(const order of history.orders || []) $("account-order-list").append(element("p",order.order_id+" · "+order.status));
+        if(account.dealer) {
+          if(accessId && accessId !== account.dealer.access_id) clearPrivateState();
+          accessId=account.dealer.access_id;restoreCart();
+          $("portal-title").textContent="Bayi paneli"; $("dealer-name").textContent=account.dealer.display_name; $("dealer-name").hidden=false;
+          $("portal-message").textContent="Bayi panelinize hoş geldiniz."; await loadCatalog();
+        } else {clearPrivateState(); $("logout").hidden=false; $("portal-message").textContent="Normal müşteri hesabınız açık. Bayi yetkisi için işletmeyle iletişime geçin.";}
+      } else {
+        clearPrivateState(); $("account-forms").hidden=false; $("account-register").hidden=!config.passwordRegistration; $("account-recover").hidden=!config.passwordRegistration;
+        $("portal-message").textContent="Müşteri hesabınızla giriş yapın.";
+      }
+    } catch(error) {clearPrivateState(); $("portal-message").textContent=error.message;}
   }
-  $("claim").addEventListener("click", async () => {
-    $("claim").disabled = true;
+  for(const action of ["login","register","recover","profile","token"]) $("account-"+action).addEventListener("submit", async event => {
+    event.preventDefault(); const form=event.currentTarget,submit=form.querySelector("button");submit.disabled=true;
     try {
-      const response = await fetch(endpoint("claim"), { method: "POST", credentials: "same-origin", headers, body: JSON.stringify({ invite_token: invite }) });
-      invite = ""; $("claim").hidden = true;
-      if (!response.ok) { $("portal-message").textContent = "Bağlantı geçersiz veya süresi dolmuş."; return; }
-      await session();
-    } catch { $("portal-message").textContent = "İşlem tamamlanamadı. Lütfen yeniden deneyin."; }
-    finally { $("claim").disabled = false; }
+      await accountRequest(action==="token"?tokenAction:action,{...Object.fromEntries(new FormData(form)),...(action==="token"?{token}:{})});
+      for(const password of form.querySelectorAll('input[type="password"]')) password.value="";
+      if(action==="token"){location.assign(location.pathname);return;}
+      if(["login","profile"].includes(action)) await session();
+      else $("portal-message").textContent="Hesap mevcutsa doğrulama veya yenileme bağlantısı gönderildi. E-posta kutunuzu kontrol edin.";
+    } catch(error){$("portal-message").textContent=error.message;}
+    finally{submit.disabled=false;}
   });
-  $("logout").addEventListener("click", async () => {
-    $("logout").disabled = true;
-    try {
-      const response = await fetch(endpoint("logout"), { method: "POST", credentials: "same-origin", headers, body: "{}" });
-      if (!response.ok) throw new Error("unavailable");
-      invite = ""; clearPrivateState(); await session();
-    } catch { $("portal-message").textContent = "Oturum kapatılamadı. Lütfen yeniden deneyin."; }
-    finally { $("logout").disabled = false; }
-  });
+  $("logout").addEventListener("click",async()=>{clearPrivateState();account=null;try{await accountRequest("logout",{});await session();}catch{$("portal-message").textContent="Yerel görünüm kapatıldı. Sunucudaki çıkışı yeniden deneyin.";}});
+  $("account-logout-all").addEventListener("click",async()=>{try{await accountRequest("logout-all",{});account=null;clearPrivateState();await session();}catch(error){$("portal-message").textContent=error.message;}});
   $("checkout-form").addEventListener("submit", async event => {
     event.preventDefault(); if (busy || Date.now() < retryUntil || !accessId) return;
     if (!pending?.payload) {
@@ -172,7 +188,7 @@
       if (response.ok && result.ok && typeof result.order_id === "string") {
         pending = null; write("sessionStorage", attemptKey(), null); cart = []; persistCart(); $("checkout-form").reset();
         $("reference").textContent = result.order_id; $("success").hidden = false; $("dealer-store").hidden = true; $("success").focus(); $("submission-message").textContent = "";
-      } else if (response.status === 401) { clearPrivateState(); $("portal-message").textContent = "Bayi erişimi gerekli."; }
+      } else if ((response.status === 401 || response.status === 403)) { clearPrivateState(); $("portal-message").textContent = "Bayi erişimi gerekli."; }
       else if ([400, 403, 409, 422].includes(response.status)) {
         $("submission-message").textContent = result.message || "Sipariş bilgilerini kontrol edin.";
         if (response.status === 409) pending.payload = null;
@@ -191,6 +207,7 @@
   $("clear-cart").addEventListener("click", () => { if (!pending && !busy) { cart = []; persistCart(); render(); } });
   $("new-order").addEventListener("click", () => { $("success").hidden = true; $("dealer-store").hidden = false; void loadCatalog(); });
   window.addEventListener("beforeunload", event => { if (pending) { event.preventDefault(); event.returnValue = ""; } });
-  window.addEventListener("hashchange", () => { captureInvite(); if (!busy) void session(); });
-  captureInvite(); void session();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !busy) void session(); });
+  setInterval(() => { if (!document.hidden && !busy) void session(); },30000);
+  void session();
 })();

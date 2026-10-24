@@ -19,7 +19,7 @@ export function createDealerCatalogs(db: DatabaseSync, access: DealerAccessProje
   const rows = db.prepare(`SELECT p.id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url, p.category_id, p.brand, COALESCE(c.name, '') AS category_name FROM catalog_products p LEFT JOIN catalog_categories c ON c.id = p.category_id AND c.business_id = p.business_id AND c.deleted_at = ''
     WHERE p.business_id = ? AND p.is_active = 1 AND p.deleted_at = '' ORDER BY p.name, p.id`).all(businessId);
   return access.dealers.filter(dealer => dealer.enabled).map(dealer => {
-    const owner = db.prepare("SELECT customer_id FROM commerce_dealer_web_access WHERE id = ? AND business_id = ?").get(dealer.access_id, businessId)!;
+    const owner = db.prepare("SELECT customer_id FROM customer_web_access WHERE id = ? AND business_id = ?").get(dealer.access_id, businessId)!;
     const products = rows.map(row => {
       const resolved = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id), customerId: String(owner.customer_id) }, true);
       return { product_id: String(row.id), name: String(row.name), description: String(row.description), sku: String(row.sku),

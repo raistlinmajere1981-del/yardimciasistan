@@ -14,13 +14,13 @@ function record(value: unknown): Record<string, unknown> {
 /** Validates only ingress data; canonical pricing and persistence own order rules. */
 export class OnlineOrderIngressService {
   constructor(private readonly database: Pick<DesktopDatabase,
-    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "createDealerWebOrder" | "replayRetainedWebOrder">>) {}
+    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "createDealerWebOrder" | "createCustomerWebOrder" | "replayRetainedWebOrder">>) {}
 
   importOrder(input: WebOrderEnvelope, afterSeq = 0, restoreReplay = false) {
     const dealer = input?.kind === "dealer";
-    // Dealer capability/access gates belong to the canonical transaction, so a revoked
-    // generation has a durable rejection outcome even while guest ingress remains enabled.
-    if (!restoreReplay && !dealer && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+    // Online Sales pauses retained intake for every account kind. Commercial revocation
+    // remains a terminal outcome inside the canonical dealer transaction.
+    if (!restoreReplay && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
       throw new Error("Online satış bu işletmede etkin değil.");
     }
     const envelope = record(input);
@@ -48,7 +48,7 @@ export class OnlineOrderIngressService {
     if (typeof note !== "string" || [...note].length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(note)) return invalidEnvelope();
     if (restoreReplay) {
       if (!this.database.replayRetainedWebOrder || typeof envelope.previouslyAcknowledged !== "boolean"
-          || (envelope.kind !== undefined && envelope.kind !== "guest" && envelope.kind !== "dealer")) return invalidEnvelope();
+          || (envelope.kind !== undefined && envelope.kind !== "guest" && envelope.kind !== "dealer" && envelope.kind !== "customer")) return invalidEnvelope();
       if (this.database.replayRetainedWebOrder(input)) return;
       if (!dealer && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
         throw new Error("Online satış bu işletmede etkin değil.");
@@ -61,6 +61,10 @@ export class OnlineOrderIngressService {
       return this.database.createDealerWebOrder(envelope.dealerAccessId, Number(envelope.accessRevision), {
         sourceReference: id, deliverySnapshot, note: note.trim(), items
       });
+    }
+    if (envelope.kind === "customer") {
+      if (typeof envelope.accountId !== "string" || !/^[a-f0-9-]{36}$/.test(envelope.accountId) || !this.database.createCustomerWebOrder) return invalidEnvelope();
+      return this.database.createCustomerWebOrder(envelope.accountId, { sourceReference: id, deliverySnapshot, note: note.trim(), items, buyerSnapshot: normalizeCommerceOrderBuyerSnapshot(envelope.buyer) });
     }
     if (envelope.kind !== undefined && envelope.kind !== "guest") return invalidEnvelope();
     const buyerSnapshot = normalizeCommerceOrderBuyerSnapshot(envelope.buyer);

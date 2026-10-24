@@ -23,7 +23,7 @@ export class SyncOutboxPublisher {
   private dealerAccessSupported = false;
   setSupportedFeatures(features: readonly string[]) {
     this.onlineCatalogSupported = features.includes("online_catalog_v1");
-    this.dealerAccessSupported = features.includes("dealer_access_v2");
+    this.dealerAccessSupported = features.includes("customer_accounts_v1");
   }
   private readonly outboxPublicationsInFlight = new Map<string, { sourceRevision: number; promise: Promise<unknown> }>();
   constructor(private readonly options: SyncOutboxPublisherOptions,
@@ -102,8 +102,9 @@ export class SyncOutboxPublisher {
         continue;
       }
       if (job.jobType === "dealer_access_publish" && (!this.dealerAccessSupported || !transport.publishDealerAccess)) {
+        errors.push("Müşteri hesap durumu yayınlanamadı; web modülünü güncelleyin.");
         this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
-          "Web modülü bayi erişimini desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
+          "Web modülü ortak müşteri hesaplarını desteklemiyor. Online hesap durumu henüz yayınlanamadı.", new Date(Date.now() + 300_000).toISOString());
         continue;
       }
       if (job.jobType === "marketing_website_publish") {

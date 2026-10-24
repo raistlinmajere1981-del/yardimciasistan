@@ -127,7 +127,27 @@ if [[ "$skip_pack" == false ]]; then
 fi
 
 required_package_files=(
-  api/dealer/claim.php
+  api/account/config.php
+  api/account/login.php
+  api/account/session.php
+  api/account/register.php
+  api/account/verify.php
+  api/account/reset.php
+  api/account/recover.php
+  api/account/logout.php
+  api/account/logout-all.php
+  api/account/refresh.php
+  api/account/profile.php
+  api/account/orders.php
+  api/account/oauth.php
+  api/account/callback.php
+  api/account/browser.php
+  api/account/exchange.php
+  lib/customer-account.php
+  lib/customer-account-store.php
+  lib/customer-account-mail.php
+  lib/customer-account-oauth.php
+  lib/customer-account-endpoint.php
   api/dealer/session.php
   api/dealer/logout.php
   lib/dealer-access.php
@@ -428,11 +448,11 @@ if command -v curl >/dev/null 2>&1; then
     exit 1
   fi
   dealer_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/session.php" || true)"
-  dealer_claim_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/claim.php" || true)"
+  account_config_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/account/config.php" || true)"
   dealer_logout_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/logout.php" || true)"
   dealer_catalog_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/catalog.php" || true)"
   dealer_order_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/order.php" || true)"
-  if [[ "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" || "$dealer_catalog_status" != "401" || "$dealer_order_status" != "405" ]]; then
+  if [[ "$dealer_session_status" != "401" && "$dealer_session_status" != "403" || "$account_config_status" != "200" || "$dealer_logout_status" != "405" || ( "$dealer_catalog_status" != "401" && "$dealer_catalog_status" != "403" ) || "$dealer_order_status" != "405" ]]; then
     printf 'Yayın uygulandı ancak bayi API/oturum sağlık kontrolü başarısız oldu.\n' >&2
     exit 1
   fi

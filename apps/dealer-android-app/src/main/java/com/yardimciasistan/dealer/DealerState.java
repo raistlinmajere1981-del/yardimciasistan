@@ -18,6 +18,14 @@ final class DealerState {
   String text(String key) { return data.optString(key, ""); }
   JSONObject object(String key) { JSONObject value = data.optJSONObject(key); return value == null ? new JSONObject() : value; }
   JSONArray array(String key) { JSONArray value = data.optJSONArray(key); return value == null ? new JSONArray() : value; }
+  JSONObject brandingFor(String base) {
+    return base.equals(text("branding_base")) ? object("branding") : new JSONObject();
+  }
+  void updateBranding(String base, JSONObject display) throws Exception {
+    data.put("branding_base", base).put("branding", display)
+        .put("branding_at", System.currentTimeMillis());
+    save();
+  }
   void put(String key, Object value) throws Exception { data.put(key, value); save(); }
   void authenticate(String base, String cookie, JSONObject dealer) throws Exception {
     String owner = base + "|" + dealer.getString("access_id");
@@ -114,9 +122,17 @@ final class DealerState {
   }
   void logout() throws Exception {
     JSONObject drafts = object("saved_drafts");
+    String connection = text("connection_base");
+    JSONObject lastBrand = brandingFor(connection);
+    long lastBrandAt = data.optLong("branding_at", 0);
     java.util.List<String> keys = new java.util.ArrayList<>(); data.keys().forEachRemaining(keys::add);
     for (String key : keys) data.remove(key);
     if (drafts.length() > 0) data.put("saved_drafts", drafts);
+    if (!connection.isEmpty()) data.put("connection_base", connection);
+    if (!connection.isEmpty() && lastBrand.length() > 0) {
+      data.put("branding_base", connection).put("branding", lastBrand)
+          .put("branding_at", lastBrandAt);
+    }
     save();
   }
 }

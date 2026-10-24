@@ -667,81 +667,39 @@ raw provider state or provider-returned error text. No polling, webhook, labels,
 Sale/fulfillment or new provider/sync outbox execution is introduced.
 
 
-## D-033 — Dealer Web Identity is canonical Customer access, not a second Customer
+## D-033 — Shared customer accounts and commercial authorization
 
-**Status:** ACCEPTED (2026-10-04)
+**Status:** ACCEPTED; common accounts replace invitation identity.
 
-Dealer Web Identity references canonical Customer + an active commercial dealer profile.
-Desktop owns `commerce_dealer_web_access`, eligibility, invite generation and
-monotonically increasing access/invitation revisions. Active commercial dealer status,
-persisted Wholesale and the enabled dealer portal determine eligibility. The technical
-access row is prepared automatically by commercial-profile writes; its stored `enabled`
-field is bookkeeping, never a second operator permission. Wholesale owns the staged
-`dealerPortalEnabled` subfeature configuration (default OFF); this is neither a new
-sector/capability nor an alias of Online Sales. Disabling Wholesale/portal, removing or
-inactivating a dealer profile, or deleting its Customer invalidates access and clears
-invites. Re-enabling restores eligibility with a fresh generation, never old sessions or invites. Explicit backup restore
-preserves the backed-up desired access under a new publication epoch; normal hosting
-apply invalidates previous-epoch sessions and retains consumed-invite history (D-043).
+A single Hosting account serves ordinary and dealer customers. Hosting owns passwords,
+provider subjects, verification/recovery and independent web/Android sessions. Desktop
+Customer, `customer_commercial_profiles` and the single `customer_web_access` binding
+own customer identity, dealer status and prices. All account/private dealer surfaces
+require persisted Online Sales; Wholesale, portal and active dealer status only add
+commercial permission. Dealer demotion preserves the ordinary account. No email-only
+merge, reassignment, invitation API/session or compatibility schema exists.
 
-The web module owns only a sanitized private access projection, one-time claim consumption
-and server-side transport sessions. It never owns or receives the canonical Customer list.
-Projection includes independently random access/customer reference ids, company display
-name, revision, enabled state and private invite hash/expiry. Contact, tax, notes, guest
-buyer snapshots, pricing and internal Customer ids do not cross this boundary. Price
-group could later annotate identity, but never establishes price authority; C1 omits it.
+Verified registration is retained while Desktop is offline, then transactionally
+imported by the existing sync ingress. A pre-existing customer email collision requires
+explicit operator confirmation in Customer Workspace. The existing durable
+`dealer_access` publication carries version 3 capability/bindings/catalogs/history and
+uses exact acknowledgements. Failed publication remains visible and cannot be called
+remote revocation. Hosting checks the latest accepted capability on every request;
+logout remains available while disabled. Records/history are retained on disable.
 
-Immediate Customer Workspace operations issue/rotate an invite or sign out all devices.
-The latter clears unused invitations and requires a short inline confirmation. They do not participate in the customer card draft; dirty
-cards must be saved/discarded first. Access status means Desktop-authorized access, not a
-claim that a hosting session is currently live. The durable versioned publication/outbox
-owns retries, idempotency and stale-publication rejection. Revocation takes effect on
-hosting after successful publication; an offline/failed sync must not be presented as
-completed remote revocation. Private projection application and publication receipt
-commit atomically; retry never resets consumed invites.
-
-Invites contain 256 bits of cryptographic randomness, expire after 72 hours, disclose
-only at generation and persist only as SHA-256 hashes. Links carry tokens in fragments,
-never query parameters; the portal removes the fragment before claim. Claim is explicit
-same-origin JSON POST, rate-limited with hashed IP counters and fail-closed storage.
-Generic failure is “Bağlantı geçersiz veya süresi dolmuş.” Consume + session creation is
-atomic. Rotation increments only `invite_revision`, invalidating the previous invitation
-while existing web and Android sessions remain usable concurrently. Signing out all
-devices and eligibility withdrawal increment `access_revision` and `invite_revision`.
-Hosting rejects regressing revisions and retains used/retired invite hashes, including
-across source epochs. V2 publications require hosting capability `dealer_access_v2`;
-V1 publications remain readable by upgraded hosting and old web/Android cookie clients
-continue to use the same session endpoints.
-
-Self-contained Android invites use the same portal with fragment
-`#invite=TOKEN&module=ENCODED_EXACT_HTTPS_MODULE_URL`. The extra field does not change
-claim/session identity or token storage. The client validates the portal's sibling path,
-origin and effective port against the exact module; it never guesses a module directory.
-Legacy links without module information remain usable on the web; Android asks for a new
-link. `#application=dealer&module=...` opens the existing public application flow without
-consuming an invite. Desktop copies it from persisted enabled service settings and module
-configuration; neither link contains a publication secret. Appearance preferences are
-device-only and independent of the encrypted account/session state.
-
-Hosting sessions carry 256-bit opaque random tokens in HttpOnly, production Secure,
-SameSite=Strict cookies scoped to the module's `/api/dealer/` path, with an eight-hour
-absolute lifetime. Only hashes persist in `dealer_sessions`. Every authenticated read
-joins enabled access and matching revision; session tokens never enter renderer JSON or
-browser storage. Logout is same-origin POST and revokes the stored session before
-expiring its cookie. Strict JSON + a non-CORS custom header protect claim/logout from
-cross-origin mutations. Hosting logs only stable allowlisted events/categories/opaque
-access ids. `/bayi/` renders sanitized session-scoped identity, catalog/order projections
-and logout; it never exposes canonical customer/contact records.
+Security, provider flows, environment configuration, current schema, restore behavior
+and manual verification boundaries are defined by
+[Shared customer accounts](CUSTOMER_ACCOUNTS_V1.md).
 
 Online Dealer Application is a default-OFF preference in the existing dealer portal
-service. Public acceptance requires that preference plus portal, Wholesale and Requests.
+service. Public acceptance requires that preference plus Online Sales, portal, Wholesale and Requests.
 Widget and Dealer Android submit `dealer_application` through the guarded, idempotent
 public request endpoint without an account. Company, authorized person, email and tax
 facts are structured ingress fields; the optional note remains the request message.
 Submission creates no customer or access. Owner approval chooses retail/dealer_a/dealer_b
 and commits canonical Customer/profile, active status, price group, request linkage/status
 and access publication intent in one transaction. Matching conflicts fail without edits;
-replay uses the retained conversion link. Invitations are an explicit later operation.
+replay uses the retained conversion link. The common account is linked separately with explicit ownership confirmation.
 Generic request status updates cannot bypass conversion or undo its identity.
 
 Up to five optional PDF/JPEG/PNG documents (10 MiB each) accompany the same multipart
@@ -770,7 +728,7 @@ inside its transaction, following D-024: current Desktop pricing wins without a 
 Client unit prices, totals, discounts and price groups never determine order prices.
 
 Initial dealer visibility is every active, non-deleted canonical Catalog Product while
-Wholesale and the dealer portal are enabled. Public `online_sales` publication flags and
+Online Sales, Wholesale and the dealer portal are enabled. Public `online_sales` publication flags and
 retail title overrides do not control this channel. No second publication checkbox is
 introduced. The existing public publication model is unchanged; a future per-product
 dealer visibility requirement must extend it explicitly. Product/publication changes still

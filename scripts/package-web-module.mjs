@@ -25,7 +25,8 @@ const requiredFiles = [
   "api/whatsapp-webhook.php",
   "api/business-messaging-status.php",
   "lib/business-messaging.php",
-  "api/dealer/claim.php",
+  ...["config", "session", "register", "verify", "login", "logout", "logout-all", "refresh", "recover", "reset", "profile", "orders", "oauth", "callback", "browser", "exchange"].map(name => `api/account/${name}.php`),
+  ...["customer-account", "customer-account-store", "customer-account-mail", "customer-account-oauth", "customer-account-endpoint"].map(name => `lib/${name}.php`),
   "api/dealer/session.php",
   "api/dealer/logout.php",
   "lib/dealer-access.php",
@@ -96,6 +97,7 @@ const FORBIDDEN_PACKAGE_STRINGS = [
 ];
 const businessOverrideFields = [
   ["display_name", "YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME"],
+  ["logo_url", "YARDIMCI_ASISTAN_DEPLOY_LOGO_URL"],
   ["profile_id", "YARDIMCI_ASISTAN_DEPLOY_PROFILE_ID"],
   ["phone", "YARDIMCI_ASISTAN_DEPLOY_PHONE"],
   ["whatsapp", "YARDIMCI_ASISTAN_DEPLOY_WHATSAPP"],

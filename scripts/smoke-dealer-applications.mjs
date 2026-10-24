@@ -30,7 +30,7 @@ const server = spawn("php", ["-d", "upload_max_filesize=11M", "-d", "post_max_si
 let logs = "", browser, webDb, uiServer;
 for (const stream of [server.stdout,server.stderr]) stream.on("data", data => logs += data);
 const database = new DesktopDatabase({ appPath: join(process.cwd(), "apps/desktop-app"), userDataPath: join(root,"desktop") });
-const setup = createSmokeSetupInput({ businessName: "Başvuru İşletmesi", profileId: "market", profileOptions:[C.WHOLESALE,C.REQUESTS], dealerPortalEnabled:true,
+const setup = createSmokeSetupInput({ businessName: "Başvuru İşletmesi", profileId: "market", profileOptions:[C.WHOLESALE,C.REQUESTS,C.ONLINE_SALES], dealerPortalEnabled:true,
   dealerApplicationEnabled:false, phone:"",whatsapp:"",syncSecret:secret,servicePreferences:{android:false,whatsapp:false},initialCounts:{rooms:0,tables:0},tableCategories:[] });
 const coordinator = new SyncCoordinator({database,getSyncConfig:()=>({baseUrl,syncSecret:secret}), createAndroidSnapshot:()=>createAndroidOperationsSnapshot(database,database.getDashboardData()),onDashboardChanged(){},onStatusChanged(){}});
 const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n");
@@ -45,8 +45,6 @@ async function submit(key, docs = [], extra = {}) {
   return {status:response.status, body:await response.json()};
 }
 async function sync() { const result = await coordinator.runNow(); assert.equal(result.ok,true,result.message); }
-async function claim(invite) { clearGuard(); const result = await fetch(`${baseUrl}/api/dealer/claim.php`,{method:"POST",headers:{"Content-Type":"application/json","X-YA-Dealer":"1"},body:JSON.stringify({invite_token:new URLSearchParams(new URL(invite).hash.slice(1)).get("invite")})}); return {status:result.status,cookie:result.headers.get("set-cookie")?.split(";")[0]}; }
-async function session(cookie) { return (await fetch(`${baseUrl}/api/dealer/session.php`,{headers:{Cookie:cookie}})).status; }
 try {
   for (let i=0;;i++) { try { if ((await fetch(`${baseUrl}/api/business.php`)).ok) break; } catch {} if(i>100)throw new Error("PHP did not start"); await new Promise(resolve=>setTimeout(resolve,30)); }
   database.initialize(); assert.equal(database.saveInitialSetup(setup).ok,true); await sync();
@@ -94,7 +92,7 @@ try {
   const query={action:"request_document",request_id:id,document_id:imported.documents[0].id};
   const downloadPost=headers=>fetch(`${baseUrl}/api/sync.php`,{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify(query)});
   assert.equal((await downloadPost({})).status,401);
-  assert.equal((await downloadPost({Cookie:"ya_dealer_session="+"x".repeat(43)})).status,401);
+  assert.equal((await downloadPost({Cookie:"ya_account_session="+"x".repeat(43)})).status,401);
   assert.deepEqual(Buffer.from(await (await downloadPost({"X-YA-Sync-Secret":secret})).arrayBuffer()),pdf);
   assert.equal((await fetch(`${baseUrl}/data/${query.document_id}`)).status,404);
   assert.equal(database.approveDealerApplication(id,"client-decides").ok,false);
@@ -108,19 +106,11 @@ try {
   assert.equal(database.getDashboardData().customers.length,1);
   database.upsertRequests([rawRequest]); assert.equal(database.getRequestById(id).status,"approved"); assert.equal(database.getRequestById(id).customer_id,customerId);
   assert.equal(database.getCustomerRequests(customerId)[0].documents.length,2,"history keeps original files");
-  const firstInvite=database.changeDealerWebAccess(customerId,"invite").inviteUrl; await sync();
-  const web=await claim(firstInvite); assert.equal(web.status,200);
-  const nextInvite=database.changeDealerWebAccess(customerId,"invite").inviteUrl; await sync();
-  assert.equal(await session(web.cookie),200,"new Android invitation preserves web session");
-  const android=await claim(nextInvite); assert.equal(android.status,200); assert.equal(await session(web.cookie),200); assert.equal(await session(android.cookie),200);
-  database.changeDealerWebAccess(customerId,"revoke_sessions"); const unused=database.changeDealerWebAccess(customerId,"invite").inviteUrl;
-  database.changeDealerWebAccess(customerId,"revoke_sessions"); await sync();
-  assert.equal(await session(web.cookie),401); assert.equal(await session(android.cookie),401); assert.equal((await claim(unused)).status,400);
-  const pending=database.changeDealerWebAccess(customerId,"invite").inviteUrl; await sync(); const beforeInactive=await claim(pending);
-  let customer=database.getCustomer(customerId); assert.equal(database.saveCustomer({...customer,commercialProfile:{...customer.commercialProfile,dealerStatus:"inactive"}}).ok,true); await sync();
-  assert.equal(await session(beforeInactive.cookie),401);
-  customer=database.getCustomer(customerId); assert.equal(database.saveCustomer({...customer,commercialProfile:{...customer.commercialProfile,dealerStatus:"active"}}).ok,true); await sync();
-  assert.equal(await session(beforeInactive.cookie),401); assert.equal((await claim(pending)).status,400);
+  let customer=database.getCustomer(customerId);
+  assert.equal(database.saveCustomer({...customer,commercialProfile:{...customer.commercialProfile,dealerStatus:"inactive"}}).ok,true); await sync();
+  assert.equal(database.getDealerWebAccess(customerId).enabled,false);
+  customer=database.getCustomer(customerId);
+  assert.equal(database.saveCustomer({...customer,commercialProfile:{...customer.commercialProfile,dealerStatus:"active"}}).ok,true); await sync();
   // Matching an existing customer preserves its card, with conflicts failing atomically.
   const second=await submit(randomUUID(),[],{customer_phone:"05552223344",tax_number:"2222222222",company_name:"Mevcut Firma"});
   const existing=database.saveCustomer({...customer,id:"",fullName:"Korunan Müşteri",phone:"05552223344",commercialProfile:null}); assert.equal(existing.ok,true);
@@ -136,9 +126,9 @@ try {
     assert.equal(database.approveDealerApplication(rollbackRequest.body.request_id,"dealer_b").ok,false);
     assert.equal(database.getDashboardData().customers.length,before); assert.equal(database.getRequestById(rollbackRequest.body.request_id).status,"new");
     rawDesktop.exec("DROP TRIGGER fixture_reject_dealer");
-    const desired=database.createDealerAccessProjection(); desired.dealers.find(item=>item.access_id===database.getDealerWebAccess(customerId).accessId).invite_revision-=1;
+    const desired=database.createDealerAccessProjection(); desired.dealers.find(item=>item.access_id===database.getDealerWebAccess(customerId).accessId).access_revision-=1;
     const revision=rawDesktop.prepare("SELECT source_revision FROM sync_publication_payloads WHERE job_key='dealer_access'").get().source_revision;
-    assert.equal((await transport.publishDealerAccess({sourceRevision:revision+1,idempotencyKey:randomUUID(),value:desired})).ok,false,"delayed invite publication cannot reinstate retired invite");
+    assert.equal((await transport.publishDealerAccess({sourceRevision:revision+1,idempotencyKey:randomUUID(),value:desired})).ok,false,"delayed commercial publication cannot reinstate an older access revision");
   } finally {rawDesktop.close();}
   // Real IPC handlers: lock/capability/document binding, PDF open, image preview and Save As.
   const handlers=new Map(), opened=[]; let locked=false, allowed=true;
@@ -182,7 +172,7 @@ try {
   await ui.getByRole("button",{name:"Reddet",exact:true}).click(); await expect(review.getByRole("button",{name:"Onayla ve Bayi Oluştur"})).toHaveCount(0);
   assert.equal(database.getRequestById(uiRequest.body.request_id).dealer_customer_id,"");
   await ui.getByRole("button",{name:"Yeniden Aç"}).click(); await review.getByLabel("Fiyat grubu",{exact:true}).selectOption("dealer_b");
-  await review.getByRole("button",{name:"Onayla ve Bayi Oluştur"}).click(); await expect(review.getByRole("region",{name:"Bayi Girişi"})).toBeVisible();
+  await review.getByRole("button",{name:"Onayla ve Bayi Oluştur"}).click(); await expect(review.getByRole("region",{name:"Müşteri Hesabı"})).toBeVisible();
   assert.equal(database.getCustomer(database.getRequestById(uiRequest.body.request_id).dealer_customer_id).commercialProfile.priceGroup,"dealer_b");
   await ui.getByRole("button",{name:"Müşteri geçmişi",exact:true}).click(); await expect(ui.getByRole("region",{name:"Başvuru belgeleri"})).toContainText("vergi.pdf");
   await ui.getByRole("button",{name:"Görseli önizle"}).click(); await expect(ui.getByAltText("Başvuru belgesi önizlemesi")).toBeVisible(); assert.deepEqual(errors,[]);

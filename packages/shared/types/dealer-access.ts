@@ -1,34 +1,30 @@
 /** Dealer identity is an access projection of canonical Customer, never a second Customer. */
-export type DealerAccessAction = "invite" | "revoke_sessions";
+export type DealerAccessAction = "revoke_sessions" | { type: "link"; accountId: string };
 export interface DealerWebAccess {
   accessId: string;
   customerId: string;
+  accountId: string;
   enabled: boolean;
   accessRevision: number;
-  inviteRevision: number;
-  inviteIssuedAt: string;
-  inviteExpiresAt: string;
+  sessionRevision: number;
   revokedAt: string;
   updatedAt: string;
+  linkCandidates: Array<{ accountId: string; email: string; fullName: string }>;
 }
-export interface DealerAccessResult {
-  access: DealerWebAccess;
-  /** One-time disclosure. Keep only in the current UI instance, never persist. */
-  inviteUrl?: string;
-}
-/** Private sync contract: no contact, tax, notes, pricing configuration or raw canonical Customer ids. */
+export interface DealerAccessResult { access: DealerWebAccess; }
+/** Private sync contract. Opaque customer binding and resolved commercial projections only. */
 export interface DealerAccessProjection {
-  version: 1 | 2;
+  version: 3;
+  online_sales_enabled: boolean;
   enabled: boolean;
   dealers: Array<{
     access_id: string;
     customer_ref: string;
     display_name: string;
     access_revision: number;
-    invite_revision?: number;
+    session_revision: number;
+    account_id: string;
     enabled: boolean;
-    invite_hash: string;
-    invite_expires_at: number;
   }>;
   /** Read-only canonical order snapshots, carried by the same private durable publication. */
   order_history?: DealerOrderHistoryProjection[];

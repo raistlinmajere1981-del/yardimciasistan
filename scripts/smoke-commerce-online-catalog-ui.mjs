@@ -169,6 +169,8 @@ try {
       setInventoryCount: input => window.__detailCall("count", input),
       getProductPublication: id => window.__detailCall("publication", id),
       saveProductPublication: input => window.__detailCall("publish", input),
+      listProductPhotos: async id => ({productId:id,revision:"fixture-photo-revision",photos:[{id:"fixture-photo",format:"image/png"}],sourceUrl:"",sourceLicense:""}),
+      previewProductPhoto: async () => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>'),
       getProductImageDataUrl: async () => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>')
     } };
   }, { ...stockProduct, imageAssetPath: "test-preview.png" });

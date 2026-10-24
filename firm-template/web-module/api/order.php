@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../lib/public-request-guard.php';
 require_once __DIR__ . '/../lib/online-order.php';
+require_once __DIR__ . '/../lib/customer-account.php';
 
 header('Cache-Control: no-store');
 ya_public_guard_enforce('order');
@@ -15,9 +16,11 @@ if (json_last_error() !== JSON_ERROR_NONE || !is_array($input) || array_is_list(
     ya_order_response(400, ['ok' => false, 'code' => 'invalid_json', 'message' => 'Sipariş bilgileri okunamadı.']);
 }
 try {
-    ya_order_response(201, ya_online_order_submit($input));
+    ya_order_response(201, ya_online_order_submit($input, (ya_account_token() !== '' || ya_account_token('ya_account_refresh') !== '') ? ya_account_order_owner() : null));
 } catch (YaOnlineOrderRejection $error) {
     ya_order_response($error->status, ['ok' => false, 'code' => $error->responseCode, 'message' => $error->getMessage()]);
+} catch (YaAccountError $error) {
+    ya_account_response($error->status, ['ok' => false, 'code' => $error->reason]);
 } catch (Throwable) {
     // No payload, contact, key or exception content is exposed or logged.
     ya_order_response(503, ['ok' => false, 'code' => 'order_unavailable', 'message' => 'Sipariş kaydedilemedi. Lütfen aynı kimlikle tekrar deneyin.']);

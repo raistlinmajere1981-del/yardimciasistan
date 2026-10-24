@@ -10,7 +10,7 @@ protocol, backup framework, background sync engine or multi-device conflict poli
 | Desktop business/public profile, capabilities, menu, rooms/tables, catalogs, dealer desired access, marketing desired/editorial/media state, AI/Google desired config, availability inputs | Backup canonical state; regenerate through current producers |
 | Web public request and guest/dealer submission facts/receipt history | Retain Hosting history; same remote identities replay |
 | Restored local request/order decisions, links and tombstones | Restored canonical owners win; ingress replay cannot overwrite them |
-| Web dealer invite consumption and sessions, request/order receipt history, rate limits | Never rewind/reset; normal access apply may revoke sessions |
+| Web customer identities, provider methods, sessions, registration inbox, request/order receipts, rate limits | Never rewind/reset; normal access apply may revoke sessions |
 
 Business Messaging webhook/status replay, Android action replay, provider deliveries,
 shipment execution, cloud backup and multi-device arbitration are not extended here.
@@ -127,5 +127,5 @@ registry/schema/apply coverage, queue rollback injection, offline and lost activ
 reopen after partial applies, lost exact receipt, old epoch fencing, restored marketing/media,
 OFF withdrawal, private config clearing without public leakage, canonical room availability,
 acknowledged public requests and both order sources with different historical prices, repeat
-restore, owner decisions, consumed historical invites and old sessions. Existing focused
+restore, owner decisions, retained shared-account bindings and old sessions. Existing focused
 request/order/portal/automatic-sync/schema/marketing/availability regressions remain gates.

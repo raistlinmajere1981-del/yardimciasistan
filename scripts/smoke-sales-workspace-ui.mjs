@@ -46,6 +46,9 @@ try {
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, hasTouch: true });
   page.setDefaultTimeout(8000);
   const sales = [], reorderCalls = [], countCalls = [], bulkCalls = [], priceCalls = [];
+  // Preload photo transport fixture; archive/codec persistence is covered in Electron media checks.
+  const photoCollections = new Map(), photoPreviews = new Map();
+  const listPhotos = productId => photoCollections.get(productId) ?? { productId, revision: "0", photos: [], sourceUrl: "", sourceLicense: "" };
   let bulkDeleteFailure = "";
   page.on("pageerror", error => errors.push(error.message));
   let delayedA = false;
@@ -76,6 +79,18 @@ try {
     if (method === "getProductPublication") return database.getCommerceProductPublication(args[0]);
     if (method === "saveProductPublication") return database.saveCommerceProductPublication(args[0]);
     if (method === "getProductImageDataUrl") return `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="orange"/></svg>')}`;
+    if (method === "listProductPhotos") return listPhotos(args[0]);
+    if (method === "previewProductPhoto") return photoPreviews.get(args[1]);
+    if (method === "addProductPhotos") {
+      const input = args[0], previous = listPhotos(input.productId);
+      assert.equal(input.expectedRevision, previous.revision);
+      const next = { ...previous, revision: String(Number(previous.revision) + 1), photos: [...previous.photos] };
+      for (const dataUrl of input.dataUrls) {
+        const id = `${input.productId}-${next.photos.length}`;
+        photoPreviews.set(id, dataUrl); next.photos.push({ id, format: "image/png" });
+      }
+      photoCollections.set(input.productId, next); return next;
+    }
     if (methods[method]) return methods[method](path, ...args);
     throw new Error(`Unexpected call: ${method}`);
   });
@@ -88,7 +103,7 @@ try {
       if (method === "listProducts") window.__salesReadCompletions++;
       return method === "createOrder" ? { ok: true, value: result } : result;
     };
-    window.yardimciDesktop = { commerce: Object.fromEntries(["listOrders", "getOrder", "createOrder", "listProducts", "listCategories", "saveProduct", "saveCategory", "deleteCategory", "deleteProduct", "setProductQuickAccess", "activateProduct", "reorderCatalog", "getInventoryBalance", "listInventoryMovements", "setInventoryCount", "getProductPublication", "saveProductPublication", "getProductImageDataUrl", "getCustomerCreditAccount", "resolveProductPrice", "completeMarketSale", "findProductByBarcode"].map(method => [method, invoke(method)])) };
+    window.yardimciDesktop = { commerce: Object.fromEntries(["listOrders", "getOrder", "createOrder", "listProducts", "listCategories", "saveProduct", "saveCategory", "deleteCategory", "deleteProduct", "setProductQuickAccess", "activateProduct", "reorderCatalog", "getInventoryBalance", "listInventoryMovements", "setInventoryCount", "getProductPublication", "saveProductPublication", "getProductImageDataUrl", "listProductPhotos", "previewProductPhoto", "addProductPhotos", "getCustomerCreditAccount", "resolveProductPrice", "completeMarketSale", "findProductByBarcode"].map(method => [method, invoke(method)])) };
     const dashboardListeners = new Set();
     window.yardimciDesktop.onDashboardDataChanged = listener => { dashboardListeners.add(listener); return () => dashboardListeners.delete(listener); };
     window.__emitSalesDashboard = data => { for (const listener of dashboardListeners) listener(structuredClone(data)); };
@@ -451,12 +466,17 @@ try {
   const workspace = page.getByRole("dialog", { name: "Elma kg", exact: true });
   await expect(workspace).toBeVisible(); await expect(workspace.getByRole("tab")).toHaveCount(0);
   await expect(workspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("Elma kg");
-  await expect(workspace.getByRole("button", { name: "Görsel Ekle / Değiştir" })).toBeVisible();
-  await workspace.locator('input[type="file"]').setInputFiles({ name: "product.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6WQAAAABJRU5ErkJggg==", "base64") });
-  await expect(workspace.getByRole("img", { name: "Elma kg ürün görseli", exact: true })).toBeVisible();
-  await expect.poll(() => workspace.getByRole("img", { name: "Elma kg ürün görseli", exact: true }).evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
-  assert.equal(await workspace.getByRole("img", { name: "Elma kg ürün görseli", exact: true }).evaluate(image => getComputedStyle(image).objectFit), "contain");
+  await expect(workspace.getByRole("button", { name: "Fotoğraf ekle" })).toBeEnabled();
+  await workspace.getByLabel("Ürün adı", { exact: true }).fill("Elma kg taslak");
+  await workspace.locator('input[type="file"]').setInputFiles({ name: "product.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP438DwHwAGgAJ/EEwb4QAAAABJRU5ErkJggg==", "base64") });
+  const photo = workspace.getByRole("img", { name: "Seçili ürün fotoğrafı", exact: true });
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+  assert.equal(await photo.evaluate(image => getComputedStyle(image).objectFit), "contain");
+  assert.equal(listPhotos(kg.id).photos.length, 1);
+  await expect(workspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("Elma kg taslak");
   await workspace.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
+  await expect(photo).toBeVisible();
   await expect(workspace.getByRole("checkbox", { name: "Aktif ürün" })).toBeVisible();
   const status = workspace.getByRole("region", { name: "Durum / Kullanım", exact: true });
   await expect(status.getByRole("checkbox", { name: "Stok takibi", exact: true })).toBeChecked();

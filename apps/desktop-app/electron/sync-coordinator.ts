@@ -415,7 +415,9 @@ export class SyncCoordinator {
       if (failure) errors.push(failure);
     }
 
-    let dashboardChanged = false;
+    const accountResult = await this.ingress.pullCustomerAccountPages(transport);
+    if (accountResult.error) errors.push(accountResult.error);
+    let dashboardChanged = accountResult.count > 0;
     const restore = this.options.database.getRestoreReconciliationStatus();
     const replayRequests = restore?.state === "reconciliation_pending" && !restore.requestsComplete;
     const replayOrders = restore?.state === "reconciliation_pending" && !restore.ordersComplete;
@@ -429,8 +431,7 @@ export class SyncCoordinator {
     }
 
     if (this.webOrdersSupported
-        && (replayOrders || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)
-          || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.WHOLESALE))) {
+        && (replayOrders || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES))) {
       const orderResult = await this.ingress.pullWebOrderPages(transport);
       dashboardChanged ||= orderResult.count > 0;
       if (orderResult.count > 0) this.options.onCommerceOrdersChanged?.();

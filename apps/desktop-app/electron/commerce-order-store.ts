@@ -232,7 +232,7 @@ export function getCommerceOrder(
 export function createCommerceOrder(
   databasePath: string,
   input: CreateCommerceOrderInput,
-  options: { wholesaleEnabled?: boolean; dealerAccess?: { accessId: string; accessRevision: number } } = {}
+  options: { wholesaleEnabled?: boolean; customerAccountId?: string; dealerAccess?: { accessId: string; accessRevision: number } } = {}
 ): CommerceOrderDetail {
   const database = openDatabase(databasePath);
   try {
@@ -240,9 +240,15 @@ export function createCommerceOrder(
     try {
       const businessId = activeBusinessId(database);
       let dealerCustomerId: string | undefined;
+      if (options.customerAccountId) {
+        const owner = database.prepare("SELECT a.customer_id FROM customer_web_access a JOIN customers c ON c.id = a.customer_id WHERE a.account_id = ? AND a.business_id = ? AND c.deleted_at = ''").get(options.customerAccountId, businessId);
+        if (!owner || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Müşteri hesabı eşleştirmesi gerekli.");
+        dealerCustomerId = String(owner.customer_id);
+      }
       if (options.dealerAccess) {
+        if (!hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Online satış bu işletmede etkin değil.");
         const access = options.dealerAccess;
-        const dealer = database.prepare(`SELECT a.customer_id FROM commerce_dealer_web_access a
+        const dealer = database.prepare(`SELECT a.customer_id FROM customer_web_access a
           JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id
           JOIN customer_commercial_profiles p ON p.customer_id = c.id AND p.business_id = a.business_id
           JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = ''

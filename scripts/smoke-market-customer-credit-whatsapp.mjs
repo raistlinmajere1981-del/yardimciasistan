@@ -74,7 +74,7 @@ try {
   const exports = {};
   let locked = false, mutationNotifications = 0;
   runInNewContext(readFileSync(join(appPath, "dist-electron/commerce-ipc.js"), "utf8"), {
-    exports, require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : commerceRequire(id)
+    exports, require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : id === "./ipc/product-photo-ipc" ? { registerProductPhotoIpcHandlers() {} } : commerceRequire(id)
   });
   exports.registerCommerceIpcHandlers({ databasePath: () => path, assertUnlocked: () => { if (locked) throw new Error("Uygulama kilitli."); }, onMutation: () => { mutationNotifications += 1; } });
   const invoke = (channel, ...args) => handlers.get(channel)({}, ...args);

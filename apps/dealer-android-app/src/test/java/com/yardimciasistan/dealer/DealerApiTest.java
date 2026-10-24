@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 public class DealerApiTest {
   static class Connection extends HttpURLConnection {
     ByteArrayOutputStream sent = new ByteArrayOutputStream(); int status = 200;
-    String response = "{\"ok\":true}", cookie = "ya_dealer_session=" + "c".repeat(43) + "; Secure; HttpOnly";
+    String response = "{\"ok\":true}", cookie = "ya_account_session=" + "c".repeat(43) + "; Secure; HttpOnly";
     Connection(URL url) { super(url); }
     public void disconnect() {}
     public boolean usingProxy() { return false; }
@@ -30,10 +30,10 @@ public class DealerApiTest {
     Connection connection = new Connection(new URL("https://firma.example/"));
     DealerApi api = new DealerApi("https://firma.example/module/", url -> { assertEquals("https://firma.example/module/api/dealer/order.php", url.toString()); return connection; });
     JSONObject input = new JSONObject().put("idempotencyKey", "same-key-123456789");
-    DealerApi.Reply reply = api.call("order", input, "ya_dealer_session=" + "b".repeat(43));
+    DealerApi.Reply reply = api.call("order", input, "ya_account_session=" + "b".repeat(43));
     assertEquals(input.toString(), connection.sent.toString("UTF-8")); assertEquals("1", connection.getRequestProperty("X-YA-Dealer"));
     assertEquals("POST", connection.getRequestMethod()); assertNull(connection.getRequestProperty("Authorization"));
-    assertEquals("ya_dealer_session=" + "c".repeat(43), reply.cookie); assertFalse(connection.getInstanceFollowRedirects());
+    assertEquals("ya_account_session=" + "c".repeat(43), reply.cookie); assertFalse(connection.getInstanceFollowRedirects());
   }
   @Test public void redirectsAreRejectedWithoutForwardingSession() throws Exception {
     Connection connection = new Connection(new URL("https://firma.example/")); connection.status = 302;

@@ -21,6 +21,7 @@ import { getRuntimeOrder, applyRuntimeShipmentProviderResult } from "./commerce-
 import type { ShipmentProviderResultInput } from "./commerce-shipment-store";
 import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegistrationSubmitted, type ShipmentRegistration } from "./shipping-registration-store";
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type ShippingSecretWrite } from "./shipping-configuration-store";
+import { getCustomerAccountCursor, importCustomerAccount } from "./customer-account-ingress";
 import { getDealerWebAccess, changeDealerWebAccess, createDealerAccessProjection } from "./dealer-web-access-store";
 import type { DealerAccessAction } from "@yardimci-asistan/shared";
 import { productImageArchives, publishedProductImage, acknowledgeProductImage } from "./product-media-publication-store";
@@ -932,20 +933,17 @@ export class DesktopDatabase {
   }
 
   getDealerWebAccess(customerId: string) {
-    this.assertWholesaleAccess();
+    if (!hasBusinessCapability(this.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.CUSTOMERS)) throw new Error("Müşteri yönetimi bu işletmede etkin değil.");
     return getDealerWebAccess(this.db, customerId);
   }
 
   changeDealerWebAccess(customerId: string, action: DealerAccessAction) {
-    this.assertWholesaleAccess();
+    if (!hasBusinessCapability(this.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.CUSTOMERS)) throw new Error("Müşteri yönetimi bu işletmede etkin değil.");
     return changeDealerWebAccess(this.db, customerId, action);
   }
 
-  private assertWholesaleAccess() {
-    if (!hasBusinessCapability(this.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.WHOLESALE)) {
-      throw new Error("Bayi / Toptan Satış bu işletmede etkin değil.");
-    }
-  }
+  getCustomerAccountCursor() { return getCustomerAccountCursor(this.db); }
+  importCustomerAccount(input: import("@yardimci-asistan/sync-core").CustomerAccountEnvelope) { importCustomerAccount(this.db, input); }
 
   createDealerAccessProjection() {
     return createDealerAccessProjection(this.db);
@@ -1060,6 +1058,10 @@ export class DesktopDatabase {
 
   createCommerceOrder(input: CreateCommerceOrderInput) {
     return createRuntimeOrder(this.databasePath, input);
+  }
+
+  createCustomerWebOrder(accountId: string, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note" | "buyerSnapshot">) {
+    return createRuntimeOrder(this.databasePath, { ...input, source: "web-online-sales" }, { customerAccountId: accountId });
   }
 
   createDealerWebOrder(accessId: string, accessRevision: number, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note">) {

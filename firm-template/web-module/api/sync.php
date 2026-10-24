@@ -73,6 +73,10 @@ try {
         ya_sync_reset_runtime();
     }
 
+    if ($action === 'pull_customer_accounts') {
+        ya_sync_response(200, ['ok' => true, ...ya_account_pull(ya_storage_open(), ya_sync_int($payload['after_seq'] ?? 0, 0), ya_sync_int($payload['limit'] ?? 100, 100))]);
+    }
+
     if ($action === 'pull_web_orders') {
         ya_sync_pull_web_orders($payload);
     }

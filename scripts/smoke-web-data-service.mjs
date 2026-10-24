@@ -52,7 +52,7 @@ try {
     rmSync(join(source, name));
   }
   const configFile = join(hosting, "config/business.json");
-  writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile, "utf8")), sync_secret: secret }));
+  writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile, "utf8")), sync_secret: secret, logo_url: "/assets/logo.webp" }));
   const probe = createServer();
   await new Promise(done => probe.listen(0, "127.0.0.1", done));
   const port = probe.address().port;
@@ -82,6 +82,11 @@ try {
   assert.match(response.headers.get("content-type"), /application\/json/);
   const business = (await response.json()).business;
   assert.equal(business.display_name, "API işletmesi");
+  assert.equal(business.logo_url, "/assets/logo.webp", "Public brand logo should be available for the shared Android APK");
+  writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile, "utf8")), logo_url: "https://wrong.example/fake.png" }));
+  const unsafeLogo = (await (await fetch(base + "/api/business.php")).json()).business;
+  assert.equal(unsafeLogo.logo_url, "", "Foreign brand logo URLs must not be reflected");
+  writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile, "utf8")), logo_url: "/assets/logo.webp" }));
   assert.equal(business.about_text, "İşletme açıklaması");
   assert.equal(business.gallery.length, 1);
   assert.equal(business.gallery[0].url, "/yardimci-asistan/media/gallery/gallery/one.jpg");
@@ -102,7 +107,7 @@ try {
   await publish({ action: "publish_menu", menu: { enabled: false, categories: [], items: [] } });
   assert.equal((await fetch(`${base}/api/menu.php`)).status, 404);
   assert.equal((await fetch(`${base}/api/order.php`)).status, 405);
-  assert.equal((await fetch(`${base}/api/dealer/session.php`)).status, 401);
+  assert.equal((await fetch(`${base}/api/dealer/session.php`)).status, 403);
   console.log("web-data-service-smoke-ok: backend archives, presentation rejection, public profile/gallery, visibility, ETag and auth");
 } finally {
   if (server) {

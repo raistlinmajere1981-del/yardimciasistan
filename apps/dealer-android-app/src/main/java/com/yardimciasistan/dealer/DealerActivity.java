@@ -1,7 +1,7 @@
 package com.yardimciasistan.dealer;
 
 import android.app.AlertDialog;
-import android.content.ClipboardManager;
+import android.net.Uri;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -41,11 +41,12 @@ public final class DealerActivity extends ComponentActivity {
   private final Map<String, String> quantityDrafts = new LinkedHashMap<>();
   private final Map<String, Integer> positions = new HashMap<>();
   private String tab = "Katalog", detail = "", renderedKey = "", message = "", query = "",
-                 category = "Tüm kategoriler", brand = "Tüm markalar", loginInvite = "";
-  private boolean busy, favoritesOnly, storageFailed, applicationLink;
+                 category = "Tüm kategoriler", brand = "Tüm markalar", connectionInput = "", accountEmail = "";
+  private boolean busy, favoritesOnly, storageFailed, accessVerified;
+  private JSONObject accountConfig;
   private int page;
   private final Locale locale = new Locale("tr", "TR");
-  private enum Task { REFRESH, CLAIM, VERIFY, SUBMIT, LOGOUT }
+  private enum Task { REFRESH, LOGIN, VERIFY, SUBMIT, LOGOUT }
   interface Action {
     void run() throws Exception;
   }
@@ -114,14 +115,15 @@ public final class DealerActivity extends ComponentActivity {
       });
       receiveLink(getIntent());
       render();
-      if (!state.text("claim_cookie").isEmpty())
-        verifyClaim(state.text("claim_base"), state.text("claim_cookie"));
-      else if (!state.text("cookie").isEmpty())
-        refresh();
+      if (!state.text("cookie").isEmpty()) refresh();
     } catch (Exception error) {
       fatalStorage();
     }
   }
+  private final android.os.Handler accountTimer = new android.os.Handler(android.os.Looper.getMainLooper());
+  private final Runnable accountCheck = new Runnable() { public void run() { if (state != null && !busy && !state.text("cookie").isEmpty()) refresh(); accountTimer.postDelayed(this, 30000); } };
+  @Override protected void onResume() { super.onResume(); accountTimer.removeCallbacks(accountCheck); accountTimer.postDelayed(accountCheck, 30000); if (state != null && !state.text("cookie").isEmpty() && !busy) { accessVerified = false; render(); refresh(); } }
+  @Override protected void onPause() { accountTimer.removeCallbacks(accountCheck); super.onPause(); }
   @Override
   protected void onNewIntent(Intent intent) {
     super.onNewIntent(intent);
@@ -138,21 +140,17 @@ public final class DealerActivity extends ComponentActivity {
     intent.removeExtra(Intent.EXTRA_TEXT);
     if (input == null)
       return;
-    if (!state.text("cookie").isEmpty() || !state.text("claim_cookie").isEmpty()) {
-      Toast
-          .makeText(this, "Hesabınız açık. Farklı bağlantı için önce Ayarlar’dan oturumu kapatın.",
-              Toast.LENGTH_LONG)
-          .show();
-      return;
-    }
     try {
-      DealerLink link = DealerLink.parse(input);
-      loginInvite = input.trim();
-      applicationLink = link.application;
-      message = "";
-    } catch (IllegalArgumentException error) {
-      message = error.getMessage();
-    }
+      Uri uri = Uri.parse(input);
+      if ("yardimci-bayi".equals(uri.getScheme()) && "account".equals(uri.getHost())) {
+        String code = uri.getQueryParameter("code"), verifier = state.text("oauth_verifier"), base = state.text("connection_base");
+        state.data.remove("oauth_verifier"); state.save();
+        if (code == null || !code.matches("[A-Za-z0-9_-]{43}") || verifier.isEmpty()) throw new IllegalArgumentException("Giriş denemesi geçersiz veya süresi dolmuş.");
+        authenticate(base, "exchange", new JSONObject().put("code", code).put("verifier", verifier));
+      } else {
+        connectionInput = DealerApi.normalizeBase(input); message = "";
+      }
+    } catch (Exception error) { message = "Geçerli işletme bağlantısı veya hesap girişini kullanın."; }
     if (shell != null)
       render();
   }
@@ -250,21 +248,12 @@ public final class DealerActivity extends ComponentActivity {
               render();
           } else if (problem instanceof DealerApi.Failure) {
             DealerApi.Failure error = (DealerApi.Failure) problem;
-            if (kind == Task.CLAIM) {
-              showMessage(error.status == 400 || error.status == 401 || error.status == 404
-                          || error.status == 410
-                      ? "Davet geçersiz, kullanılmış veya süresi dolmuş. Firmanızdan yeni davet "
-                          + "isteyin."
-                      : error.getMessage());
-            } else if (error.status == 401) {
+            if (error.status == 401 || error.status == 403) {
+              accessVerified = false;
+              if (error.code.equals("online_sales_disabled")) accountConfig = new JSONObject().put("enabled", false);
               state.invalidateSession();
-              state.data.remove("claim_cookie");
-              state.data.remove("claim_base");
-              state.save();
-              if (photos.active())
-                photos.close();
-              message = "Oturumunuz sona erdi. Firmanızdan yeni davet isteyin. Sepetiniz bu "
-                  + "cihazda saklanıyor.";
+              if (photos.active()) photos.close();
+              message = error.status == 401 && kind != Task.LOGIN ? "Oturumunuz sona erdi. Aynı hesabınızla yeniden giriş yapın. Sepetiniz cihazda korunuyor." : error.getMessage();
               render();
             } else {
               if (kind == Task.SUBMIT && error.status == 422) {
@@ -278,7 +267,7 @@ public final class DealerActivity extends ComponentActivity {
           } else
             showMessage(kind == Task.SUBMIT
                     ? "Gönderim doğrulanamadı. Aynı siparişi tekrar deneyin."
-                    : kind == Task.CLAIM || kind == Task.VERIFY
+                    : kind == Task.LOGIN || kind == Task.VERIFY
                     ? "Bağlantı kurulamadı. Giriş işlemini yeniden deneyin."
                     : "Bağlantı kurulamadı. Son kayıtlı bilgiler gösteriliyor.");
         } catch (Exception error) {
@@ -295,26 +284,45 @@ public final class DealerActivity extends ComponentActivity {
         ()
             -> {
           DealerApi api = new DealerApi(base);
-          JSONObject session = api.call("session", null, cookie).body;
-          JSONObject result = new JSONObject().put("dealer", session.getJSONObject("dealer"));
+          String activeCookie = cookie;
+          JSONObject session;
+          try { session = api.call("session", null, activeCookie).body; }
+          catch (DealerApi.Failure error) {
+            if (error.status != 401) throw error;
+            DealerApi.Reply renewed = api.call("account/refresh", new JSONObject(), cookie);
+            if (renewed.cookie.isEmpty()) throw new IllegalStateException("Oturum yenilenemedi.");
+            activeCookie = renewed.cookie;
+            session = api.call("session", null, activeCookie).body;
+          }
+          JSONObject result = new JSONObject().put("dealer", session.getJSONObject("dealer")).put("cookie", activeCookie);
+          if (brandingRefreshDue(base)) {
+            JSONObject branding = loadBusinessBrand(api, base);
+            if (branding != null) result.put("branding", branding);
+          }
           try {
-            result.put("catalog", api.call("catalog", null, cookie).body.getJSONObject("catalog"));
+            result.put("catalog", api.call("catalog", null, activeCookie).body.getJSONObject("catalog"));
           } catch (DealerApi.Failure error) {
-            if (error.status == 401)
+            if (error.status == 401 || error.status == 403)
               throw error;
             result.put("catalog_error", error.getMessage());
           }
-          result.put("history", api.call("orders", null, cookie).body);
+          result.put("history", api.call("orders", null, activeCookie).body);
           return result;
         },
         result
         -> {
+          accessVerified = true;
+          state.data.put("cookie", result.getString("cookie"));
           JSONObject old = state.object("catalog");
           String previousProducts =
               old.optJSONArray("products") == null ? "" : old.optJSONArray("products").toString();
           String previousMethods = String.valueOf(old.optJSONArray("delivery_methods"));
           String previousOrders = state.array("orders").toString();
           state.data.put("dealer", result.getJSONObject("dealer"));
+          if (result.has("branding")) {
+            state.data.put("branding_base", base).put("branding", result.getJSONObject("branding"))
+                .put("branding_at", System.currentTimeMillis());
+          }
           if (result.has("catalog"))
             state.data.put("catalog", result.getJSONObject("catalog")).put("catalog_at", now());
           else
@@ -415,7 +423,7 @@ public final class DealerActivity extends ComponentActivity {
     progress.setIndeterminate(true);
     progress.setVisibility(busy ? View.VISIBLE : View.GONE);
     shell.addView(progress, new LinearLayout.LayoutParams(-1, dp(3)));
-    if (state.text("cookie").isEmpty()) {
+    if (state.text("cookie").isEmpty() || !accessVerified) {
       login();
       return;
     }
@@ -428,11 +436,12 @@ public final class DealerActivity extends ComponentActivity {
         render();
       }, false);
     else {
-      header.addView(ui.logo(32));
+      header.addView(businessLogo(32));
       LinearLayout copy = ui.column();
       copy.setPadding(dp(12), 0, 0, 0);
       header.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
       ui.label(copy, tab, 24, ui.ink).setTypeface(null, Typeface.BOLD);
+      ui.label(copy, DealerBranding.displayName(businessBrand()), 12, ui.muted);
       if (tab.equals("Katalog"))
         ui.label(copy, state.object("dealer").optString("display_name"), 12, ui.muted);
       if (!tab.equals("Ayarlar"))
@@ -502,98 +511,95 @@ public final class DealerActivity extends ComponentActivity {
       navigation.addView(button);
     }
   }
+  private JSONObject businessBrand() {
+    return state.brandingFor(state.text("connection_base"));
+  }
+  private ImageView businessLogo(int size) {
+    ImageView view = ui.logo(size);
+    String url = businessBrand().optString("logo_url");
+    if (!url.isEmpty()) images.loadBrand(view, url);
+    return view;
+  }
+  private JSONObject loadBusinessBrand(DealerApi api, String base) {
+    try { return DealerBranding.normalize(api.applicationInfo(), base); }
+    catch (Exception ignored) { return null; }
+  }
+  private boolean brandingRefreshDue(String base) {
+    return !base.equals(state.text("branding_base"))
+        || System.currentTimeMillis() - state.data.optLong("branding_at", 0) > 6 * 3600_000L;
+  }
   private void login() {
     ScrollView container = new ScrollView(this);
     shell.addView(container, new LinearLayout.LayoutParams(-1, -1));
-    LinearLayout form = ui.column();
-    form.setPadding(dp(16), dp(36), dp(16), dp(24));
-    container.addView(form);
-    form.addView(ui.logo(72));
-    ui.label(form, "Yardımcı Asistan Bayi", 14, ui.muted);
-    ui.label(form, "Bayi hesabınıza\nbağlanın", 28, ui.ink).setTypeface(null, Typeface.BOLD);
-    EditText invitation =
-        field(form, applicationLink ? "Başvuru bağlantısı" : "Bayi davet bağlantısı", loginInvite,
-            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI,
-            value -> loginInvite = value, 4096);
-    invitation.setSaveEnabled(false);
-    invitation.setHint("https://…");
-    invitation.setAutofillHints((String[]) null);
-    invitation.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-    invitation.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE
-        | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
-    ui.button(form, "Yapıştır", () -> {
-      try {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (!clipboard.hasPrimaryClip() || clipboard.getPrimaryClip() == null
-            || clipboard.getPrimaryClip().getItemCount() == 0) {
-          showMessage("Panoda bağlantı yok. Gönderilen bağlantıyı kopyalayın.");
-          return;
-        }
-        CharSequence text = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
-        invitation.setText(text == null ? "" : text.toString().trim());
-        invitation.setSelection(invitation.length());
-      } catch (Exception error) {
-        showMessage("Bağlantıyı alana uzun basarak yapıştırabilirsiniz.");
+    LinearLayout form = ui.column(); form.setPadding(dp(16), dp(36), dp(16), dp(24)); container.addView(form);
+    form.addView(businessLogo(72)); ui.label(form, DealerBranding.displayName(businessBrand()), 14, ui.muted);
+    ui.label(form, "Müşteri hesabınıza giriş", 26, ui.ink).setTypeface(null, Typeface.BOLD);
+    notice = ui.label(form, message, 14, ui.danger); notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+    String base = state.text("connection_base");
+    if (base.isEmpty() || accountConfig == null) {
+      EditText connection = field(form, "İşletme bağlantısı", connectionInput.isEmpty() ? base : connectionInput,
+          InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, value -> connectionInput = value, 2048);
+      connection.setHint("İşletmenin paylaştığı HTTPS bağlantısı");
+      loginButton = ui.button(form, "İşletmeye bağlan", () -> safely(() -> {
+        String target = DealerApi.normalizeBase(connection.getText().toString());
+        task(() -> {
+          DealerApi api = new DealerApi(target);
+          JSONObject config = api.call("account/config", null, "").body;
+          JSONObject response = new JSONObject().put("account", config);
+          JSONObject branding = loadBusinessBrand(api, target);
+          if (branding != null) response.put("branding", branding);
+          return response;
+        }, result -> {
+          state.put("connection_base", target);
+          state.updateBranding(target,
+              result.optJSONObject("branding") == null ? new JSONObject() : result.getJSONObject("branding"));
+          accountConfig = result.getJSONObject("account"); message = "";
+        }, Task.LOGIN);
+      }), true);
+    } else if (!accountConfig.optBoolean("enabled")) {
+      ui.label(form, "Bu işletmede Online Satış kapalı. Hesap erişimi işletme yeniden açtığında kullanılabilir.", 16, ui.ink);
+      ui.button(form, "Yeniden kontrol et", () -> { accountConfig = null; render(); }, false);
+    } else {
+      ui.label(form, base, 13, ui.muted);
+      EditText email = field(form, "E-posta", accountEmail, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, value -> accountEmail = value, 254);
+      email.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS);
+      EditText password = field(form, "Şifre", "", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, null, 72);
+      password.setSaveEnabled(false); password.setAutofillHints(View.AUTOFILL_HINT_PASSWORD);
+      loginButton = ui.button(form, "Giriş yap", () -> safely(() -> {
+        JSONObject credentials = new JSONObject().put("email", email.getText().toString().trim()).put("password", password.getText().toString());
+        password.setText(""); authenticate(base, "login", credentials);
+      }), true);
+      org.json.JSONArray providers = accountConfig.optJSONArray("providers");
+      if (providers != null) for (int i = 0; i < providers.length(); i++) {
+        String provider = providers.optString(i);
+        if (provider.equals("google") || provider.equals("facebook")) ui.button(form, provider.equals("google") ? "Google ile giriş" : "Facebook ile giriş", () -> safely(() -> {
+          String verifier = DealerAccountAuth.verifier(); state.put("oauth_verifier", verifier);
+          task(() -> new DealerApi(base).call("account/oauth", new JSONObject().put("provider", provider).put("nativeChallenge", DealerAccountAuth.challenge(verifier)), "").body,
+            result -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(result.getString("url")))), Task.LOGIN);
+        }), false);
       }
-    }, false);
-    ui.label(form,
-        applicationLink ? "İşletmenin gönderdiği başvuru bağlantısı."
-                        : "Firmanızın gönderdiği bağlantıyı yapıştırın.",
-        13, ui.muted);
-    notice = ui.label(form, message, 14, ui.danger);
-    notice.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
-    notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-    if (!state.text("claim_cookie").isEmpty())
-      loginButton = ui.button(form, "Girişi tamamla",
-          () -> verifyClaim(state.text("claim_base"), state.text("claim_cookie")), true);
-    else
-      loginButton = ui.button(form, applicationLink ? "Formu aç" : "Giriş yap",
-          () -> safely(() -> connect(invitation.getText().toString())), true);
-    ui.button(form, applicationLink ? "Girişe dön" : "Bayi başvurusu", () -> {
-      applicationLink = !applicationLink;
-      message = "";
-      render();
-    }, false);
+      ui.button(form, "Hesap oluştur / Şifremi unuttum", () -> {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(accountConfig.getString("site_url")))); }
+        catch (Exception error) { showMessage("İşletmenin web sitesindeki Hesabım alanını açın."); }
+      }, false);
+      ui.button(form, "Bayi başvurusu", () -> application.open(base), false);
+      ui.button(form, "İşletmeyi değiştir", () -> safely(() -> { state.put("connection_base", ""); accountConfig = null; render(); }), false);
+    }
+    ui.button(form, "Yerel oturumu temizle", () -> safely(() -> { state.invalidateSession(); accessVerified = false; message = "Yerel oturum kapatıldı."; render(); }), false);
     loading(busy);
   }
-  private void connect(String input) throws Exception {
-    DealerLink link = DealerLink.parse(input);
-    if (link.application) {
-      hideKeyboard();
-      application.open(link.base);
-      return;
-    }
-    if (applicationLink)
-      throw new IllegalArgumentException("İşletmenin gönderdiği başvuru bağlantısını yapıştırın.");
-    task(
-        ()
-            -> {
-          DealerApi.Reply claim = new DealerApi(link.base).call(
-              "claim", new JSONObject().put("invite_token", link.token), "");
-          if (claim.cookie.isEmpty())
-            throw new IllegalStateException();
-          return new JSONObject().put("cookie", claim.cookie);
-        },
-        result
-        -> {
-          loginInvite = "";
-          state.data.put("claim_base", link.base).put("claim_cookie", result.getString("cookie"));
-          state.save();
-          message = "Hesabınız doğrulanıyor…";
-          verifyClaim(link.base, result.getString("cookie"));
-        },
-        Task.CLAIM);
-  }
-  private void verifyClaim(String base, String cookie) {
-    task(() -> new DealerApi(base).call("session", null, cookie).body, result -> {
-      state.authenticate(base, cookie, result.getJSONObject("dealer"));
-      state.data.remove("claim_cookie");
-      state.data.remove("claim_base");
-      state.save();
-      message = "";
-      hideKeyboard();
+  private void authenticate(String base, String endpoint, JSONObject credentials) {
+    task(() -> {
+      DealerApi api = new DealerApi(base);
+      DealerApi.Reply login = api.call("account/" + endpoint, credentials, "");
+      if (login.cookie.isEmpty()) throw new IllegalStateException("Oturum alınamadı.");
+      try { return new JSONObject().put("cookie", login.cookie).put("dealer", api.call("session", null, login.cookie).body.getJSONObject("dealer")); }
+      catch (Exception error) { try { api.call("account/logout", new JSONObject(), login.cookie); } catch (Exception ignored) {} throw error; }
+    }, result -> {
+      state.authenticate(base, result.getString("cookie"), result.getJSONObject("dealer"));
+      state.put("connection_base", base); message = ""; accessVerified = true; hideKeyboard();
       new android.os.Handler(getMainLooper()).post(this::refresh);
-    }, Task.VERIFY);
+    }, Task.LOGIN);
   }
   private void catalog() {
     EditText search = field(body, "Ürün veya kod ara", query, InputType.TYPE_CLASS_TEXT, null, 180);
@@ -1036,7 +1042,7 @@ public final class DealerActivity extends ComponentActivity {
                 .setTitle("Oturum kapatılsın mı?")
                 .setMessage(state.data.has("pending")
                         ? "Önce Sepet’ten bekleyen siparişinizi tekrar deneyin."
-                        : "Yeniden giriş için firmanızdan yeni davet gerekir.")
+                        : "Aynı müşteri hesabınızla yeniden giriş yapabilirsiniz.")
                 .setNegativeButton("Vazgeç", null)
                 .setPositiveButton(state.data.has("pending") ? "Sepete dön" : "Oturumu kapat",
                     (dialog, which) -> {
@@ -1046,10 +1052,10 @@ public final class DealerActivity extends ComponentActivity {
                       }
                       String cookie = state.text("cookie"), base = state.text("base");
                       task(()
-                               -> new DealerApi(base).call("logout", new JSONObject(), cookie).body,
+                               -> new DealerApi(base).call("account/logout", new JSONObject(), cookie).body,
                           result
                           -> {
-                            state.logout();
+                            state.logout(); accessVerified = false;
                             quantityDrafts.clear();
                             positions.clear();
                             tab = "Katalog";

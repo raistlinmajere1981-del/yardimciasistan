@@ -447,7 +447,7 @@ function verifyIpc(databasePath, customerId, cart, account, raw) {
   const exports = {};
   runInNewContext(readFileSync(join(appPath, "dist-electron/commerce-ipc.js"), "utf8"), {
     exports,
-    require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : runtime
+    require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : id === "./ipc/product-photo-ipc" ? { registerProductPhotoIpcHandlers() {} } : runtime
   });
   const mainEntry = readFileSync(join(appPath, "electron/main-entry.ts"), "utf8");
   assert.ok(/registerCommerceIpcHandlers\(\{\s*databasePath,[\s\S]*?assertUnlocked: assertAppSessionUnlocked/.test(mainEntry));

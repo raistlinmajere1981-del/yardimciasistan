@@ -74,13 +74,18 @@ function ya_dealer_orders(string $token): array
 {
     $access = ya_dealer_session_access($token);
     if (!$access) throw new YaOnlineOrderRejection(401, 'dealer_access_required', 'Bayi erişimi gerekli.');
+    return ya_customer_order_history($access);
+}
+
+function ya_customer_order_history(array $access): array
+{
     $publication = ya_storage_get_publication('dealer_access_private', []);
     $orders = [];
     foreach ($publication['order_history'] ?? [] as $history) if ($history['access_id'] === $access['access_id']) {
         foreach ($history['orders'] as $order) $orders[$order['order_id']] = $order;
     }
-    $query = ya_storage_open()->prepare("SELECT payload_json FROM web_orders WHERE json_extract(payload_json, '$.kind') = 'dealer' AND json_extract(payload_json, '$.dealerAccessId') = ? ORDER BY seq DESC");
-    $query->execute([$access['access_id']]);
+    $query = ya_storage_open()->prepare("SELECT payload_json FROM web_orders WHERE (json_extract(payload_json, '$.kind') = 'dealer' AND json_extract(payload_json, '$.dealerAccessId') = ?) OR (json_extract(payload_json, '$.kind') = 'customer' AND json_extract(payload_json, '$.accountId') = ?) ORDER BY seq DESC");
+    $query->execute([$access['access_id'], $access['account_id'] ?? '']);
     foreach ($query as $row) {
         $input = json_decode($row['payload_json'], true, 512, JSON_THROW_ON_ERROR);
         if (isset($orders[$input['id']])) continue;

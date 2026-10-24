@@ -73,6 +73,12 @@ public class DealerStateTest {
     assertEquals("{}", disk);
   }
 
+  @Test public void logoutPreservesOnlyTheBusinessConnection() throws Exception {
+    DealerState state = signedIn(); state.put("connection_base", "https://firma.example/module/"); state.quantity("p",2); state.logout();
+    assertEquals("https://firma.example/module/",state.text("connection_base"));
+    assertEquals(1,state.data.length());
+  }
+
   @Test public void reorderUsesCurrentCatalogAndSkipsUnavailableProducts() throws Exception {
     DealerState state = signedIn(); state.product("p").put("price", 20);
     int missing = state.reorder(new JSONArray("[{\"product_id\":\"p\",\"quantity\":2},{\"product_id\":\"removed\",\"quantity\":3}]"));

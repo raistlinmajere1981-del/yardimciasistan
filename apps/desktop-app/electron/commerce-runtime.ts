@@ -361,7 +361,7 @@ export function getRuntimeOrder(
 export function createRuntimeOrder(
   databasePath: string,
   input: CreateCommerceOrderInput,
-  options: { dealerAccess?: { accessId: string; accessRevision: number }; desktopEntry?: boolean } = {}
+  options: { customerAccountId?: string; dealerAccess?: { accessId: string; accessRevision: number }; desktopEntry?: boolean } = {}
 ): CommerceOrderDetail {
   requireCapability(
     databasePath,
@@ -374,6 +374,7 @@ export function createRuntimeOrder(
     if (!String(input.sourceReference ?? "").trim()) throw new Error("Sipariş kaynak kimliği gerekli.");
   }
   return createCommerceOrder(databasePath, options.desktopEntry ? { ...input, source: "desktop" } : input, {
+    ...(options.customerAccountId !== undefined ? { customerAccountId: options.customerAccountId } : {}),
     ...(options.dealerAccess !== undefined ? { dealerAccess: options.dealerAccess } : {}),
     wholesaleEnabled: hasPersistedBusinessCapability(databasePath, BUSINESS_CAPABILITIES.WHOLESALE)
   });

@@ -109,7 +109,7 @@ for (const target of profiles) {
 
 const stateTables = ["business", "business_capabilities", "settings", "ai_service_profiles", "commerce_shipping_provider_config",
   "business_messaging_provider_config", "marketing_provider_config", "kbs_service_settings", "sync_outbox", "sync_outbox_revisions",
-  "sync_publication_payloads", "commerce_dealer_web_access"];
+  "sync_publication_payloads", "customer_web_access"];
 const snapshotRows = raw => Object.fromEntries(stateTables.map(table => [table, raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
 
 for (const [stage, table, when] of [

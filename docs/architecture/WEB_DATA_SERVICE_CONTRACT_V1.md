@@ -41,10 +41,13 @@ public profile ve galeri yayın sahibine ikinci veri yazma yolu eklenmez.
   Site `chat.php` isteğine isteğe bağlı `response_language: 'en'` eklediğinde
   yanıt dili sunucu sistem talimatında İngilizce seçilir; alan yoksa/başka
   değerdeyse varsayılan Türkçe korunur. İşlem/rezervasyon kuralları değişmez.
-- `api/dealer/{claim,session,logout,catalog,order}.php`: aynı-origin, JSON +
-  X-YA-Dealer, HttpOnly/Secure/Strict cookie, bayi ve katalog yetkisi korunur.
-  Davet sayfası sitenin modüle kardeş `bayi/` yoludur; fragment hemen temizlenir.
-  Cookie yalnız modülün `api/dealer/` yoluna gider. Başka bayi verileri yayınlanmaz.
+- `api/account/`: ortak hesap oluşturma, doğrulama, giriş, bağımsız oturumlar,
+  yenileme, çıkış, kurtarma, profil ve kendi siparişleri. Online Satış zorunludur;
+  çıkış kapalıyken de çalışır. [Hesap sözleşmesi](CUSTOMER_ACCOUNTS_V1.md) SMTP/OAuth
+  yapılandırmasını ve güvenlik sınırlarını tanımlar.
+- `api/dealer/{session,logout,catalog,order,orders,receipt}.php`: ortak hesabın
+  güncel ticari yetkisini denetler. HttpOnly/Secure/Lax cookie modül köküne gider;
+  başka müşteri verileri yayınlanmaz. Tek Hesabım sunumunun sahibi mevcut sitedir.
 - WhatsApp webhook/status API'leri ve Android/operasyon API'leri değişmez;
   mevcut secret/device/session/permission kontrolleri uygulanır.
 - `api/sync.php` ve availability sync, [publication v3](DESKTOP_HOSTING_PUBLICATION_PROTOCOL_V3.md)

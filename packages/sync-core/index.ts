@@ -54,6 +54,9 @@ export interface PullRequestsOptions extends SyncCoreConfig {
   clientId?: string;
 }
 
+export interface CustomerAccountEnvelope { syncSeq: number; accountId: string; email: string; fullName: string; emailVerified: true; }
+export type PullCustomerAccountsResult = { ok: true; accounts: CustomerAccountEnvelope[]; next_cursor: number; has_more: boolean } | SyncFailure;
+
 /** Hosting inbox record; canonical business ownership remains in commerce.orders. */
 interface WebOrderEnvelopeBase {
   previouslyAcknowledged?: boolean;
@@ -66,6 +69,7 @@ interface WebOrderEnvelopeBase {
 }
 export type WebOrderEnvelope = WebOrderEnvelopeBase & (
   | { kind?: "guest"; buyer: CommerceOrderBuyerSnapshot }
+  | { kind: "customer"; accountId: string; buyer: CommerceOrderBuyerSnapshot }
   | { kind: "dealer"; dealerAccessId: string; accessRevision: number; catalogRevision?: string; buyer?: never }
 );
 
@@ -1029,6 +1033,7 @@ export function createCompanionSourceKey(kind: CompanionTransportKind, sourceId:
 
 export interface SyncTransport {
   getCapabilities(): Promise<SyncCapabilitiesResult>;
+  pullCustomerAccounts?(input: PullCursorInput): Promise<PullCustomerAccountsResult>;
   pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult>;
   acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult>;
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;

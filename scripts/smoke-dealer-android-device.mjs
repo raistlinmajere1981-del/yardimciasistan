@@ -1,5 +1,6 @@
+import {createDealerAccountDeviceFixture} from "./test-helpers/dealer-account-device.mjs";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,7 +12,7 @@ const devices = run("adb", ["devices"]).split(/\r?\n/).filter(line => /\tdevice$
 const serial = process.env.ANDROID_SERIAL || (devices.length === 1 ? devices[0] : "");
 assert.ok(serial && devices.includes(serial), "Tek bağlı ADB cihazı veya ANDROID_SERIAL gerekli.");
 const adb = args => run("adb", ["-s", serial, ...args]);
-let installed = false, restoreSleep = false;
+let installed = false, restoreSleep = false, accountFixture;
 try {
   assert.equal(adb(["shell", "pm", "list", "packages", packageName]).trim(), "", "Önceki fixture kurulumu korunur; üzerine yazılmaz.");
   const sdk = Number(adb(["shell", "getprop", "ro.build.version.sdk"]).trim()); assert.ok(sdk >= 26);
@@ -19,11 +20,18 @@ try {
   adb(["install", "-t", join(build, "outputs/apk/debug/yardimci-asistan-bayi-debug.apk")]); installed = true;
   restoreSleep = /mWakefulness=Asleep/.test(adb(["shell", "dumpsys", "power"]));
   if (restoreSleep) adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"]);
-  const result = adb(["shell", "am", "instrument", "-w", "-r", `${packageName}/com.yardimciasistan.dealer.DealerDeviceFixture`]);
+  accountFixture = await createDealerAccountDeviceFixture(serial);
+  const result = await new Promise((resolve, reject) => {
+    const child=spawn("adb",["-s",serial,"shell","am","instrument","-w","-r","-e","account_base",accountFixture.baseUrl,"-e","account_ca",accountFixture.ca,`${packageName}/com.yardimciasistan.dealer.DealerDeviceFixture`]);
+    let output="";for(const stream of [child.stdout,child.stderr])stream.on("data",chunk=>{output+=chunk;});
+    const timer=setTimeout(()=>{child.kill();reject(new Error("Device fixture timed out"));},300000);
+    child.on("error",reject);child.on("close",code=>{clearTimeout(timer);if(code===0)resolve(output);else reject(new Error(output));});
+  });
+  accountFixture.verify();
   const output = resolve("artifacts/dealer-android"); mkdirSync(output, { recursive: true });
-  writeFileSync(join(output, "native-fixture.txt"), `Device SDK: ${sdk}\nSynthetic cache only; no live server or real account.\n${result}`);
+  writeFileSync(join(output, "native-fixture.txt"), `Device SDK: ${sdk}\nActual local TLS/PHP shared-account API and isolated Desktop fixtures; synthetic UI cache; no real provider/production account.\n${result}`);
   assert.match(result, /dealer-native-device-ok:/); assert.match(result, /INSTRUMENTATION_CODE: -1/);
-  writeFileSync(join(output, `native-fixture-sdk${sdk}.txt`), `Device SDK: ${sdk}\nSynthetic cache only; no live server or real account.\n${result}`);
+  writeFileSync(join(output, `native-fixture-sdk${sdk}.txt`), `Device SDK: ${sdk}\nActual local TLS/PHP shared-account API and isolated Desktop fixtures; synthetic UI cache; no real provider/production account.\n${result}`);
   const shots = join(output, `sdk${sdk}`); mkdirSync(shots, { recursive: true });
   for (const file of adb(["shell", "run-as", packageName, "ls", "files/ui-evidence"]).trim().split(/\s+/)) {
     assert.match(file, /^[a-z-]+\.png$/);
@@ -32,10 +40,13 @@ try {
   }
   console.log(result.trim());
 } finally {
+  try { await accountFixture?.cleanup(); }
+  finally {
   try { if (installed) adb(["uninstall", packageName]); }
   finally {
     try { adb(["shell", "input", "keyevent", "KEYCODE_HOME"]); if (restoreSleep) adb(["shell", "input", "keyevent", "KEYCODE_SLEEP"]); }
     finally { rmSync(build, { recursive: true, force: true }); }
+  }
   }
 }
 function run(command, args, inherit = false) {

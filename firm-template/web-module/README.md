@@ -17,12 +17,13 @@ PHP/PDO_SQLITE gerekir; config/data/knowledge erişim kuralları korunmalıdır.
 
 Public veri uçları: business (galeri dahil), menu, rooms, tables, catalog, marketing,
 availability, google-reviews. İşlemler: request, order, chat, audio-transcribe,
-dealer claim/session/logout/catalog/order. WhatsApp webhook/status, medya yüklemeleri,
+account register/login/logout/recovery/profile ve dealer session/catalog/order. WhatsApp webhook/status, medya yüklemeleri,
 Android ve Desktop publication/restore hizmetleri mevcut yetki kurallarını korur.
 
-Bayi davet sayfası sitenin modüle kardeş `bayi/` yoludur. Davet fragment'i site
-kodunca hemen temizlenir; claim/logout aynı-origin JSON ve X-YA-Dealer gerektirir.
-HttpOnly/Secure/Strict session cookie yalnız modülün api/dealer/ yoluna gönderilir.
+Ortak müşteri hesapları `api/account/` altında yönetilir. Online Satış tüm hesap ve
+özel bayi uçlarının ön koşuludur. Hosting kimlik/oturumları, Desktop müşteri/ticari
+kararları sahiplenir. Kurulum, SMTP/OAuth ortam değişkenleri ve doğrulama sınırları:
+[Ortak müşteri hesapları](../../docs/architecture/CUSTOMER_ACCOUNTS_V1.md).
 
 Ayrıntılar: [veri sözleşmesi v1](../../docs/architecture/WEB_DATA_SERVICE_CONTRACT_V1.md),
 [kurulum](../../docs/WEB_MODULE_INSTALLATION.md),
@@ -467,30 +468,13 @@ Sipariş toplamı yalnız ürün toplamıdır. Manual sipariş yöntem verilmezs
 kullanır. Desktop Siparişler detayında teslimat bilgileri read-only gösterilir.
 
 
-### Dealer portal (C1 / D-033)
+### Shared customer accounts and private dealer APIs
 
-The site-owned sibling `/bayi/` page supplies the dealer identity shell. Wholesale + the Desktop Services setting
-“Bayi Web Erişimi” enable invitations from the canonical Customer Workspace. Manually
-share the one-time HTTPS fragment link; the invitation expires in 72 hours. The link is
-shown only at creation and must not be entered into analytics or request-body logging.
-The page has no analytics/external assets and removes the fragment immediately.
-
-`POST api/dealer/claim.php` accepts `{ "invite_token": "…" }`; claim/logout require
-`Content-Type: application/json` and `X-YA-Dealer: 1` from the same origin. Claim returns
-only `{ "ok": true }` and sets a HttpOnly cookie; `GET api/dealer/session.php` returns
-only `{ "authenticated": true, "dealer": { "access_id": "…", "display_name": "…" } }`
-or 401 `{ "authenticated": false }`. `POST api/dealer/logout.php` revokes the session.
-Cookies are Secure in production, Strict, scoped to `/api/dealer/`, and expire in 8 hours.
-Only the loopback PHP development server permits HTTP cookies; production requires HTTPS.
-
-The sync-secret-protected POST `publish_dealer_access` action uses the existing versioned
-publication/receipt contract, private `dealer_access_private` storage and transactional
-`dealer_access` projection application. There is no public dealer list endpoint. Deploy
-must deny direct access to `data/` and `config/` using their packaged access rules.
-Revocation/rotation becomes effective after successful Desktop sync; no online round trip
-means no guarantee that remote sessions have already ended. Claimed status is hosting
-state and is not inferred from Desktop's “Davet hazır” label. Runtime reset clears both
-dealer access and sessions. Customer contacts/tax/notes and price groups are not published.
+See [the authoritative account contract](../../docs/architecture/CUSTOMER_ACCOUNTS_V1.md).
+The private publication is version 3 and requires `customer_accounts_v1` support.
+The invitation claim route, invite sessions and unused invite schema are removed.
+No historical migration or compatibility fallback exists in this test-stage schema.
+Account records and registration history survive routine publication/runtime resets.
 
 WhatsApp Business Cloud outbound status webhooks use `api/whatsapp-webhook.php`.
 Set hosting environment secrets `YA_WHATSAPP_VERIFY_TOKEN` and `YA_WHATSAPP_APP_SECRET`

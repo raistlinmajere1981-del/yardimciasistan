@@ -26,6 +26,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 $publicContext = ya_business_public_context();
 $displayName = ya_business_string($publicContext['business_name'] ?? $config['display_name'] ?? $config['name'] ?? 'Yardımcı Asistan İşletmesi');
+// An optional host-owned, root-relative logo path: the API never exposes a foreign image origin.
+$logoCandidate = ya_business_string($publicContext['logo_url'] ?? $config['logo_url'] ?? '');
+$logoUrl = preg_match('~^/(?!/)[a-zA-Z0-9_./-]+\\.(?:png|jpe?g|webp)$~iD', $logoCandidate) === 1
+    && !str_contains($logoCandidate, '..') ? $logoCandidate : '';
 $phone = ya_business_string($publicContext['phone'] ?? $config['phone'] ?? '');
 $whatsapp = ya_business_string($publicContext['whatsapp'] ?? $config['whatsapp'] ?? $phone);
 $email = ya_business_string($publicContext['email'] ?? $config['email'] ?? '');
@@ -65,6 +69,7 @@ ya_business_response(200, [
         'id' => ya_business_string($config['id'] ?? ''),
         'name' => ya_business_string($config['name'] ?? ''),
         'display_name' => $displayName !== '' ? $displayName : 'Yardımcı Asistan İşletmesi',
+        'logo_url' => $logoUrl,
         'profile_id' => $profileId,
         'public_surfaces' => $publicSurfaces,
         'ai_enabled' => $aiEnabled,

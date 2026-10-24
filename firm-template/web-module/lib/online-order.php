@@ -90,18 +90,25 @@ function ya_online_order_normalize(array $input): array
 }
 
 /** Catalog gate + queue + receipt share one transaction; Desktop remains business authority. */
-function ya_online_order_submit(array $input): array
+function ya_online_order_submit(array $input, ?array $account = null): array
 {
     $key = $input['idempotencyKey'] ?? null;
     if (!is_string($key) || preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $key) !== 1) {
         throw new YaOnlineOrderRejection(422, 'invalid_idempotency_key', 'Tekrar deneme kimliği gerekli veya geçersiz.');
     }
+    if ($account) {
+        $input['buyer']['name'] = $account['full_name'];
+        $input['buyer']['email'] = $account['email'];
+    }
     $request = ya_online_order_normalize($input);
-    $keyHash = hash('sha256', $key);
+    if ($account) $request = ['kind' => 'customer', 'accountId' => $account['id'], ...$request];
+    $keyHash = hash('sha256', ($account ? 'customer:' . $account['id'] . ':' : '') . $key);
     $database = ya_storage_open();
     $database->exec('BEGIN IMMEDIATE');
     try {
-        $requestHash = ya_storage_web_order_submission_fingerprint($request);
+        $fingerprint = $request;
+        if ($account) $fingerprint['buyer'] = ['phone' => $request['buyer']['phone']];
+        $requestHash = ya_storage_web_order_submission_fingerprint($fingerprint);
         $receipt = ya_storage_get_web_order_submission_receipt($keyHash);
         if ($receipt !== null && !hash_equals($receipt['request_hash'], $requestHash)) {
             throw new YaOnlineOrderRejection(409, 'idempotency_conflict', 'Tekrar deneme kimliği farklı bir sipariş için kullanılmış.');

@@ -222,6 +222,7 @@ try {
       let locked = true, notifications = 0;
       runInNewContext(readFileSync(resolve("apps/desktop-app/dist-electron/commerce-ipc.js"), "utf8"), {
         exports: api, Error, require: id => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } }
+          : id === "./ipc/product-photo-ipc" ? { registerProductPhotoIpcHandlers() {} }
           : id === "./desktop-logger" ? { desktopLog: { warn() {} } } : ipcRequire(id)
       });
       api.registerCommerceIpcHandlers({ databasePath: () => path, assertUnlocked: () => { if (locked) throw new Error("Uygulama kilitli."); }, onMutation: () => { notifications++; } });

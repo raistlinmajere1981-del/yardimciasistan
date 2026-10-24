@@ -144,7 +144,7 @@ YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-ve-tahmin-edilemeyen-bir-anahtar" \
 npm run pack:web-module
 ```
 
-Desteklenen ek alanlar: `YARDIMCI_ASISTAN_DEPLOY_EMAIL`, `YARDIMCI_ASISTAN_DEPLOY_ADDRESS`, `YARDIMCI_ASISTAN_DEPLOY_PRIMARY_COLOR`, `YARDIMCI_ASISTAN_DEPLOY_ACCENT_COLOR`. Bu değerler sadece `artifacts/web-module-deploy/yardimci-asistan/config/business.json` içine yazılır; repo içindeki kaynak template değişmez. Hâssas `sync_secret` değerini commit etmeyin.
+Desteklenen ek alanlar: `YARDIMCI_ASISTAN_DEPLOY_EMAIL`, `YARDIMCI_ASISTAN_DEPLOY_ADDRESS`, `YARDIMCI_ASISTAN_DEPLOY_PRIMARY_COLOR`, `YARDIMCI_ASISTAN_DEPLOY_ACCENT_COLOR`. Bu değerler sadece `artifacts/web-module-deploy/yardimci-asistan/config/business.json` içine yazılır; repo içindeki kaynak template değişmez. Hâssas `sync_secret` değerini commit etmeyin ve YARDIMCI_ASISTAN_DEPLOY_LOGO_URL (aynı HTTPS sitede /assets/logo.webp gibi PNG/JPEG/WebP yolu).
 
 ## 2. Config Ayarları
 
@@ -159,6 +159,7 @@ Değiştirilecek temel alanlar:
 ```json
 {
   "display_name": "Firma Adı",
+  "logo_url": "/assets/logo.webp",
   "phone": "+90 5xx xxx xx xx",
   "whatsapp": "+90 5xx xxx xx xx",
   "email": "info@firma.com",
@@ -204,7 +205,8 @@ siparişler `api/order.php` üzerinden gönderilir. `sync_secret` tarayıcıya v
 Tek demo kaynağı `test-site/landing` dizinidir. Demo kendi mağaza, kampanya, bayi,
 harita ve asistan kodunu barındırır. `npm run build:demo` yalnız demo asset'lerini
 üretir; müşteri web modülünün paketi veya deploy'u bu derlemeye bağlı değildir.
-Bayi davetinin açılacağı modüle kardeş `/bayi/` sayfasını da site sağlar.
+Site tek `/hesabim/` alanını sağlar. Online Satış görünürlük ve API erişiminin
+ön koşuludur. SMTP/OAuth dış ayarları için [ortak müşteri hesapları](architecture/CUSTOMER_ACCOUNTS_V1.md) sözleşmesini izleyin.
 
 ## 5. QR Menü Sayfası
 

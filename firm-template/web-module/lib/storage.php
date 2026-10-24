@@ -66,8 +66,7 @@ function ya_storage_capabilities(): array
             'business_messaging_status_v1',
             'web_orders_v1',
             'online_catalog_v1',
-            'dealer_access_v1',
-            'dealer_access_v2',
+            'customer_accounts_v1',
             'request_documents_v1',
             'dealer_catalog_v1',
             'dealer_orders_v1',
@@ -91,10 +90,7 @@ function ya_storage_reset_runtime(): array
     $database = ya_storage_open();
     $tables = [
         'business_messaging_status_queue',
-        'dealer_sessions',
-        'dealer_consumed_invites',
         'dealer_catalogs',
-        'dealer_invite_versions',
         'dealer_access',
         'web_requests',
         'web_orders',
@@ -243,7 +239,7 @@ function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSe
 /** Inbox API; the public submission service owns guest and catalog validation. */
 function ya_storage_enqueue_web_order(array $order): array
 {
-    if (!in_array($order['kind'] ?? 'guest', ['guest', 'dealer'], true)) throw new InvalidArgumentException('invalid_web_order_kind');
+    if (!in_array($order['kind'] ?? 'guest', ['guest', 'dealer', 'customer'], true)) throw new InvalidArgumentException('invalid_web_order_kind');
     $id = ya_storage_string($order['id'] ?? '');
     $createdAt = ya_storage_string($order['createdAt'] ?? '');
     if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)
@@ -260,6 +256,9 @@ function ya_storage_enqueue_web_order(array $order): array
             || !is_int($order['accessRevision'] ?? null) || $order['accessRevision'] < 1) throw new InvalidArgumentException('invalid_dealer_order');
         $identity = ['kind' => 'dealer', 'dealerAccessId' => $order['dealerAccessId'], 'accessRevision' => $order['accessRevision']];
         if (isset($order['catalogRevision'])) $identity['catalogRevision'] = $order['catalogRevision'];
+    } elseif (($order['kind'] ?? '') === 'customer') {
+        if (!is_string($order['accountId'] ?? null) || preg_match('/^[a-f0-9-]{36}$/D', $order['accountId']) !== 1) throw new InvalidArgumentException('invalid_customer_order');
+        $identity = ['kind' => 'customer', 'accountId' => $order['accountId'], 'buyer' => $order['buyer']];
     } elseif (isset($order['buyer']['email'])) $identity['buyer']['email'] = $order['buyer']['email'];
     // Transport allowlist only; public submission and Desktop ingress own address validation.
     $delivery = ['method' => $order['delivery']['method'] ?? null, 'address' => null];
@@ -846,6 +845,7 @@ function ya_storage_update_state(array $changes): void
 
 function ya_storage_create_schema(PDO $database): void
 {
+    if (function_exists('ya_account_create_schema')) ya_account_create_schema($database);
     $database->exec("CREATE TABLE IF NOT EXISTS business_messaging_status_queue (
         seq INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT NOT NULL UNIQUE, account_key TEXT NOT NULL,
         payload_json TEXT NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
@@ -859,41 +859,17 @@ function ya_storage_create_schema(PDO $database): void
         );
 
         CREATE TABLE IF NOT EXISTS dealer_access (
-          access_id TEXT PRIMARY KEY,
-          customer_ref TEXT NOT NULL UNIQUE,
-          display_name TEXT NOT NULL,
+          access_id TEXT PRIMARY KEY, customer_ref TEXT NOT NULL UNIQUE,
+          account_id TEXT NOT NULL DEFAULT '', display_name TEXT NOT NULL,
           access_revision INTEGER NOT NULL CHECK (access_revision > 0),
-          enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
-          invite_hash TEXT NOT NULL DEFAULT '',
-          invite_expires_at INTEGER NOT NULL DEFAULT 0,
-          consumed_at INTEGER NOT NULL DEFAULT 0,
-          source_epoch INTEGER NOT NULL DEFAULT 0
+          session_revision INTEGER NOT NULL CHECK (session_revision > 0),
+          enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)), source_epoch INTEGER NOT NULL DEFAULT 0
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_dealer_invite_hash ON dealer_access(invite_hash) WHERE invite_hash <> '';
-        CREATE TABLE IF NOT EXISTS dealer_invite_versions (
-          access_id TEXT PRIMARY KEY REFERENCES dealer_access(access_id) ON DELETE CASCADE,
-          revision INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS dealer_consumed_invites (
-          invite_hash TEXT PRIMARY KEY,
-          consumed_at INTEGER NOT NULL
-        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_access_account ON dealer_access(account_id) WHERE account_id <> '';
         CREATE TABLE IF NOT EXISTS dealer_catalogs (
           dealer_access_id TEXT PRIMARY KEY REFERENCES dealer_access(access_id),
-          access_revision INTEGER NOT NULL,
-          catalog_revision TEXT NOT NULL,
-          payload_json TEXT NOT NULL
+          access_revision INTEGER NOT NULL, catalog_revision TEXT NOT NULL, payload_json TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS dealer_sessions (
-          session_hash TEXT PRIMARY KEY,
-          dealer_access_id TEXT NOT NULL REFERENCES dealer_access(access_id),
-          access_revision INTEGER NOT NULL,
-          created_at INTEGER NOT NULL,
-          expires_at INTEGER NOT NULL,
-          revoked_at INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE INDEX IF NOT EXISTS idx_dealer_sessions_access ON dealer_sessions(dealer_access_id);
-        CREATE INDEX IF NOT EXISTS idx_dealer_sessions_expiry ON dealer_sessions(expires_at);
 
         CREATE TABLE IF NOT EXISTS web_requests (
           seq INTEGER PRIMARY KEY AUTOINCREMENT,

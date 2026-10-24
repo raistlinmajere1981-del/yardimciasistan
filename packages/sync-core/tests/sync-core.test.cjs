@@ -1290,7 +1290,7 @@ test("online catalog publication uses the versioned transport and a public field
     idempotency_key: "desktop-catalog:online_catalog:4", online_catalog: {
       version: 1, enabled: true, delivery_methods: ["pickup", "shipping"], updated_at: "2026-10-04T00:00:00Z", products: [{
         product_id: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
-        price: 25, currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0
+        price: 25, currency: "TRY", tax_rate: 20, image_url: "", image_urls: [], availability: "available", sort_order: 0
       }]
     }
   });

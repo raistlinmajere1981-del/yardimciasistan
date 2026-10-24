@@ -5,7 +5,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     header('Allow: GET'); ya_dealer_response(405, ['ok' => false]);
 }
 try {
-    $token = $_COOKIE['ya_dealer_session'] ?? '';
+    $token = $_COOKIE['ya_account_session'] ?? '';
     $db = ya_storage_open(); $db->exec('BEGIN'); $reading = true;
     $history = ya_dealer_orders(is_string($token) ? $token : '');
     $db->exec('COMMIT'); $reading = false;
@@ -13,6 +13,9 @@ try {
 } catch (YaOnlineOrderRejection $error) {
     if ($reading ?? false) $db->exec('ROLLBACK');
     ya_dealer_response($error->status, ['ok' => false, 'message' => $error->getMessage()]);
+} catch (YaAccountError $error) {
+    if (($reading ?? false) && isset($db)) $db->exec('ROLLBACK');
+    ya_account_response($error->status, ['ok' => false, 'code' => $error->reason]);
 } catch (Throwable) {
     if ($reading ?? false) $db->exec('ROLLBACK');
     ya_dealer_response(503, ['ok' => false, 'message' => 'Siparişler alınamadı.']);

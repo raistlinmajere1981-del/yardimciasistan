@@ -14,7 +14,7 @@ Its registry-wide republish never reuses backup frozen payloads or resets Web su
 | `menu` | Outbox plus optional-revision manual POST | Menu invalidation triggers; shared durable publication lifecycle |
 | `android_snapshot` | Outbox plus direct action/manual snapshot | Android invalidation triggers; shared durable publication lifecycle |
 | `online_catalog` | Versioned outbox | Commerce publication invalidation triggers |
-| `dealer_access_private` | Versioned outbox, transactional apply callback | Dealer aggregate `dealer_access` |
+| `dealer_access_private` | Versioned outbox, transactional apply callback | Customer account/commercial aggregate `dealer_access` |
 | `marketing_website` | Versioned outbox | Marketing desired-state triggers; prepared projection and sent metadata frozen together |
 | `room_catalog` | Direct, in-memory payload comparison | Canonical public catalog reconstructed each cycle; persisted desired-body comparison |
 | `table_catalog` | Direct, in-memory payload comparison | Canonical public catalog reconstructed each cycle; persisted desired-body comparison |
@@ -27,6 +27,9 @@ Its registry-wide republish never reuses backup frozen payloads or resets Web su
 All aggregate job keys equal the hosting name except `dealer_access`, whose private
 hosting name is `dealer_access_private`. Every key has **one** allocator:
 `sync_outbox` + the permanent `sync_outbox_revisions` high-water mark.
+
+The version 3 private access body also carries the authoritative Online Sales account
+gate and opaque shared-account bindings. See [shared customer accounts](CUSTOMER_ACCOUNTS_V1.md).
 
 ## Preparation and retry
 

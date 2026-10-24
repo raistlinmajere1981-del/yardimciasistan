@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-customer-accounts.mjs",
   "scripts/smoke-desktop-visible-updater.mjs",
   "scripts/smoke-entity-single-card.mjs",
   "scripts/smoke-data-transfer.mjs",
@@ -418,7 +419,7 @@ const PROFILE_TRANSITION_CHECKS = new Set([
   "profile-transition", "profile-transition-ui", "business-capabilities", "setup-profile-contract",
   "capability-settings-source", "settings-correctness", "settings-ui-correctness", "settings-platform",
   "capability-runtime", "capability-surface-consistency", "workspace-platform", "sector-feature-contributions",
-  "commerce-online-catalog", "commerce-dealer-access", "commerce-dealer-orders", "commerce-aras-provider",
+  "customer-accounts", "commerce-online-catalog", "commerce-dealer-access", "commerce-dealer-orders", "commerce-aras-provider",
   "business-messaging-provider", "kbs-domain", "market-product-data-contract", "birthday-foundation",
   "publication-protocol", "sync-publication-correctness", "marketing-website", "unit-tests",
   "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "verification-registry-tests", "git-diff-check"
@@ -600,7 +601,7 @@ function smokeLabel(file) {
 
 function smokeRequires(file) {
   if (file === "scripts/smoke-entity-single-card.mjs") return ["build-desktop"];
-  if (file === "scripts/smoke-dealer-android-device.mjs") return [];
+  if (file === "scripts/smoke-dealer-android-device.mjs") return ["build-desktop", "php-lint"];
   // Own disposable native fixture build; does not consume the customer APK or Desktop.
   if (file === "scripts/smoke-android-native-ui-family.mjs") return [];
   if (file === "scripts/smoke-desktop-ui-family.mjs") return [];
@@ -624,6 +625,7 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-instagram-staging.mjs" || file === "scripts/smoke-instagram-oauth-web.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
+  if (file === "scripts/smoke-customer-accounts.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-dealer-applications.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-storefront.mjs") return ["build-demo", "php-lint"];
@@ -684,7 +686,7 @@ function smokeDomainsForGeneralOwnership(file) {
   if (name === "marketing-log-privacy") domains.add("diagnostics");
   if (/messaging-dispatch/.test(name)) { domains.add("messaging-dispatch"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/messaging-campaigns/.test(name)) { domains.add("messaging-campaigns"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
-  if (/dealer-access|dealer-portal|dealer-applications|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
+  if (/customer-accounts|dealer-access|dealer-portal|dealer-applications|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
 
   if (/android/.test(name)) domains.add("android");
   if (/web|sync|public-room|connection/.test(name)) domains.add("web");

@@ -467,6 +467,19 @@ export class PhpHostingSyncTransport implements SyncTransport {
     return getSyncCapabilities(this.config);
   }
 
+  async pullCustomerAccounts(input: PullCursorInput): Promise<import("./index").PullCustomerAccountsResult> {
+    const result = await syncRequest<{ ok: true; accounts: import("./index").CustomerAccountEnvelope[]; next_cursor: number; has_more: boolean }>(this.config,
+      { action: "pull_customer_accounts", after_seq: input.afterSeq, limit: input.limit ?? 100 });
+    if (!result.ok) return result;
+    let cursor = input.afterSeq;
+    if (!Array.isArray(result.accounts) || typeof result.has_more !== "boolean") return { ok: false, message: "Müşteri hesap kuyruğu geçersiz.", error: "invalid_account_page" };
+    for (const row of result.accounts) {
+      if (!Number.isSafeInteger(row.syncSeq) || row.syncSeq <= cursor) return { ok: false, message: "Müşteri hesap sırası geçersiz.", error: "invalid_account_page" };
+      cursor = row.syncSeq;
+    }
+    return result.next_cursor === cursor && !(result.accounts.length === 0 && result.has_more) ? result : { ok: false, message: "Müşteri hesap cursor değeri geçersiz.", error: "invalid_account_page" };
+  }
+
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult> {
     return pullRequests({
       ...this.config,

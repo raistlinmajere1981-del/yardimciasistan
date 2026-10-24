@@ -582,7 +582,7 @@ export function approveDealerApplication(db: DatabaseSync, requestId: string, pr
     insertDatabaseEvent(db, { type: "request.dealer_approved", entityType: "request", entityId: requestId,
       payload: { customer_id: result.savedId, price_group: priceGroup }, now });
     db.exec("COMMIT");
-    return { ok: true, message: "Başvuru onaylandı. Bayi daveti oluşturabilirsiniz.", customerId: result.savedId };
+    return { ok: true, message: "Başvuru onaylandı. Müşteri ortak hesabını webden açabilir; eşleştirmeyi müşteri kartından yönetin.", customerId: result.savedId };
   } catch (error) {
     db.exec("ROLLBACK");
     return { ok: false, message: error instanceof Error ? error.message : "Başvuru onaylanamadı." };

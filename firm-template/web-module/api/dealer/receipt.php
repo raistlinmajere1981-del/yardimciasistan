@@ -7,7 +7,7 @@ try {
     $input = is_string($raw) && strlen($raw) <= 1024 ? json_decode($raw, true) : null;
     $key = is_array($input) ? ($input['idempotencyKey'] ?? null) : null;
     if (!is_string($key) || preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $key) !== 1) ya_online_order_invalid();
-    $token = $_COOKIE['ya_dealer_session'] ?? '';
+    $token = $_COOKIE['ya_account_session'] ?? '';
     $db = ya_storage_open(); $db->exec('BEGIN'); $reading = true;
     $access = is_string($token) ? ya_dealer_session_access($token) : null;
     if (!$access) throw new YaOnlineOrderRejection(401, 'dealer_access_required', 'Bayi erişimi gerekli.');
@@ -18,6 +18,9 @@ try {
 } catch (YaOnlineOrderRejection $error) {
     if ($reading ?? false) $db->exec('ROLLBACK');
     ya_dealer_response($error->status, ['ok' => false, 'message' => $error->getMessage()]);
+} catch (YaAccountError $error) {
+    if (($reading ?? false) && isset($db)) $db->exec('ROLLBACK');
+    ya_account_response($error->status, ['ok' => false, 'code' => $error->reason]);
 } catch (Throwable) {
     if ($reading ?? false) $db->exec('ROLLBACK');
     ya_dealer_response(503, ['ok' => false, 'message' => 'Gönderim sonucu alınamadı.']);

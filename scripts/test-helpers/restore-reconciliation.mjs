@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -126,8 +127,15 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     const customer = f.db.saveCustomer({ fullName: 'Restore dealer', phone: '05550001199', email: '', notes: '', tags: [],
       commercialProfile: { companyName: 'Restore dealer', dealerStatus: 'active', priceGroup: 'dealer_a' } });
     assert.equal(customer.ok, true, customer.message);
-    const invite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
-    const token = new URLSearchParams(new URL(invite.inviteUrl).hash.slice(1)).get("invite");
+    const accountId = randomUUID();
+    storage(`$db->prepare("INSERT INTO customer_accounts(id,email,full_name,email_verified,created_at) VALUES (?, 'restore@example.test', 'Restore account', 1, ?)")->execute(['${accountId}',time()]);`);
+    mutate(`UPDATE customer_web_access SET account_id='${accountId}' WHERE customer_id='${customer.savedId}'`);
+    const access = f.db.getDealerWebAccess(customer.savedId);
+    const sessionCookie = () => {
+      const session = randomBytes(32).toString('base64url'), refresh = randomBytes(32).toString('base64url');
+      storage(`$db->prepare("INSERT INTO customer_account_sessions VALUES (?, ?, ?, (SELECT session_version FROM customer_accounts WHERE id=?), 'web', ?, ?, ?, 0)")->execute(['${createHash('sha256').update(session).digest('hex')}','${createHash('sha256').update(refresh).digest('hex')}','${accountId}','${accountId}',time(),time()+1800,time()+2592000]);`);
+      return 'ya_account_session='+session;
+    };
     const asset = f.media.importBytes(imageBytes, 'upload');
     const content = f.service.saveContent(editorialInput({ mediaAssetIds: [asset.id] }));
     let pub = f.service.savePublication({ contentId: content.content.id, channel: 'website', placement: 'homepage_feature', title: 'Restore A', text: 'Backup A', mediaAssetIds: [asset.id] });
@@ -135,8 +143,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     coordinator = makeCoordinator();
     let result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
     const a = backup(); // T1: no Web-owned request/order yet
-    const claim = await post('dealer/claim', { invite_token: token }, { 'X-YA-Dealer': '1' });
-    assert.equal(claim.status, 200); const cookie = claim.cookie.split(';')[0];
+    const cookie = sessionCookie();
     f.service.savePublication({ ...pub, expectedRevision: pub.revision, title: 'Remote B', text: 'Newer B' });
     mutate("UPDATE business SET name='Remote B', display_name='Remote B'; UPDATE settings SET google_place_id='restore-place-B';");
     mutate("UPDATE rooms SET name='Room B'; UPDATE reservations SET end_date='2030-07-25'; UPDATE tables SET name='Table B'; UPDATE menu_categories SET name='Menu B';");
@@ -160,15 +167,10 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     // Backup prices/access differ from the accepted canonical snapshots, and B has
     // newer high-water revisions plus an unrelated frozen body awaiting retry.
     saveRuntimeCatalogProduct(f.db.databasePath, { ...productInput, id: product.id, salePrice: 200, dealerPriceA: 120 });
-    // Current remote access is ahead of backup, with a different consumed invite.
-    // Restoring the lower revision must use new epoch authority, not resurrect T1's invite.
-    const newerInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
-    const newerClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(newerInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
-    // The new invite must be published before claim.
-    assert.notEqual(newerClaim.status, 200);
+    // Current remote session revocation is ahead of backup. A restored source fences those sessions.
+    f.db.changeDealerWebAccess(customer.savedId, 'revoke_sessions');
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
-    const liveClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(newerInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
-    assert.equal(liveClaim.status, 200); const liveCookie = liveClaim.cookie.split(';')[0];
+    const liveCookie = sessionCookie();
     f.db.queueSyncJob('marketing_website_publish');
     f.db.prepareSyncPublication('marketing_website_publish', { projection: { version: 1, enabled: false, publications: [] }, sent: [] });
     const oldEpoch = activated.source_epoch;
@@ -254,7 +256,6 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     assert.deepEqual(orders().map(o => [o.sourceReference, o.total]).sort(), historicalPrices, 'replay preserves canonical pricing, not restored current product pricing');
     assert.equal(f.db.getDashboardData().requests.length, 1);
     assert.deepEqual(storage('echo json_encode([$db->query("SELECT COUNT(*) FROM web_order_submission_receipts")->fetchColumn(), $db->query("SELECT COUNT(*) FROM web_request_submission_receipts")->fetchColumn()]);'), webOwnedCounts);
-    assert.equal((await post('dealer/claim', { invite_token: token }, { 'X-YA-Dealer': '1' })).status, 400, 'consumed T1 invite stays consumed after restored epoch');
     assert.equal((await nativeFetch(`${config.baseUrl}/api/dealer/session.php`, { headers: { Cookie: liveCookie } })).status, 401, 'old epoch session is invalidated by normal access apply');
     // F: same operation restart is a no-op; another explicit restore has a fresh epoch
     // and replays the same identities with no duplicate business side effects.
@@ -275,20 +276,18 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: true });
     setPublicationFixtureCapability({ capability: C.QR_MENU, enabled: true });
     mutate("UPDATE customer_commercial_profiles SET dealer_status = 'active'");
-    const offRaceInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
-    const offRaceClaim = await post('dealer/claim', { invite_token: new URLSearchParams(new URL(offRaceInvite.inviteUrl).hash.slice(1)).get("invite") }, { 'X-YA-Dealer': '1' });
-    assert.equal(offRaceClaim.status, 200); const offRaceCookie = offRaceClaim.cookie.split(';')[0];
+    const offRaceCookie = sessionCookie();
     await restore(off); coordinator = makeCoordinator();
     result = await coordinator.run(false); assert.equal(result.ok, true, result.message);
     await finishRecovery();
     assert.deepEqual((await nativeFetch(`${config.baseUrl}/api/marketing.php`).then(r => r.json())).publications, []);
     assert.equal(storage("echo json_encode(ya_storage_get_publication('menu', []));").enabled, false);
     assert.equal(f.db.getDashboardData().requests[0].status, 'approved', 'same-ID replay preserves restored local owner decisions');
-    assert.equal(storage(`echo $db->query("SELECT enabled FROM dealer_access WHERE access_id='${invite.access.accessId}'")->fetchColumn();`), 0, 'restored disabled canonical dealer access withdraws newer remote authorization');
+    assert.equal(storage(`echo $db->query("SELECT enabled FROM dealer_access WHERE access_id='${access.accessId}'")->fetchColumn();`), 0, 'restored disabled canonical dealer access withdraws newer remote authorization');
     assert.equal((await nativeFetch(`${config.baseUrl}/api/dealer/session.php`, { headers: { Cookie: offRaceCookie } })).status, 401);
     assert.equal(orders().length, 2); assert.equal(f.db.getDashboardData().requests.length, 1);
     assert.ok(orders().every(order => order.status === 'confirmed'), 'restored canonical order decisions survive replay');
-    console.log('restore reconciliation: staged registry coverage, new epoch, offline/CAS lost response, crash/partial apply, exact receipts, request/order replay, canonical historical prices, marketing/OFF, consumed invites and session fencing PASS');
+    console.log('restore reconciliation: staged registry coverage, new epoch, offline/CAS lost response, crash/partial apply, exact receipts, request/order replay, canonical historical prices, marketing/OFF, shared accounts and session fencing PASS');
   } finally { globalThis.fetch = nativeFetch; coordinator?.stop(); f.dispose(); }
 }

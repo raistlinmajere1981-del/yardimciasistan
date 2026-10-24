@@ -1,4 +1,4 @@
-<resources><string name="app_name">Yardımcı Asistan Bayi</string><string name="storage_failure">Cihazdaki kayıt açılamadı veya güvenle kaydedilemedi. Verileriniz silinmedi. Uygulamayı kapatıp yeniden açın; sorun sürerse destek alın.</string>
+<resources><string name="app_name">Bayi Portalı</string><string name="storage_failure">Cihazdaki kayıt açılamadı veya güvenle kaydedilemedi. Verileriniz silinmedi. Uygulamayı kapatıp yeniden açın; sorun sürerse destek alın.</string>
 <string name="last_updated">Son güncelleme: %1$s</string>
 <string name="estimated_total">Tahmini toplam  %1$s</string>
 </resources>

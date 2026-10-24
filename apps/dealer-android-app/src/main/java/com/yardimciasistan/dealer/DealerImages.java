@@ -31,6 +31,7 @@ final class DealerImages {
   private final Handler main = new Handler(Looper.getMainLooper());
   private final Context context;
   private final File directory;
+  private final File brandDirectory;
   private boolean closed;
   private final LruCache<String, Bitmap> cache = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
     @Override
@@ -60,6 +61,8 @@ final class DealerImages {
     this.context = context.getApplicationContext();
     directory = new File(context.getCacheDir(), "catalog-images");
     directory.mkdirs();
+    brandDirectory = new File(context.getFilesDir(), "dealer-brand-logos");
+    brandDirectory.mkdirs();
   }
   void close() {
     closed = true;
@@ -88,6 +91,35 @@ final class DealerImages {
       ImageView target = reference.get();
       if (target != null && source.equals(target.getTag()))
         target.setImageBitmap(bitmap);
+    });
+  }
+  // Logos remain in the app's own files (not evictable cache) for offline openings.
+  void loadBrand(ImageView view, String source) {
+    view.setTag(source);
+    Bitmap cached = cache.get(source);
+    if (cached != null) { view.setImageBitmap(cached); return; }
+    java.lang.ref.WeakReference<ImageView> reference = new java.lang.ref.WeakReference<>(view);
+    request(r -> {
+      File local = new File(brandDirectory, cacheFile(source).getName());
+      if (!local.isFile()) {
+        File downloaded = download(source, r);
+        if (downloaded.length() > 2 * 1024 * 1024L) throw new IOException();
+        File temporary = File.createTempFile("brand-", ".part", brandDirectory);
+        try {
+          r.check();
+          java.nio.file.Files.copy(downloaded.toPath(), temporary.toPath(),
+              java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+          r.check();
+          if (!temporary.renameTo(local)) throw new IOException();
+        } finally { temporary.delete(); }
+      }
+      if (local.length() < 1 || local.length() > 2 * 1024 * 1024L) throw new IOException();
+      return decode(local, 384, r);
+    }, (bitmap, error) -> {
+      if (bitmap == null) return;
+      cache.put(source, bitmap);
+      ImageView target = reference.get();
+      if (target != null && source.equals(target.getTag())) target.setImageBitmap(bitmap);
     });
   }
   Request remote(String source, int edge, Callback callback) {

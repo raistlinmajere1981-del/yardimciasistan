@@ -15,10 +15,10 @@ function showcase_features(): array
         'finance' => ['title'=>'Finans ve raporlar', 'text'=>'Gelir, gider ve ödeme hareketlerini tarih aralığına göre inceleyin.', 'image'=>'finance', 'group'=>'daily', 'guide'=>''],
         'calendar' => ['title'=>'Takvim ve görevler', 'text'=>'Rezervasyonları ve günlük görevleri aynı takvimden açın.', 'image'=>'calendar', 'group'=>'daily', 'guide'=>''],
         'companion' => ['featured'=>true, 'title'=>'Android Companion', 'text'=>'Telefondan talep, rezervasyon, masa ve stok işlemlerine cihaz izinleriyle erişin; eşleştirmeyi Desktop’tan yönetin.', 'image'=>'companion', 'group'=>'mobile', 'guide'=>'android', 'note'=>'Desktop eşleştirme ekranı'],
-        'wholesale' => ['title'=>'Toptan ve bayi', 'text'=>'Bayi müşterilerini, fiyat gruplarını ve siparişlerini yönetin; davetli web erişimini isteğe bağlı açın.', 'image'=>'wholesale', 'group'=>'sales', 'guide'=>'musteri', 'note'=>'İsteğe bağlı'],
+        'wholesale' => ['title'=>'Toptan ve bayi', 'text'=>'Bayi müşterilerini, fiyat gruplarını ve siparişlerini yönetin; ortak hesapla bayi erişimini yönetin.', 'image'=>'wholesale', 'group'=>'sales', 'guide'=>'musteri', 'note'=>'İsteğe bağlı'],
         'requests' => ['title'=>'Müşteri talepleri', 'text'=>'Web ve telefon kanallarından gelen talepleri Müşteri İşleri alanında takip edin.', 'image'=>'requests', 'group'=>'daily', 'guide'=>'musteri'],
         'translations' => ['title'=>'Çoklu dil ve AI çeviri', 'text'=>'Yayın metinlerini elle veya AI desteğiyle çevirin; eksik ve güncelliğini yitiren çeviriler Türkçeye döner.', 'image'=>'translations', 'group'=>'daily', 'guide'=>'', 'note'=>'AI için sağlayıcı gerekir'],
-        'dealer' => ['title'=>'Bayi Android', 'text'=>'Davetle giriş yapın; bayiye özel katalog, fiyat, sepet ve sipariş geçmişini pilot uygulamada test edin.', 'image'=>'dealer', 'group'=>'mobile', 'guide'=>'', 'note'=>'Pilot'],
+        'dealer' => ['title'=>'Bayi Android', 'text'=>'Müşteri hesabınızla giriş yapın; bayiye özel katalog, fiyat, sepet ve sipariş geçmişini pilot uygulamada test edin.', 'image'=>'dealer', 'group'=>'mobile', 'guide'=>'', 'note'=>'Pilot'],
     ];
 }
 
@@ -43,7 +43,7 @@ function showcase_services(): array
         ['title'=>'Ses ve dikte', 'text'=>'Desteklenen seslerle metni dinleyin veya kaydettiğiniz sesi inceleyerek metne dönüştürün.', 'status'=>'İsteğe bağlı'],
         ['title'=>'AI çeviri ve Dil Yönetimi', 'text'=>'Web’de yayınlanan metinler için hedef dilleri seçin; manuel çevirileri koruyun ve AI çevirilerini kontrol edin.', 'status'=>'AI için sağlayıcı gerekir'],
         ['title'=>'Teslimat ve kargo', 'text'=>'Siparişte teslim alma veya kargoyu seçin; gönderileri ve takip bilgilerini yönetin. Aras bağlantısı hesap ve başarılı bağlantı testi gerektirir.', 'status'=>'Hesap ve bağlantı testi'],
-        ['title'=>'Bayi portalı', 'text'=>'Davetli bayiler kendi katalog, fiyat ve siparişlerine web’den erişir; erişim ve sipariş yetkileri Desktop’tan yönetilir.', 'status'=>'İsteğe bağlı'],
+        ['title'=>'Bayi portalı', 'text'=>'Aktif bayiler aynı hesapla kendi katalog, fiyat ve siparişlerine web’den erişir; erişim ve sipariş yetkileri Desktop’tan yönetilir.', 'status'=>'İsteğe bağlı'],
         ['title'=>'Barkoddan ürün bilgisi', 'text'=>'Desteklenen barkodları Open Food Facts üzerinden sorgulayın; dönen ürün bilgilerini kontrol ederek kullanın.', 'status'=>'Ürün bulunmasına bağlı'],
         ['title'=>'Doğum günü hatırlatmaları', 'text'=>'İzinli müşteri kayıtları için doğum günü mesajı hazırlığını WhatsApp ayarlarıyla birlikte yönetin.', 'status'=>'İzin ve servis ayarı'],
         ['title'=>'Google yorumları ve harita', 'text'=>'Yayınlanan işletme iletişimini ve konumunu web’de gösterin; Google yorumları için kendi hesabınızı yapılandırın.', 'status'=>'Hesap ve izin gerektirir'],
@@ -58,7 +58,7 @@ function showcase_web_surfaces(): array
         ['title'=>'Oda ve rezervasyon', 'text'=>'Yayınlanan odaları inceleyin ve rezervasyon talebinin Desktop’a ulaşmasını test edin.', 'path'=>'/odalar/'],
         ['title'=>'Restoran ve masalar', 'text'=>'Yayınlanan masaları inceleyin; masa rezervasyonu taleplerini uygulamayla test edin.', 'path'=>'/restoran/'],
         ['title'=>'QR Menü', 'text'=>'Desktop’tan yayınladığınız menü, ürün ve fiyat değişikliklerini görün.', 'path'=>'/qr-menu/'],
-        ['title'=>'Bayi portalı', 'text'=>'Desktop’tan oluşturulan davetle oturum açın; bayiye özel katalog ve siparişleri deneyin.', 'path'=>'/bayi/'],
+        ['title'=>'Bayi portalı', 'text'=>'Webden hesap açın ve işletmenin verdiği bayi yetkisiyle giriş yapın; bayiye özel katalog ve siparişleri deneyin.', 'path'=>'/hesabim/'],
         ['title'=>'Duyurular ve kampanyalar', 'text'=>'Yayınladığınız duyuruları görün; düzenleme ve yayından kaldırma sonuçlarını kontrol edin.', 'path'=>'/duyurular/'],
         ['title'=>'İşletme bilgileri ve galeri', 'text'=>'İşletme açıklaması, fotoğraflar ve konum bilgileri kendi yayınlarınızdan gelir.', 'path'=>'/hakkimizda/'],
         ['title'=>'Galeri', 'text'=>'Yayınlanan işletme fotoğraflarını ve desteklenen medyaları inceleyin.', 'path'=>'/galeri/'],

@@ -248,7 +248,7 @@ try {
   assert.equal(firstCycle.pulledActions, 1);
   assert.equal(firstCycle.appliedActions, 1);
   assert.equal(firstCycle.failedActions, 0);
-  assert.equal(firstCycle.publishedJobs, 3, "menu, catalog and Android snapshot are acknowledged");
+  assert.equal(firstCycle.publishedJobs, 4, "menu, catalog, common account state and Android snapshot are acknowledged");
   assert.ok(dashboardChangeCount >= 1);
   assert.ok(statusEvents.some((status) => status.phase === "syncing"));
   assert.equal(statusEvents.at(-1)?.phase, "success");
@@ -633,7 +633,7 @@ try {
   assert.equal(promoteResult.ok, true);
   const adminProfilePublishCycle = await coordinator.runNow();
   assert.equal(adminProfilePublishCycle.ok, true, adminProfilePublishCycle.message);
-  assert.equal(adminProfilePublishCycle.publishedJobs, 1);
+  assert.equal(adminProfilePublishCycle.publishedJobs, 2);
   const adminSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
   const adminSummary = await adminSummaryResponse.json();
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].role, "admin");
@@ -1218,8 +1218,7 @@ function assertCapabilitiesShape() {
       "business_messaging_status_v1",
       "web_orders_v1",
       "online_catalog_v1",
-      "dealer_access_v1",
-      "dealer_access_v2",
+      "customer_accounts_v1",
       "request_documents_v1",
       "dealer_catalog_v1",
       "dealer_orders_v1",

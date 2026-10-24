@@ -64,14 +64,15 @@ app.whenReady().then(async () => {
     assert.deepEqual(fs.readFileSync(absolute(previousPath)), previousBytes);
 
     const before = row();
+    const retainedFiles = files().slice().sort();
     raw.exec("CREATE TRIGGER test_product_fail BEFORE UPDATE ON catalog_products BEGIN SELECT RAISE(ABORT,'injected_product'); END");
     await assert.rejects(save(input), /injected_product/);
     assert.deepEqual(row(), before);
     assert.deepEqual(fs.readFileSync(absolute(previousPath)), previousBytes, "DB failure never overwrites the valid image");
-    assert.equal(files().length, 2, "uncommitted completed asset is only an orphan");
+    assert.ok(files().length > retainedFiles.length, "uncommitted completed originals/previews remain only as orphans");
     raw.exec("DROP TRIGGER test_product_fail");
     media.cleanupOrphanProductImages(database.databasePath);
-    assert.deepEqual(files(), [path.basename(previousPath)]);
+    assert.deepEqual(files().sort(), retainedFiles);
 
     const rename = fs.renameSync;
     try {
@@ -80,7 +81,7 @@ app.whenReady().then(async () => {
     } finally { fs.renameSync = rename; }
     assert.equal(row().image_asset_path, previousPath, "rename failure occurs before the DB attachment");
     assert.deepEqual(fs.readFileSync(absolute(previousPath)), previousBytes);
-    assert.equal(files().length, 1, "failed finalize removes the temporary file");
+    assert.deepEqual(files().sort(), retainedFiles, "failed finalize removes temporary files while preserving originals and preview");
 
     for (const point of ["staged", "prepared", "committed"]) {
       const beforeCrash = row();
@@ -99,7 +100,9 @@ app.whenReady().then(async () => {
       media.cleanupOrphanProductImages(database.databasePath);
       const current = row().image_asset_path;
       assert.ok(fs.existsSync(absolute(current)));
-      assert.deepEqual(files(), [path.basename(current)], "restart cleanup retains only the referenced image");
+      const stored = raw.prepare("SELECT image_asset_path, image_original_assets_json FROM catalog_products WHERE id=?").get(id);
+      const referenced = [stored.image_asset_path, ...JSON.parse(stored.image_original_assets_json).map(asset => asset.assetPath)].filter(Boolean).map(asset => path.basename(asset));
+      assert.deepEqual(files().sort(), [...new Set(referenced)].sort(), "restart cleanup retains exactly the referenced original archive and preview");
     }
 
     // Optional Android image response cannot replace a newer user image or changed URL.
