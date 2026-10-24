@@ -21,7 +21,8 @@ try {
   assert.equal((await call('dealer/claim',{invite_token:'a'.repeat(43)})).status,404);
   const registered=await call('account/register',{email:'new@example.test',fullName:'New Customer',password:'Attacker-preregister-123'});
   assert.equal(registered.status,200,JSON.stringify(registered.body));assert.equal(JSON.stringify(registered.body).includes(token()),false);
-  assert.equal((await call('account/login',{email:'new@example.test',password:'Attacker-preregister-123'})).body.code,'email_verification_required');
+  assert.equal(storage('echo json_encode($db->query("SELECT password_hash FROM customer_accounts WHERE email=\'new@example.test\'")->fetchColumn());'),'','unverified account must never store a preregistration password');
+  assert.equal((await call('account/login',{email:'new@example.test',password:'Attacker-preregister-123'})).body.code,'invalid_credentials');
   const verifyToken=token();
   assert.equal((await call('account/verify',{token:verifyToken,password:accountPassword})).status,200);
   assert.equal((await call('account/verify',{token:verifyToken,password:accountPassword})).status,400);
@@ -121,7 +122,7 @@ try {
 
   await f.publish();
   assert.equal((await call('account/config')).body.enabled,false);
-  for(const [endpoint,body] of [['account/session',undefined],['account/orders',undefined],['account/register',{email:'off@example.test',fullName:'Off',password:accountPassword}],['account/login',{email:'new@example.test',password:accountPassword}],['account/recover',{email:'new@example.test'}],['account/reset',{token:'x'.repeat(43),password:accountPassword}],['account/verify',{token:'x'.repeat(43),password:accountPassword}],['account/refresh',{}],['account/profile',{fullName:'Off'}],['account/oauth',{provider:'google'}],['account/exchange',{code:'x'.repeat(43),verifier}],['dealer/session',undefined],['dealer/catalog',undefined],['dealer/orders',undefined],['dealer/order',{}],['dealer/receipt',{idempotencyKey:randomUUID()}]]){
+  for(const [endpoint,body] of [['account/session',undefined],['account/orders',undefined],['account/register',{email:'off@example.test',fullName:'Off'}],['account/login',{email:'new@example.test',password:accountPassword}],['account/recover',{email:'new@example.test'}],['account/reset',{token:'x'.repeat(43),password:accountPassword}],['account/verify',{token:'x'.repeat(43),password:accountPassword}],['account/refresh',{}],['account/profile',{fullName:'Off'}],['account/oauth',{provider:'google'}],['account/exchange',{code:'x'.repeat(43),verifier}],['dealer/session',undefined],['dealer/catalog',undefined],['dealer/orders',undefined],['dealer/order',{}],['dealer/receipt',{idempotencyKey:randomUUID()}]]){
     const result=await call(endpoint,body,current);assert.equal(result.status,403,endpoint+': '+JSON.stringify(result.body));
   }
   assert.equal((await call('account/logout-all',{},current)).status,200);

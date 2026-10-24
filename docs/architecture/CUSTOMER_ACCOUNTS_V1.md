@@ -136,3 +136,7 @@ state, PKCE and linking tests inject explicit provider responses at the service
 boundary; they do not prove real Google/Meta credentials, consent/app approval or
 mail delivery to external inboxes. HTTPS Hosting, Android browser deep-link behavior
 on a physical device and real provider/SMTP configuration remain live manual checks.
+
+### Parola belirleme ve posta kutusu sahipliği
+
+Web kaydında yalnız ad-soyad ve e-posta istenir. Şifre ilk kayıt sırasında alınmaz veya saklanmaz; posta kutusuna gönderilen tek kullanımlık doğrulama bağlantısı açıldığında bir defa belirlenir. Böylece üçüncü kişinin başkasının adresine ön kayıt oluşturup parolayı seçerek hesabı devralması önlenir. Mevcut doğrulanmış hesapların şifre ve oturumları korunur. Şifre yenileme aynı tek kullanımlık token modeliyle çalışır.

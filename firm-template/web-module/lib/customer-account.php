@@ -165,14 +165,16 @@ function ya_account_send_token(array $account, string $purpose): void
 function ya_account_register(array $input): void
 {
     ya_account_require_enabled();
-    $email = ya_account_email($input['email'] ?? null); $password = ya_account_password($input['password'] ?? null); $name = ya_account_name($input['fullName'] ?? null);
+    $email = ya_account_email($input['email'] ?? null); $name = ya_account_name($input['fullName'] ?? null);
     ya_account_rate('register', $email);
     if (!ya_account_mail_configured()) throw new YaAccountError(503, 'mail_unconfigured');
-    $db = ya_storage_open(); $hash = password_hash($password, PASSWORD_ARGON2ID);
-    $db->prepare('INSERT OR IGNORE INTO customer_accounts(id, email, full_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
-        ->execute([ya_account_uuid(), $email, $name, $hash, time()]);
+    $db = ya_storage_open();
+    // A visitor can type somebody else's address. Never accept a password or account ownership
+    // until the mailbox owner opens the single-use verification link.
+    $db->prepare('INSERT OR IGNORE INTO customer_accounts(id, email, full_name, created_at) VALUES (?, ?, ?, ?)')
+        ->execute([ya_account_uuid(), $email, $name, time()]);
     $find = $db->prepare('SELECT * FROM customer_accounts WHERE email = ?'); $find->execute([$email]); $account = $find->fetch();
-    // Never replace an existing pending password/profile: resubmission cannot take ownership.
+    // Never replace an existing pending identity/profile: resubmission cannot take ownership.
     if (!(bool)$account['email_verified']) ya_account_send_token($account, 'verify');
 }
 function ya_account_login(array $input): void
