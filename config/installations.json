@@ -92,6 +92,10 @@
       "webModuleUrl": "https://yardimciasistantoptanci.alwaysdata.net/yardimci-asistan",
       "versionEndpoint": "https://yardimciasistantoptanci.alwaysdata.net/yardimci-asistan/api/version.php",
       "credentialRef": "alwaysdata-teknikel",
+      "externalRepo": {
+        "env": "TEKNIKEL_REPO",
+        "defaultSibling": "teknikel_web"
+      },
       "deploy": {
         "type": "ssh-rsync",
         "host": "yardimciasistantoptanci@ssh-yardimciasistantoptanci.alwaysdata.net",

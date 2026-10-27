@@ -53,6 +53,13 @@ Pazarlama stüdyo, kampanya, yayın, medya, takvim ve analitik aynı page worksp
 kalır. Yayın/plan/segment düzenleme ve önizleme inline alt işlemdir. Müşteri, ürün,
 menü ürünü, oda ve masa mevcut canonical entity Workspace'i kullanır.
 
+Müşteri ve ürün kartında ana Kaydet başarılı olduğunda Workspace kapanır ve mevcut
+dönüş bağlamına döner. Yeni kaydın kimliği aynı dönüş sözleşmesiyle çağırana iletilir.
+Kapanış, temizlenmiş taslak ve tamamlanmış işlem durumuyla mevcut close guard'dan
+geçer; bağımsız alt işlem taslakları atılmaz. Kayıt başarısızsa kart ve taslak açık
+kalır. Kayıt sonucu ve hataları yalnız üst bardaki uygulama durumunda gösterilir;
+footer'da yinelenmez. Müşteride `Kaydet ve Yeni Ekle` formu temizleyip açık tutar.
+
 `app/page-view-state.tsx` tek presentation persistence sahibidir. Provider unlocked
 uygulamada, business ID + database path anahtarıyla yaşar. Route remount sırasında
 sekme, filtre, arama, seçili kayıt ID'si, rapor aralığı, takvim tarihi ve geçici görünüm

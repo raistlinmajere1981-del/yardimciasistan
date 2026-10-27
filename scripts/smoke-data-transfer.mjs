@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { resolveInstallationRepo } from "./lib/installation-registry.mjs";
 const require=createRequire(import.meta.url);
 const {createTransferPlan,applyTransferPlan,collectTransferExport,createTransferExport}=require("../apps/desktop-app/dist-electron/data-transfer-service.js");
 const {parseTransferFile,encodeTransferFile,suggestTransferMapping,transferNumber,readTransferArchive,transferHash,imageMime,MAX_TRANSFER_BYTES}=require("../apps/desktop-app/dist-electron/data-transfer-format.js");
@@ -147,7 +148,7 @@ try{
   const oversized=zipSync({"oversized":new Uint8Array(129*1024*1024)},{level:1});assert.throws(()=>readTransferArchive(oversized),/boyut/);
   // Teknikel demo import uses the exact external CSV shipped to the pilot operator.
   let demoCsv;
-  try { if (process.argv.includes("--external-pilots")) demoCsv=readFileSync("/home/raistlin/teknikel_web/data-import/teknikel-demo-musteriler-30.csv"); }
+  try { if (process.argv.includes("--external-pilots")) demoCsv=readFileSync(join(resolveInstallationRepo("teknikel"), "data-import/teknikel-demo-musteriler-30.csv")); }
   catch (error) { if (error.code!=="ENOENT") throw error; }
   if (demoCsv) {
     const demoDb=database("teknikel-demo-customers");open.push(demoDb.db);

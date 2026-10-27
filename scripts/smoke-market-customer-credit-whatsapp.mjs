@@ -288,7 +288,8 @@ try {
   const beforeZero = preparedCount(), beforeZeroExternal = external.length;
   await share();
   await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
-  await expect(panel.locator(".customer-credit-balances")).toContainText("₺0,00");
+  await expect(panel.locator(".customer-credit-balances")).toHaveText("Borç yok.");
+  assert.ok(account().balances.every((balance) => balance.amountMinor === 0));
   assert.equal(preparedCount(), beforeZero); assert.equal(external.length, beforeZeroExternal);
   await expect(compose).toHaveCount(0);
 
@@ -300,7 +301,8 @@ try {
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
   await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
   await expect(compose).toHaveCount(0);
-  await expect(panel.locator(".customer-credit-balances")).toContainText("₺0,00");
+  await expect(panel.locator(".customer-credit-balances")).toHaveText("Borç yok.");
+  assert.ok(account().balances.every((balance) => balance.amountMinor === 0));
   assert.equal(external.length, beforeZeroExternal);
   addDebt(10000);
   await toggle("commerce.customer_credit", false); await toggle("commerce.customer_credit", true); await openAccount();

@@ -1633,7 +1633,7 @@ function ya_sync_publish_business_context(array $payload): void
     // A deployment has a single public business; no private source fields are accepted.
     if (count($businessIds) === 1) $businessRecords[$businessIds[0]] = ['description','about_text','directions_note','policy_note','payment_note'];
     $publishedContext['localization'] = ya_public_localization($candidate['localization'] ?? null, [
-        'business' => $businessRecords, 'gallery' => ya_localization_records($gallery, 'id', ['title'])]);
+        'business' => $businessRecords, 'gallery' => ya_localization_records($gallery, 'id', ['title'])], true);
     $publication = ya_sync_apply_publication($payload, 'business_context', $publishedContext, $candidate, $now);
 
     ya_sync_response(200, [

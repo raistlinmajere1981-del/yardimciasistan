@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { PUBLIC_TRANSLATION_KINDS, type PublicLocalization, type SaveTranslationInput, type TranslationField, type TranslationFilter, type TranslationIdentity, type TranslationPage, type TranslationRecord, type TranslationSettings } from "@yardimci-asistan/shared";
+import { PUBLIC_LANGUAGES, PUBLIC_TRANSLATION_KINDS, type PublicSiteCatalog, type PublicLocalization, type SaveTranslationInput, type TranslationField, type TranslationFilter, type TranslationIdentity, type TranslationPage, type TranslationRecord, type TranslationSettings } from "@yardimci-asistan/shared";
+import { validateSiteCatalog } from "../public-site-catalog";
 import { queueSyncJob } from "./sync-runtime-store";
 
 const translationHash = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -10,7 +11,7 @@ interface StoredTranslation { record_type: TranslationIdentity["kind"]; record_i
 const defaults = (): TranslationSettings => ({ enabled: false, sourceLanguage: "tr", targetLanguages: [], automatic: false });
 
 export class PublicTranslationStore {
-  constructor(private readonly db: DatabaseSync, private readonly gallery: () => Array<{ id: string; title: string }> = () => []) {}
+  constructor(private readonly db: DatabaseSync, private readonly gallery: () => Array<{ id: string; title: string }> = () => [], private readonly targetUrl: () => string = () => "") {}
   businessId() { return String(this.db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1").get()?.id ?? ""); }
   settings(): TranslationSettings {
     const row = this.db.prepare("SELECT * FROM public_translation_settings WHERE business_id=?").get(this.businessId());
@@ -18,7 +19,7 @@ export class PublicTranslationStore {
   }
   saveSettings(input: TranslationSettings) {
     if (!input || input.sourceLanguage !== "tr" || typeof input.enabled !== "boolean" || typeof input.automatic !== "boolean" || !Array.isArray(input.targetLanguages)
-      || input.targetLanguages.length > 16 || input.targetLanguages.some(l => typeof l !== "string" || !/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(l) || l === "tr")
+      || input.targetLanguages.length > 16 || input.targetLanguages.some(l => typeof l !== "string" || !PUBLIC_LANGUAGES.some(v => v.code === l) || l === "tr")
       || new Set(input.targetLanguages).size !== input.targetLanguages.length) throw Error("Yayın dilleri geçersiz. Kaynak dil Türkçe olmalıdır.");
     const businessId = this.businessId();
     if (!businessId) throw Error("Önce işletme kurulumunu tamamlayın.");
@@ -38,8 +39,28 @@ export class PublicTranslationStore {
   }
   private sources() {
     return { sql: `WITH sources AS (SELECT record_type,record_id,label,fields_json FROM public_translation_sources WHERE business_id=?
-      UNION ALL SELECT 'gallery', json_extract(value,'$.id'), json_extract(value,'$.title'), json_object('title',json_extract(value,'$.title')) FROM json_each(?))`,
-    args: [this.businessId(), JSON.stringify(this.gallery().map(({ id, title }) => ({ id, title })))] };
+      UNION ALL SELECT 'gallery', json_extract(value,'$.id'), json_extract(value,'$.title'), json_object('title',json_extract(value,'$.title')) FROM json_each(?)
+      UNION ALL SELECT 'site_text', json_extract(value,'$.id'), json_extract(value,'$.label'), json_extract(value,'$.fields') FROM json_each(?))`,
+    args: [this.businessId(), JSON.stringify(this.gallery().map(({ id, title }) => ({ id, title }))), JSON.stringify(this.siteSources().map(s => ({id:s.id,label:s.id,fields:s.fields})))] };
+  }
+  siteCatalog(): PublicSiteCatalog | undefined {
+    const row = this.db.prepare("SELECT catalog_json FROM public_site_translation_catalogs WHERE business_id=? AND target_url=?").get(this.businessId(), this.targetUrl());
+    return row ? JSON.parse(String(row.catalog_json)) as PublicSiteCatalog : undefined;
+  }
+  replaceSiteCatalog(catalog: PublicSiteCatalog) {
+    catalog = validateSiteCatalog(catalog);
+    const serialized = JSON.stringify(catalog);
+    if (JSON.stringify(this.siteCatalog()) === serialized) return false;
+    this.transaction(() => {
+      this.db.prepare("INSERT INTO public_site_translation_catalogs(business_id,target_url,catalog_json) VALUES (?,?,?) ON CONFLICT(business_id,target_url) DO UPDATE SET catalog_json=excluded.catalog_json")
+        .run(this.businessId(), this.targetUrl(), serialized);
+      this.invalidate("site_text");
+    });
+    return true;
+  }
+  private siteSources(): TranslationSource[] {
+    const catalog = this.siteCatalog();
+    return catalog ? Object.entries(catalog.entries).map(([key, entry]) => ({kind:"site_text", id:`${catalog.id}:${key}`, fields:{text:entry.text}})) : [];
   }
   private source(identity: TranslationIdentity): SourceRow | undefined {
     if (!identity || !PUBLIC_TRANSLATION_KINDS.includes(identity.kind) || typeof identity.id !== "string" || identity.id.length > 200) throw Error("Public kayıt kimliği geçersiz.");
@@ -69,6 +90,20 @@ export class PublicTranslationStore {
     const row = this.db.prepare("SELECT translated_text FROM public_translations WHERE business_id=? AND source_hash=? AND target_language=? AND origin='ai' AND status='ready' LIMIT 1")
       .get(this.businessId(), sourceHash, language);
     return row ? String(row.translated_text) : undefined;
+  }
+  attention(): {failed: number; review: number} {
+    const settings = this.settings();
+    if (!settings.enabled) return {failed:0,review:0};
+    const sources = this.sources();
+    const row = this.db.prepare(`${sources.sql} SELECT
+      SUM(CASE WHEN t.status='failed' AND f.value=t.source_text THEN 1 ELSE 0 END) AS failed,
+      SUM(CASE WHEN t.origin='manual' AND f.value!=t.source_text THEN 1 ELSE 0 END) AS review
+      FROM public_translations t
+      JOIN sources s ON s.record_type=t.record_type AND s.record_id=t.record_id
+      JOIN json_each(s.fields_json) f ON f.key=t.field
+      WHERE t.business_id=? AND (t.status='failed' OR t.origin='manual')
+      AND t.target_language IN (SELECT value FROM json_each(?))`).get(...sources.args, this.businessId(), JSON.stringify(settings.targetLanguages));
+    return {failed:Number(row?.failed ?? 0),review:Number(row?.review ?? 0)};
   }
   list(filter: TranslationFilter): TranslationPage {
     this.language(filter?.language);
@@ -139,9 +174,15 @@ export class PublicTranslationStore {
       : ["room_catalog_publish", "table_catalog_publish", "menu_publish", "online_catalog_publish", "business_context_publish", "marketing_website_publish"];
     for (const job of jobs) queueSyncJob(this.db, job as Parameters<typeof queueSyncJob>[1]);
   }
-  localization(sources: TranslationSource[]): PublicLocalization {
+  localization(sources: TranslationSource[], includeSite = false): PublicLocalization {
     const settings = this.settings();
     const result: PublicLocalization = { version: 1, source_language: "tr", target_languages: settings.enabled ? settings.targetLanguages : [], translations: {} };
+    if (includeSite) {
+      result.languages = PUBLIC_LANGUAGES.filter(l => l.code === "tr" || result.target_languages.includes(l.code));
+      result.business_id = this.businessId();
+      const catalog = this.siteCatalog();
+      if (catalog && settings.enabled) { result.site_catalog = catalog; sources = [...sources, ...this.siteSources()]; }
+    }
     if (!result.target_languages.length || !sources.length) return result;
     const refs = new Map(sources.map(s => [`${s.kind}\0${s.id}`, s.fields]));
     const rows = this.db.prepare("SELECT * FROM public_translations WHERE business_id=? AND status='ready'").all(this.businessId()) as unknown as StoredTranslation[];

@@ -1,3 +1,4 @@
 <?php
-header('Location: /hesabim/', true, 302);
-exit;
+declare(strict_types=1);
+require_once dirname(__DIR__, 1) . '/inc/retired-route.php';
+redirect_demo_route('account');

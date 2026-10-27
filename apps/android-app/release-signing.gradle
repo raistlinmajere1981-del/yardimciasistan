@@ -1,0 +1,68 @@
+// One external signing configuration for Companion and Dealer; no credentials in source or output.
+def signingDirectory = file("../android-app")
+def localSigning = new Properties()
+def localSigningFile = new File(signingDirectory, "keystore.properties")
+if (localSigningFile.isFile()) localSigningFile.withInputStream { localSigning.load(it) }
+def signingValue = { String name ->
+  def environmentValue = System.getenv(name)
+  if (environmentValue != null && !environmentValue.isEmpty()) return environmentValue
+  def localValue = localSigning.getProperty(name)
+  if (localValue != null && !localValue.isEmpty()) return localValue
+  def gradleValue = providers.gradleProperty(name).orNull
+  return gradleValue != null && !gradleValue.isEmpty() ? gradleValue : null
+}
+def names = [path:"YA_ANDROID_KEYSTORE_PATH", storePassword:"YA_ANDROID_KEYSTORE_PASSWORD", alias:"YA_ANDROID_KEY_ALIAS", keyPassword:"YA_ANDROID_KEY_PASSWORD"]
+def signing = names.collectEntries { key, name -> [(key):signingValue(name)] }
+def missing = names.findAll { key, name -> signing[key] == null }.values().toList()
+def storePath = signing.path == null ? null : new File(signing.path)
+if (storePath != null && !storePath.isAbsolute()) storePath = new File(signingDirectory, signing.path)
+
+android {
+  signingConfigs {
+    if (missing.isEmpty()) {
+      create("release") {
+        storeFile = storePath
+        storePassword = signing.storePassword
+        keyAlias = signing.alias
+        keyPassword = signing.keyPassword
+      }
+    }
+  }
+  buildTypes {
+    release {
+      debuggable = false
+      if (missing.isEmpty()) signingConfig = signingConfigs.getByName("release")
+    }
+  }
+}
+
+def signingCertificate = {
+  if (!missing.isEmpty()) throw new GradleException("Release signing eksik. Gerekli ayar adları: ${missing.join(', ')}. Environment, git-ignored apps/android-app/keystore.properties veya Gradle kullanıcı ayarlarını kullanın.")
+  if (!storePath.isFile()) throw new GradleException("Release keystore dosyası bulunamadı.")
+  try {
+    def store = java.security.KeyStore.getInstance(storePath, signing.storePassword.toCharArray())
+    if (!store.isKeyEntry(signing.alias) || store.getKey(signing.alias, signing.keyPassword.toCharArray()) == null) throw new IllegalArgumentException()
+    def certificate = store.getCertificate(signing.alias)
+    if (certificate == null || certificate.subjectX500Principal.name.contains("CN=Android Debug")) throw new IllegalArgumentException()
+    return certificate
+  } catch (Exception ignored) {
+    throw new GradleException("Release keystore, alias veya parola doğrulanamadı; debug anahtarı kullanılamaz.")
+  }
+}
+def validateReleaseSigning = tasks.register("validateReleaseSigning") {
+  group = "verification"
+  description = "Validates the permanent external release key without building an APK or logging signing data."
+  doLast { signingCertificate(); logger.lifecycle("release-signing-ready") }
+}
+// Public certificate digest is an ignored, freshly regenerated verification input, never a source authority.
+tasks.register("writeReleaseSigningMetadata") {
+  group = "verification"
+  dependsOn validateReleaseSigning
+  doLast {
+    def digest = java.security.MessageDigest.getInstance("SHA-256").digest(signingCertificate().encoded).encodeHex().toString()
+    def output = layout.buildDirectory.file("release-signing/certificate.json").get().asFile
+    output.parentFile.mkdirs()
+    output.text = groovy.json.JsonOutput.toJson([sha256:digest]) + "\n"
+  }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn validateReleaseSigning }

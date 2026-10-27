@@ -88,10 +88,32 @@ screens. Normal customers receive an explanation and retain their web accounts.
 
 The API-only module contains no presentation assets. Hosts own their `/hesabim/`
 screen; Teknikel keeps its established design and Turkish/English copy. Demo
-presentation lives under `test-site/landing/hesabim/`. Unconfigured provider buttons
+presentation lives in the shared template under `test-site/landing/deneme/`;
+`/hesabim/` and `/deneme/hesabim/` redirect to its account page. Unconfigured provider buttons
 are absent and email-dependent registration/recovery is unavailable without SMTP.
 
 ## External configuration
+
+### Shared web customer experience
+
+The common website has one account/profile, catalog/product detail, cart/checkout
+and own order list/detail for retail and commercial customers. Commercial permission
+adds only the account's Bayi badge and the server-authorized catalog prices. There
+is no visitor-selectable customer/dealer mode or account-page dealer store.
+The account owner verifies the session before private rendering; the same storefront
+consumes the existing public or authorized dealer catalog and submits to the existing
+order owners. Client identity, price groups and monetary values have no authority.
+
+`api/account/receipt.php` is a same-origin, authenticated, read-only POST accepting
+only an idempotency key. It resolves customer and dealer receipt scopes from that
+account's immutable binding, including accepted attempts preceding commercial
+demotion. It cannot enqueue or resubmit an order. An unresolved local attempt keeps
+only owner-scoped recovery metadata (key, item IDs/quantities, delivery method and
+semantic fingerprint), never private prices, personal fields or credentials.
+Logout/401/403, hidden/pagehide, offline and identity changes synchronously remove
+private catalog, comparison, active cart and account DOM. Late responses are fenced.
+A failed logout stays unavailable until explicit successful login or confirmed
+logout; it cannot silently become guest checkout with an old authenticated cookie.
 
 Configure these as private PHP environment variables, never published business JSON,
 client code, source control or command-line logs:

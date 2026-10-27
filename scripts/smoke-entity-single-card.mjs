@@ -36,7 +36,7 @@ try {
   page.setDefaultTimeout(8000);
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/single-card", async route => route.fulfill({ contentType: "text/html", body: await server.transformIndexHtml("/single-card", `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve("scripts/fixtures/entity-single-card.tsx")}"></script></body></html>`) }));
-  let failProduct = false, conflict = false;
+  let failProduct = false, failCustomer = false, conflict = false;
   await page.exposeFunction("__cardCall", async (method, input) => {
     calls.push({ method, input });
     if (method === "saveProduct") { if (failProduct) throw new Error("Ürün kayıt fixture hatası"); return runtime.saveRuntimeCatalogProduct(database.databasePath, input); }
@@ -50,7 +50,7 @@ try {
     }
     if (method === "publication") return database.getCommerceProductPublication(input);
     if (method === "publish") return database.saveCommerceProductPublication(input);
-    if (method === "saveCustomer") { const result = database.saveCustomer(input); if (result.ok) data = { ...data, customers: result.dashboardData.customers, revision: data.revision + 1 }; return result; }
+    if (method === "saveCustomer") { if (failCustomer) return { ok: false, message: "Müşteri kayıt fixture hatası" }; const result = database.saveCustomer(input); if (result.ok) data = { ...data, customers: result.dashboardData.customers, revision: data.revision + 1 }; return result; }
     if (method === "customer") return database.getCustomer(input);
     if (method === "assign") { data = { ...data, revision: data.revision + 1, tables: data.tables.map(table => ({ ...table, currentCustomerId: input.customerId })) }; return { ok: true, message: "Bağlandı", dashboardData: data }; }
     throw new Error(`Unexpected fixture method: ${method}`);
@@ -76,10 +76,15 @@ try {
   await dialog.getByLabel("Perakende fiyat", { exact: true }).fill("25");
   await dialog.getByLabel("Alış fiyatı", { exact: true }).fill("10");
   failProduct = true;
-  await button("Ürünü Kaydet").click(); await expect(dialog.getByRole("status").filter({ hasText: "fixture hatası" })).toBeVisible();
+  await button("Ürünü Kaydet").click(); await expect(page.getByTestId("topbar-status")).toContainText("Ürün kayıt fixture hatası");
+  await expect(dialog.locator(".product-workspace-actions [role=status], .product-workspace-actions [role=alert]")).toHaveCount(0);
   await expect(dialog.getByLabel("Ürün adı", { exact: true })).toHaveValue("Yeni tek kart");
   failProduct = false;
   await button("Ürünü Kaydet").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Yeni ürün", exact: true })).toBeFocused();
+  await expect(page.getByTestId("topbar-status")).toContainText("Yeni tek kart kaydedildi.");
+  await page.locator(".market-catalog-products .market-list-row").filter({ hasText: "Yeni tek kart" }).click();
   await expect(dialog.getByRole("heading", { name: "Yeni tek kart", exact: true })).toBeVisible();
   await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toBeEnabled();
   const created = calls.filter(call => call.method === "saveProduct").at(-1);
@@ -87,8 +92,8 @@ try {
   await dialog.getByLabel("Web satışında yayınla", { exact: true }).uncheck();
   await expect.poll(() => calls.filter(call => call.method === "publish").length).toBe(1);
   await expect(dialog.getByLabel("Aktif ürün", { exact: true })).toBeChecked();
-  await close(); await expect(page.getByRole("button", { name: "Yeni ürün", exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "Düzenle", exact: true }).first().click();
+  await close(); await expect(page.locator(".market-catalog-products .market-list-row").filter({ hasText: "Yeni tek kart" })).toBeFocused();
+  await page.locator(`[data-sort-id="${product.id}"] .market-list-row`).click();
   await expect(dialog.getByRole("button", { name: "Kategori", exact: true })).toContainText("Pasif gerçek kategori (Pasif)");
   await dialog.getByLabel("Stok işlem miktarı").fill("3"); await expect(dialog.getByText("İşlem sonrası: 13 piece", { exact: true })).toBeVisible();
   await button("Stok İşlemini Onayla").click(); await button("Stok Hareketini Kaydet").evaluate(element => { element.click(); element.click(); });
@@ -117,6 +122,11 @@ try {
   await page.getByRole("button", { name: "Mevcut bayi", exact: true }).click();
   await expect(dialog.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Kayıtlı firma");
   await expect(dialog.getByLabel("Adres", { exact: true })).toHaveValue("Kayıtlı adres");
+  await expect(dialog.getByLabel("Fiyat grubu", { exact: true })).toHaveValue("retail");
+  await button("Müşteri Kartını Kaydet").click();
+  await expect(dialog).toHaveCount(0);
+  assert.equal(database.getCustomer(existing.savedId).commercialProfile.priceGroup, "retail");
+  await page.getByRole("button", { name: "Mevcut bayi", exact: true }).click();
   await dialog.locator("summary").click();
   await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).not.toBeChecked();
   await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).toBeEnabled();
@@ -180,16 +190,29 @@ try {
   assert.ok(birthBounds && expiryBounds);
   assert.ok(Math.abs(birthBounds.width - expiryBounds.width) < 2, "Birth and expiry dates share width");
   await dialog.getByLabel("Kimlik / pasaport no", { exact: true }).fill("ABC-123");
+  failCustomer = true;
   await button("Müşteri Kartını Kaydet").click();
+  await expect(page.getByTestId("topbar-status")).toHaveText("Müşteri kayıt fixture hatası");
+  await expect(dialog.getByLabel("Ad soyad", { exact: true })).toHaveValue("Yeni müşteri kartı");
+  await expect(dialog.locator(".customer-workspace-footer [role=status], .customer-workspace-footer [role=alert]")).toHaveCount(0);
+  failCustomer = false;
+  await button("Müşteri Kartını Kaydet").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("topbar-status")).not.toContainText("fixture hatası");
+  await page.getByRole("button", { name: "Yeni müşteri kartı", exact: true }).click();
   await expect(dialog.getByRole("heading", { name: "Yeni müşteri kartı", exact: true })).toBeVisible();
   await dialog.getByLabel("Not", { exact: true }).fill("Güncel kayıt notu"); await button("Müşteri Kartını Kaydet").click();
-  await expect(button("Müşteri Kartını Kaydet")).toBeDisabled();
-  const customerSaves = calls.filter(call => call.method === "saveCustomer");
-  assert.equal(customerSaves.length, 2); assert.ok(customerSaves[1].input.id);
-  assert.equal(customerSaves[0].input.phone, "+90 (532) 123-45-67");
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Yeni müşteri kartı", exact: true }).click();
+  const customerSaves = calls.filter(call => call.method === "saveCustomer" && call.input.fullName === "Yeni müşteri kartı");
+  assert.equal(customerSaves.length, 3); assert.ok(customerSaves[2].input.id);
+  assert.equal(customerSaves[1].input.phone, "+90 (532) 123-45-67");
   await expect(dialog.getByLabel("Telefon", { exact: true })).toHaveValue("+905321234567");
   await verifyPhoneInput(page, dialog.getByLabel("Telefon", { exact: true }));
-  assert.equal(customerSaves[1].input.address, "Korunan adres"); assert.equal(customerSaves[1].input.identityNumber, "ABC123");
+  assert.equal(customerSaves[2].input.address, "Korunan adres"); assert.equal(customerSaves[2].input.identityNumber, "ABC123");
+  await close();
+  await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
+  await dialog.getByLabel("Ad soyad", { exact: true }).fill("Ardışık müşteri kaydı");
   await button("Kaydet ve Yeni Ekle").click(); await expect(dialog.getByLabel("Ad soyad", { exact: true })).toHaveValue("");
   await expect(dialog.getByLabel("Adres", { exact: true })).toHaveValue("");
   await page.setViewportSize({ width: 560, height: 720 });
@@ -204,7 +227,7 @@ try {
     await expect(dialog).toHaveCount(1);
     await expect(dialog.getByRole("complementary", { name: "Müşteri işlemleri" })).toBeVisible();
     await dialog.getByLabel("Ad soyad", { exact: true }).fill(name); await button("Müşteri Kartını Kaydet").click();
-    await expect(dialog.getByRole("heading", { name, exact: true })).toBeVisible(); await close();
+    await expect(page.locator("dialog.customer-workspace-frame")).toHaveCount(0);
     if (launcher === "Odayı aç") {
       await expect(page.getByRole("button", { name: `${name} misafir slotu`, exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Değişiklikleri Bırak", exact: true }).click();

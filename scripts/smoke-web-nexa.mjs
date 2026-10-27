@@ -14,8 +14,10 @@ const assetFor = (key) => {
 };
 const bundle = readFileSync("test-site/landing/assets/assistant/widget.js", "utf8");
 assert.ok(!bundle.includes("data:image/webp"), "Runtime images must remain external, not embedded in launcher JS");
+const showcaseBundle = readFileSync('test-site/landing/assets/assistant/showcase.js','utf8');
 const server = createServer((req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
+  if (path === '/module/showcase.js') { res.setHeader('content-type','text/javascript; charset=utf-8');res.end(showcaseBundle);return; }
   if (path === "/module/widget.js") { res.setHeader("content-type", "text/javascript; charset=utf-8"); res.end(bundle); return; }
   if (path.startsWith("/module/") && paths.includes(path.slice(8))) {
     res.setHeader("content-type", "image/webp"); res.end(readFileSync(resolve("test-site/landing/assets/assistant", path.slice(8)))); return;
@@ -24,7 +26,8 @@ const server = createServer((req, res) => {
   res.setHeader("content-type", "text/html; charset=utf-8");
   if (path.startsWith("/showcase")) {
     const english = path.startsWith("/showcase-en");
-    res.end(`<!doctype html><html lang="${english ? "en" : "tr"}"><body><main style="width:180px;margin:12px"><div data-showcase-avatar data-showcase-size="144"></div></main><script src="/module/widget.js"></script></body></html>`);
+    const context={language:{code:english?'en':'tr',locale:english?'en':'tr-TR',messages:{greeting:english?'Hello!':'Merhaba!'}},sourceKeys:{'Merhaba!':'greeting'}};
+    res.end(`<!doctype html><html lang="${english ? "en" : "tr"}"><body><main style="width:180px;margin:12px"><div data-showcase-avatar data-showcase-size="144"></div></main><script type="application/json" id="site-context">${JSON.stringify(context)}</script><script src="/module/showcase.js"></script></body></html>`);
     return;
   }
   res.end('<!doctype html><html><body><main>İşletme sitesi</main><script src="/module/widget.js"></script></body></html>');
@@ -47,7 +50,7 @@ try {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(nextResult) });
   });
   await page.goto(`${base}/site/`);
-  await page.evaluate((base) => window.YardimciAsistanWidget.init({ apiBaseUrl: base, businessName: "Nexa Test", profileId: "pension_restaurant" }), `${base}/api-host`);
+  await page.evaluate((base) => window.YardimciAsistanWidget.init({ apiBaseUrl: base, businessName: "Nexa Test", profileId: "pension_restaurant", aiEnabled: true, forceVisible: true }), `${base}/api-host`);
   const launcher = page.locator('[data-nexa-role="launcher"] svg[data-nexa-rig]');
   await expect(launcher).toBeVisible();
   await expect(launcher).toHaveAttribute("data-expression", "idle");
@@ -183,6 +186,7 @@ try {
     const heroPage = await browser.newPage({ viewport: { width: 320, height: 700 } });
     heroPage.on('pageerror', error => errors.push(error.message));
     await heroPage.goto(`${base}/${language === 'en' ? 'showcase-en' : 'showcase'}/`);
+    assert.equal(await heroPage.evaluate(()=>typeof window.YardimciAsistanWidget),'undefined','Presentation bundle must not install real AI operations');
     const hero = heroPage.locator('[data-showcase-avatar]');
     const heroRig = hero.locator('svg[data-nexa-rig]');
     const greeting = hero.locator('.showcase-avatar-speech');
@@ -231,7 +235,8 @@ try {
     const restingHero = await heroRig.evaluate(element => element.outerHTML);
     await heroPage.waitForTimeout(200);
     expect(await heroRig.evaluate(element => element.outerHTML)).toBe(restingHero);
-    await expect(greeting).toBeHidden({ timeout: 4500 });
+    // The guided tour keeps its scripted message visible for reading and topic selection.
+    await expect(greeting).toBeVisible();
     await expect(heroRig).toHaveAttribute('data-nexa-state', 'ready');
     await heroPage.evaluate(() => { window.__heroRig = document.querySelector('[data-showcase-avatar] svg'); window.dispatchEvent(new Event('pagehide')); });
     expect(await heroPage.evaluate(() => ({ connected: window.__heroRig.isConnected, motion: window.__heroRig.dataset.motionActive }))).toEqual({ connected: false, motion: 'false' });
@@ -268,7 +273,7 @@ try {
     Object.defineProperty(SVGSVGElement.prototype, "createSVGRect", { configurable: true, value: undefined });
   });
   await fallbackPage.goto(`${base}/site/`);
-  await fallbackPage.evaluate((base) => window.YardimciAsistanWidget.init({ apiBaseUrl: `${base}/api-host`, businessName: "Fallback Test", profileId: "pension_restaurant" }), base);
+  await fallbackPage.evaluate((base) => window.YardimciAsistanWidget.init({ apiBaseUrl: `${base}/api-host`, businessName: "Fallback Test", profileId: "pension_restaurant", aiEnabled: true, forceVisible: true }), base);
   const fallbackLauncher = fallbackPage.locator('[data-nexa-role="launcher"] img');
   await expect(fallbackLauncher).toHaveAttribute("src", `${base}/module/${assetFor("launcher")}`);
   await expect.poll(() => fallbackLauncher.evaluate(im => im.complete && im.naturalWidth > 0)).toBe(true);

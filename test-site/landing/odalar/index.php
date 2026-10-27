@@ -1,1 +1,4 @@
-<?php require_once dirname(__DIR__) . '/inc/site.php'; $pageTitle=site_text('Odalar | Yardımcı Asistan');$pageDescription=site_text('Odaları ve olanakları keşfedin.');$pageScript='rooms.js';require dirname(__DIR__).'/inc/header.php';render_site_hero(site_text('Odalar'),site_text('Odalar'),site_text('Odaları inceleyin, size uygun olanı seçin.')); ?><section class="section"><div class="shell"><div class="room-grid room-grid-all" data-room-list><div class="room-catalog-loading"><?= site_e(site_text('Odalar hazırlanıyor…')) ?></div></div></div></section><?php require dirname(__DIR__).'/inc/footer.php'; ?>
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__, 1) . '/inc/retired-route.php';
+redirect_demo_route('rooms');

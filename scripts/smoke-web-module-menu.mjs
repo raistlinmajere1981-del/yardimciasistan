@@ -547,7 +547,7 @@ try {
       idempotency_key: "web-menu-android-4",
       snapshot: {
         ...androidStockSnapshot,
-        business_capabilities: [...androidStockSnapshot.business_capabilities, "service.ai"],
+        business_capabilities: [...androidStockSnapshot.business_capabilities, "service.ai", "core.customers", "customer.requests"],
         updated_at: "2026-07-18T10:01:00+03:00"
       }
     }
@@ -1162,12 +1162,42 @@ try {
   expect(unavailableResult.answer).toContain("Cide sahil yolundan Gideros yönüne 5 km gidince solda.");
   expect(unavailableResult.answer).not.toMatch(/WhatsApp|müsaitlik|rezervasyon/i);
 
-  const aiRequestResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+  // A disabled reservation cannot be written through chat or downgraded to
+  // a general request. The AI conversation itself must remain usable.
+  const blockedReservationResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {
       message: "18 Temmuz saat 20:00 için 2 kişi balkonlu oda bilgisi almak istiyorum.",
       customer_name: "AI Misafir",
       customer_phone: "0555 333 44 55",
       request_type: "pension_reservation",
+      date_text: "18 Temmuz",
+      time: "20:00",
+      guest_count: 2,
+      create_request: true
+    }
+  });
+  expect(blockedReservationResponse.ok()).toBe(true);
+  const blockedReservation = await blockedReservationResponse.json();
+  expect(blockedReservation.ok).toBe(true);
+  expect(blockedReservation.request_created).toBe(false);
+  expect(blockedReservation.request_id).toBe("");
+  expect(blockedReservation.error.code).toBe("unsupported_business_domain");
+
+  const requestsBeforeGeneral = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": "change-this-secret" },
+    data: { action: "pull_requests", after_seq: 0, limit: 200 }
+  });
+  expect(requestsBeforeGeneral.ok()).toBe(true);
+  expect((await requestsBeforeGeneral.json()).requests.some((request) => request.customer_name === "AI Misafir")).toBe(false);
+
+  // General requests are enabled separately; the same single chat route can
+  // create one without granting the disabled pension reservation capability.
+  const aiRequestResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: {
+      message: "18 Temmuz saat 20:00 için 2 kişi balkonlu oda bilgisi almak istiyorum.",
+      customer_name: "AI Genel Misafir",
+      customer_phone: "0555 333 44 55",
+      request_type: "general_info",
       date_text: "18 Temmuz",
       time: "20:00",
       guest_count: 2,
@@ -1190,6 +1220,7 @@ try {
   const aiRequest = requests.find((request) => request.id === aiRequestResult.request_id);
   expect(aiRequest).toBeTruthy();
   expect(aiRequest.source).toBe("web_ai");
+  expect(aiRequest.customer_name).toBe("AI Genel Misafir");
   expect(aiRequest.request_type).toBe("general_info");
   expect(aiRequest.message).toContain("balkonlu oda");
   expect(aiRequestResult.error.code).toBe("unsupported_business_domain");

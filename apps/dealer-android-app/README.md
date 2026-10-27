@@ -1,28 +1,33 @@
 # Yardımcı Asistan Bayi
 
-Bağımsız native Java Android pilotu. `applicationId`: `com.yardimciasistan.dealer`,
-minimum SDK 26. Personel Companion APK'sı ve izinleriyle ortak runtime kullanmaz.
+Bağımsız native Java Android uygulaması. `applicationId`: `com.yardimciasistan.dealer`,
+minimum SDK 26. Companion APK'sı ve izinleriyle ortak runtime kullanmaz.
 Sunucu/işletme/marka ve yayın anahtarı APK'ya gömülmez.
 
-## Demo pilot indirmesi
+## Release dağıtımı
 
-Demo /kurulum/ sayfasında Bayi Android, sürümlü pilot APK olarak bulunur.
-Bu dosya **debug imzalı test sürümüdür**, üretim ya da uygulama mağazası sürümü değildir.
-Companion ve Bayi Android, aynı canonical product-version.json içindeki versionName ve
-androidVersionCode değerlerini kullanır. Demo deploy, APK build metadata ve SHA-256
-eşleşmesini doğrular. Bayi APK'sını dağıtmadan önce birim/lint/derleme testleri çalışır.
+Companion ve Bayi Android, `product-version.json` içindeki aynı `version` ve
+`androidVersionCode` değerlerini okur. Bayinin ikinci sürüm dosyası yoktur.
+Release APK `yardimci-asistan-bayi-release.apk`; yayındaki adı
+`YardimciAsistan-Bayi-Android-<version>.apk` olur. Debug yalnız geliştirme içindir
+ve `-debug` suffix'i kullanır.
 
-## Derleme ve kurulum
+İki uygulama `apps/android-app/release-signing.gradle` üzerinden aynı harici,
+kalıcı keystore yapılandırmasını kullanır. Yerel signing dosyası yalnız
+`apps/android-app/keystore.properties` konumunda tutulur ve Git'e girmez.
+Eksik/yanlış anahtar release doğrulamasını durdurur. Ayrıntılar
+[`docs/ANDROID_DISTRIBUTION.md`](../../docs/ANDROID_DISTRIBUTION.md) içindedir.
 
-```sh
-npm run verify:check -- dealer-android-build
-adb -s CIHAZ_SERI_NO install -r apps/dealer-android-app/build/outputs/apk/debug/yardimci-asistan-bayi-debug.apk
-adb -s CIHAZ_SERI_NO shell am start -n com.yardimciasistan.dealer/.DealerActivity
+```fish
+npm run dealer:android:release-apk
+npm run release:check
 ```
 
-Registry mevcut doğrulanmış Gradle wrapper'ını `--dealer` seçimiyle kullanır.
-İlk bağımlılık hazırlığı gerektiğinde aynı wrapper `--offline` olmadan çalıştırılabilir.
-APK debug imzalı pilot yapıdır; genel mağaza/release dağıtımı için imza yapılandırması gerekir.
+Bu release'ten önce yalnız test telefonunda bulunan eski debug/pilot APK'lar
+kaldırılıp yeni release APK temiz yüklenir; imza uyuşmazlığında yerinde güncelleme
+beklenmez. Kaldırma cihazdaki uygulama verilerini siler. Otomatik veri taşıma veya
+eski imza uyumluluk katmanı bulunmaz. Gelecek sürümlerde aynı kalıcı release
+keystore ve artan canonical versionCode kullanılmalıdır.
 
 ## İlk bağlantı ve ortak hesap
 

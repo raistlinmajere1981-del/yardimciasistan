@@ -83,6 +83,7 @@ export class SyncCoordinator {
   private outboxTimer: NodeJS.Timeout | null = null;
   private initialTimer: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
+  private publicationRequested = false;
   private inFlight: Promise<AutomaticSyncCycleResult> | null = null;
   private phase: AutomaticSyncPhase = "idle";
   private message = "Otomatik senkron hazır.";
@@ -149,6 +150,7 @@ export class SyncCoordinator {
     this.outboxTimer = null;
     this.initialTimer = null;
     this.debounceTimer = null;
+    this.publicationRequested = false;
     this.marketBarcodeFastPullActive = false;
   }
 
@@ -181,14 +183,19 @@ export class SyncCoordinator {
     }
   }
 
-  scheduleSoon(delayMs = DEBOUNCE_DELAY_MS) {
+  scheduleSoon(delayMs = DEBOUNCE_DELAY_MS, publicationIntent = false) {
     if (this.suspendedForMaintenance) return;
+    // An explicit publication setting/write uses this same cycle even with passive sync OFF.
+    this.publicationRequested ||= publicationIntent;
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
-      void this.run(false);
+      if (this.inFlight && this.publicationRequested) return; // finally drains the newer intent.
+      const force = this.publicationRequested;
+      this.publicationRequested = false;
+      void this.run(force);
     }, Math.max(0, delayMs));
   }
 
@@ -301,6 +308,7 @@ export class SyncCoordinator {
       })
       .finally(() => {
         this.inFlight = null;
+        if (this.publicationRequested) this.scheduleSoon(0);
       });
     return this.inFlight;
   }

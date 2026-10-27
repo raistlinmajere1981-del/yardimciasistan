@@ -11,6 +11,7 @@ require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/business-ai-policy.php';
 require_once YA_BASE_DIR . '/lib/cloudflare-ai.php';
+require_once YA_BASE_DIR . '/lib/public-request-policy.php';
 
 $businessConfig = ya_chat_load_json(YA_CONFIG_FILE, []);
 $aiConfig = is_file(YA_AI_CONFIG_FILE) ? require YA_AI_CONFIG_FILE : [];
@@ -1305,6 +1306,12 @@ function ya_chat_extract_request(array $businessConfig, array $businessContext, 
     $requestType = ya_chat_normalize_request_type(ya_chat_first_string($payload, ['request_type', 'requestType']));
     if ($requestType === '') {
         $requestType = ya_chat_detect_request_type($message);
+    }
+    // Conversation topics do not grant mutation rights. Check the original type
+    // before the AI policy can downgrade an unsupported intent to general_info.
+    $allowedTypes = ya_public_request_types(ya_public_runtime_capabilities());
+    if (!in_array($requestType, $allowedTypes, true)) {
+        return ['request' => null, 'missing_fields' => []];
     }
     $decision = ya_business_ai_evaluate($businessContext['capability_ids'] ?? [], $requestType, $message);
     if (in_array($decision['kind'], ['unsupported', 'unrecognized'], true)) {

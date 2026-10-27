@@ -84,6 +84,7 @@ export function ProductWorkspace({
   const [resourceState, setResourceState] = useState<WorkspaceState>(intent.mode === "create" ? "success" : "idle");
   const [saveState, setSaveState] = useState<WorkspaceState>("idle");
   const [saveMessage, setSaveMessage] = useState("");
+  const [pendingSavedId, setPendingSavedId] = useState("");
   const [countedQuantity, setCountedQuantity] = useState("");
   const [countNote, setCountNote] = useState("");
   const [fieldsBusy, setFieldsBusy] = useState(false);
@@ -126,6 +127,13 @@ export function ProductWorkspace({
     busy: mutationBusy || resourceState === "loading",
     dirty: dirty || menuDirty || stockDraftDirty
   });
+  useEffect(() => {
+    if (!pendingSavedId || closeBlocked) return;
+    navigation.closeWorkspace(
+      { entityType: "product", entityId: intent.entityId },
+      intent.mode === "create" ? { createdEntityId: pendingSavedId } : undefined
+    );
+  }, [closeBlocked, intent.entityId, intent.mode, navigation, pendingSavedId]);
   useEffect(() => { beginPhotoChangeRequest(); }, [beginPhotoChangeRequest, productId]);
   const photosChanged = useCallback(async (collection: ProductPhotoCollection) => {
     const isCurrent = beginPhotoChangeRequest();
@@ -282,11 +290,11 @@ export function ProductWorkspace({
 
   async function saveProduct() {
     if (!bridge || (!product && !creating) || saveLock.current || mutationBusy || stockDraftDirty || resourceState !== "success") return;
-    if (!form.name.trim()) { setSaveMessage("Ürün adı girin."); setSaveState("error"); return; }
+    if (!form.name.trim()) { onStateChange("error", "Ürün adı girin."); setSaveState("error"); return; }
     const priceError = validateProductFormPrices(form);
     if (priceError) {
       setSaveState("error");
-      setSaveMessage(priceError);
+      onStateChange("error", priceError);
       return;
     }
     const isCurrent = beginSaveRequest();
@@ -367,8 +375,8 @@ export function ProductWorkspace({
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
     saveLock.current = false;
     setSaveState("success");
-    setSaveMessage(message);
     onStateChange("success", message);
+    setPendingSavedId(saved.id);
   }
 
   const history = inventoryEnabled && intent.mode === "history";
@@ -510,7 +518,6 @@ export function ProductWorkspace({
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop
       footer={!history && <div className="panel product-workspace-actions" data-surface-role="configuration">
-        <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
         <div className="action-row">
           <ActionButton variant="secondary" type="button" disabled={mutationBusy || !dirty} onClick={() => {
             setForm(baseline);

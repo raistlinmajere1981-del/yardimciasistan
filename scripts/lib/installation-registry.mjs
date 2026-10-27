@@ -22,6 +22,14 @@ export function getInstallation(id, root = defaultRepoRoot) {
   return installation;
 }
 
+export function resolveInstallationRepo(id, root = defaultRepoRoot) {
+  const config = getInstallation(id, root).externalRepo;
+  const explicit = config?.env && process.env[config.env]?.trim();
+  if (explicit) return resolve(explicit);
+  if (!config?.defaultSibling) throw new Error(`Installation repo tanımı bulunamadı: ${id}`);
+  return resolve(root, "..", config.defaultSibling);
+}
+
 export function getInstallationValue(id, path, root = defaultRepoRoot) {
   const installation = getInstallation(id, root);
   const parts = String(path ?? "").split(".").filter(Boolean);

@@ -6,7 +6,7 @@ import {
   normalizeInternationalPhone
 } from "@yardimci-asistan/whatsapp-bridge";
 
-type RequestType = "pension_reservation" | "restaurant_reservation";
+type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
 
 interface RequestPayload {
   idempotency_key?: string;
@@ -122,6 +122,7 @@ function interceptRequestSubmit(event: Event) {
 }
 
 async function submitRequest(form: HTMLFormElement) {
+  if (!form.reportValidity()) return;
   const formData = new FormData(form);
   const customerPhone = String(formData.get("customer_phone") ?? "").trim();
   const normalizedPhone = normalizeInternationalPhone(customerPhone);
@@ -132,7 +133,7 @@ async function submitRequest(form: HTMLFormElement) {
   }
 
   const requestType = String(formData.get("request_type") ?? "pension_reservation");
-  if (requestType !== "pension_reservation" && requestType !== "restaurant_reservation") {
+  if (requestType !== "pension_reservation" && requestType !== "restaurant_reservation" && requestType !== "general_info") {
     showStatus(ui("Talep türü geçerli değil. Lütfen yeniden deneyin."));
     return;
   }
@@ -227,6 +228,7 @@ function contextualRequestMessage(note: string, resourceType: string, resourceNa
 }
 
 function validateRequestSchedule(payload: RequestPayload): string {
+  if (payload.request_type === "general_info") return "";
   if (payload.request_type === "pension_reservation") {
     if (!payload.start_date || !payload.end_date) {
       return ui("Lütfen giriş ve çıkış tarihlerini seçin.");

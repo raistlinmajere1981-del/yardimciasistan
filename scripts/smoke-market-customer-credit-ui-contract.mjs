@@ -485,14 +485,20 @@ try {
   await expect(panel.getByRole("form")).toHaveCount(0);
   await expect(topbarStatus).toContainText("Hesap bilgileri alınamadı");
   await panel.getByRole("button", { name: "Hesabı Yenile" }).click();
-  await expect(panel.locator(".customer-credit-balances")).toContainText("€0,00");
+  await expect(panel.locator(".customer-credit-balances")).toContainText("₺80,00");
+  await expect(panel.locator(".customer-credit-balances")).not.toContainText("EUR");
   assert.equal(balance("EUR"), 0);
   await panel.getByRole("button", { name: "Tahsilat Al", exact: true }).click();
   payment = panel.getByRole("form", { name: "Tahsilat", exact: true });
   await payment.getByLabel("Tutar", { exact: true }).fill("80,00");
   await payment.getByRole("button", { name: "Tahsilatı Kaydet" }).click();
-  await expect(panel.locator(".customer-credit-balances")).toContainText("₺0,00");
+  await expect(panel.locator(".customer-credit-balances")).toHaveText("Borç yok.");
+  await expect(panel.getByText("Güncel borç", { exact: true })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: "Tahsilat Al", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Hesabı Kapat", exact: true }).click();
+  await expect(panel.locator(".customer-credit-last")).toHaveCount(0);
+  await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Hesap hareketleri", exact: true })).toBeVisible();
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_sales WHERE status = 'credit'").get().n, 1, "Old credit sale status must not determine current debt.");
 
   // Real M7 cart draft loads into the same cart and closes after a credit sale.

@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 const require=createRequire(import.meta.url);
 const { planReleaseVersion }=require("../apps/admin-control-center/dist-electron/electron/services/release-version-plan.js");
-const { ReleaseRunner }=require("../apps/admin-control-center/dist-electron/electron/services/release-runner.js");
+const { ReleaseRunner, planReleaseSteps }=require("../apps/admin-control-center/dist-electron/electron/services/release-runner.js");
 const current={version:"2.0.5",androidVersionCode:9,webModuleVersion:"2.0.5"};
 
 test("Release version plan increments Android code and optionally synchronizes web",()=>{
@@ -82,4 +82,14 @@ test("Release runner executes version-only canonical steps without packaging or 
     assert.equal(require("node:fs").readFileSync(join(root,"product-version.json"),"utf8"),JSON.stringify(current),
       "only the canonical scripts write version metadata; the admin runner itself must not write it");
   } finally {rmSync(root,{recursive:true,force:true});}
+});
+
+
+test("Release package and combined deployment plans reuse canonical commands without pilot/Linux packaging",()=>{
+  const packagePlan=planReleaseSteps("package");
+  assert.deepEqual(packagePlan.map(step=>step.args),[["run","pack:release"]]);
+  for(const action of ["preview","publish"]){
+    const steps=planReleaseSteps(action);assert.equal(steps.length,1);
+    assert.deepEqual(steps[0].args,["run","deploy:landing","--",action==="preview"?"--dry-run":"--yes","--with-downloads","--fresh-web-module","--activate-updates"]);
+  }
 });

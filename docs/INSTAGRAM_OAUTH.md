@@ -16,7 +16,7 @@ Bu URI değiştirilirse PHP'deki IG_REDIRECT ve masaüstü sözleşmesi birlikte
 Meta'da **Instagram app secret** alanını açıp kopyalayın. **Sohbete, Git'e veya
 herhangi bir URL'ye yapıştırmayın.** Geliştirme makinesindeki kendi terminalinizde:
 
-`cd /home/raistlin/YardimciAsistan; node scripts/configure-instagram-oauth-secret.mjs`
+`cd ~/YardimciWorkspace/YardimciAsistan; node scripts/configure-instagram-oauth-secret.mjs`
 
 Komut parolayı terminale göstermeden SSH stdin üzerinden Alwaysdata'ya gönderir.
 Anahtar `/home/yardimciasistan/.config/yardimci-asistan/instagram-oauth.json`

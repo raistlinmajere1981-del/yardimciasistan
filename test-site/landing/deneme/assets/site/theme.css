@@ -1,0 +1,69 @@
+/* Demo-specific presentation. Business records and visible links still come
+   exclusively from the shared public publication projection. */
+:root {
+  --site-bg: #f7f9f6;
+  --site-ink: #20312d;
+  --site-surface: #fff;
+  --site-border: #dce6df;
+  --site-link: #246452;
+  --site-focus: #27685c;
+  --site-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --site-width: 1040px;
+  --site-section-space: clamp(2rem, 4.5vw, 3.5rem);
+  --site-gap: 1rem;
+  --site-card-width: 15rem;
+  --site-card-padding: 1.5rem;
+  --site-radius: 14px;
+  --site-image-ratio: 4 / 3;
+  --site-image-fit: cover;
+}
+
+.site-header {
+  background: rgba(255,255,255,.92);
+  border-bottom: 1px solid var(--site-border);
+}
+.header-content { min-height: 76px; gap: 1.25rem; }
+.site-name { font-size: 1.1rem; font-weight: 750; color: var(--site-ink); text-decoration: none; }
+.main-navigation { align-items: center; gap: .25rem; }
+.main-navigation a, .footer-navigation a {
+  padding: .6rem .9rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #466059;
+  font-size: .92rem;
+}
+.main-navigation a:hover, .footer-navigation a:hover { background: #eaf3ed; color: var(--site-ink); }
+.main-navigation a[aria-current="page"] { color: #1d5a48; background: #e6f1e9; font-weight: 700; }
+
+.main-content { min-height: min(66vh, 650px); }
+.hero { margin-bottom: 2rem; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.25rem); margin: 0 0 .75rem; letter-spacing: -.035em; }
+.hero .lede { font-size: 1.06rem; color: #536962; margin: 0; }
+.page-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.page-link {
+  min-height: 84px; display: flex; align-items: center;
+  color: var(--site-ink); font-size: 1.04rem; font-weight: 650;
+  text-decoration: none; transition: border-color .15s, background .15s;
+}
+.page-link:hover { background: #f0f6f1; border-color: #98c8b2; }
+.empty-state {
+  max-width: 660px; background: #fff;
+  border: 1px dashed #b8ccbe; padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+.empty-state h2 { margin-top: 0; font-size: 1.3rem; }
+.empty-state p { margin: .5rem 0 0; color: #586f63; }
+.content-card { box-shadow: 0 4px 22px rgba(29,65,47,.035); }
+.site-footer { background: #f0f5f0; color: #557065; }
+.footer-navigation a { font-size: .9rem; }
+.site-footer small { display: inline-block; margin-top: .75rem; }
+
+@media (max-width: 760px) {
+  .header-content { min-height: 68px; padding-block: .65rem; }
+  .main-navigation { flex-direction: row; flex-wrap: wrap; width: auto; gap: .15rem; }
+  .main-navigation a { font-size: .875rem; padding-inline: .6rem; }
+  .main-content { min-height: 57vh; }
+  .empty-state { margin-top: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-link { transition: none; }
+}

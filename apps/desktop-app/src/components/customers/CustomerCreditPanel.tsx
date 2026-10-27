@@ -19,7 +19,8 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
   const [saving, setSaving] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const panelId = useId();
-  const debtExists = account?.balances.some((balance) => balance.amountMinor > 0) ?? false;
+  const outstandingBalances = account?.balances.filter((balance) => balance.amountMinor > 0) ?? [];
+  const debtExists = outstandingBalances.length > 0;
 
   useEffect(() => {
     if (expanded && form === null && !saving) toggle.current?.focus();
@@ -32,11 +33,11 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
   function closeForm() { setForm(null); }
 
   return <section className="panel record-stack customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
-    <div className="customer-credit-heading"><h3>Veresiye</h3><span>Güncel borç</span></div>
+    <div className="customer-credit-heading"><h3>Veresiye</h3>{debtExists && <span>Güncel borç</span>}</div>
     {error && <ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton>}
     {account && <>
-      <CustomerCreditBalances balances={account.balances} />
-      {!expanded && account.entries[0] && <div className="customer-credit-last">
+      {debtExists ? <CustomerCreditBalances balances={outstandingBalances} /> : <p className="customer-credit-balances"><strong>Borç yok.</strong></p>}
+      {debtExists && !expanded && account.entries[0] && <div className="customer-credit-last">
         <small>Son hareket</small><div><CustomerCreditMovement entry={account.entries[0]} /></div>
       </div>}
       <div className="action-row">

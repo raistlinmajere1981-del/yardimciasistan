@@ -62,3 +62,4 @@ export * from "./types/public-translations";
 export * from "./types/data-transfer";
 
 export * from "./types/product-photos";
+export * from "./types/public-languages";

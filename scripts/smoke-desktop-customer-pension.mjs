@@ -362,8 +362,6 @@ try {
   await page.getByRole('dialog').getByLabel('Ad soyad', { exact: true }).fill('Migration Misafiri');
   await page.getByRole('dialog').getByLabel('Telefon', { exact: true }).fill('05321234567');
   await page.getByRole('dialog').getByRole('button', { name: 'Müşteri Kartını Kaydet', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Migration Misafiri', exact: true })).toBeVisible();
-  await page.getByRole('dialog').getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.customers-workspace__items')).toContainText('Migration Misafiri');
   const customerCall = await page.evaluate(() => window.__designCalls.find(call => call.kind === 'customer'));

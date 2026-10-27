@@ -15,7 +15,9 @@ export interface WidgetConfig {
   aiEnabled: boolean;
   whatsappEnabled: boolean;
   requestsEnabled: boolean;
+  requestTypes: WidgetRequestType[];
   dealerApplicationEnabled?: boolean;
+  forceVisible?: boolean;
   address: string;
   mapUrl: string;
 }
@@ -42,6 +44,23 @@ export function readScriptConfig(): Partial<WidgetConfig> {
   }
   if (dataset.whatsappEnabled === "true" || dataset.whatsappEnabled === "false") {
     scriptConfig.whatsappEnabled = dataset.whatsappEnabled === "true";
+  }
+  if (dataset.requestsEnabled === "true" || dataset.requestsEnabled === "false") {
+    scriptConfig.requestsEnabled = dataset.requestsEnabled === "true";
+  }
+  if (dataset.forceVisible === "true" || dataset.forceVisible === "false") {
+    scriptConfig.forceVisible = dataset.forceVisible === "true";
+  }
+  for (const [attribute, field] of [["publicSurfaces", "publicSurfaces"], ["requestTypes", "requestTypes"]] as const) {
+    if (dataset[attribute] === undefined) continue;
+    try {
+      const value: unknown = JSON.parse(dataset[attribute]);
+      if (field === "publicSurfaces") scriptConfig.publicSurfaces = normalizePublicSurfaces(value);
+      else scriptConfig.requestTypes = normalizeRequestTypes(value);
+    } catch {
+      if (field === "publicSurfaces") scriptConfig.publicSurfaces = [];
+      else scriptConfig.requestTypes = [];
+    }
   }
   return scriptConfig;
 }
@@ -71,14 +90,22 @@ export function normalizePublicSurfaces(value: unknown): PublicSurface[] {
   ]);
   return [...new Set(
     value
-      .map((item) => String(item ?? "").trim() as PublicSurface)
+      .map((item) => {
+        const name = String(item ?? "").trim();
+        return ({rooms: "accommodation", restaurant: "food_service", tables: "food_service", store: "catalog", online_sales: "catalog"}[name] ?? name) as PublicSurface;
+      })
       .filter((item) => allowed.has(item))
   )];
 }
 
 export function resolvePublicSurfaces(config: Pick<WidgetConfig, "profileId" | "publicSurfaces">): ReadonlySet<PublicSurface> {
-  const configured = normalizePublicSurfaces(config.publicSurfaces);
-  return new Set(configured.length > 0 ? configured : profilePublicSurfaces(config.profileId));
+  return new Set(normalizePublicSurfaces(config.publicSurfaces));
+}
+
+export function normalizeRequestTypes(value: unknown): WidgetRequestType[] {
+  const supported = new Set<WidgetRequestType>(["pension_reservation", "restaurant_reservation", "general_info", "dealer_application"]);
+  return Array.isArray(value) ? [...new Set((value as unknown[]).filter((item): item is WidgetRequestType =>
+    typeof item === "string" && supported.has(item as WidgetRequestType)))] : [];
 }
 
 export function isWhatsAppAvailable(config: Pick<WidgetConfig, "whatsappEnabled" | "whatsappPhone">): boolean {
@@ -86,15 +113,24 @@ export function isWhatsAppAvailable(config: Pick<WidgetConfig, "whatsappEnabled"
 }
 
 export function isRequestTypeAvailable(
-  config: Pick<WidgetConfig, "requestsEnabled" | "profileId" | "publicSurfaces" | "dealerApplicationEnabled">,
+  config: Pick<WidgetConfig, "requestsEnabled" | "requestTypes" | "profileId" | "publicSurfaces" | "dealerApplicationEnabled">,
   requestType: WidgetRequestType
 ): boolean {
-  if (!config.requestsEnabled) return false;
+  if (!config.requestsEnabled || !normalizeRequestTypes(config.requestTypes).includes(requestType)) return false;
   if (requestType === "dealer_application") return config.dealerApplicationEnabled === true;
   const surfaces = resolvePublicSurfaces(config);
   if (requestType === "pension_reservation") return surfaces.has("accommodation");
   if (requestType === "restaurant_reservation") return surfaces.has("food_service");
   return true;
+}
+
+export function isDirectionsAvailable(config: Pick<WidgetConfig, "profileId" | "publicSurfaces" | "address" | "mapUrl">): boolean {
+  return resolvePublicSurfaces(config).has("directions") && (config.address.trim() !== "" || config.mapUrl.trim() !== "");
+}
+
+export function hasAvailableActions(config: WidgetConfig): boolean {
+  return config.aiEnabled || isWhatsAppAvailable(config) || isDirectionsAvailable(config)
+    || normalizeRequestTypes(config.requestTypes).some(type => isRequestTypeAvailable(config, type));
 }
 
 export function buildInfoSuggestions(config: Pick<WidgetConfig, "profileId" | "publicSurfaces">): string[] {
@@ -153,12 +189,4 @@ export function buildWhatsAppTopics(
   }
   topics.push({ key: "custom", label: ui("Kendi mesajımı yazacağım"), message: "" });
   return topics;
-}
-
-function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface[] {
-  if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "qr_menu", "directions"];
-  if (profileId === "pension") return ["accommodation", "directions"];
-  if (profileId === "restaurant") return ["food_service", "menu", "qr_menu", "directions"];
-  if (profileId === "market") return ["catalog", "directions"];
-  return [];
 }

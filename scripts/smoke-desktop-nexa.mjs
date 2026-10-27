@@ -17,6 +17,8 @@ try {
     await route.fulfill({ contentType: "text/html", body: html });
   });
   await page.addInitScript(() => {
+    // Exercise the latest possible natural blink/glance rather than a lucky early gesture.
+    Math.random = () => .999999;
     window.__nexaReply = null;
     window.yardimciDesktop = {
       generateDailyBusinessEvaluation: () => new Promise((resolve) => { window.__nexaReply = resolve; }),
@@ -50,18 +52,24 @@ try {
           && rect.top >= nav.bottom && rect.bottom <= footer.top;
       });
     })).toBe(true);
-    if (await habitat.locator('.nexa-character-stage').count()) {
-      const alignment = await habitat.evaluate(el => {
-        const stage = el.querySelector('.nexa-character-stage').getBoundingClientRect();
-        const shadow = el.querySelector('.nexa-habitat-shadow').getBoundingClientRect();
-        const avatar = el.querySelector('.nexa-character').getBoundingClientRect();
-        const area = el.getBoundingClientRect();
-        const center = rect => rect.left + rect.width / 2;
-        return Math.max(Math.abs(center(stage) - center(shadow)), Math.abs(center(stage) - center(avatar)), Math.abs(center(stage) - center(area)));
-      });
-      expect(alignment).toBeLessThan(1);
-      await assertGroundClear();
-    }
+    // ResizeObserver can switch wide/compact/hidden after a locator count.
+    // Sample visibility and geometry atomically, and poll through transitions.
+    await expect.poll(() => habitat.evaluate(el => {
+      const stageNode = el.querySelector('.nexa-character-stage');
+      if (el.classList.contains('nexa-habitat--hidden')) return stageNode === null;
+      const shadowNode = stageNode?.querySelector('.nexa-habitat-shadow');
+      const avatarNode = stageNode?.querySelector('.nexa-character');
+      if (!stageNode || !shadowNode || !avatarNode) return false;
+      const stage = stageNode.getBoundingClientRect();
+      const shadow = shadowNode.getBoundingClientRect();
+      const avatar = avatarNode.getBoundingClientRect();
+      const area = el.getBoundingClientRect();
+      const center = rect => rect.left + rect.width / 2;
+      const alignment = Math.max(Math.abs(center(stage) - center(shadow)),
+        Math.abs(center(stage) - center(avatar)), Math.abs(center(stage) - center(area)));
+      const artwork = avatarNode.querySelector('[data-part="presence"]')?.getBoundingClientRect() ?? avatar;
+      return alignment < 1 && shadow.top > Math.max(avatar.bottom, artwork.bottom);
+    })).toBe(true);
     await expect(page.getByRole('button', { name: 'Ayarlar', exact: true })).toBeInViewport();
   }
   await expect(habitat).toHaveClass(/--wide/);
@@ -76,7 +84,9 @@ try {
   const idleBrow = await svg.locator('[data-brow="left"]').getAttribute("d");
   await expect(habitat).toHaveAttribute("data-motion-active","true");
   await expect(svg).toHaveAttribute("data-motion-active", "true");
-  // Observe an entire eye-contact/glance/blink cycle, including actual clipping.
+  // Observe the real blink and gaze, including actual clipping. A glance can
+  // start at 6500ms of animation time; dropped frames advance that clock more
+  // slowly than wall time, so 6500ms is a minimum observation, not a deadline.
   const eyeMotion = await svg.evaluate(async (rig) => {
     const eye = rig.querySelector('[data-eye-white="left"]');
     const clip = rig.querySelector('[data-eye-clip="left"]');
@@ -91,7 +101,9 @@ try {
         shapes.add(eye.getAttribute("d")); gazes.add(pupil.getAttribute("transform"));
         matched &&= eye.getAttribute("d") === clip.getAttribute("d");
         minimumGroundGap = Math.min(minimumGroundGap, shadow.getBoundingClientRect().top - artwork.getBoundingClientRect().bottom);
-        if (now - start >= 6500) done(); else requestAnimationFrame(sample);
+        const observed = shapes.size > 1 && gazes.size > 1;
+        if (now - start >= 15000 || now - start >= 6500 && observed) done();
+        else requestAnimationFrame(sample);
       }
       requestAnimationFrame(sample);
     });

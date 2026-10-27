@@ -1,5 +1,6 @@
 import { getAppLockPasswordVerifier as getAppLockPasswordVerifierStored, setAppLockPasswordVerifier as setAppLockPasswordVerifierStored, getAppLockNotificationCount as getAppLockNotificationCountStored } from "./database/app-lock-store.js";
 import { recordRejectedDealerWebOrder } from "./dealer-web-order-rejection.js";
+import { getWebSyncConfig } from "./sync-config";
 import { PublicTranslationStore } from "./database/public-translation-store";
 import { publishedGallery } from "./business-gallery-service";
 import * as marketingAnalyticsStore from "./marketing/analytics-read-store";
@@ -294,7 +295,7 @@ export class DesktopDatabase {
     }
   }
 
-  translations() { return new PublicTranslationStore(this.db, () => publishedGallery(this.userDataPath)); }
+  translations() { return new PublicTranslationStore(this.db, () => publishedGallery(this.userDataPath), () => getWebSyncConfig(this.getSetupData()).baseUrl.trim().replace(/\/+$/, "")); }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
     return readEnabledBusinessCapabilities(this.db);

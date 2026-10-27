@@ -11,6 +11,8 @@ veri sürümü değişikliği değildir.
 - Hosting `api/`, `lib/`, korumalı `config/`, `data/`, `knowledge/` ve `media/` hizmetlerini sağlar.
 - Her site HTML/CSS/JS, sayfa yapısı, navigasyon, widget ve etkileşim sunumunu kendisi sahiplenir.
 - Demo sahibi yalnız `test-site/landing` dizinidir. Ortak pakette tasarım dosyaları bulunmaz.
+- `web-site-template/` ayrı kopyalanabilir site sunumudur; API paketinin parçası değildir.
+  Sayfa/tema/dil/efekt/güncelleme sınırları [şablon sözleşmesindedir](WEB_SITE_TEMPLATE_V1.md).
 
 ## Korunan public veri uçları
 
@@ -21,7 +23,7 @@ veri sürümü değişikliği değildir.
 | `GET api/rooms.php`, `api/tables.php` | `ok`, `version`, `enabled`, `updated_at`, rooms/tables, source_revision/server_revision ve ETag. Kapalıyken boş liste. Kapasite, özellik, açıklama, sıralama ve yayınlanmış medya alanları korunur. |
 | `GET api/catalog.php` | v1 online catalog, enabled, delivery_methods, products ve revision/ETag. Delivery OFF kataloğu gizlemez; yeni siparişi kapatır. |
 | `GET api/marketing.php` | `ok`, yayınlanmış publication listesi: placement/title/text/ordered images. Kapalı/yayından kaldırılmış içerik dönmez. Provider sırları ve yerel dosya yolları dönmez. |
-| `GET api/availability.php` | Mevcut public oda müsaitlik projection'ı, tarih/kapasite ve freshness/unknown semantiği. Kesin rezervasyon onayı değildir. |
+| `POST api/availability.php` | Mevcut public oda müsaitlik projection'ı, tarih/kapasite ve freshness/unknown semantiği. Kesin rezervasyon onayı değildir. |
 | `GET api/google-reviews.php` | Mevcut normalize yorumlar ve kullanılabilirlik; ek `reviews_uri` Google Maps yorum sekmesi bağlantısıdır, bulunmazsa `google_maps_uri` işletme sayfası fallback'idir. API anahtarı sunucuda kalır. |
 
 Medya URL'leri `/yardimci-asistan/media/…` altında kalır; room/table/gallery/marketing
@@ -96,6 +98,7 @@ ve aşağıdaki alanlar bulunabilir:
 | --- | --- | --- |
 | `business` | business_context / business.php | description, about_text, directions_note, policy_note, payment_note |
 | `gallery` | business_context / business.php | title |
+| `site_text` | business_context / business.php | text (kaynak manifestindeki katalog kimliği:anahtar) |
 | `room` | room_catalog / rooms.php | name, bed_info, description, price_note |
 | `table` | table_catalog / tables.php | name, area, description |
 | `menu_category`, `menu_product` | menu / menu.php | name, description |
@@ -143,15 +146,17 @@ revision ile birlikte değişir ve eski ETag yeni metin için 304 üretmez.
 Business/marketing mevcut `no-store` politikalarını korur. Kaynak hash'i, hata,
 köken, API anahtarı ve yerel durum bilgileri public sözleşmeye girmez.
 
-Demo sahibi `test-site/landing/assets/i18n/en.json`, Türkçe kaynak anahtarlarıyla
-site arayüzü ve demo asistanının İngilizce sözlüğünü sahiplenir. PHP `inc/language.php`,
-JS `assets/js/language.js` ve asistanın `assistant/site-language.ts` adaptörü aynı
-sözlüğü kullanır. Sözlük yalnız siteye ait etiket, açıklama, doğrulama ve durum
-metinlerine uygulanır; public kayıt metni, kullanıcı girdisi ve AI yanıtı sözlüğe
-sokulmaz. Public alanlar yalnız `localization` içinden seçilir.
+Site arayüzünün tek Türkçe kaynak kataloğu `locales/tr.json` dosyasıdır. Demo iki
+katmanı aynı kataloğu ve ortak `YaSite\language_context` çözücüsünü kullanır.
+PHP `t()`, ortak `interaction-language.js` ve widget `assistant/site-language.ts`
+adaptörü aynı hash kontrollü yayınlanmış çevirileri tüketir. Sabit İngilizce sözlük
+ve eski PHP/JS TR/EN motoru authority değildir. Katalog yalnız siteye ait etiket,
+açıklama, doğrulama ve durum metinlerine uygulanır; public kayıt metni, kullanıcı
+girdisi ve AI yanıtı kataloğa sokulmaz. Public alanlar kendi `localization`
+metadata'sından seçilir.
 
 Site seçimi query/HttpOnly cookie ile sayfalar arasında korunur; HTML cevapları
-`private, no-store` kullanır. Tarih ve sayı sunumu `tr-TR`/`en-GB` locale kullanır;
+`private, no-store` kullanır. Tarih ve sayı sunumu yayınlanan dil registry kaydının locale değerini kullanır;
 işlem kimlikleri, ISO tarihler, sayısal değerler ve idempotency sözleşmesi korunur.
 Dil servisi kapalıyken site arayüzü İngilizce kalabilir; public kayıtlar Türkçe
 kaynağa döner. API kullanıcının seçimine göre kaynak alanlarını yeniden yazmaz.
@@ -172,3 +177,70 @@ Desktop yayın/ingress zinciri ile exact acknowledgement regresyonlarını korur
 `public-translations`, `public-translations-ui`, `public-translations-web` sırasıyla
 SQLite/AI/IPC/outbox, 10.000 kayıtlık gerçek SQLite + sınırlı DOM ve gerçek
 Desktop → PHP → İngilizce demo/fallback zincirini doğrular.
+
+### Ortak şablonun kaynak kataloğu
+
+`business_context.localization` ek `business_id`, `languages` ve isteğe bağlı `site_catalog`
+taşır. `business_id` canonical Desktop localization kimliğidir; Hosting config ID'si
+değildir. `languages` merkezi Desktop kaydından `{code,name,nativeName,locale,direction}`
+projection'ıdır; yalnız `tr` ve etkin hedefler bulunur. Ülkesiz dil ülke bayrağına zorlanmaz.
+Diğer publication'ların mevcut v1 metadata'sı değişmez.
+
+`site_catalog` v1 `{id,revision,source_language:'tr',entries:{key:{text,hash}}}` kaynak
+manifestidir. Kaynak yalnız sitenin `locales/tr.json` kataloğudur; temalar aynı kataloğa
+anahtar ekler. Desktop modül URL'sinin bir üstündeki `?resource=translation-source`
+GET yanıtını okur; secret/cookie göndermez, redirect izlemez, timeout ve boyut sınırı
+uygular. Şablon endpoint'i public kaynak metinden başka veri okumaz. Katalog işletme/yayın
+hedefiyle SQLite'a alınır. Şablonsuz eski sitelerin mevcut yayın akışı korunur.
+
+SHA-256 metin hash'i UTF-8 byte'larından hesaplanır. Revision ASCII anahtar sırasındaki
+`key:hash\n` birleşiminin SHA-256'sıdır. Üç tüketici manifesti doğrular; kaynak değişikliği
+ayrı sürüm artırmayı veya uygulamada metin listesi güncellemeyi gerektirmez. Desktop
+`site_text` kimliğini `catalog-id:key`, alanı `text` olarak mevcut AI/manual kayıt sistemine
+verir; değişmemiş hash yeniden çevrilmez. Kaynak, servis, hedef ve manual sahiplik kontrolleri
+asenkron AI sınırında korunur. Hosting yalnız manifestteki anahtarların çevirisini kabul eder.
+Site kendi güncel kaynak hash'iyle uyuşan alanı kullanır; aksi halde o alan Türkçe kalır.
+
+Metadata ve çeviriler mevcut `business_context` producer/outbox/exact ACK ile yayınlanır;
+ayrı publisher/revision/ziyaretçi AI otoritesi yoktur. Kaydet akışı otomatik hazırlamayı açar.
+Dil ayarı ve çeviri yazımı aynı coordinator döngüsünden açık yayın niyetiyle geçer;
+pasif otomatik senkron kapalıyken de yayın denenir, tercih değiştirilmez. Çevrimdışı
+işler mevcut durable outbox/backoff içinde kalır. Hata ve AI yapılandırma yokluğu Desktop durumunda görünür; Türkçe yayın AI sonucunu beklemez.
+Başarısız çeviriler otomatik tekrar edilmez; mevcut Dil Yönetimi yeniden deneme işlemidir.
+Ayrıntılar: [şablon dil/entegrasyon sözleşmesi](../../web-site-template/README.md#dil-ve-entegrasyon).
+
+Public `business.php` advertises AI/request availability only when the existing
+Desktop runtime publication (`android_snapshot.business_capabilities`) explicitly enables
+it. Missing or malformed capability publication fails closed; profile/config presets
+never grant a service. Global requests require `core.customers` and `customer.requests`.
+`business.request_types` lists the currently accepted request types. Its per-type
+requirements match shared `isRequestTypeAvailable`: room reservation requires
+`accommodation.reservations`; table/breakfast requests require `food_service.reservations`;
+menu questions require `channel.qr_menu`; dealer applications retain their wholesale,
+published preference and private dealer-access gates. Generic information/location/price
+questions and `other` require no reservation date. Reservation and breakfast date
+validation remains unchanged. `request.php` applies the same policy before queue writes.
+WhatsApp additionally requires persisted `service.whatsapp` and its published contact
+setting/number. The underlying publication, chat, account and mutation owners are unchanged.
+
+`public_surfaces` contains canonical `rooms`, `restaurant`, `qr_menu`, `store` only while
+their owning publication is enabled. Legacy domain aliases in bootstrap config or a
+profile cannot restore a withdrawn surface. Published location data may expose
+`directions` independently of AI and requests.
+
+The public business response includes `check_in_time`, `check_out_time`,
+`breakfast_start_time`, `breakfast_end_time` as optional `HH:MM` strings (empty when
+absent/invalid). These are the existing Desktop public-profile fields, carried through
+normal business-context publication. The Desktop producer and public projection expose
+them only for persisted `accommodation.rooms`; runtime withdrawal suppresses stale hours.
+Sites render nonempty published clocks without inventing defaults.
+
+### İşletme kimliği yayın kökeni
+
+`business.php` kökündeki ek `business_publication` alanı business_context durable
+yayın metadata'sından `{enabled, server_revision, fields}` döndürür. `fields` yalnız
+business_name/description/phone/email/address/gallery/social_links alan adlarıdır;
+secret, müşteri verisi veya yeni işletme kaydı içermez. Mevcut business/config
+fallback davranışı değişmez. Canonical SEO yalnız yayınlanmış kimliği ve bu
+listede bildirilen public alanları kullanır; eski modül bu metadata'yı sağlamıyorsa
+yerel site JSON-LD üretmez. DB/şema, outbox veya işlem yetkileri değişmez.

@@ -265,3 +265,14 @@ düzeltmeler yapmaktır.
 Linux `desktop-xvfb` testi artık yalnız Electron sürecinin açık kaldığını değil, izole profilde DevTools protokolüyle Yardımcı Asistan renderer DOM'unun oluştuğunu da doğrular. Süreç ve geçici profil test bitiminde kapatılır.
 
 Admin startup preload köprüsü geçici olarak eksikse yükleme ekranı korunur; React StrictMode'un çift effect çağrısı erken kırmızı hata kartı oluşturmaz. Kalıcı eksiklikte deneme sınırından sonra hata gösterilir.
+
+## Release planı sahipliği
+
+Paketleme mevcut `pack:release` komutunu kullanır: Windows x64/x86, Companion ve
+Bayi kalıcı imzalı release APK, temiz web modülü paketi ve demo build'i. AppImage
+zorunlu otomatik adım değildir; manuel Linux hattı korunur. Önizleme/yayın mevcut
+`deploy:landing --with-downloads --fresh-web-module --activate-updates` seçeneklerini
+kullanır. Temiz backend kurulumu mevcut deploy-web script'ine delegedir; eski test
+verileri taşınmaz. Windows feed'leri site ve dosya doğrulamalarından sonra etkinleşir.
+İlerleme çıktısı ve hata durumu aynı ReleaseRunner sahibindedir; ikinci yayın
+uygulaması yoktur. Operatör sırası `dev/RELEASE_WORKFLOW.md` içindedir.

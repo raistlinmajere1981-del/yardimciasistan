@@ -1,6 +1,7 @@
 import { ui } from "./site-language";
 import {
   isRequestTypeAvailable,
+  isDirectionsAvailable,
   isWhatsAppAvailable,
   type WidgetConfig,
   type WidgetRequestType
@@ -13,6 +14,7 @@ export type WidgetIntent =
   | "accommodation.info"
   | "food.reserve"
   | "contact.whatsapp"
+  | "request.general"
   | "info"
   | "directions";
 
@@ -61,8 +63,15 @@ export function resolveWidgetOpenOptions(
       ? { view: "whatsapp", context, questionDraft: "" }
       : homeState();
   }
+  if (intent === "request.general") {
+    return isRequestTypeAvailable(config, "general_info")
+      ? { view: "form", requestType: "general_info", context, questionDraft: "" }
+      : homeState();
+  }
   if (intent === "directions") {
-    return { view: "directions", context, questionDraft: context?.question ?? "" };
+    return isDirectionsAvailable(config)
+      ? { view: "directions", context, questionDraft: context?.question ?? "" }
+      : homeState();
   }
   if (intent === "accommodation.info" || intent === "info") {
     if (!config.aiEnabled) return homeState();
@@ -97,6 +106,7 @@ export function normalizeWidgetIntent(value: unknown): WidgetIntent | null {
     "accommodation.info",
     "food.reserve",
     "contact.whatsapp",
+    "request.general",
     "info",
     "directions"
   ].includes(intent)

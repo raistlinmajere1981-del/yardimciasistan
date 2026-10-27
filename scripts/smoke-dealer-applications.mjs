@@ -26,7 +26,7 @@ const configFile = join(hosting, "config/business.json");
 writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile)), sync_secret: secret }));
 const port = await new Promise(resolve => { const s = http.createServer(); s.listen(0, "127.0.0.1", () => { const port = s.address().port; s.close(() => resolve(port)); }); });
 const siteUrl = `http://127.0.0.1:${port}`, baseUrl = `${siteUrl}/yardimci-asistan`;
-const server = spawn("php", ["-d", "upload_max_filesize=11M", "-d", "post_max_size=52M", "-d", "max_file_uploads=20", "-S", `127.0.0.1:${port}`, "-t", publicRoot], {stdio:["ignore","pipe","pipe"]});
+const server = spawn("php", ["-d", "upload_max_filesize=11M", "-d", "post_max_size=52M", "-d", "max_file_uploads=20", "-S", `127.0.0.1:${port}`, "-t", publicRoot], {env:{...process.env,PHP_CLI_SERVER_WORKERS:"4",YA_SITE_API_ORIGIN:siteUrl},stdio:["ignore","pipe","pipe"],detached:true});
 let logs = "", browser, webDb, uiServer;
 for (const stream of [server.stdout,server.stderr]) stream.on("data", data => logs += data);
 const database = new DesktopDatabase({ appPath: join(process.cwd(), "apps/desktop-app"), userDataPath: join(root,"desktop") });
@@ -146,7 +146,7 @@ try {
   locked=true; await assert.rejects(()=>document({},id,doc.id,"open"),/locked/); locked=false; allowed=false; await assert.rejects(()=>document({},id,doc.id,"open"),/denied/); allowed=true;
   // Real Widget form: selection/removal, failed upload retry retains identity.
   browser=await launchChromiumForSmoke(chromium); const page=await browser.newPage({viewport:{width:390,height:844}});
-  await page.goto(siteUrl); await page.waitForFunction(()=>window.YardimciAsistanWidget); await page.evaluate(()=>window.YardimciAsistanWidget.open());
+  await page.goto(siteUrl+"/deneme/"); await page.waitForFunction(()=>window.YardimciAsistanWidget); await page.evaluate(()=>window.YardimciAsistanWidget.open());
   await page.getByRole("button",{name:/Bayi Başvurusu/}).click(); const form=page.locator("[data-dealer-application]");
   for(const [name,value]of Object.entries(fields))if(await form.locator(`[name="${name}"]`).count())await form.locator(`[name="${name}"]`).fill(value);
   await form.locator('[data-document-picker]').setInputFiles([{name:"belge.pdf",mimeType:"application/pdf",buffer:pdf},{name:"resim.png",mimeType:"image/png",buffer:png}]);
@@ -178,4 +178,4 @@ try {
   await ui.getByRole("button",{name:"Görseli önizle"}).click(); await expect(ui.getByAltText("Başvuru belgesi önizlemesi")).toBeVisible(); assert.deepEqual(errors,[]);
   assert.equal(database.saveInitialSetup({...setup,dealerApplicationEnabled:false}).ok,true); await sync(); assert.equal((await submit(randomUUID(),docs)).status,403);
   assert.ok(!logs.includes(secret)); console.log("dealer-applications-smoke-ok: gate, multipart validation, retry, durable files, approval, matching, concurrent sessions, revocation, IPC authorization and Widget");
-} finally {await uiServer?.close();await browser?.close();webDb?.close();database.close();server.kill();await new Promise(resolve=>server.once("exit",resolve));rmSync(root,{recursive:true,force:true});}
+} finally {await uiServer?.close();await browser?.close();webDb?.close();database.close();try{process.kill(-server.pid,'SIGTERM');}catch{}await new Promise(resolve=>server.once("exit",resolve));rmSync(root,{recursive:true,force:true});}

@@ -5,8 +5,22 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { runInNewContext } from "node:vm";
+import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { fixtureHttp, fixtureSecretService, fixtureShippingService, testCredentials } from "./test-helpers/aras-provider-fixtures.mjs";
+
+function publishedMap(value) {
+  const code='require $argv[1]."/core/bootstrap.php"; echo json_encode(\\YaSite\\contact_projection(json_decode(stream_get_contents(STDIN),true)));';
+  const result=spawnSync('php',['-r',code,resolve('web-site-template')],{input:JSON.stringify(value),encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);return JSON.parse(result.stdout);
+}
+function assertPublishedMapSelection() {
+  const embed='https://www.google.com/maps/embed?pb=!fixture';
+  assert.match(publishedMap({latitude:39,longitude:32,mapDisplayMode:'manual',googleMapsEmbedUrl:embed}).embed,/^https:\/\/www.openstreetmap.org\//);
+  assert.equal(publishedMap({latitude:39,longitude:32,mapDisplayMode:'google_maps_embed',googleMapsEmbedUrl:embed}).embed,embed);
+  assert.equal(publishedMap({latitude:39,longitude:32,mapDisplayMode:'google_maps_embed',googleMapsEmbedUrl:'https://invalid.test'}).embed,'','Google selection never falls back to manual coordinates');
+}
+if(process.argv.includes('--map-contract-only')) { assertPublishedMapSelection(); console.log('settings-public-map-contract-ok'); process.exit(0); }
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
@@ -278,17 +292,8 @@ try {
   web = createCurrentBusinessWebContext(db);
   assert.equal(web.latitude, 39);
   assert.equal(web.googleMapsEmbedUrl, "");
-  const mapWindow = {};
-  runInNewContext(readFileSync(resolve("test-site/landing/assets/js/language.js"), "utf8"), { window: mapWindow, document: { documentElement: { lang: "tr" } } });
-  runInNewContext(readFileSync(resolve("test-site/landing/assets/js/business-map.js"), "utf8"), { window: mapWindow, URL });
-  const frame = { removeAttribute: () => { delete frame.src; }, style: {} };
-  const mapRoot = { querySelectorAll: selector => selector === "[data-business-map-frame]" ? [frame] : [] };
-  mapWindow.YardimciBusinessMap.render({ latitude: 39, longitude: 32, mapDisplayMode: "manual", googleMapsEmbedUrl: embed }, mapRoot);
-  assert.match(frame.src, /^https:\/\/www.openstreetmap.org\//);
-  mapWindow.YardimciBusinessMap.render({ latitude: 39, longitude: 32, mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: embed }, mapRoot);
-  assert.equal(frame.src, embed);
-  mapWindow.YardimciBusinessMap.render({ latitude: 39, longitude: 32, mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: "https://invalid.test" }, mapRoot);
-  assert.equal(frame.hidden, true, "Google selection never falls back to manual coordinates");
+  assertPublishedMapSelection();
+  assert.match(publishedMap(web).embed,/^https:\/\/www.openstreetmap.org\//,'Actual Desktop web context reaches the canonical map projection');
   raw = new DatabaseSync(db.databasePath);
   assert.equal(raw.prepare("SELECT latitude FROM business_public_profile").get().latitude, 39);
   for (const [remote, expected] of [["2.0.1", -1], ["2.0.2", 0], ["2.0.3", 1]]) assert.equal(compareVersions(remote, "2.0.2"), expected);

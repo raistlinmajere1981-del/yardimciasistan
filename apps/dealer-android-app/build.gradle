@@ -13,7 +13,7 @@ android {
     versionName = productVersion.version
   }
   buildTypes {
-    debug { versionNameSuffix = "-pilot" }
+    debug { versionNameSuffix = "-debug" }
     release { minifyEnabled = false }
   }
   compileOptions {
@@ -26,9 +26,7 @@ androidComponents {
     variant.outputs.each { output -> output.outputFileName.set("yardimci-asistan-bayi-${variant.name}.apk") }
   }
 }
-tasks.matching { it.name == "preReleaseBuild" }.configureEach {
-  doFirst { throw new GradleException("Pilot debug APK kullanın. Dağıtım imzası ayrıca yapılandırılmalıdır.") }
-}
+apply from: file("../android-app/release-signing.gradle")
 dependencies {
   implementation "androidx.activity:activity:1.13.0"
   implementation "androidx.core:core:1.19.1"

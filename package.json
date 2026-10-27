@@ -16,7 +16,7 @@
     "design:audit": "node scripts/design-system-audit.mjs",
     "design:audit:baseline": "node scripts/design-system-audit.mjs --write-baseline",
     "design:audit:strict": "node --test scripts/test-desktop-style-audit.mjs && node scripts/design-system-audit.mjs --strict",
-    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\" \"test-site/landing/**/*.{js,ts}\"",
+    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\" \"web-site-template/**/*.{js,mjs}\" \"test-site/landing/**/*.{js,ts}\"",
     "lint:strict": "npm run lint -- --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "knip": "knip --config knip.json",
@@ -129,7 +129,10 @@
     "version:web:set": "node scripts/product-version.mjs web-set",
     "version:web:bump": "node scripts/product-version.mjs web-bump",
     "deploy:market-pilot": "bash scripts/deploy-market-pilot.sh",
-    "build:demo": "npm run build -w @yardimci-asistan/demo-site"
+    "build:demo": "npm run build -w @yardimci-asistan/demo-site",
+    "dealer:android:release-apk": "node scripts/run-android-gradle.mjs --dealer assembleRelease",
+    "release:check": "node scripts/release-artifacts.mjs",
+    "pack:release": "npm run pack:desktop:windows && npm run dealer:android:release-apk && npm run prepare:web-install -- --installation ya --no-print-secret && npm run build:demo && npm run release:check"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

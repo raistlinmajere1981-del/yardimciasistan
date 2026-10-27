@@ -77,6 +77,23 @@ function ya_dealer_orders(string $token): array
     return ya_customer_order_history($access);
 }
 
+/** Recover the account's accepted attempt even after commercial permission changes.
+ * The caller has already required its current account session. Access IDs are
+ * resolved here, never accepted from the client; no price or other account leaks.
+ */
+function ya_customer_order_receipt(string $accountId, string $key): ?array
+{
+    $receipt = ya_storage_get_web_order_submission_receipt(hash('sha256', 'customer:' . $accountId . ':' . $key));
+    if ($receipt !== null) return $receipt['response'];
+    $query = ya_storage_open()->prepare('SELECT access_id FROM dealer_access WHERE account_id = ?');
+    $query->execute([$accountId]);
+    foreach ($query->fetchAll(PDO::FETCH_COLUMN) as $accessId) {
+        $receipt = ya_storage_get_web_order_submission_receipt(hash('sha256', 'dealer:' . $accessId . ':' . $key));
+        if ($receipt !== null) return $receipt['response'];
+    }
+    return null;
+}
+
 function ya_customer_order_history(array $access): array
 {
     $publication = ya_storage_get_publication('dealer_access_private', []);

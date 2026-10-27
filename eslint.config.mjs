@@ -20,6 +20,12 @@ export default tseslint.config(
       "**/.demo-runtime/**",
       "**/release/**",
       "test-site/landing/assets/assistant/**",
+      // Demo mirrors and release widget/vendor bundles are checked by hashes and browser smokes.
+      // Lint their maintained source once, below the canonical template directory.
+      "test-site/landing/deneme/assets/core/**",
+      "test-site/landing/deneme/assets/vendor/**",
+      "web-site-template/public/assets/core/widget.js",
+      "web-site-template/public/assets/vendor/**",
       "demo-data/**"
     ]
   },

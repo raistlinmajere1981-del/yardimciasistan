@@ -28,7 +28,6 @@ export function DealerWebAccessPanel({ customerId, disabled, active = true }: { 
   }
   return <section className="panel customer-operation-card form-stack" aria-label="Müşteri Hesabı">
     <div className="customer-operation-card__heading"><h3>Müşteri Hesabı</h3><StatusBadge tone={access?.accountId ? "success" : "neutral"}>{access?.accountId ? "Bağlı" : "Hesap bekleniyor"}</StatusBadge></div>
-    <p>Müşteri webden hesap oluşturabilir. Bayi statüsü ve fiyat grubu bu müşteri kartından yönetilir.</p>
     {access?.accountId && <><p>{access.enabled ? "Bayi erişimi açık." : "Normal müşteri hesabı. Bayi erişimi için Online Satış, Bayi / Toptan Satış ve bayi portalı açık olmalı."}</p>
       <ActionButton variant="secondary" disabled={disabled || busy} onClick={() => setConfirm("revoke_sessions")}>Tüm cihazlardan çıkış yap</ActionButton></>}
     {!access?.accountId && access?.linkCandidates.map(candidate => <div key={candidate.accountId} className="form-stack">
@@ -39,7 +38,6 @@ export function DealerWebAccessPanel({ customerId, disabled, active = true }: { 
       <ActionButton variant="danger" disabled={busy} onClick={() => void change(confirm)}>Onayla</ActionButton>
       <ActionButton variant="secondary" onClick={() => setConfirm(null)}>Vazgeç</ActionButton>
     </div></div>}
-    {disabled && <small>Önce müşteri kartındaki değişiklikleri kaydedin veya geri alın.</small>}
     {message && <p role="status">{message}</p>}
   </section>;
 }

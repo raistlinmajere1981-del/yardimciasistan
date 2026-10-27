@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { CustomerFormState } from "../../app/customer-model";
 import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
 
@@ -6,10 +7,25 @@ interface CustomerCommercialProfileFieldsProps {
   onChange: (form: CustomerFormState) => void;
 }
 
+function priceGroupForDealerStatus(
+  status: CustomerFormState["commercialDealerStatus"],
+  priceGroup: CustomerFormState["commercialPriceGroup"]
+): CustomerFormState["commercialPriceGroup"] {
+  return status === "active" ? (priceGroup === "retail" ? "dealer_a" : priceGroup) : "retail";
+}
+
 export function CustomerCommercialProfileFields({
   form,
   onChange
 }: CustomerCommercialProfileFieldsProps) {
+  const priceGroup = priceGroupForDealerStatus(form.commercialDealerStatus, form.commercialPriceGroup);
+
+  useEffect(() => {
+    if (form.commercialPriceGroup !== priceGroup) {
+      onChange({ ...form, commercialPriceGroup: priceGroup });
+    }
+  }, [form, onChange, priceGroup]);
+
   const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
     onChange({ ...form, [field]: value });
   };
@@ -59,10 +75,14 @@ export function CustomerCommercialProfileFields({
             <select
               aria-label="Bayi durumu"
               value={form.commercialDealerStatus}
-              onChange={(event) => update(
-                "commercialDealerStatus",
-                event.target.value as CustomerFormState["commercialDealerStatus"]
-              )}
+              onChange={(event) => {
+                const status = event.target.value as CustomerFormState["commercialDealerStatus"];
+                onChange({
+                  ...form,
+                  commercialDealerStatus: status,
+                  commercialPriceGroup: priceGroupForDealerStatus(status, form.commercialPriceGroup)
+                });
+              }}
             >
               <option value="active">Aktif</option>
               <option value="inactive">Pasif</option>
@@ -72,15 +92,16 @@ export function CustomerCommercialProfileFields({
             Fiyat grubu
             <select
               aria-label="Fiyat grubu"
-              value={form.commercialPriceGroup}
+              value={priceGroup}
               onChange={(event) => update(
                 "commercialPriceGroup",
                 event.target.value as CustomerFormState["commercialPriceGroup"]
               )}
             >
-              <option value="retail">Perakende</option>
-              <option value="dealer_a">Bayi A</option>
-              <option value="dealer_b">Bayi B</option>
+              {form.commercialDealerStatus === "active" ? <>
+                <option value="dealer_a">Bayi A</option>
+                <option value="dealer_b">Bayi B</option>
+              </> : <option value="retail">Perakende</option>}
             </select>
           </label>
           <label className="form-field form-field--short">

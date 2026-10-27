@@ -30,6 +30,15 @@ try {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') throw new YaAccountError(405, 'get_required');
         ya_account_response(200, ['ok' => true, 'account' => ya_account_profile(ya_account_require_session())]);
     }
+    if (YA_ACCOUNT_ACTION === 'receipt') {
+        // Read-only recovery, scoped to the authenticated account. No retry mutation.
+        ya_account_require_post();
+        $account = ya_account_require_session(); $input = ya_account_input();
+        $key = $input['idempotencyKey'] ?? null;
+        if (!is_string($key) || preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $key) !== 1) throw new YaAccountError(422, 'invalid_idempotency_key');
+        require_once __DIR__ . '/dealer-order.php';
+        ya_account_response(200, ['ok' => true, 'receipt' => ya_customer_order_receipt($account['id'], $key)]);
+    }
     ya_account_require_post();
     // Local/global logout remains possible after the capability is withdrawn.
     if (YA_ACCOUNT_ACTION === 'logout-all') { ya_account_logout(true); ya_account_response(200, ['ok' => true]); }

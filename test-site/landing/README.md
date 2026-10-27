@@ -1,189 +1,111 @@
-# Yardımcı Asistan tanıtım ve test merkezi
+# Yardımcı Asistan tanıtım ve işletme demosu
 
-`https://yardimciasistan.alwaysdata.net/` tanıtım, kurulum ve kullanıcı yayını test merkezidir; reklam veya satış sitesi değildir.
-Tek aktif site kaynağı bu dizindir; Sayfa yapısı PHP'dir; asistan TypeScript kaynaklarından bu site için derlenir.
+Bu dizin iki ayrı sunum katmanıdır. Kök, uygulamanın tanıtımını, kılavuzunu ve
+indirmelerini sunar. `/deneme/`, Desktop yayınıyla çalışan ortak işletme şablonudur.
+Backend, `/yardimci-asistan/` altında ayrıca kurulan API-only web modülüdür.
 
-## Kaynak ve route sahipliği
+## Kaynak sahipliği
 
-- `index.php`: altı bölümlü sabit tanıtım; açılış, dört gerçek işletme profili, görsel özellikler, örnek web kataloğu/test sayfaları, servisler ve kurulum.
-- `inc/showcase-content.php`: profil, özellik, servis, test sayfası açıklamaları ve ana sayfaya özel örnek ürünlerin merkezi kaynağı. Yeni özellik mevcut kart/galeri düzenine eklenir; CMS veya ikinci bir capability sistemi değildir.
-- `inc/header.php`, `inc/footer.php`, `inc/site.php`: ortak PHP shell ve publication okunması.
-- `assets/css`, `assets/js`: responsive site, oda/masa/QR menü ve normalize Google yorumları.
-- `assets/showcase/*.webp`: gerçek uygulama bileşenlerinden alınan, örnek verili optimize ekranlar. `sources.json` kaynak, boyut ve kırpım bilgisini korur. Companion görseli Desktop cihaz eşleştirme ekranıdır; Bayi Android pilot olarak etiketlenir.
-- `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/magaza/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
-- `/duyurular/`: D4 marketing yayınının tümünü siteye ait renderer ile gösterir; ana sayfaya yayın içeriği taşınmaz.
-- `/#kurulum`: Windows x64/x86, Android Companion, Bayi Android pilot APK, demo bağlantısı ve üç kısa adım. `release.json` sürümü belirler; yalnız bu hostta `downloads/` altında mevcut, okunabilir ve dolu dosya indirilebilir. Linux yayın mekanizması/paketi bulunmadığından bağlantı üretilmez.
-- `/kurulum/`: dil tercihini koruyan 301 yönlendirmesi → `/?lang=tr|en#kurulum`.
-- `/kullanim-kilavuzu/`: başlangıç, rezervasyon, stok, Android eşleştirme ve müşteri adımları; eski route korunur. Ana menüde değil footer ve ilgili özelliklerde bulunur.
-- `/bayi/`: siteye ait bayi portalı; işlemler `/yardimci-asistan/api/dealer/` üzerinden yürür.
+- `index.php`, `inc/upper-shell.php`, `inc/discovery.php`: tanıtım, gezinme ve
+  canonical capability registry'sinden üretilen açıklama projection'ı.
+- `kurulum/`, `inc/demo-installation.php`, `release.json`: mevcut demo bağlantısı,
+  güncel kurulum dosyaları ve yalnız demo için izinli kurulum anahtarı sunumu.
+- `kullanim-kilavuzu/`, `assets/guide/`: gerçek uygulama görüntülerini kullanan
+  kılavuz. `sources.json` kaynak ve sentetik test kapsamı bilgisini korur.
+- `assistant/`: gerçek widget ile ayrı tanıtım avatarının TypeScript kaynakları.
+  Tanıtım avatarı AI çağrısı veya işletme işlemi yapmaz.
+- `deneme/core/`, `deneme/assets/core/`: `web-site-template/` canonical ortak
+  kaynağının kontrollü kopyası. Widget, hesap, sepet ve işletme sayfaları buradadır.
+- `deneme/site/`, `deneme/assets/site/`: demo kurulumuna ait ayar/tema sınırı.
+- `locales/tr.json`: iki katmanın tek Türkçe UI kaynağı;
+  `deneme/locales/tr.json` aynı kaynağın eşitliği doğrulanan kurulum kopyasıdır.
 
-## Sabit tanıtım ve gerçek yayın sınırı
+Eski `inc/site.php` shell'i, sabit TR/EN motoru ve hedef İngilizce sözlüğü emekliye
+ayrılmıştır. Yeni sayfa bu sahipleri include etmez. Eski tanıtım çizimlerinin
+fiziksel görselleri değiştirilmez; güncel kılavuz bunları çalışan mağaza gibi sunmaz.
+Mevcut `scripts/test-helpers/showcase-store-images.mjs` bakım girişi yalnız güncel
+kılavuz görüntülerinin provenance, boyut ve okunabilir metadata'sını denetler;
+eski TR/EN çizim renderer'ını yeniden üretmez.
 
-Ana sayfanın tanıtım bölümleri Desktop publication verisinden oluşturulmaz. Oda,
-duyuru ve Google yorum renderer'ları ana sayfada çalışmaz. İşletme adı, adresi,
-telefonu ve sosyal hesapları da ana sayfa footer'ına taşınmaz. Profil ve özellik
-metinleri, gerçek uygulamadan alınan örnek verili ekranlar ve temsili ürün çizimleri
-site kaynağına aittir; veriler değişse, yayın kaldırılsa veya API okunamasa da kalır.
+## Yayın ve işlemler
 
-`showcase_sample_products()` içindeki 18 ürün yalnız `index.php` tanıtım kataloğunda
-render edilir. Sepet, fiyat hesaplama, sipariş, API yazma veya otomatik seed/yayın
-akışı yoktur. Canlı mağaza bu dosyayı kullanmaz; yalnız yayınlanmış katalog gelir.
+Gerçek işletme verisi yalnız public HTTP API projection'ından gelir. Profil adı
+sayfa veya işlem açmaz. Oda/masa/katalog/menü yayını kapalı ya da boşsa ilgili
+sayfa gezinmeden kaldırılır ve doğrudan istek 404 olur. Kesinti eski başarılı
+veriyi veya örnek işletme verisini fallback olarak göstermez.
 
-Ana sayfadaki sabit test sayfası kartları mevcut route'ları açıklar; yayının etkin
-olduğunu iddia etmez. Yayın bulunmadığında ilgili sayfa kendi boş durumunu gösterir;
-bayi portalı kendi davet/oturum/yetki kontrolünü korur. Header/footer'daki koşullu
-Canlı Sayfalar navigasyonu, gerçek sohbet ve kurulumun release/dosya/anahtar
-mekanizması mevcut dinamik sahiplerinde kalır. Yeni availability registry yoktur.
+Kök tanıtım, canlı işletmenin oda/fiyat/iletişim/yayın verisini taklit etmez.
+`/deneme/?page=rooms`, `restaurant`, `menu`, `catalog`, `about`, `gallery`,
+`announcements`, `reviews`, `contact` ve `account` gerçek kullanılabilirlik
+kapılarını kullanır. Eski `/odalar/`, `/restoran/`, `/qr-menu/`, `/magaza/`,
+`/hakkimizda/`, `/galeri/` ve diğer işletme rotaları `/deneme/` girişine yönlenir.
+Oda detayı `?page=rooms&id=…` biçimindedir; hesap alias'ı
+`/deneme/hesabim/` doğrulama/OAuth bağlantılarının action ve token fragment'ini korur.
 
-Kullanıcı önce tanıtımı inceler, uygulamayı indirip demo adresi/anahtarını bağlar;
-Desktop'tan içerik yayınlar, ardından test sayfalarında düzenleme, kaldırma ve gerçek
-işlemlerin sonucunu kontrol eder. Publication/outbox/API/sipariş sözleşmeleri değişmez.
+AI, Talepler, WhatsApp ve yol tarifi birbirinden bağımsız kullanılabilirliklere
+sahiptir. Request türleri backend'in persisted capability kararından gelir;
+formlar kesin rezervasyon veya fiyat onayı vermez. Hesabım erişimi mevcut hesap
+API'sinin Online Satış kararını izler; yeni sipariş kabulü ve teslimat ayrı kalır.
+Sepet/hesap/mutation authority'si mevcut backend'dir. İstek hatasında taslak ve
+aynı işlem niyeti için idempotency anahtarı korunur.
 
-Mağaza tanıtım resmi `showcase_store_illustration()` ile aynı 18 ürün kaynağından
-seçilen ürün, çizim ve örnek fiyatları kullanır. Sepeti salt görseldir. `web-store*.webp`
-TR/EN ve dar/geniş yerleşimleridir; `<picture>` uygun dosyayı seçer ve galeri aynı
-varyantı büyütür. Kaynak `inc/showcase-content.php`, çizim CSS'i
-`assets/showcase/store-illustration.css` dosyasındadır. Üretim yalnız çevrimdışı PHP
-render + tarayıcı raster export kullanır; HTTP, API, veri tabanı ve yayın işlemi yoktur.
+## Dinamik dil
 
-```bash
-# Bilinçli görsel güncellemesi; build/smoke bu dosyaları yeniden yazmaz.
-node scripts/test-helpers/showcase-store-images.mjs --write
-# Salt okunur kaynak parmak izi, dosya özeti/boyutu ve metin sığma kontrolü.
-node scripts/test-helpers/showcase-store-images.mjs
-```
+Sabit hedef dil dosyası veya zorunlu İngilizce yoktur. Desktop Çoklu Dil servisinde
+seçilen hedefler, merkezi dil adı/locale/RTL bilgisi ve hazır çeviriler normal
+publication akışıyla gelir. PHP `YaSite\language_context`, etkileşim adaptörü ve
+widget aynı kaynak hash'i doğrulanmış kataloğu kullanır. `?resource=translation-source`
+hem kökte hem `/deneme/` altında aynı katalog kimliği/revision'ı döndürür.
 
-`sources.json` her varyantın kaynağını, render parmak izini, WebP SHA-256'sını,
-piksel boyutunu ve dosya boyutunu tutar. Showcase smoke bu kontrolü de çalıştırır;
-`artifacts/showcase/web-story-375.png` ve diğer genişlik/dil görüntüleri bütün
-Desktop → Web bölümünün son halini gösterir.
+Her anahtar için katalog kimliği, güncel kaynak hash'i ve placeholder eşitliği
+aranır. Eksik/eski çeviri yalnız ilgili alanda Türkçeye döner. Hedef dil çekilince
+veya servis kapatılınca sonraki kabul edilmiş yayında seçenekler kaldırılır.
+Public kayıtlar kendi localization metadata'sını kullanır; müşteri mesajları ve
+AI cevapları UI kataloğuna sokulmaz. Canlı AI sağlayıcısı test için gerekli değildir;
+sentetik çeviri fixture'ları kullanılabilir. Sohbet backend'inin desteklediği yanıt
+dilleri ayrı HTTP sözleşmesidir.
 
-## Navigasyon sahipliği
+## Derleme, kopya eşitliği ve doğrulama
 
-Bu showcase kendi route listesini ve sırasını `inc/site.php` içinde sahiplenir. Opsiyonel sayfalar yalnız ilgili
-capability/publication gerçekten kullanılabilir olduğunda header/footer'da görünür. Desktop müşteri sitelerinin
-sayfa listesini, sırasını veya görünürlüğünü yayınlamaz; her müşteri sitesi kendi bilgi mimarisini korur.
-
-Header yalnız Ana Sayfa, koşullu Canlı Sayfalar açılır menüsü, İletişim ve İndir ve Kur
-bağlantısını gösterir. Native `details` menü Enter/Space/Tab ile kullanılabilir; Escape kapatır.
-Özellik ve kılavuz görselleri native `dialog` ile büyür; sağ/sol oklar ve Escape desteklenir,
-kapanış odağı açan bağlantıya döndürür. Profil kartları açılan alanı `aria-expanded` ile bildirir.
-
-Tek kolonlu mobil görünüm (≤540 px) beş öne çıkan özellikle açılır; seçim günlük iş,
-konaklama/servis, satış ve Android kategorilerini kapsar. Tümü ve kategori düğmeleri
-tüm özelliklere erişir; açık kullanıcı seçimi pencere genişliği değişince korunur.
-Masaüstü ve tablet başlangıçta tüm özellikleri gösterir. Öne çıkan kartlar merkezi
-içerikteki `featured` alanıyla belirlenir.
-
-
-## Demo anahtarı sınırı
-
-**Yalnız bu site için** `inc/demo-installation.php`, `/yardimci-asistan/config/business.json` dosyasından
-anahtarı okur. Yalnız `/` bu helper'ı çağırır; eski kurulum URL'si buraya yönlenir. Değer HTML-escaped readonly input'ta gösterilir;
-konfigürasyon yoksa temiz fallback kullanılır. Secret kaynakta, release metadata'da, JS bundle'da veya loglarda saklanmaz.
-Bu helper firm-template, generic müşteri paketi veya BlackSea'ye taşınmaz. Secret rendering için ortak modül yoktur.
-
-## Paketler ve deploy
-
-`release.json` download adlarını belirleyen Desktop/Android Companion/Bayi Android sürümleridir.
-`scripts/product-version.mjs` canonical ürün sürümü değiştiğinde bu metadata'yı günceller.
+`npm run build:demo`, yalnız ignored `assets/assistant/` çıktılarını üretir.
+Canonical widget bundle'ının güncellenmesi bilinçli bakım adımıdır. Ortak kaynak
+bakımından sonra manifest ve demo kopyası kontrollü güncellenir; build bunları
+sessizce yeniden yazmaz. Kaynak kopyası eşitliği:
 
 ```bash
-npm run build:demo
-npm run deploy:landing -- --dry-run
-npm run deploy:landing -- --yes
-npm run deploy:landing -- --yes --with-downloads
+node scripts/sync-demo-template.mjs --check
 ```
 
-Normal landing deploy yalnız root site kodu, sahip olunan route'lar, site asset'leri ve `release.json` yayınlar.
-Önce timestamped yedek alınır; helper/asset/route upload'larından sonra root index atomik değiştirilir.
-Bilinen eski bundle'lar, product-guide ve eski demo ağacı yedek sonrası temizlenir.
-`/yardimci-asistan` modül kodu, business config, sync secret, data/SQLite, media ve publication state korunur.
-Backend değişiklikleri ayrıca normal `npm run deploy:web -- --yes` ile yayınlanır.
-Web deploy'un `--fresh` semantiği ayrı kalır; normal yayın runtime/config'i taşır.
-
-`--with-downloads` güncel Windows x64/x86, Companion release APK ve debug imzalı Bayi pilot APK artefaktlarını SHA-256 doğrulayarak yayınlar;
-normal site deploy download dosyalarını değiştirmez. Download sürümleri yayınlanmış paketlerle eşleşmelidir.
-
-## Doğrulama
+Dar sözleşme kontrolleri:
 
 ```bash
-npm run verify:check -- showcase-website
-npm run verify:check -- marketing-website
-npm run verify:check -- package-web-module
+node scripts/smoke-public-translations-web.mjs --language-contract-only
+node scripts/smoke-settings-correctness.mjs --map-contract-only
+node scripts/smoke-business-site-pages.mjs
 ```
 
-Showcase smoke gerçek PHP/SQLite ve Desktop publication servisleriyle menü, availability, demo-only secret,
-çoklu görsel, edit/reorder/remove/add/unpublish, route'lar, mobil menü ve reduced-motion davranışını doğrular.
-Sabit tanıtımın publication açma/kapatma/düzenleme ve API kesintisinden bağımsızlığını;
-18 örnek ürünün canlı mağazaya sızmadığını da kontrol eder.
+Tam browser/translation kontrolleri registry'deki `demo-two-layer`,
+`web-site-template`, `web-widget-module`, `public-translations-web` ve
+`showcase-website` sahiplerindedir. Bu komutlar build prerequisite'leri başlatabilir;
+uzun doğrulamalar kullanıcı tarafından uygun entegrasyon aşamasında çalıştırılır.
+Kılavuz resimleri yeni sürüm, fiziksel cihaz veya canlı sağlayıcı kanıtı değildir.
 
-Önizlemeler `artifacts/showcase/desktop.png` ve `mobile.png` yanında 320/768 px,
-TR/EN ve tüm kartları açık mobil görüntüleri içerir. Smoke sayfayı kontrollü
-kaydırır, görünür her görselde `complete`, `naturalWidth > 0` ve `decode()`
-sonucunu doğrular; sabit yükleme beklemesi kullanmaz. `image-checks.json`
-doğrulanan görselleri listeler. Önizleme DOM'una eklenen DEMO etiketleri indirme fixture'larını belirtir; üretim sayfasına veya API'ye eklenmez.
-Tanıtım kataloğunun örnek/temsili etiketi ise sitenin sabit içeriğinde her zaman bulunur.
+## Kurulum anahtarı ve dağıtım sınırı
 
-Mağaza `/magaza/` sayfası `inc/storefront.php` ve `assets/css/storefront.css`,
-`assets/js/storefront.js` dosyalarını kullanır. `data-api-base="/yardimci-asistan/api/"`
-API sahibini belirtir. Duyuru, bayi ve harita renderer'ları da site asset'leridir.
-`assistant/` TypeScript kaynakları `npm run build:demo` ile ignored
-`assets/assistant/` altına derlenir. Footer yalnız bu site asset'ini yükler.
-Ortak modülde mağaza/duyuru/bayi/widget rotası bulunmaz. Landing deploy asistanı
-önce derler; API-only web deploy'dan bağımsızdır.
+Demo kurulum sayfası yalnız demo modülünün kurulu config'indeki anahtarı sunar.
+Bu istisna müşterinin ortak şablonuna veya BlackSea'ye taşınmaz. Kaynak kod,
+release metadata, JS bundle ve loglar secret taşımaz.
 
-## Canlı demo doğrulaması
+Hazırlanmış web modülü manifesti hedef installation/module URL/origin metadata'sını
+korur. Demo fresh planı bu hedefi beklenen kurulumla karşılaştırır; BlackSea için
+hazırlanmış paket demo hedefine kabul edilmez. Paket hedef metadata'sı ve
+install-info, public paket kökünün dışında kalır.
 
-Yetkili yayın aşamasında önce `npm run deploy:web -- --dry-run` ve
-`npm run deploy:landing -- --dry-run` farkları incelenir; API ve site ayrı
-komutlarıyla yayınlanır. Normal güncellemede `--fresh` kullanılmaz.
+Landing deploy, siteyi kendi allowlist'iyle hazırlar; backend runtime, downloads
+ve update feed'leri varsayılan kapsamın dışındadır. İndirmeler yalnız açık release
+akışıyla eklenir; Bayi Android kalıcı release imzasıyla dağıtılır. Gerçek upload,
+fresh cleanup, installer/APK paketleme ve canlı doğrulama ayrı kullanıcı kararıdır.
+Yerel çalışmada gerçek veriye yazmak yerine izole test işletmesi kullanılmalıdır.
 
-1. Desktop'tan menü, oda/masa, galeri, online katalog ve Website kampanyası yayınlayın;
-   publication işlerinin exact acknowledgement ile tamamlandığını kontrol edin.
-2. `/yardimci-asistan/api/` uçları ile `/qr-menu/`, `/odalar/`, `/restoran/`,
-   `/galeri/`, `/magaza/` ve `/duyurular/` sayfalarını karşılaştırın.
-3. Talep, AI ve isteğe bağlı WhatsApp akışını; guest sipariş ve bayi davet/oturum/sipariş
-   akışını test edin. Talep ve siparişin Desktop'a bir kez ulaştığını doğrulayın.
-4. Yayını kapatma, kampanyayı kaldırma, teslimatı kapatma ve bayi erişimini iptal
-   etme sonrası görünürlük/işlem reddini kontrol edin; mobil görünümü de inceleyin.
-5. Modül altındaki eski `/magaza/`, `/duyurular/`, `/bayi/` ve `/widget.js` yolları
-   404 dönmelidir. Site kendi asset'lerini yüklemeli; runtime veri ve medya korunmalıdır.
-
-Çoklu Dil denemesinde Desktop'ta hedef `en` ekleyip public kayıtların çevirilerini
-kaydedin ve normal eşitlemeyi çalıştırın. Üstteki site dili alanından English seçip
-Uygula'ya basın; seçim sayfalar arasında korunur. Ürün, menü, oda/masa, galeri ve
-kampanya metinleri `localization` verisinden seçilir; eksik/stale alanlar Türkçe kalır.
-Site UI sözlüğü `assets/i18n/en.json` içindedir; PHP, JS ve demo asistanı aynı sözlüğü
-kullanır. Kullanıcı notları ve AI yanıtları çevrilmez. Tarih ve sayı gösterimi
-seçilen site dilini izler; ISO tarihler ve işlem değerleri değişmez. API metinleri
-Türkçe kaynaklarını korur; servis OFF iken İngilizce seçili olsa da public içerik
-Türkçe gösterilir. `npm run verify:domain -- translations` bu zinciri gerçek PHP ve
-tarayıcıyla sınar.
-
-Yerel manuel test için `npm run build:demo` ardından
-`php -S 127.0.0.1:8080 -t test-site/landing` çalıştırın. Bu dizindeki
-`yardimci-asistan/` yerel demo API kurulumunun mevcut olması gerekir; smoke testleri
-kendi geçici API/SQLite kurulumlarını oluşturur ve çalışan işletme verisine dokunmaz.
-
-1. `http://127.0.0.1:8080/?lang=en` açın. Yukarıdaki tüm public sayfalara menüden
-   geçin; mobilde menü ve dil seçicisini, oda/masa detayında ID'nin korunmasını deneyin.
-2. Asistanda tarih, kişi ve saat seçin; geçersiz telefon, gönderim hatası/yeniden
-   deneme, başarılı talep ve bilgi sorusunu deneyin. Gerçek talep/sipariş oluşturmak
-   için test işletmesini kullanın. AI testi mevcut sağlayıcının kullanılabilirliğine bağlıdır.
-3. Bir alanı çevirisiz bırakın, başka bir alanın Türkçe kaynağını değiştirip eşitleyin.
-   Yalnız bu alanların Türkçeye dönmesini kontrol edin. Servisi kapatıp eşitleyin;
-   public içerik Türkçe, site düğmeleri seçilen dilde kalmalıdır.
-4. Yayından kaldırdığınız içerikleri ve boş yüzeyleri kontrol edin. Dil Yönetimi'nde
-   gerçek boş kaynak açıklaması ile okuma hatası/yenileme mesajı farklıdır.
-
-`public-translations-web` gerçek PHP/TR-EN gezinme, mobil, asistan işlemleri ve
-fallback testlerini; `public-translations-ui` 10.000 kayıt, boş/dolu SQLite fixture
-ve ilk yükleme/yenileme hatalarını içerir. Her biri `npm run verify:check -- <id>`
-ile çalıştırılır.
-
-Avatar V2 hero ve mevcut sohbet içinde paylaşılan `mountNexaRig({ natural: true })`
-denetleyicisini kullanır. Hero yalnız kısa bir karşılama gösterir; düşünme/sonuç
-balonu yalnız mevcut gerçek AI isteği durumundan gelir. Gölge avatarın altında
-ayrılmış zeminde kalır. Reduced motion, görünmezlik/odak ve pagehide temizliği
-korunur; Electron veya Desktop bileşeni web bundle'ına taşınmaz.
+Canonical ayrıntılar: `docs/architecture/WEB_SITE_TEMPLATE_V1.md`,
+`docs/architecture/WEB_DATA_SERVICE_CONTRACT_V1.md` ve `docs/dev/RELEASE_WORKFLOW.md`.

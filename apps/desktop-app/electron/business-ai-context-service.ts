@@ -72,7 +72,7 @@ export function createCurrentBusinessWebContext(database: DesktopDatabase): Busi
     localization: database.translations().localization([
       {kind: "business", id: businessId, fields: {description: profile.description, about_text: profile.aboutText ?? "", directions_note: profile.directionsNote, policy_note: profile.policyNote, payment_note: profile.paymentNote}},
       ...gallery.map(g => ({kind: "gallery" as const, id: g.id, fields: {title: g.title}}))
-    ]),
+    ], true),
     latitude: profile.mapDisplayMode === "manual" ? context.latitude : null,
     longitude: profile.mapDisplayMode === "manual" ? context.longitude : null,
     mapDisplayMode: profile.mapDisplayMode,

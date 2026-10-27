@@ -4,7 +4,11 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import process from "node:process";
 
+import { getInstallation, readInstallationRegistry } from "./lib/installation-registry.mjs";
+import { createWebModuleTarget } from "./lib/release-artifacts.mjs";
+
 const args = process.argv.slice(2);
+let installationId = "";
 let publicUrl = "";
 let displayName = "";
 let printSecret = true;
@@ -12,7 +16,9 @@ const explicitOrigins = [];
 
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
-  if (arg === "--url") {
+  if (arg === "--installation") {
+    installationId = String(args[++index] ?? "").trim();
+  } else if (arg === "--url") {
     publicUrl = String(args[++index] ?? "").trim();
   } else if (arg === "--name") {
     displayName = String(args[++index] ?? "").trim();
@@ -27,6 +33,11 @@ for (let index = 0; index < args.length; index += 1) {
   } else {
     throw new Error(`Bilinmeyen seçenek: ${arg}`);
   }
+}
+
+if (installationId) {
+  if (publicUrl) throw new Error("--installation ve --url birlikte kullanılamaz.");
+  publicUrl = getInstallation(installationId).webModuleUrl;
 }
 
 if (!publicUrl) {
@@ -47,13 +58,18 @@ publicUrl = publicUrl.replace(/\/+$/, "");
 const origins = explicitOrigins.length > 0
   ? [...new Set(explicitOrigins.map(normalizeOrigin))]
   : [parsedUrl.origin];
+if (!installationId) installationId = Object.values(readInstallationRegistry().installations)
+  .find(value => value.webModuleUrl?.replace(/\/+$/, '') === publicUrl)?.id ?? '';
+const target = createWebModuleTarget({installationId, moduleUrl:publicUrl, siteOrigin:origins[0], allowedOrigins:origins});
 const syncSecret = randomBytes(32).toString("base64url");
 
 const env = {
   ...process.env,
   YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET: syncSecret,
   YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS: origins.join(","),
-  YARDIMCI_ASISTAN_DEPLOY_WEBSITE: parsedUrl.origin
+  YARDIMCI_ASISTAN_DEPLOY_WEBSITE: target.site_origin,
+  YARDIMCI_ASISTAN_DEPLOY_MODULE_URL: target.module_url,
+  YARDIMCI_ASISTAN_DEPLOY_INSTALLATION_ID: target.installation_id
 };
 if (displayName) {
   env.YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME = displayName;
@@ -115,6 +131,7 @@ function normalizeOrigin(value) {
 function printHelp() {
   console.log(`Kullanım:
   npm run prepare:web-install -- --url <web-modül-adresi> [--name <işletme-adı>] [--origin <site-origin>] [--no-print-secret]
+  npm run prepare:web-install -- --installation ya --no-print-secret
 
 Örnek:
   npm run prepare:web-install -- --url https://firma.com/yardimci-asistan --name "Firma Adı"

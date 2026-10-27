@@ -844,6 +844,8 @@ try {
   await expect(menuItemWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true })).toBeDisabled();
   await expect(menuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
   await page.evaluate(() => window.__releaseProductSave());
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Canlı Serpme Kahvaltı" }).first().click();
   const savedMenuItemWorkspace = page.getByRole("dialog", { name: "Canlı Serpme Kahvaltı" });
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
   await expect(savedMenuItemWorkspace.getByRole("heading", { name: "Canlı Serpme Kahvaltı", exact: true })).toBeVisible();
@@ -1699,9 +1701,6 @@ try {
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
   await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(customerEditor).toHaveCount(0);
-  const savedCustomerWorkspace = conversionPage.getByRole("dialog", { name: "Kimlik Smoke", exact: true });
-  await expect(savedCustomerWorkspace).toBeVisible();
-  await savedCustomerWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(conversionPage.getByRole("dialog")).toHaveCount(0);
   const createdCustomerRow = conversionPage.locator(".customer-record-row").filter({ hasText: "Kimlik Smoke" });
   await expect(createdCustomerRow).toBeVisible();

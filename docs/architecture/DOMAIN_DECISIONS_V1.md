@@ -1671,8 +1671,11 @@ Catalog visibility and order acceptance remain independent under D-047.
 availability forms, shop, announcements, dealer portal and map renderer belong to
 that site. QR menu, room and table designs remain site-owned. Demo builds produce
 ignored site assets separately from the PHP API package; no shared widget workspace
-or tracked widget snapshot exists. No theme/editor/framework or compatibility route
-is introduced. Dealer invitations resolve to the site-owned sibling `bayi/` route,
+or tracked widget snapshot exists. The backend introduces no theme/editor/framework or compatibility route.
+An independent `web-site-template/` presentation distribution may be copied into a new site;
+its common PHP/navigation/language/integration files and site-owned themes have explicit
+ownership and reviewed update boundaries in [the template contract](WEB_SITE_TEMPLATE_V1.md).
+It is never injected or packaged by the API service. Dealer invitations resolve to the site-owned sibling `bayi/` route,
 with the token still confined to the fragment; dealer API cookie scope is unchanged.
 
 See [Web data service contract v1](WEB_DATA_SERVICE_CONTRACT_V1.md).
@@ -1689,7 +1692,9 @@ status is derived against the current allowlisted public source; retained manual
 translations always require user review rather than automatic AI replacement.
 
 Only public business descriptions, room/table copy, menu/catalog products/categories,
-gallery captions and Website marketing publications are eligible. Internal business
+gallery captions, Website marketing publications and source-only Turkish site catalog
+entries are eligible. The site owns `locales/tr.json`, including theme keys. Desktop
+validates its v1 source manifest and stores `site_text` in the same translation system. Internal business
 data, identifiers, amounts, stock, dates, media paths and feature IDs are excluded.
 Existing ai-core and the selected configured text model prepare bounded background
 work without delaying normal publication or requiring new credentials. Session,
@@ -1701,6 +1706,12 @@ Current translations are additive `localization` data; missing/stale/unavailable
 translations use the original Turkish fields. Sites own language choice and all
 presentation. OFF retains translations and withdraws language metadata through the
 same ordered publication lifecycle. Current schema only; no historical upgrade path.
+
+Normal Settings saves opt into automatic preparation with language selection only.
+The shared language registry owns names, locale and writing direction; sites consume
+its published projection. The source manifest is scoped to business/publication target;
+per-key hash agreement is required before a site applies a translated catalog entry.
+No visitor AI calls or second site translation authority exists.
 
 See [Web data service contract v1](WEB_DATA_SERVICE_CONTRACT_V1.md#çok-dilli-public-veri).
 

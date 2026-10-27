@@ -159,6 +159,12 @@ Empty disables transcription. STT-only edits invalidate its durable revision and
 join exact acknowledgements, including in-flight mutation checks; no second
 publisher exists. See [voice input](voice-input.md).
 
+Explicit language settings and translation writes request the same coordinator cycle
+with publication intent. That coalesced cycle also runs when passive automatic sync is
+OFF, without changing the preference. Intent arriving during a cycle is drained after
+it completes; maintenance clears the scheduling flag while retaining durable jobs.
+No direct translation publisher or second retry/outbox lifecycle exists.
+
 An installed AI capability with missing provider configuration is unconfigured,
 not a failure of unrelated automatic sync; its durable intent waits for configuration.
 Explicit publication still reports invalid configuration. Metadata acknowledgement

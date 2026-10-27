@@ -113,8 +113,7 @@ try {
     const saved = createdProducts.at(-1);
     assert.equal(database.getCommerceProductPublication(saved.id).isPublished, !optOut);
     const detail = page.getByRole("dialog", { name: saved.name, exact: true });
-    await expect(detail).toBeVisible();
-    await detail.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+    await expect(detail).toHaveCount(0);
     await page.locator('.market-catalog-record[data-sort-kind="products"]').filter({hasText: saved.name}).getByRole("button").filter({hasText:saved.name}).click();
     if (optOut) await expect(checkbox).not.toBeChecked();
     else await expect(checkbox).toBeChecked();
@@ -133,7 +132,6 @@ try {
   await expect(offlineCreate).toHaveCount(0);
   selectOnlineSales(true);
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
-  await page.getByRole("dialog", { name: "Created offline", exact: true }).getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Exercise the real detail editor against the same temporary database. Counting
@@ -223,6 +221,8 @@ try {
   await expect(rail.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
   await expect(detail.getByRole("button", { name: "Stok Hareketleri", exact: true })).toBeDisabled();
   await detail.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(detail).toHaveCount(0);
+  await detailPage.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   await expect(detail.getByRole("heading", { name: "Hybrid saved product", exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
   assert.equal(listRuntimeCatalogProducts(database.databasePath).items.find(product => product.id === stockProduct.id).name, "Hybrid saved product");

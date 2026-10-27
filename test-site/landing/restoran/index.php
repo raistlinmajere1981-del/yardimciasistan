@@ -1,1 +1,4 @@
-<?php require_once dirname(__DIR__) . '/inc/site.php'; $pageTitle=site_text('Restoran | Yardımcı Asistan');$pageDescription=site_text('Masaları ve oturma alanlarını keşfedin.');$pageScript='tables.js';require dirname(__DIR__).'/inc/header.php';render_site_hero(site_text('Restoran'),site_text('Restoran ve masalar'),site_text('Masaları inceleyin, size uygun alanı seçin.')); ?><section class="section"><div class="shell"><div class="section-heading"><span class="demo-status-chip" data-table-count><?= site_e(site_text('Hazırlanıyor')) ?></span></div><div class="room-grid room-grid-all" data-table-list><div class="room-catalog-loading"><?= site_e(site_text('Masalar hazırlanıyor…')) ?></div></div></div></section><?php require dirname(__DIR__).'/inc/footer.php'; ?>
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__, 1) . '/inc/retired-route.php';
+redirect_demo_route('restaurant');

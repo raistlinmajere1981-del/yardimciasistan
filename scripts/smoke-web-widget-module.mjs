@@ -9,6 +9,11 @@ import { join } from "node:path";
 import process from "node:process";
 import { installDemoSite } from "./test-helpers/demo-site.mjs";
 
+if (process.argv.includes("--capabilities-only")) {
+  await runCapabilityContracts();
+} else if (process.argv.includes("--language-only")) {
+  await runInteractionLanguageContracts();
+} else {
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
 const webModuleRoot = installDemoSite(tempRoot);
 writeFileSync(join(tempRoot, "assistant-test.php"), "<!doctype html><html lang=\"tr\"><body><main>Firma sitesi</main></body></html>");
@@ -51,7 +56,10 @@ try {
   expect(publicBusinessBeforeSyncResponse.status).toBe(200);
   const publicBusinessBeforeSync = await publicBusinessBeforeSyncResponse.json();
   expect(publicBusinessBeforeSync.business.profile_id).toBe("pension_restaurant");
-  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+  expect(publicBusinessBeforeSync.business.ai_enabled).toBe(false);
+  expect(publicBusinessBeforeSync.business.requests_enabled).toBe(false);
+  expect(publicBusinessBeforeSync.business.whatsapp_enabled).toBe(false);
+  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual([]);
 
   const capabilityPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -80,10 +88,30 @@ try {
   expect(capabilityPublication.status).toBe(200);
   expect((await capabilityPublication.json()).ok).toBe(true);
 
+  const contactPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
+    method: "POST", headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
+    body: JSON.stringify({ action: "publish_business_context", client_id: "desktop-widget-module-smoke", business_context: {
+      business_name: businessConfig.display_name, profile_id: "pension_restaurant",
+      whatsapp: businessConfig.whatsapp, whatsapp_enabled: true
+    } })
+  });
+  expect(contactPublication.status).toBe(200);
+
+  for (const publication of [
+    {action: "publish_room_catalog", room_catalog: {enabled: true, rooms: [{id: "room-fixture", name: "Synthetic room", capacity: 2, media: []}]}},
+    {action: "publish_table_catalog", table_catalog: {enabled: true, tables: [{id: "table-fixture", name: "Synthetic table", capacity: 2, media: []}]}},
+    {action: "publish_menu", menu: {enabled: true, categories: [{id: "category-fixture", name: "Synthetic category", is_active: true}],
+      items: [{id: "menu-fixture", category_id: "category-fixture", name: "Synthetic item", price: 1, is_available: true}]}}
+  ]) {
+    const response = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {method: "POST",
+      headers: {"Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret}, body: JSON.stringify({...publication, client_id: "desktop-widget-module-smoke"})});
+    expect(response.status).toBe(200);
+  }
+
   const publicBusinessAfterSyncResponse = await fetch(`${baseUrl}/api/business.php`);
   expect(publicBusinessAfterSyncResponse.status).toBe(200);
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
-  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["rooms", "restaurant", "qr_menu"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.whatsapp_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.requests_enabled).toBe(true);
@@ -147,7 +175,7 @@ try {
 
   const contextPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await contextPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
-  await injectWidget(contextPage, baseUrl, { profileId: "pension", connectApi: false });
+  await injectWidget(contextPage, baseUrl, { profileId: "pension", connectApi: false, address: "Cide, Kastamonu" });
   await contextPage.evaluate(() => {
     const reserve = document.createElement("button");
     reserve.textContent = "Balkonlu Odayı Ayır";
@@ -197,6 +225,7 @@ try {
   await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
   await expect(page.locator(".ya-widget-action-card")).toHaveCount(5);
+  await expect(page.locator('[data-ya-view="directions"]')).toHaveCount(0); // No published address/map.
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {
@@ -389,7 +418,7 @@ try {
   expect(requestsDisabledBusiness.business.requests_enabled).toBe(false);
   expect(requestsDisabledBusiness.business.ai_enabled).toBe(true);
   expect(requestsDisabledBusiness.business.whatsapp_enabled).toBe(true);
-  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["rooms", "restaurant", "qr_menu"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await requestsDisabledPage.goto(`${siteUrl}/assistant-test.php`, { waitUntil: "domcontentloaded" });
@@ -450,7 +479,7 @@ async function pullRequests() {
 }
 
 async function injectWidget(page, widgetBaseUrl, options = {}) {
-  await page.evaluate(({ url, profileId, connectApi }) => {
+  await page.evaluate(({ url, profileId, connectApi, publicSurfaces, requestTypes, address }) => {
     document.body.innerHTML = "<main>Firma sitesi</main>";
 
     const script = document.createElement("script");
@@ -459,6 +488,13 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
     script.dataset.whatsappPhone = "+90 531 696 9334";
     if (connectApi) script.dataset.apiBaseUrl = url;
     script.dataset.profileId = profileId;
+    script.dataset.publicSurfaces = JSON.stringify(publicSurfaces);
+    script.dataset.requestTypes = JSON.stringify(requestTypes);
+    if (address) script.dataset.address = address;
+    script.dataset.requestsEnabled = connectApi ? "false" : "true";
+    script.dataset.aiEnabled = connectApi ? "false" : "true";
+    script.dataset.whatsappEnabled = connectApi ? "false" : "true";
+
     script.dataset.logoUrl = new URL("/assets/yardimci-asistan-symbol.png", url).href;
     script.dataset.primaryColor = "#2F6F5E";
     script.dataset.accentColor = "#E47863";
@@ -471,7 +507,10 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
   }, {
     url: widgetBaseUrl,
     profileId: options.profileId ?? "pension_restaurant",
-    connectApi: options.connectApi !== false
+    connectApi: options.connectApi !== false,
+    publicSurfaces: options.publicSurfaces ?? ["rooms", "qr_menu", "directions"],
+    requestTypes: options.requestTypes ?? ["general_info", "pension_reservation"],
+    address: options.address ?? ""
   });
 }
 
@@ -504,4 +543,281 @@ function delay(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+}
+
+// A bounded browser contract for the current bundle; no broad demo/PHP fixture,
+// build, provider call or download. The form API owner tests real PHP ingress.
+async function runCapabilityContracts() {
+  const bundle = readFileSync("test-site/landing/assets/assistant/widget.js", "utf8");
+  const browser = await launchChromiumForSmoke(chromium);
+  let cases = 0;
+  const denied = { profile_id: "pension_restaurant", public_surfaces: [], ai_enabled: false,
+    requests_enabled: false, request_types: [], whatsapp_enabled: false, address: "", whatsapp: "" };
+  async function fixture(business, {forceVisible = false, initial = {}} = {}) {
+    const page = await browser.newPage({viewport: {width: 390, height: 844}, reducedMotion: "reduce"});
+    const errors = [], requests = [];
+    const state = {business: {...denied, ...business}, failOnce: false};
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("http://widget-contract.test/**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/widget.js") return route.fulfill({contentType: "text/javascript", body: bundle});
+      if (path === "/yardimci-asistan/api/business.php") return route.fulfill({json: {ok: true, business: state.business}});
+      if (path === "/yardimci-asistan/api/request.php") {
+        const body = route.request().postDataJSON(); requests.push(body);
+        if (!state.business.requests_enabled || !state.business.request_types.includes(body.request_type)) {
+          return route.fulfill({status: 403, json: {ok: false, code: "request_type_disabled"}});
+        }
+        if (state.failOnce) { state.failOnce = false; return route.fulfill({status: 503, json: {ok: false}}); }
+        return route.fulfill({status: 201, json: {ok: true, request_id: "synthetic-request"}});
+      }
+      if (path !== "/") return route.fulfill({status: 404, body: ""});
+      const attrs = Object.entries(initial).map(([key, value]) => `data-${key}='${JSON.stringify(value)}'`).join(" ");
+      return route.fulfill({contentType: "text/html", body: `<!doctype html><html lang="tr"><head><meta charset="utf-8"></head><body><main>Site</main><script src="/widget.js" data-api-base-url="/yardimci-asistan" data-force-visible="${forceVisible}" ${attrs}></script></body></html>`});
+    });
+    await page.goto("http://widget-contract.test/");
+    await expect.poll(() => page.locator("#yardimci-asistan-widget").count()).toBe(1);
+    await expect.poll(() => page.locator("#yardimci-asistan-widget").getAttribute("data-ya-whatsapp-enabled")).toBe(state.business.whatsapp_enabled ? "1" : "0");
+    return {page, state, requests, async open() { await page.getByRole("button", {name: "Yardımcı Asistan'ı aç"}).click(); },
+      async done() { expect(errors).toEqual([]); await page.close(); cases++; }};
+  }
+  try {
+    const missing = await fixture({email: "contact@example.test"});
+    await expect(missing.page.locator("#yardimci-asistan-widget")).toBeHidden();
+    await missing.done();
+
+    const emptyDemo = await fixture({}, {forceVisible: true});
+    await emptyDemo.open();
+    await expect(emptyDemo.page.getByRole("status")).toContainText("Şu anda kullanılabilir bir asistan işlemi yok.");
+    await expect(emptyDemo.page.locator(".ya-widget-action-card")).toHaveCount(0);
+    await emptyDemo.done();
+
+    for (const profile of ["", "market"]) {
+      const hybrid = await fixture({profile_id: profile, public_surfaces: ["rooms", "restaurant", "store"], requests_enabled: true,
+        request_types: ["general_info", "pension_reservation", "restaurant_reservation"]});
+      await hybrid.open();
+      await expect(hybrid.page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
+      await expect(hybrid.page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
+      await expect(hybrid.page.locator('[data-ya-request-type="general_info"]')).toBeVisible();
+      await hybrid.done();
+    }
+
+    const emptySurfaces = await fixture({public_surfaces: [], requests_enabled: true,
+      request_types: ["general_info", "pension_reservation", "restaurant_reservation"]});
+    await emptySurfaces.open();
+    await expect(emptySurfaces.page.locator('[data-ya-request-type="pension_reservation"]')).toHaveCount(0);
+    await expect(emptySurfaces.page.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
+    await expect(emptySurfaces.page.locator('[data-ya-request-type="general_info"]')).toBeVisible();
+    await emptySurfaces.done();
+
+    const optionalOff = await fixture({public_surfaces: ["rooms", "restaurant"], requests_enabled: true, request_types: ["general_info"]});
+    await optionalOff.open();
+    await expect(optionalOff.page.locator('[data-ya-request-type="pension_reservation"]')).toHaveCount(0);
+    await expect(optionalOff.page.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
+    await optionalOff.page.evaluate(() => window.YardimciAsistanWidget.open({intent: "accommodation.reserve"}));
+    await expect(optionalOff.page.locator("[data-ya-form]")).toHaveCount(0);
+    await optionalOff.done();
+
+    const general = await fixture({profile_id: "market", requests_enabled: true, request_types: ["general_info"]});
+    await general.open();
+    await general.page.locator('[data-ya-request-type="general_info"]').click();
+    await expect(general.page.locator('[data-ya-form]')).toBeVisible();
+    await expect(general.page.locator('[name="start_date"], [name="end_date"], [name="time"]')).toHaveCount(0);
+    await general.page.locator('[name="customer_name"]').fill("Synthetic guest");
+    await general.page.locator('[name="customer_phone"]').fill("+44 7911 123456");
+    await general.page.locator('[name="message"]').fill("Synthetic question");
+    general.state.failOnce = true;
+    await general.page.locator('[data-ya-form] button[type="submit"]').click();
+    await expect(general.page.locator('[data-ya-status]')).toBeVisible();
+    await expect(general.page.locator('[name="message"]')).toHaveValue("Synthetic question");
+    await general.page.locator('[data-ya-form] button[type="submit"]').click();
+    await expect(general.page.locator(".ya-widget-request-success")).toBeVisible();
+    expect(general.requests.length).toBe(2);
+    expect(general.requests[0].idempotency_key).toBe(general.requests[1].idempotency_key);
+    expect(general.requests[1]).toMatchObject({request_type: "general_info", start_date: "", end_date: "", time: "", date_text: "", message: "Synthetic question"});
+    await general.done();
+
+    const embedUrl = "https://www.google.com/maps/embed?pb=synthetic-location";
+    const embedOnly = await fixture({public_surfaces: ["directions"], mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: embedUrl});
+    await embedOnly.open();
+    await embedOnly.page.locator('[data-ya-view="directions"]').click();
+    await expect(embedOnly.page.getByRole("link", {name: "Haritada Aç"})).toHaveAttribute("href", embedUrl);
+    await expect(embedOnly.page.locator('[data-ya-request-type], [data-ya-view="info"]')).toHaveCount(0);
+    await embedOnly.done();
+    for (const invalid of ["https://invalid.example/maps/embed?pb=x", "https://www.google.com/maps/embed"]) {
+      const invalidEmbed = await fixture({public_surfaces: ["directions"], mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: invalid,
+        latitude: 41.1, longitude: 32.2});
+      await expect(invalidEmbed.page.locator("#yardimci-asistan-widget")).toBeHidden();
+      await invalidEmbed.done();
+    }
+    const independent = await fixture({profile_id: "market", public_surfaces: ["directions"], whatsapp_enabled: true,
+      whatsapp: "+44 7911 123456", mapDisplayMode: "manual", latitude: 41.1, longitude: 32.2});
+    await independent.open();
+    await expect(independent.page.locator('[data-ya-view="whatsapp"]')).toBeVisible();
+    await expect(independent.page.locator('[data-ya-view="directions"]')).toBeVisible();
+    await expect(independent.page.locator('[data-ya-view="info"]')).toHaveCount(0);
+    await expect(independent.page.locator('[data-ya-request-type]')).toHaveCount(0);
+    await independent.page.locator('[data-ya-view="directions"]').click();
+    await expect(independent.page.getByRole("link", {name: "Haritada Aç"})).toHaveAttribute("href", /destination=41.1%2C32.2/);
+    await independent.done();
+
+    const aiOnly = await fixture({ai_enabled: true});
+    await aiOnly.open();
+    await expect(aiOnly.page.locator('[data-ya-view="info"]')).toBeVisible();
+    await expect(aiOnly.page.locator('[data-ya-request-type]')).toHaveCount(0);
+    await aiOnly.done();
+
+    const withdrawal = await fixture({requests_enabled: true, request_types: ["general_info"]}, {forceVisible: true});
+    await withdrawal.open();
+    await withdrawal.page.locator('[data-ya-request-type="general_info"]').click();
+    withdrawal.state.business = {...denied};
+    await withdrawal.page.evaluate(() => window.YardimciAsistanWidget.init({apiBaseUrl: "/yardimci-asistan", forceVisible: true}));
+    await expect(withdrawal.page.locator("[data-ya-form]")).toHaveCount(0);
+    await expect(withdrawal.page.getByRole("status")).toContainText("Şu anda kullanılabilir");
+    await withdrawal.done();
+
+    console.log(`widget-capability-contracts-ok: ${cases} bounded browser cases; public payload → widget/form, optional OFF/withdrawal, independent services and idempotent mock-ingress retry`);
+  } finally { await browser.close(); }
+}
+
+// The site's PHP owner validates hashes; these contexts simulate its accepted
+// output with source keys from the real catalog, without a provider call.
+async function runInteractionLanguageContracts() {
+  const catalog = JSON.parse(readFileSync("web-site-template/locales/tr.json", "utf8"));
+  const sourceKeys = Object.fromEntries(Object.entries(catalog).filter(([,value]) => typeof value === "string").map(([key,value]) => [value,key]));
+  // Exact envelopes from request.php, request-documents.php and the submission
+  // owner. No new error codes are required from legacy uncoded 422 responses.
+  const failures = [
+    {status: 503, json: {ok: false}},
+    {status: 422, json: {ok: false, message: "Lütfen bilgileri kontrol edin.", errors: [{field: "email", message: "Geçerli e-posta adresi girin."}]}},
+    ...["En fazla 5 belge ekleyin.", "Belge yüklenemedi. Dosyayı yeniden seçin.", "Her belge en fazla 10 MB olabilir.",
+      "Yalnız PDF, JPG ve PNG belgeleri yüklenebilir.", "PDF belgesi okunamadı.", "Belge türü geçersiz.", "Bu talebe belge eklenemez."]
+      .map(message => ({status: 422, json: {ok: false, message}})),
+    {status: 403, json: {ok: false, code: "requests_disabled", message: "Talep alma özelliği bu işletmede etkin değil."}},
+    {status: 403, json: {ok: false, code: "dealer_application_disabled", message: "Online bayi başvurusu kapalı."}},
+    {status: 403, json: {ok: false, code: "request_type_disabled", message: "Bu talep türü işletmede etkin değil."}},
+    {status: 500, json: {ok: false, message: "Talep kaydedilemedi. Lütfen biraz sonra tekrar deneyin."}},
+    {status: 422, json: {ok: false, code: "invalid_idempotency_key", message: "Tekrar deneme kimliği gerekli veya geçersiz."}},
+    {status: 409, json: {ok: false, code: "idempotency_conflict", message: "Tekrar deneme kimliği farklı bir talep için kullanılmış."}},
+    {status: 503, json: {ok: false, message: "Unknown private server diagnostic <b>must not be displayed</b>"}},
+    {status: 403, json: {ok: false, code: "dealer_application_disabled", message: "Unknown replacement server message"}, expected: "Online bayi başvurusu kapalı."}
+  ];
+  const fallback = "Başvuru sonucu doğrulanamadı. Aynı başvuruyu yeniden deneyin.";
+  for (const failure of failures) {
+    const source = failure.expected || (failure.json.message?.startsWith("Unknown") ? fallback : failure.json.message) || fallback;
+    expect(typeof sourceKeys[source], `Backend result must have a source key: ${source}`).toBe("string");
+    failure.expected = source;
+  }
+  for (const source of ["Bayi Başvurusu", "Firma / unvan", "Belge türü", "{0}: miktar", "Sepet toplamı: {0}"]) {
+    expect(typeof sourceKeys[source], `Source catalog must include ${source}`).toBe("string");
+  }
+  const bundle = readFileSync("test-site/landing/assets/assistant/widget.js", "utf8");
+  expect(bundle).toBe(readFileSync("web-site-template/public/assets/core/widget.js", "utf8"));
+  expect(bundle).toBe(readFileSync("test-site/landing/deneme/assets/core/widget.js", "utf8"));
+  const portal = readFileSync("web-site-template/public/assets/core/portal.js", "utf8");
+  const adapter = readFileSync("web-site-template/public/assets/core/interaction-language.js", "utf8");
+  const browser = await launchChromiumForSmoke(chromium);
+  let cases = 0;
+  try {
+    for (const code of ["de", "ar"]) {
+      const prefix = code === "de" ? "DE " : "AR ";
+      const translated = source => prefix + source;
+      const messages = Object.fromEntries(Object.entries(sourceKeys).map(([source,key]) => [key,translated(source)]));
+      const context = {apiBasePath: "/yardimci-asistan", sourceKeys, language: {code, locale: code === "de" ? "de-DE" : "ar-SA", direction: code === "de" ? "ltr" : "rtl", messages}};
+      const contextHtml = `<script id="site-context" type="application/json">${JSON.stringify(context).replace(/</g, "\\u003c")}</script>`;
+      const page = await browser.newPage({viewport: {width: 390, height: 844}, reducedMotion: "reduce"});
+      const errors = [], submissions = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.route("https://widget-language.test/**", async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === "/widget.js") return route.fulfill({contentType: "text/javascript", body: bundle});
+        if (path === "/yardimci-asistan/api/business.php") return route.fulfill({json: {ok: true, business: {
+          profile_id: "market", public_surfaces: [], ai_enabled: false, whatsapp_enabled: false,
+          requests_enabled: true, request_types: ["general_info", "dealer_application"], dealer_application_enabled: true
+        }}});
+        if (path === "/yardimci-asistan/api/request.php") {
+          submissions.push(route.request().postDataBuffer().toString());
+          const failure = failures[submissions.length - 1];
+          if (failure) return route.fulfill({status: failure.status, json: failure.json});
+          return route.fulfill({status: 201, json: {ok: true, request_id: "synthetic-dealer-request"}});
+        }
+        if (path !== "/") return route.fulfill({status: 404, body: ""});
+        return route.fulfill({contentType: "text/html", body: `<!doctype html><html lang="${code}" dir="${context.language.direction}"><head><meta charset="utf-8"></head><body>${contextHtml}<script src="/widget.js" data-api-base-url="/yardimci-asistan"></script></body></html>`});
+      });
+      await page.goto("https://widget-language.test/");
+      await page.locator("[data-ya-open]").click();
+      await expect(page.locator('[data-ya-request-type="dealer_application"]')).toContainText(translated("Bayi Başvurusu"));
+      await page.locator('[data-ya-request-type="dealer_application"]').click();
+      await expect(page.locator("h2.ya-widget-view-title")).toHaveText(translated("Bayi Başvurusu"));
+      await page.getByLabel(translated("Firma / unvan"), {exact: true}).fill("Synthetic company");
+      await page.getByLabel(translated("Yetkili adı soyadı"), {exact: true}).fill("Synthetic person");
+      await page.getByLabel(translated("Telefon"), {exact: true}).fill("+44 7911 123456");
+      await page.getByLabel(translated("E-posta"), {exact: true}).fill("synthetic@example.test");
+      await page.locator('[name="tax_office"]').fill("Synthetic office");
+      await page.locator('[name="tax_number"]').fill("1234567890");
+      await page.locator('[name="message"]').fill("Synthetic application note");
+      await page.locator("[data-document-picker]").setInputFiles({name: "invalid.txt", mimeType: "text/plain", buffer: Buffer.from("invalid")});
+      await expect(page.locator("[data-application-status]")).toHaveText(translated("PDF, JPG veya PNG seçin. Her dosya en fazla 10 MB olabilir."));
+      await page.locator("[data-document-picker]").setInputFiles({name: "synthetic.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-synthetic-contract")});
+      await expect(page.locator("[data-document-list]")).toContainText(translated("Vergi levhası"));
+      await expect(page.locator("[data-document-list] button")).toHaveText(translated("Kaldır"));
+      for (const failure of failures) {
+        await page.locator('[data-dealer-application] button[type="submit"]').click();
+        await expect(page.locator("[data-application-status]")).toHaveText(translated(failure.expected));
+        for (const [name, value] of Object.entries({company_name: "Synthetic company", authorized_person: "Synthetic person",
+          customer_phone: "+44 7911 123456", email: "synthetic@example.test", tax_office: "Synthetic office",
+          tax_number: "1234567890", message: "Synthetic application note"})) {
+          await expect(page.locator(`[name="${name}"]`)).toHaveValue(value);
+        }
+        await expect(page.locator('[data-dealer-application] button[type="submit"]')).toBeEnabled();
+        await expect(page.locator("[data-document-list]")).toContainText("synthetic.pdf");
+        cases++;
+      }
+      await page.locator('[data-dealer-application] button[type="submit"]').click();
+      await expect(page.locator("[data-application-status]")).toHaveText(translated("Başvurunuz alındı. İşletmenin değerlendirmesi bekleniyor."));
+      expect(submissions.length).toBe(failures.length + 1);
+      const key = body => body.match(/name="idempotency_key"\r\n\r\n([^\r]+)/)?.[1];
+      expect(key(submissions[0])).toMatch(/^[a-f0-9-]+$/);
+      // Only the generated multipart boundary may change on an unchanged retry;
+      // fields, idempotency key, selected document kind and bytes must all match.
+      const normalizeMultipart = body => body.replaceAll(body.slice(0, body.indexOf("\r\n")), "--BOUNDARY");
+      for (const body of submissions) {
+        expect(key(body)).toBe(key(submissions[0]));
+        expect(normalizeMultipart(body)).toBe(normalizeMultipart(submissions[0]));
+        expect(body).toContain('name="request_type"\r\n\r\ndealer_application');
+        expect(body).toContain('name="document_kinds[]"\r\n\r\ntax_certificate');
+        expect(body).toContain("%PDF-synthetic-contract");
+      }
+      await expect(page.locator('[name="company_name"]')).toHaveValue("");
+      await expect(page.locator("[data-document-list]")).toBeEmpty();
+      expect(errors).toEqual([]);
+      await page.close(); cases++;
+
+      const cartPage = await browser.newPage({viewport: {width: 390, height: 844}});
+      const cartErrors = []; cartPage.on("pageerror", error => cartErrors.push(error.message));
+      await cartPage.route("https://portal-language.test/**", async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === "/adapter.js") return route.fulfill({contentType: "text/javascript", body: adapter});
+        if (path === "/portal.js") return route.fulfill({contentType: "text/javascript", body: portal});
+        if (path.endsWith("/account/config.php")) return route.fulfill({json: {ok: true, enabled: true, providers: []}});
+        if (path.endsWith("/account/session.php")) return route.fulfill({json: {ok: true, account: {methods: [], dealer: {access_id: "synthetic-access", display_name: "Synthetic dealer"}}}});
+        if (path.endsWith("/dealer/catalog.php")) return route.fulfill({json: {ok: true, catalog: {delivery_methods: ["pickup"], catalog_revision: 1,
+          products: [{product_id: "synthetic-product", name: "Synthetic product", description: "", price: 5, currency: "TRY", unit: "piece"}]}}});
+        if (path !== "/") return route.fulfill({status: 404, body: ""});
+        return route.fulfill({contentType: "text/html", body: `<!doctype html><html lang="${code}" dir="${context.language.direction}"><head><meta charset="utf-8"></head><body>${contextHtml}
+          <h1 id="portal-title"></h1><p id="portal-message"></p><div id="success" hidden></div><div id="dealer-store" hidden><div id="product-grid"></div><ul id="cart-lines"></ul><div id="subtotal"></div></div>
+          <script src="/adapter.js"></script><script src="/portal.js"></script></body></html>`});
+      });
+      await cartPage.goto("https://portal-language.test/");
+      await cartPage.getByRole("button", {name: translated("Sepete ekle")}).click();
+      await expect(cartPage.getByRole("spinbutton", {name: translated("{0}: miktar").replace("{0}", "Synthetic product"), exact: true})).toHaveValue("1");
+      await expect(cartPage.getByRole("button", {name: translated("{0}: miktarı azalt").replace("{0}", "Synthetic product"), exact: true})).toBeVisible();
+      await expect(cartPage.getByRole("button", {name: translated("{0}: miktarı artır").replace("{0}", "Synthetic product"), exact: true})).toBeVisible();
+      await expect(cartPage.locator("#subtotal")).toContainText(prefix + "Sepet toplamı:");
+      expect(cartErrors).toEqual([]);
+      await cartPage.close(); cases++;
+    }
+    console.log(`widget-interaction-language-contracts-ok: ${cases} bounded de/ar browser cases; real-shaped 422/403/document/500/409 errors, unknown-message fallback, unchanged multipart/idempotency retries, dealer success and cart; synthetic accepted catalog, no provider`);
+  } finally {await browser.close();}
 }

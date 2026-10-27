@@ -17,7 +17,7 @@ const root=mkdtempSync(join(tmpdir(),'marketing-host-')),f=marketingFixture(),se
 const hosting = installDemoSite(root);
 writeFileSync(join(hosting,'config/business.json'),JSON.stringify({sync_secret:secret,allowed_origins:[]}));
 const port=await new Promise(resolve=>{const server=http.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});
-const siteUrl=`http://127.0.0.1:${port}`,baseUrl=`${siteUrl}/yardimci-asistan`,php=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{stdio:'ignore'});
+const siteUrl=`http://127.0.0.1:${port}`,baseUrl=`${siteUrl}/yardimci-asistan`,php=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{env:{...process.env,PHP_CLI_SERVER_WORKERS:'4',YA_SITE_API_ORIGIN:siteUrl},stdio:'ignore',detached:true});
 const config={baseUrl,syncSecret:secret},clientId=f.db.getSyncRuntimeStatus().clientId,transport=new PhpHostingSyncTransport({...config,clientId,sourceEpoch:1});
 let browser;
 const coordinator=new SyncCoordinator({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
@@ -64,12 +64,12 @@ try {
   await push();pub=f.db.listMarketingPublications()[0];assert.equal(pub.status,'published');
   publicItems=(await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications;assert.equal(publicItems[0].text,'Yeni canlı metin');assert.deepEqual(publicItems[0].images.map(i=>i.assetId),[c.id,b.id]);
   browser=await launchChromiumForSmoke(chromium);const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(`${siteUrl}/duyurular/`);await expect(page.getByRole('heading',{name:'Duyurular / Kampanyalar',exact:true})).toBeVisible();
-  await expect(page.locator('.ya-marketing-card')).toHaveCount(1);await expect(page.locator('.ya-marketing-gallery img')).toHaveCount(2);
+  await page.goto(`${siteUrl}/duyurular/`);await expect(page.getByRole('heading',{name:'Duyurular',exact:true})).toBeVisible();
+  await expect(page.locator('main .content-card')).toHaveCount(1);await expect(page.locator('main .content-card img')).toHaveCount(2);
   assert.equal(await page.locator('article script').count(),0,'text rendered safely');
   for(const width of [375,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
   const second=f.service.savePublication({contentId:content.content.id,channel:'website',placement:'homepage_feature',title:'İkinci duyuru',text:'Ayrı yayın',mediaAssetIds:[b.id]});
-  f.service.publish(second.id,second.revision);await push();await page.reload();await expect(page.locator('.ya-marketing-card')).toHaveCount(2);
+  f.service.publish(second.id,second.revision);await push();await page.reload();await expect(page.locator('main .content-card')).toHaveCount(2);
   // Freeze an enabled publication, then lose its response. Capability OFF must
   // invalidate that retry, not resend the old frozen enabled body.
   f.db.queueSyncJob('marketing_website_publish');
@@ -93,9 +93,9 @@ try {
   assert.equal((await transport.publishMarketingWebsite({...oldWire,idempotencyKey:'late-enabled-job'})).ok,false);
   assert.deepEqual((await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications,[]);
   assert.deepEqual(f.db.listMarketingPublications().map(p=>[p.id,p.desiredPublished,p.revision]),editorial);
-  await page.reload();await expect(page.locator('[data-marketing-surface]')).toBeHidden();
+  await page.reload();await expect(page.locator('main')).toContainText('Bu sayfa şu anda kullanılamıyor.');await expect(page.locator('main .content-card')).toHaveCount(0);
   assert.equal(setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:true}).enabledCapabilities.includes('marketing.studio'),true);
-  await push();await page.reload();await expect(page.locator('.ya-marketing-card')).toHaveCount(2);
+  await push();await page.reload();await expect(page.locator('main .content-card')).toHaveCount(2);
   // Capability mutation during async preparation cannot attach an old enabled
   // body to the newer withdrawal revision.
   f.db.queueSyncJob('marketing_website_publish');
@@ -119,7 +119,7 @@ try {
   setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:true});await push();
   for(const p of f.db.listMarketingPublications())f.service.unpublish(p.id,p.revision);
   await push();assert.deepEqual((await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications,[]);
-  await page.reload();await expect(page.locator('[data-marketing-surface]')).toBeHidden();assert.deepEqual(errors,[]);
+  await page.reload();await expect(page.locator('main')).toContainText('Bu sayfa şu anda kullanılamıyor.');await expect(page.locator('main .content-card')).toHaveCount(0);assert.deepEqual(errors,[]);
   const lastJob=f.db.getPendingSyncJobs().find(j=>j.jobType==='marketing_website_publish');assert.equal(lastJob,undefined);
   const retired=f.db.listMarketingPublications()[0];f.service.publish(retired.id,retired.revision);
   const retryJob=f.db.getPendingSyncJobs().find(j=>j.jobType==='marketing_website_publish');assert.ok(retryJob.sourceRevision>job.sourceRevision);
@@ -128,4 +128,4 @@ try {
   await failOutbox.publishOutbox(wrongAck);assert.ok(f.db.getPendingSyncJobs('9999').some(j=>j.jobType==='marketing_website_publish'));
   assert.equal(f.db.listMarketingPublications().find(p=>p.id===retired.id).status,'failed');
   console.log('D4 real PHP upload, exact sync/ack/revision, capability-off withdrawal, stale enabled replay/race, retained editorial intent/reactivation and explicit unpublish passed.');
-} finally {await browser?.close();coordinator.stop();php.kill();await new Promise(r=>php.once('exit',r));f.dispose();rmSync(root,{recursive:true,force:true});}
+} finally {await browser?.close();coordinator.stop();try{process.kill(-php.pid,'SIGTERM');}catch{}await new Promise(r=>php.once('exit',r));f.dispose();rmSync(root,{recursive:true,force:true});}

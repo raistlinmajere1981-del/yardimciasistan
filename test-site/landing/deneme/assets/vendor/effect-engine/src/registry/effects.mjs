@@ -1,0 +1,49 @@
+import {createSunlight} from '../runtime/effects/sunlight.mjs';
+import {createOffshore} from '../runtime/effects/offshore.mjs';
+import {createShimmer} from '../runtime/effects/shimmer.mjs';
+import {polygonBounds} from '../model/geometry.mjs';
+
+const number = (key,label,value,min,max,step=1) => ({key,label,default:value,min,max,step,kind:'number'});
+const toggle = (key,label,value) => ({key,label,default:value,kind:'boolean'});
+const common = [number('count','Yoğunluk / parçacık',155,0,800), number('speed','Hız',2.85,0,5,.05), number('opacity','Opaklık',1.15,0,2,.05)];
+// Normalized anchors extracted from the original 1818×1228 Gideros sun polygon.
+// Every coordinate and band size is relative to its zone bounding box, never the photo.
+const reference={x:760,y:615,width:740,height:390};
+const bandGroups=[
+  {id:'core',gain:1,share:.46,bands:[[1450,646,96,25,1],[1416,677,140,32,.96],[1367,710,180,35,.86],[1330,739,195,37,.78]]},
+  {id:'middle',gain:.76,share:.38,bands:[[1310,753,212,39,1],[1248,787,245,44,.97],[1180,824,255,45,.9],[1114,856,270,48,.82],[1060,887,265,49,.7]]},
+  {id:'tail',gain:.4,share:.16,bands:[[1060,873,245,46,.9],[1000,905,260,46,.8],[935,936,245,48,.62],[860,965,210,42,.4],[817,987,130,30,.15]]},
+].map(layer=>({...layer,bands:layer.bands.map(([x,y,w,h,f])=>[(x-reference.x)/reference.width,(y-reference.y)/reference.height,w/reference.width,h/reference.height,f])}));
+
+export const effectRegistry = Object.freeze({
+  offshore: {
+    label:'Yüzey dalgacıkları', description:'Hafif ilerleyen dalga tepeleri ve küçük kırılmalar.', create:createOffshore,
+    controls:[...common,number('length','Dalga boyutu',1,.15,3,.05),number('travel','İlerleme mesafesi',1,0,3,.05),number('breakProbability','Kırılma olasılığı',.06,0,1,.01),toggle('crestLines','Dalga tepeleri',true),toggle('breaking','Küçük köpükler',true)],
+    compile(zone,p) {
+      const bounds=polygonBounds(zone.points), unit=bounds.width/635;
+      return {enabled:true,count:p.count,opacity:p.opacity,speedScale:p.speed,breaking:p.breaking,crestLines:p.crestLines,breakProbability:p.breakProbability,distribution:'even',
+        bounds,areas:[zone.points],horizon:bounds.y-60/328*bounds.height,depthSpan:450/328*bounds.height,
+        length:[48,92].map(n=>n*unit*p.length),travel:[47,83].map(n=>n*unit*p.travel),direction:[-1,.18],life:[3,5.2],wait:[.15,1.4]};
+    },
+  },
+  sunlight: {
+    label:'İnce güneş parıltıları', description:'Su yüzeyinde bağımsız, ince ve hareketli ışık çizgileri.', create:createSunlight,
+    controls:[number('count','Yoğunluk / parçacık',110,0,500),number('opacity','Opaklık',1.1,0,2,.05),number('drift','Sürüklenme',1,0,3,.05),number('length','Parıltı boyutu',1,.15,3,.05)],
+    compile(zone,p) {
+      const b=polygonBounds(zone.points), unit=Math.min(b.width/600,b.height/240);
+      return {enabled:true,count:p.count,opacity:p.opacity,waterArea:zone.points,color:'#fff5d6',life:[1.8,4.2],drift:[4,18].map(n=>n*unit*p.drift),
+        regions:[{weight:1,center:[b.x+b.width/2,b.y+b.height/2],radius:[b.width/Math.SQRT2,b.height/Math.SQRT2],length:[5,18].map(n=>n*unit*p.length),width:[.7,1.7].map(n=>n*unit)}]};
+    },
+  },
+  shimmer: {
+    label:'Güneş yansıması', description:'Bölgeyle birlikte taşınan ışık şeridi ve parıltılar.', create:createShimmer,
+    controls:[number('count','Yoğunluk / parçacık',140,0,800),number('speed','Hız',1.45,0,5,.05),number('opacity','Opaklık',1.15,0,2,.05),number('bandOpacity','Işık şeridi',.69,0,2,.01),number('length','Parıltı boyutu',1,.15,3,.05),number('drift','Sürüklenme',1,0,3,.05)],
+    compile(zone,p) {
+      const b=polygonBounds(zone.points), unit=b.width/740;
+      return {area:zone.points,count:p.count,opacity:p.opacity,speedScale:p.speed,bandOpacity:p.bandOpacity*p.opacity/1.15,
+        length:[8,24].map(n=>n*unit*p.length),height:[1.7,3].map(n=>n*b.height/390*p.length),life:[2.4,4.8],wait:[.15,.85],drift:[18,33].map(n=>n*unit*p.drift),
+        layers:bandGroups.map(layer=>({...layer,bands:layer.bands.map(([x,y,w,h,f])=>[b.x+x*b.width,b.y+y*b.height,w*b.width,h*b.height,f])}))};
+    },
+  },
+});
+export const defaultParams = type => Object.fromEntries(effectRegistry[type].controls.map(c=>[c.key,c.default]));

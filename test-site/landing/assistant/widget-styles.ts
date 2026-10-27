@@ -40,6 +40,7 @@ export function widgetStyles(rootId: string, widgetConfig: WidgetStyleConfig) {
       outline-offset: 2px;
     }
 
+    #${rootId}[hidden],
     #${rootId} [hidden] {
       display: none !important;
     }

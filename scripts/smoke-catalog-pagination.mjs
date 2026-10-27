@@ -196,7 +196,7 @@ try {
   await tabs.getByRole("button", { name: "Ürünler", exact: true }).click();
   const management = page.locator(".market-catalog-products"), managementSearch = page.getByPlaceholder("Ürün adı, marka, SKU veya barkod ara");
   await managementSearch.fill("SKU-1000"); await expect(management.locator("article")).toHaveCount(1); await expect(management).toContainText("Pasif");
-  await managementSearch.fill("SKU-1001"); await expect(management).toContainText("SKU-1001"); await management.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await managementSearch.fill("SKU-1001"); await expect(management).toContainText("SKU-1001"); await management.locator(".market-list-row").click();
   const productWorkspace = page.getByRole("dialog", { name: /Katalog 01001/ });
   await expect(productWorkspace).toBeVisible(); await productWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await tabs.getByRole("button", { name: "Stok", exact: true }).click(); await page.getByRole("button", { name: "Ürün", exact: true }).click();

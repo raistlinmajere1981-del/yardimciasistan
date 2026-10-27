@@ -5,6 +5,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import process from "node:process";
+import {execFileSync} from "node:child_process";
+
+function assertCanonicalWebMenuGate() {
+  const code=`require $argv[1].'/core/bootstrap.php';
+    $b=['ok'=>true,'business'=>['profile_id'=>'market','public_surfaces'=>[]]];
+    $menu=['data'=>['ok'=>true,'enabled'=>true,'categories'=>[['id'=>'c','name'=>'Category']], 'items'=>[['id'=>'m','category_id'=>'c','name'=>'Meal']]]];
+    $hidden=\\YaSite\\available_pages(\\YaSite\\project_publication($b,['menu'=>$menu],'/yardimci-asistan','tr'),[]);
+    $b['business']['public_surfaces']=['qr_menu'];
+    $visible=\\YaSite\\available_pages(\\YaSite\\project_publication($b,['menu'=>$menu],'/yardimci-asistan','tr'),[]);
+    $menu['data']['enabled']=false;
+    $withdrawn=\\YaSite\\available_pages(\\YaSite\\project_publication($b,['menu'=>$menu],'/yardimci-asistan','tr'),[]);
+    echo json_encode([isset($hidden['menu']),isset($visible['menu']),isset($withdrawn['menu'])]);`;
+  assert.deepEqual(JSON.parse(execFileSync('php',['-r',code,'web-site-template'],{encoding:'utf8'})),[false,true,false], 'Canonical public surface + publication, independently of profile; withdrawal removes the route');
+}
+if(process.argv.includes('--web-only')) { assertCanonicalWebMenuGate(); console.log('canonical-web-surface-contract-ok'); process.exit(0); }
 
 const require = createRequire(import.meta.url);
 const {
@@ -73,8 +88,6 @@ const hostingSyncSource = source("firm-template/web-module/api/sync.php");
 const webChatSource = source("firm-template/web-module/api/chat.php");
 const menuCssSource = source("apps/desktop-app/src/styles/pages/menu.css");
 const productCssSource = source("apps/desktop-app/src/styles/pages/market.css");
-const testSiteHeaderSource = source("test-site/landing/inc/site.php");
-const testSiteQrMenuSource = source("test-site/landing/assets/js/qr-menu.js");
 
 // A — service.whatsapp controls both renderer affordances and hard boundaries.
 assert.match(requestsSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
@@ -164,12 +177,7 @@ assert.match(
   /\.menu-page-layout\s*\{[\s\S]{0,200}gap:\s*var\(--space-3\)/,
   "QR service panel must keep a visible gap above the menu management grid"
 );
-assert.match(testSiteHeaderSource, /'qr_menu'=>site_qr_menu_available\(\)/, "site navigation availability uses the QR publication gate");
-assert.match(
-  testSiteQrMenuSource,
-  /response\.status === 404[\s\S]{0,120}window\.location\.replace\("\/"\)/,
-  "an already-open QR menu page must leave the hidden publication instead of showing an error shell"
-);
+assertCanonicalWebMenuGate();
 assert.match(menuManagerSource, /stockImageImportEnabled\s*\?[\s\S]{0,220}<StockImageImportWorkspace/);
 assert.match(menuProductEntryFieldsSource, /inventoryEnabled && <label/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);

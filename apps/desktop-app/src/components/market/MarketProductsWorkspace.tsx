@@ -59,16 +59,17 @@ function emptyCategoryForm(): CategoryFormState {
   return { id: "", parentId: "", name: "", code: "", isActive: true };
 }
 
-function CategoryFormFields({ form, categories, onChange }: {
+function CategoryFormFields({ form, categories, onChange, showActive = true }: {
   form: CategoryFormState;
   categories: CatalogCategory[];
   onChange: (form: CategoryFormState) => void;
+  showActive?: boolean;
 }) {
   return <>
     <label className="form-field form-field--fluid">Kategori adı<input value={form.name} onChange={event => onChange({ ...form, name: event.target.value })} /></label>
     <label className="form-field form-field--fluid">Kod<input value={form.code} onChange={event => onChange({ ...form, code: event.target.value })} /></label>
     <label className="form-field form-field--fluid form-field--span">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={form.parentId} placeholder="Ana kategori" onChange={parentId => onChange({ ...form, parentId })} options={categories.filter(category => category.id !== form.id).map(category => ({ id: category.id, label: category.name }))} /></label>
-    <label className="form-check"><input type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif kategori</label>
+    {showActive && <label className="form-check"><input type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif kategori</label>}
   </>;
 }
 
@@ -292,22 +293,20 @@ export function MarketProductsWorkspace({
               title={action === "publish" && !onlineSalesEnabled ? "Webde yayınlamak için online satış etkin olmalı." : undefined}
               onClick={() => requestBulk(action)}>{bulkActionLabels[action]}</ActionButton>)}
           </div>
-          <div ref={pageScroll} className={`market-list market-catalog-products market-catalog-products--${productView.preset}`}>
+          <div ref={pageScroll} className={`market-list market-catalog-products market-catalog-products--${productView.preset}${productView.showImages ? " has-product-images" : ""}`}>
             {filteredProducts.map((product) => (
               <article className={`market-catalog-record ${sortClass(productSortKind, product.id)}`} key={product.id}
                 data-sort-kind={productSortKind} data-sort-id={product.id}>
-                <label className="market-product-selection"><input type="checkbox" aria-label={`${product.name} seç`} checked={selectedIds.has(product.id)} disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)}
-                  onChange={event => setSelectedIds(previous => { const next = new Set(previous); if (event.target.checked) next.add(product.id); else next.delete(product.id); return next; })} /></label>
-                <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${product.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps(productSortKind, product.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
-                <DataListButton disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} className="market-list-row" onClick={() => { if (!reorder.suppressRowClickRef.current) openProduct(product); }}
+                <div className="market-product-controls">
+                  <label className="market-product-selection"><input type="checkbox" aria-label={`${product.name} seç`} checked={selectedIds.has(product.id)} disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)}
+                    onChange={event => setSelectedIds(previous => { const next = new Set(previous); if (event.target.checked) next.add(product.id); else next.delete(product.id); return next; })} /></label>
+                  <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${product.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps(productSortKind, product.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
+                </div>
+                <DataListButton disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} twoLine={productView.preset === "list"} className="market-list-row" onClick={() => { if (!reorder.suppressRowClickRef.current) openProduct(product); }}
                   leading={productView.showImages ? <MarketProductThumbnail product={product} className="market-list-product-thumb" /> : null} title={product.name}
                   meta={<span>{money(product.salePrice, product.currency)} · {product.sku || product.barcode || "Kod yok"}</span>}
                   trailing={<StatusBadge tone={product.isActive ? "success" : "neutral"}>{product.isActive ? "Aktif" : "Pasif"}</StatusBadge>} />
-                <div className="market-record-actions">
-                  <ActionButton variant="secondary" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => openProduct(product)}>Düzenle</ActionButton>
-                  <ActionButton variant="secondary" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => { if (bridge) void mutate(() => bridge.setProductQuickAccess(product.id, !product.quickAccessEnabled), "Hızlı erişim tercihi kaydedildi."); }}>{product.quickAccessEnabled ? "Hızlı erişimden çıkar" : "Hızlı erişime ekle"}</ActionButton>
-                  <ActionButton variant="danger" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => setPendingDelete({ kind: "products", id: product.id, name: product.name })}>Sil</ActionButton>
-                </div>
+                <ActionButton className="market-product-delete" variant="danger" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => setPendingDelete({ kind: "products", id: product.id, name: product.name })}>Sil</ActionButton>
               </article>
             ))}
             {!busy && !catalog.loading && !catalog.error && filteredProducts.length === 0 && <p className="market-muted">Eşleşen ürün yok.</p>}
@@ -347,9 +346,12 @@ export function MarketProductsWorkspace({
               ))}
             </div>
             <form className="market-category-create" aria-label="Yeni kategori" onSubmit={event => { event.preventDefault(); void saveCategory(newCategoryForm); }}>
-              <h3>Yeni kategori</h3>
               <fieldset className="market-category-fields" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)}>
-                <CategoryFormFields form={newCategoryForm} categories={categories} onChange={setNewCategoryForm} />
+                <div className="market-category-create-heading">
+                  <h3>Yeni kategori</h3>
+                  <label className="form-check"><input type="checkbox" checked={newCategoryForm.isActive} onChange={event => setNewCategoryForm({ ...newCategoryForm, isActive: event.target.checked })} /> Aktif kategori</label>
+                </div>
+                <CategoryFormFields form={newCategoryForm} categories={categories} onChange={setNewCategoryForm} showActive={false} />
                 <div className="market-category-actions">
                   <ActionButton type="submit" size="sm" busy={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} disabled={!newCategoryForm.name.trim()}><Plus size={16} aria-hidden="true" /> Kategori Ekle</ActionButton>
                 </div>

@@ -47,6 +47,7 @@ const phpFiles = [
   "firm-template/web-module/lib/online-catalog.php",
   "firm-template/web-module/lib/public-request-guard.php",
   "firm-template/web-module/lib/public-request-submission.php",
+  "firm-template/web-module/lib/public-request-policy.php",
   "firm-template/web-module/lib/request-documents.php",
   "firm-template/web-module/lib/public-room-availability.php",
   "firm-template/web-module/lib/public-room-availability-intent.php",

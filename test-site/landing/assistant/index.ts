@@ -1,6 +1,7 @@
 import { dealerApplicationForm, mountDealerApplicationForm } from "./dealer-application-flow";
-import { ui, html, locale } from "./site-language";
+import { ui, html, locale, languageCode } from "./site-language";
 import { requestMessage } from "./request-message";
+import { normalizeGoogleMapsEmbedUrl } from "@yardimci-asistan/shared";
 import {
   createWhatsAppUrl,
   normalizeInternationalPhone as normalizeBridgeInternationalPhone
@@ -12,9 +13,12 @@ import {
   buildInfoSuggestions,
   buildWhatsAppTopics,
   isRequestTypeAvailable,
+  isDirectionsAvailable,
   isWhatsAppAvailable,
+  hasAvailableActions,
   normalizeBusinessProfileId,
   normalizePublicSurfaces,
+  normalizeRequestTypes,
   readScriptConfig as getScriptConfig,
   resolvePublicSurfaces,
   type PublicSurface,
@@ -95,9 +99,14 @@ interface PublicBusinessApiResponse {
     ai_enabled?: boolean;
     whatsapp_enabled?: boolean;
     requests_enabled?: boolean;
+    request_types?: unknown[];
     dealer_application_enabled?: boolean;
     address?: string;
     map_url?: string;
+    mapDisplayMode?: string;
+    googleMapsEmbedUrl?: string;
+    latitude?: number | null;
+    longitude?: number | null;
   };
 }
 
@@ -123,9 +132,10 @@ const defaultConfig: WidgetConfig = {
   accentColor: "#E47863",
   profileId: "",
   publicSurfaces: [],
-  aiEnabled: true,
-  whatsappEnabled: true,
-  requestsEnabled: true,
+  aiEnabled: false,
+  whatsappEnabled: false,
+  requestsEnabled: false,
+  requestTypes: [],
   dealerApplicationEnabled: false,
   address: "",
   mapUrl: ""
@@ -190,7 +200,8 @@ export function init(userConfig: Partial<WidgetConfig> = {}) {
   config = {
     ...mergedConfig,
     profileId: normalizeBusinessProfileId(mergedConfig.profileId),
-    publicSurfaces: normalizePublicSurfaces(mergedConfig.publicSurfaces)
+    publicSurfaces: normalizePublicSurfaces(mergedConfig.publicSurfaces),
+    requestTypes: normalizeRequestTypes(mergedConfig.requestTypes)
   };
 
   injectStyles(config);
@@ -283,6 +294,7 @@ export function normalizeInternationalPhone(phone: string): { ok: true; whatsapp
 
 function render() {
   const root = getOrCreateRoot();
+  root.hidden = !config.forceVisible && !hasAvailableActions(config);
   root.dataset.yaWhatsappEnabled = config.whatsappEnabled ? "1" : "0";
   unmountWidgetNexa();
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
@@ -349,7 +361,7 @@ function homeTemplate() {
   const surfaces = currentPublicSurfaces();
   const actions: string[] = [];
 
-  if (config.requestsEnabled && surfaces.has("accommodation")) {
+  if (isRequestTypeEnabled("pension_reservation")) {
     actions.push(homeActionCard({
       requestType: "pension_reservation",
       icon: "calendar",
@@ -357,7 +369,7 @@ function homeTemplate() {
       description: ui("Tarih ve kişi bilgilerini iletin")
     }));
   }
-  if (config.requestsEnabled && surfaces.has("food_service")) {
+  if (isRequestTypeEnabled("restaurant_reservation")) {
     actions.push(homeActionCard({
       requestType: "restaurant_reservation",
       icon: "table",
@@ -365,7 +377,11 @@ function homeTemplate() {
       description: ui("Tarih, saat ve kişi sayısını seçin")
     }));
   }
-  if (config.requestsEnabled && config.dealerApplicationEnabled) actions.push(homeActionCard({ requestType: "dealer_application", icon: "send", title: "Bayi Başvurusu", description: "Firma bilgilerinizi iletin" }));
+  if (isRequestTypeEnabled("dealer_application")) actions.push(homeActionCard({ requestType: "dealer_application", icon: "send", title: ui("Bayi Başvurusu"), description: ui("Firma bilgilerinizi iletin") }));
+  if (isRequestTypeEnabled("general_info")) actions.push(homeActionCard({
+    requestType: "general_info", icon: "send", title: ui("Bilgi talebi oluştur"),
+    description: ui("Sorunuzu ve iletişim bilgilerinizi iletin")
+  }));
   if (config.aiEnabled && surfaces.has("catalog")) {
     actions.push(homeActionCard({
       view: "info",
@@ -384,7 +400,7 @@ function homeTemplate() {
     }));
   }
 
-  if (surfaces.has("directions")) {
+  if (isDirectionsAvailable(config)) {
     actions.push(homeActionCard({
       view: "directions",
       icon: "pin",
@@ -413,7 +429,7 @@ function homeTemplate() {
         </div>
       </div>
       <div class="ya-widget-actions" role="group" aria-label="${html("Hızlı asistan seçenekleri")}">
-        ${actions.join("")}
+        ${actions.length ? actions.join("") : `<p role="status">${html("Şu anda kullanılabilir bir asistan işlemi yok.")} ${html("İletişim bilgilerini sitenin iletişim bölümünde bulabilirsiniz.")}</p>`}
       </div>
     </div>
   `;
@@ -444,9 +460,10 @@ function homeActionCard(input: {
 function formTemplate() {
   if (state.requestType === "dealer_application") return dealerApplicationForm();
   const isTableRequest = state.requestType === "restaurant_reservation";
-  const requestLabel = isTableRequest ? ui("Masa talebi") : ui("Rezervasyon talebi");
-  const title = isTableRequest ? ui("Masa talebinizi hazırlayalım") : ui("Rezervasyonunuzu hazırlayalım");
-  const scheduleControls = isTableRequest
+  const isGeneralRequest = state.requestType === "general_info";
+  const requestLabel = isGeneralRequest ? ui("Bilgi talebi") : isTableRequest ? ui("Masa talebi") : ui("Rezervasyon talebi");
+  const title = isGeneralRequest ? ui("Bilgi talebinizi hazırlayalım") : isTableRequest ? ui("Masa talebinizi hazırlayalım") : ui("Rezervasyonunuzu hazırlayalım");
+  const scheduleControls = isGeneralRequest ? "" : isTableRequest
     ? restaurantScheduleControlsTemplate()
     : accommodationScheduleControlsTemplate();
 
@@ -457,7 +474,7 @@ function formTemplate() {
         <span aria-hidden="true">${iconTemplate("sparkles")}</span>
         <div>
           <h2 class="ya-widget-view-title" tabindex="-1">${title}</h2>
-          <p>${html("Tarih ve iletişim bilgilerinizi ekleyin.")}</p>
+          <p>${isGeneralRequest ? html("Sorunuzu ve iletişim bilgilerinizi ekleyin.") : html("Tarih ve iletişim bilgilerinizi ekleyin.")}</p>
         </div>
       </div>
       ${contextCardTemplate()}
@@ -475,10 +492,10 @@ function formTemplate() {
             <input name="customer_phone" required inputmode="tel" autocomplete="tel" placeholder="+90 5xx… / +44…" />
           </label>
         </div>
-        ${guestStepperTemplate()}
+        ${isGeneralRequest ? '<input type="hidden" name="guest_count" value="1" />' : guestStepperTemplate()}
         <label class="ya-widget-field">
-          <span>${html("Kısa not")} <small>${html("(isteğe bağlı)")}</small></span>
-          <textarea name="message" rows="2" placeholder="${html("Tercihiniz veya eklemek istediğiniz kısa not")}"></textarea>
+          <span>${isGeneralRequest ? html("Sorunuz") : `${html("Kısa not")} <small>${html("(isteğe bağlı)")}</small>`}</span>
+          <textarea name="message" rows="2" maxlength="3000" ${isGeneralRequest ? "required" : ""} placeholder="${isGeneralRequest ? html("İşletmeye iletmek istediğiniz soruyu yazın") : html("Tercihiniz veya eklemek istediğiniz kısa not")}"></textarea>
         </label>
         <button class="ya-widget-primary-action" type="submit">
           ${iconTemplate("send")}
@@ -1296,7 +1313,7 @@ async function handleAiSubmit(event: Event) {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ message, ...(locale === "en-GB" ? { response_language: "en" } : {}) })
+      body: JSON.stringify({ message, ...(languageCode === "tr" ? {} : {response_language: languageCode}) })
     });
     const result = (await response.json().catch(() => null)) as AiChatResponse | null;
 
@@ -1429,6 +1446,25 @@ function getWhatsAppTopics() {
   return buildWhatsAppTopics(config);
 }
 
+/** Use the same manual coordinate contract as the canonical contact projection. */
+function publishedDirectionsUrl(business: NonNullable<PublicBusinessApiResponse["business"]>): string {
+  if (business.mapDisplayMode === "manual") {
+    const lat = business.latitude, lon = business.longitude;
+    if (typeof lat !== "number" || typeof lon !== "number"
+      || !Number.isFinite(lat) || !Number.isFinite(lon)
+      || Math.abs(lat) > 90 || Math.abs(lon) > 180) return "";
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lon}`)}`;
+  }
+  const url = typeof business.map_url === "string" ? business.map_url.trim() : "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:" && !parsed.username && !parsed.password) return parsed.toString();
+  } catch { /* An embed-only publication can still provide its validated map. */ }
+  return business.mapDisplayMode === "google_maps_embed"
+    ? normalizeGoogleMapsEmbedUrl(business.googleMapsEmbedUrl)
+    : "";
+}
+
 async function hydrateBusinessContext(loadId: number) {
   const apiBaseUrl = config.apiBaseUrl.trim().replace(/\/$/, "");
   if (!apiBaseUrl) return;
@@ -1447,23 +1483,25 @@ async function hydrateBusinessContext(loadId: number) {
     config = {
       ...config,
       businessName: String(business.display_name ?? "").trim() || config.businessName,
-      whatsappPhone: String(business.whatsapp ?? "").trim() || config.whatsappPhone,
+      whatsappPhone: typeof business.whatsapp === "string" ? business.whatsapp.trim() : config.whatsappPhone,
       primaryColor: String(business.primary_color ?? "").trim() || config.primaryColor,
       accentColor: String(business.accent_color ?? "").trim() || config.accentColor,
-      address: String(business.address ?? "").trim() || config.address,
-      mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
-      aiEnabled: typeof business.ai_enabled === "boolean" ? business.ai_enabled : config.aiEnabled,
-      whatsappEnabled: typeof business.whatsapp_enabled === "boolean" ? business.whatsapp_enabled : config.whatsappEnabled,
+      address: typeof business.address === "string" ? business.address.trim() : config.address,
+      mapUrl: publishedDirectionsUrl(business),
+      aiEnabled: business.ai_enabled === true,
+      whatsappEnabled: business.whatsapp_enabled === true,
       dealerApplicationEnabled: business.dealer_application_enabled === true,
-      requestsEnabled: typeof business.requests_enabled === "boolean" ? business.requests_enabled : config.requestsEnabled,
+      requestsEnabled: business.requests_enabled === true,
+      requestTypes: normalizeRequestTypes(business.request_types),
       profileId: profileId || config.profileId,
-      publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
+      publicSurfaces
     };
 
     if (
       (state.view === "form" && !isRequestTypeEnabled(state.requestType))
       || (state.view === "info" && !config.aiEnabled)
       || (state.view === "whatsapp" && !isWhatsAppEnabled())
+      || (state.view === "directions" && !isDirectionsAvailable(config))
     ) {
       state = { ...state, view: "home", status: "", aiLoading: false, aiAnswer: "", questionDraft: "" };
     }

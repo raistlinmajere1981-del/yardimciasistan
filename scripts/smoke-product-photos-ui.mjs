@@ -111,6 +111,8 @@ try {
   await page.getByLabel("Alış fiyatı", { exact: true }).fill("15");
   await page.getByRole("region", { name: "Ürün görseli", exact: true }).locator('input[type="file"]').setInputFiles({ name: "cover.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==", "base64") });
   await page.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   await expect(gallery.getByRole("listitem")).toHaveCount(1);
   assert.deepEqual(errors, []);
   console.log("product-photos-ui-ok: append, cover, reorder, errors, busy, draft preservation, capability off, new product transition");

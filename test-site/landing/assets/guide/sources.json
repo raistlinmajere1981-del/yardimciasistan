@@ -1,0 +1,80 @@
+{
+  "description": "Existing verified application screenshots reused in the guide only. Synthetic test data; not live or new-release evidence.",
+  "images": [
+    {
+      "file": "dashboard.webp",
+      "width": 1116,
+      "height": 663,
+      "bytes": 50732,
+      "source": "artifacts/screenshots/desktop-compact-dashboard-light-1366x768.png",
+      "uiOwner": "scripts/smoke-desktop-renderer.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1340,
+        752
+      ]
+    },
+    {
+      "file": "translations.webp",
+      "width": 1200,
+      "height": 885,
+      "bytes": 24374,
+      "source": "/tmp/yardimci-translations-desktop-polished.png",
+      "uiOwner": "scripts/smoke-public-translations-ui.mjs / real Language Workspace",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        96,
+        70,
+        1344,
+        990
+      ]
+    },
+    {
+      "file": "pension.webp",
+      "width": 1116,
+      "height": 663,
+      "bytes": 68250,
+      "source": "artifacts/screenshots/desktop-compact-pension-1366x768.png",
+      "uiOwner": "scripts/smoke-desktop-renderer.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        224,
+        89,
+        1340,
+        752
+      ]
+    },
+    {
+      "file": "products.webp",
+      "width": 1200,
+      "height": 797,
+      "bytes": 38628,
+      "source": "artifacts/screenshots/market-products/inline-edit-1440.png",
+      "uiOwner": "scripts/smoke-sales-workspace-ui.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        0,
+        44,
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "android-pairing.webp",
+      "width": 1000,
+      "height": 734,
+      "bytes": 23666,
+      "source": "artifacts/desktop-architecture/style-parity/settings-android-A__k-1649-after.png",
+      "uiOwner": "scripts/smoke-settings-platform.mjs / scripts/test-helpers/settings-style-parity.mjs",
+      "capture": "Existing application component rendered with synthetic local test data. Not proof of a live provider, real device connection or accepted transaction.",
+      "crop": [
+        325,
+        97,
+        1325,
+        831
+      ]
+    }
+  ]
+}

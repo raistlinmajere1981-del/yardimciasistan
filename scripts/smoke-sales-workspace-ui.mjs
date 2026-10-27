@@ -409,9 +409,7 @@ try {
   await newCustomer.click();
   await createCustomer.getByLabel("Ad soyad", { exact: true }).fill("Satışta Yeni Müşteri");
   await createCustomer.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
-  const savedCustomer = page.getByRole("dialog", { name: "Satışta Yeni Müşteri", exact: true });
-  await expect(savedCustomer).toBeVisible(); await expect(page.getByRole("dialog")).toHaveCount(1);
-  await savedCustomer.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(cart.getByRole("button", { name: "Müşteri", exact: true })).toContainText("Satışta Yeni Müşteri");
   await expect(tender).toHaveValue("10"); await expect(submit).toBeEnabled();
   await submit.click(); await expect(cart.locator(".market-sale-cart-line")).toHaveCount(0);
@@ -421,10 +419,15 @@ try {
   await expect(page.getByLabel("Sıra", { exact: true })).toHaveCount(0);
   const productRows = page.locator('.market-catalog-record[data-sort-kind="products"]');
   const elmaRow = productRows.filter({ hasText: "Elma kg" });
-  await elmaRow.getByRole("button", { name: "Hızlı erişime ekle", exact: true }).click();
-  await expect.poll(() => runtime.listRuntimeCatalogProducts(path).items.find(item => item.id === kg.id).quickAccessEnabled).toBe(true);
-  await elmaRow.getByRole("button", { name: "Hızlı erişimden çıkar", exact: true }).click();
-  await expect.poll(() => runtime.listRuntimeCatalogProducts(path).items.find(item => item.id === kg.id).quickAccessEnabled).toBe(false);
+  for (const name of ["Düzenle", "Hızlı erişime ekle", "Hızlı erişimden çıkar"]) {
+    await expect(elmaRow.getByRole("button", { name, exact: true })).toHaveCount(0);
+  }
+  await elmaRow.getByRole("button", { name: "Sil", exact: true }).click();
+  const deleteProduct = page.getByRole("dialog", { name: "Ürünü sil", exact: true });
+  await expect(deleteProduct).toContainText("Elma kg");
+  await deleteProduct.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await expect(deleteProduct).toHaveCount(0);
+  await expect(elmaRow).toBeVisible();
   await elmaRow.getByRole("button", { name: "Elma kg sırasını değiştir" }).focus(); await page.keyboard.press("ArrowUp");
   await expect.poll(() => reorderCalls.length).toBe(1);
   assert.deepEqual(runtime.listRuntimeCatalogProducts(path).items.map(item => item.id), [bread.id, kg.id, water.id]);
@@ -462,7 +465,7 @@ try {
   await expect.poll(() => reorderCalls.length).toBe(6);
   assert.equal(reorderCalls[5][0], "quickAccess");
   await page.getByRole("group", { name: "Ürün listesi" }).getByRole("button", { name: "Tüm ürünler", exact: true }).click();
-  await elmaRow.getByRole("button", { name: "Düzenle", exact: true }).click();
+  await elmaRow.locator(".market-list-row").click();
   const workspace = page.getByRole("dialog", { name: "Elma kg", exact: true });
   await expect(workspace).toBeVisible(); await expect(workspace.getByRole("tab")).toHaveCount(0);
   await expect(workspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("Elma kg");
@@ -491,13 +494,15 @@ try {
   await published.click(); await expect(published).toBeChecked({ checked: initiallyPublished });
   await workspace.getByRole("checkbox", { name: "Aktif ürün" }).uncheck();
   await workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
-  await expect(workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
+  await expect(workspace).toHaveCount(0);
   assert.equal(runtime.listRuntimeCatalogProducts(path).items.find(item => item.id === kg.id).isActive, false);
+  await elmaRow.locator(".market-list-row").click();
   await workspace.getByRole("checkbox", { name: "Aktif ürün" }).check();
   await workspace.getByRole("checkbox", { name: "Hızlı erişim", exact: true }).check();
   await workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
-  await expect(workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
+  await expect(workspace).toHaveCount(0);
   assert.equal(runtime.listRuntimeCatalogProducts(path).items.find(item => item.id === kg.id).quickAccessEnabled, true);
+  await elmaRow.locator(".market-list-row").click();
   await workspace.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
   await workspace.getByLabel("Stok işlem miktarı", { exact: true }).fill("12,5"); await workspace.getByLabel("Kısa not", { exact: true }).fill("Canlı sayım");
   await workspace.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
@@ -515,7 +520,7 @@ try {
   await expect(categories.getByRole("button")).toHaveText(["Tümü", "Hızlı Erişim", "Gıda · 2", "İçecek · 1"]);
   await categories.getByRole("button", { name: "Hızlı Erişim", exact: true }).click();
   await expect(grid.locator(".market-sale-product > span > strong")).toHaveText(["Su", "Ekmek", "Elma kg"]);
-  // Creating a retail product continues in its canonical saved-product workspace.
+  // A successful retail product save returns to the product list.
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
   const createProduct = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
@@ -525,9 +530,6 @@ try {
   await createProduct.getByLabel("Alış fiyatı", { exact: true }).fill("0");
   await createProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(createProduct).toHaveCount(0);
-  const savedProduct = page.getByRole("dialog", { name: "Duman test ürünü", exact: true });
-  await expect(savedProduct).toBeVisible();
-  await savedProduct.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator('.market-catalog-record[data-sort-kind="products"]').filter({ hasText: "Duman test ürünü" })).toBeVisible();
   assert.equal(runtime.listRuntimeCatalogProducts(path).items.some(product => product.name === "Duman test ürünü"), true);
@@ -542,8 +544,13 @@ try {
     assert.equal(await page.locator(".market-catalog-products").evaluate(element => element.scrollWidth <= element.clientWidth), true);
   }
   await expect(page.locator(".market-catalog-products img")).toHaveCount(1);
+  mkdirSync("artifacts/screenshots/market-products", { recursive: true });
+  const imageRow = productRows.filter({ hasText: "Ekmek" });
+  await expect(imageRow.locator("img")).toHaveCount(1);
+  await imageRow.screenshot({ path: "artifacts/screenshots/market-products/row-image-visible.png" });
   await productToolbar.getByRole("checkbox", { name: "Resimleri göster" }).uncheck();
   await expect(page.locator(".market-catalog-products img")).toHaveCount(0);
+  await imageRow.screenshot({ path: "artifacts/screenshots/market-products/row-image-hidden.png" });
   await productToolbar.getByRole("textbox", { name: "Ürün ara", exact: true }).fill("no match");
   await expect(productRows).toHaveCount(0);
   await productToolbar.getByRole("button", { name: "Temizle", exact: true }).click(); await expect(productRows).toHaveCount(4);
@@ -648,9 +655,15 @@ try {
     await page.screenshot({ path: `artifacts/screenshots/market-products/inline-edit-${viewport.width}.png` });
   }
   // Reserve the expanded desktop sidebar and page gutters as well as the fixture's full canvas.
+  for (const [index, name] of ["Uzun ürün adı · üç yollu vana bağlantı grubu", "Uzun ürün adı · orijinal sağ hidrolik blok bağlantı takımı"].entries()) {
+    const product = runtime.saveRuntimeCatalogProduct(path, { name, sku: `UZUN-URUN-KODU-${index}-123456789`, salePrice: 1234.56, trackInventory: false });
+    runtime.saveRuntimeCatalogProduct(path, { ...product }, { productId: product.id, assetPath: "products/fixture-grid.webp", sourceUrl: "", license: "fixture" });
+  }
+  await page.reload();
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; document.documentElement.style.colorScheme = "dark"; });
   await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   await page.locator("main").evaluate(element => { element.style.marginInlineStart = "var(--sidebar-width)"; element.style.paddingInline = "var(--page-padding)"; });
-  for (const width of [1120, 1440, 1650]) {
+  for (const width of [1120, 1440, 1650, 1920]) {
     await page.setViewportSize({ width, height: 800 });
     for (const preset of ["comfortable", "balanced", "dense", "list"]) {
       await quick.getByLabel("Ürün görünümü", { exact: true }).selectOption(preset);
@@ -664,11 +677,17 @@ try {
     await tabs.getByRole("button", { name: /Ürünler/ }).click();
     for (const preset of ["comfortable", "balanced", "dense", "list"]) {
       await productToolbar.getByLabel("Ürün görünümü", { exact: true }).selectOption(preset);
+      await productToolbar.getByRole("checkbox", { name: "Resimleri göster" }).check();
       assert.equal(await page.locator(".market-catalog-products").evaluate(element => element.scrollWidth <= element.clientWidth), true);
+      if (width === 1920) await page.screenshot({ path: `artifacts/screenshots/market-products/${preset}-images.png` });
+      await productToolbar.getByRole("checkbox", { name: "Resimleri göster" }).uncheck();
+      assert.equal(await page.locator(".market-catalog-products").evaluate(element => element.scrollWidth <= element.clientWidth), true);
+      if (width === 1920) await page.screenshot({ path: `artifacts/screenshots/market-products/${preset}-no-images.png` });
       assert.equal(await productToolbar.evaluate(element => element.scrollWidth <= element.clientWidth), true);
       await expect(productToolbar.getByRole("button", { name: "Yeni ürün", exact: true })).toBeInViewport({ ratio: 1 });
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.screenshot({ path: `artifacts/screenshots/market-products/product-rows-${width}.png` });
     await tabs.getByRole("button", { name: /Yeni İşlem/ }).click();
   }
   await page.locator("main").evaluate(element => { element.style.marginInlineStart = ""; element.style.paddingInline = ""; });

@@ -66,7 +66,6 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [customerLoadError, setCustomerLoadError] = useState("");
   const [customerLoading, setCustomerLoading] = useState(Boolean(activeId && window.yardimciDesktop?.getCustomer));
   const hydratedId = useRef("");
-  const [recordRevision, setRecordRevision] = useState(0);
   useEffect(() => {
     if (!activeId || !window.yardimciDesktop?.getCustomer) return;
     let current = true;
@@ -80,11 +79,11 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     }).catch(error => { if (current) setCustomerLoadError(error instanceof Error ? error.message : "Müşteri okunamadı."); })
       .finally(() => { if (current) setCustomerLoading(false); });
     return () => { current = false; };
-  }, [activeId, recordRevision]);
+  }, [activeId]);
   const customer = loadedCustomer?.id === activeId ? loadedCustomer : data.customers.find(item => item.id === activeId) ?? null;
   const formId = useId();
   const saveLock = useRef(false);
-  const [saveMessage, setSaveMessage] = useState("");
+  const [pendingSavedId, setPendingSavedId] = useState("");
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [formRevision, setFormRevision] = useState(0);
   const formGeneration = useRef(0);
@@ -99,6 +98,14 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [history, setHistory] = useState(intent.mode === "history");
   const presentation = navigation.current?.presentation ?? "centered";
   const closeWorkspace = () => navigation.closeWorkspace(undefined, intent.mode === "create" && activeId ? { createdEntityId: activeId } : undefined);
+
+  useEffect(() => {
+    if (!pendingSavedId || closeBlocked) return;
+    navigation.closeWorkspace(
+      { entityType: "customer", entityId: intent.entityId },
+      intent.mode === "create" ? { createdEntityId: pendingSavedId } : undefined
+    );
+  }, [closeBlocked, intent.entityId, intent.mode, navigation, pendingSavedId]);
 
   useEffect(() => {
     if (!customer || customerLoading || customerLoadError || hydratedId.current === customer.id || dirty) return;
@@ -161,26 +168,21 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   async function saveCustomer(continueAdding = false) {
     if (saveLock.current || fieldsBusy || customerLoading || customerLoadError || messagingBusy || !form.fullName.trim()) return;
     saveLock.current = true;
-    setSaveState("loading"); setSaveMessage("");
+    setSaveState("loading");
     try {
       const result = await onSave(customerFormToInput(form, wholesaleEnabled));
-      if (!result.ok) { setSaveMessage(result.message); setSaveState("error"); return; }
+      if (!result.ok) { reportAppStatus("error", result.message); setSaveState("error"); return; }
       const persistedForm = { ...form, id: result.savedId };
-      // Saving is already committed. A failed record refresh must never create a second customer on retry.
       setFormRevision(++formGeneration.current);
       if (continueAdding) {
         const empty = toCustomerForm(null);
         setForm(empty); setBaseline(empty); setActiveId(""); setLoadedCustomer(null); hydratedId.current = "";
       } else {
-        setForm(persistedForm); setBaseline(persistedForm); setActiveId(result.savedId);
-        if (window.yardimciDesktop?.getCustomer) { setCustomerLoading(true); setRecordRevision(value => value + 1); }
-        else hydratedId.current = "";
-        const savedRecord = result.dashboardData.customers.find(item => item.id === result.savedId);
-        if (savedRecord) setLoadedCustomer(savedRecord);
+        setForm(persistedForm); setBaseline(persistedForm); setPendingSavedId(result.savedId);
       }
-      setSaveMessage(result.message); setSaveState("success");
+      reportAppStatus("success", result.message); setSaveState("success");
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : "Müşteri kaydedilemedi."); setSaveState("error");
+      reportAppStatus("error", error instanceof Error ? error.message : "Müşteri kaydedilemedi."); setSaveState("error");
     } finally { saveLock.current = false; }
   }
 
@@ -219,9 +221,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     returnFocusRef={navigation.returnFocusRef}
     dismissOnBackdrop
     footer={!history ? <div className="customer-workspace-footer">
-      {saveMessage && <p className={`form-status sync-${saveState}`} role={saveState === "error" ? "alert" : "status"}>{saveMessage}</p>}
       <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || !dirty} onClick={() => {
-        setFormRevision(++formGeneration.current); setForm(baseline); setSaveState("idle"); setSaveMessage("");
+        setFormRevision(++formGeneration.current); setForm(baseline); setSaveState("idle");
       }}>Değişiklikleri Geri Al</ActionButton>
       {intent.mode === "create" && <ActionButton variant="secondary" type="submit" form={formId} name="saveMode" value="continue"
         disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || Boolean(customerLoadError) || !form.fullName.trim()}>Kaydet ve Yeni Ekle</ActionButton>}

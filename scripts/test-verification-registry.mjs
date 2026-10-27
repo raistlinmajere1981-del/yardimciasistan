@@ -36,7 +36,7 @@ test("release pre-main kapsamını taşır ve paket doğrulamalarını ekler", (
   const preMain = new Set(createVerificationPlan({ preset: "pre-main", platform: "linux" }).map((item) => item.id));
   const release = new Set(createVerificationPlan({ preset: "release", platform: "linux" }).map((item) => item.id));
   for (const id of preMain) assert.ok(release.has(id), `release pre-main kontrolünü içermiyor: ${id}`);
-  for (const id of ["package-web-module", "package-desktop-dir", "android-release-apk", "android-release-aab", "desktop-package"]) {
+  for (const id of ["package-web-module", "package-desktop-dir", "android-release-apk", "dealer-android-release-apk", "android-release-aab", "desktop-package"]) {
     assert.ok(release.has(id), `release paket kontrolü eksik: ${id}`);
   }
 });
@@ -87,4 +87,11 @@ test("Android domain sync ve local companion çapraz akışlarını kapsar", () 
   assert.ok(ids.has("automatic-sync"));
   assert.ok(ids.has("local-companion-server"));
   assert.ok(ids.has("market-companion-desktop-inbox"));
+});
+
+
+test("release stages the current signed Companion before the desktop package",()=>{
+  const ids=createVerificationPlan({preset:"release",platform:"linux"}).map(item=>item.id);
+  assert.ok(ids.indexOf("android-release-apk")<ids.indexOf("package-desktop-dir"));
+  assert.ok(ids.includes("dealer-android-release-apk"));
 });

@@ -1,5 +1,5 @@
 /** Desktop translation owner; publication languages are unrelated to spoken languages. */
-export const PUBLIC_TRANSLATION_KINDS = ["business", "room", "table", "menu_category", "menu_product", "catalog_category", "catalog_product", "gallery", "marketing"] as const;
+export const PUBLIC_TRANSLATION_KINDS = ["business", "room", "table", "menu_category", "menu_product", "catalog_category", "catalog_product", "gallery", "marketing", "site_text"] as const;
 export type PublicTranslationKind = typeof PUBLIC_TRANSLATION_KINDS[number];
 export interface TranslationSettings {
   enabled: boolean;
@@ -27,7 +27,7 @@ export interface SaveTranslationInput extends TranslationIdentity {
   language: string; fields: Array<{ field: string; sourceHash: string; text: string }>;
 }
 export interface TranslationJob {
-  id: string; state: "running" | "complete" | "cancelled";
+  id: string; state: "running" | "complete" | "cancelled" | "unavailable";
   total: number; completed: number; failed: number; skipped: number; message: string;
 }
 export interface TranslateSelectionInput {
@@ -48,4 +48,12 @@ export interface TranslationBridge {
 export interface PublicLocalization {
   version: 1; source_language: "tr"; target_languages: string[];
   translations: Partial<Record<PublicTranslationKind, Record<string, Record<string, Record<string, string>>>>>;
+  languages?: import("./public-languages").PublicLanguage[];
+  site_catalog?: PublicSiteCatalog;
+  business_id?: string;
+}
+/** Source-only catalog served by the site. No translated files or private business context. */
+export interface PublicSiteCatalog {
+  version: 1; id: string; revision: string; source_language: "tr";
+  entries: Record<string, {text: string; hash: string}>;
 }

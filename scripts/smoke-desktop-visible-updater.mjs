@@ -271,6 +271,8 @@ try {
   assert.ok(helper.includes('IsIndeterminate="True"')); assert.doesNotMatch(helper, /(?:Value|Maximum)="100"|Stop-Process|taskkill|Invoke-Expression/);
   const nsis = fs.readFileSync("apps/desktop-app/resources/updater/installer.nsh", "utf8");
   assert.ok(nsis.includes('!macro customCheckAppRunning')); assert.ok(nsis.includes('SetErrorLevel 2'));
+  assert.match(nsis, /nsProcess::_FindProcess\s+\/NOUNLOAD/, 'NSIS plugin exports _FindProcess, not FindProcess');
+  assert.doesNotMatch(nsis, /nsProcess::FindProcess\s/, 'Do not call nonexistent NSIS export');
   assert.doesNotMatch(nsis, /KILL_PROCESS|taskkill|Stop-Process/);
   console.log(`desktop-visible-updater-ok: ${assertions} behavioral scenarios; native helper and x64/x86 configuration contracts`);
 } finally {

@@ -189,6 +189,16 @@ if [[ "$fresh_install" == true ]]; then
     printf '  npm run prepare:web-install -- --url %s\n' "$public_url" >&2
     exit 1
   fi
+  # Bind the prepared bytes to this destination before any SSH or upload.
+  node --input-type=module - "$project_root" "$public_url" <<'TARGET_CHECK'
+import {pathToFileURL} from 'node:url';
+const [root, moduleUrl] = process.argv.slice(2);
+const {validatePreparedWebModule} = await import(pathToFileURL(root + '/scripts/lib/release-artifacts.mjs'));
+const {readInstallationRegistry} = await import(pathToFileURL(root + '/scripts/lib/installation-registry.mjs'));
+const installationId = process.env.YARDIMCI_ASISTAN_DEPLOY_INSTALLATION_ID ?? Object.values(readInstallationRegistry(root).installations)
+  .find(value => value.webModuleUrl?.replace(/\/+$/, '') === moduleUrl.replace(/\/+$/, ''))?.id ?? '';
+await validatePreparedWebModule(root, {target:{installationId, moduleUrl, siteOrigin:process.env.YARDIMCI_ASISTAN_DEPLOY_SITE_ORIGIN || new URL(moduleUrl).origin}});
+TARGET_CHECK
 fi
 
 printf 'Paket içindeki PHP dosyaları doğrulanıyor...\n'

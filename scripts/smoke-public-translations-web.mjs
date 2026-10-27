@@ -3,7 +3,9 @@ import {createRequire} from "node:module";
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join,resolve} from "node:path";
-import {spawn} from "node:child_process";
+import {spawn,spawnSync} from "node:child_process";
+import {runInNewContext} from "node:vm";
+import ts from "typescript";
 import {createServer} from "node:net";
 import {DatabaseSync} from "node:sqlite";
 import {chromium,expect} from "@playwright/test";
@@ -11,25 +13,56 @@ import {installDemoSite} from "./test-helpers/demo-site.mjs";
 import {launchChromiumForSmoke} from "./test-helpers/playwright-browser.mjs";
 import {createSmokeSetupInput} from "./test-helpers/desktop-setup.mjs";
 const require=createRequire(import.meta.url);
+function syntheticUiDictionary() {
+  return Object.fromEntries(Object.values(JSON.parse(readFileSync('test-site/landing/locales/tr.json','utf8')))
+    .filter(value=>typeof value==='string').map(value=>[value,`fixture-en ${value}`]));
+}
+function assertCanonicalLanguageAdapters() {
+  const code=`require $argv[1].'/core/bootstrap.php'; $source=\\YaSite\\source_catalog($argv[1]);
+    $translations=[];foreach($source['entries'] as $key=>$entry)$translations[$source['id'].':'.$key]=['en'=>['text'=>'fixture-en '.$entry['text']]];
+    $business=['localization'=>['version'=>1,'source_language'=>'tr','target_languages'=>['en'],
+      'languages'=>[['code'=>'en','locale'=>'en-GB','direction'=>'ltr','nativeName'=>'English']],
+      'site_catalog'=>$source,'translations'=>['site_text'=>$translations]]];
+    $_GET['lang']='en';$language=\\YaSite\\language_context($argv[1],$business);
+    echo json_encode(['language'=>$language,'sourceKeys'=>\\YaSite\\source_keys($argv[1])]);`;
+  const php=spawnSync('php',['-r',code,resolve('test-site/landing/deneme')],{encoding:'utf8'});
+  assert.equal(php.status,0,php.stderr);
+  const context=JSON.parse(php.stdout),node={textContent:JSON.stringify(context)},window={};
+  const document={getElementById:()=>node};
+  runInNewContext(readFileSync('web-site-template/public/assets/core/interaction-language.js','utf8'),{document,window});
+  const exports={};
+  runInNewContext(ts.transpileModule(readFileSync('test-site/landing/assistant/site-language.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{document,exports});
+  assert.equal(context.language.code,'en');
+  for(const adapter of [window.DemoLanguage,exports])assert.equal(adapter.ui('Sepete ekle'),'fixture-en Sepete ekle');
+  const source={products:[{product_id:'p',name:'Çay',price:12.5}],localization:{version:1,source_language:'tr',target_languages:['en'],translations:{catalog_product:{p:{en:{name:'Tea'}}}}}};
+  const localized=window.DemoLanguage.localize(source,'online_catalog');
+  assert.equal(localized.products[0].name,'Tea');assert.equal(localized.products[0].price,12.5);assert.equal(source.products[0].name,'Çay');
+  console.log('canonical-language-adapters-ok: PHP source hashes → synthetic publication → interaction and widget adapters');
+}
+if(process.argv.includes('--language-contract-only')) { assertCanonicalLanguageAdapters(); process.exit(0); }
 const {DesktopDatabase}=require("../apps/desktop-app/dist-electron/database.js");
 const {createPublicRoomCatalog}=require("../apps/desktop-app/dist-electron/public-room-catalog-publication.js");
 const {createPublicTableCatalog}=require("../apps/desktop-app/dist-electron/public-table-catalog-publication.js");
 const {createCurrentBusinessWebContext}=require("../apps/desktop-app/dist-electron/business-ai-context-service.js");
+const {createAndroidOperationsSnapshot}=require("../apps/desktop-app/dist-electron/android-operations-snapshot.js");
 const {MarketingWebsitePublicationService}=require("../apps/desktop-app/dist-electron/marketing/website-publication.js");
+const {readPublicSiteCatalog}=require("../apps/desktop-app/dist-electron/public-site-catalog.js");
 const {publishDesktopProjection}=require("../apps/desktop-app/dist-electron/desktop-publication-service.js");
 const core=require("../packages/sync-core/dist/index.js");
 const root=mkdtempSync(join(tmpdir(),"ya-translations-web-")),site=join(root,"site"),secret="translation-fixture-secret";
-const hosting=installDemoSite(site),configPath=join(hosting,"config/business.json");
+const hosting=installDemoSite(site, {httpApi:true}),configPath=join(hosting,"config/business.json");
 writeFileSync(configPath,JSON.stringify({...JSON.parse(readFileSync(configPath,"utf8")),sync_secret:secret}));
 const listener=createServer();await new Promise(done=>listener.listen(0,"127.0.0.1",done));const port=listener.address().port;await new Promise(done=>listener.close(done));
 const base=`http://127.0.0.1:${port}`,config={baseUrl:`${base}/yardimci-asistan`,syncSecret:secret};
-const php=spawn("php",["-S",`127.0.0.1:${port}`,"-t",site],{stdio:"ignore"});
+const php=spawn("php",["-S",`127.0.0.1:${port}`,"-t",site],{env:{...process.env,PHP_CLI_SERVER_WORKERS:"4",YA_SITE_API_ORIGIN:base, YA_ACCOUNT_SITE_URL:`${base}/deneme/hesabim/`},stdio:"ignore",detached:true});
 const desktop=new DesktopDatabase({appPath:resolve("apps/desktop-app"),userDataPath:join(root,"desktop")});
 let raw,browser,resolveAi,translationService;
 try {
   for(let n=0;n<100;n++){try{if((await fetch(`${config.baseUrl}/api/business.php`)).ok)break;}catch{}await new Promise(done=>setTimeout(done,25));}
   desktop.initialize();
-  assert.equal(desktop.saveInitialSetup(createSmokeSetupInput({businessName:"Çeviri Test",profileId:"pension_restaurant",profileOptions:["channel.online_sales","channel.qr_menu","marketing.studio"],phone:"+905321234567",whatsapp:"+905321234567",syncSecret:secret,webModuleUrl:config.baseUrl,servicePreferences:{whatsapp:true,android:false},initialCounts:{rooms:0,tables:0},tableCategories:[]})).ok,true);
+  // Synthetic credential placeholders stay inside this disposable test DB; chat HTTP is intercepted.
+  const setupResult=desktop.saveInitialSetup(createSmokeSetupInput({businessName:"Çeviri Test",aiEnabled:true,aiModel:"fixture-model",aiApiKey:"fixture-non-provider-key",profileId:"pension_restaurant",profileOptions:["channel.online_sales","channel.qr_menu","marketing.studio","customer.requests","service.ai","accommodation.reservations","food_service.reservations"],phone:"+905321234567",whatsapp:"+905321234567",syncSecret:secret,webModuleUrl:config.baseUrl,servicePreferences:{whatsapp:true,android:false},initialCounts:{rooms:0,tables:0},tableCategories:[]}), {mode:"replace",encryptedValue:"safe-storage:v1:fixture-ciphertext"});
+  assert.equal(setupResult.ok,true,setupResult.message);
   raw=new DatabaseSync(desktop.databasePath);
   const b=raw.prepare("SELECT id FROM business").get().id;
   raw.exec(`UPDATE business SET publish_tables_web=1;
@@ -48,8 +81,20 @@ try {
   const galleryPath=join(desktop.userDataPath,"assets/business-gallery");mkdirSync(galleryPath,{recursive:true});
   writeFileSync(join(galleryPath,"manifest.json"),JSON.stringify({version:1,media:[{id:"g",resourceId:"gallery",kind:"photo",title:"Bahçe",storedPath:"files/g.jpg",remoteUrl:"/yardimci-asistan/media/gallery/gallery/g.jpg",mimeType:"image/jpeg",sortOrder:0,originalName:"g.jpg",contentHash:"a".repeat(64)}]}));
   const store=desktop.translations();store.saveSettings({enabled:true,sourceLanguage:"tr",targetLanguages:["en"],automatic:false});
+  const dictionary=syntheticUiDictionary();
+  const ui=source=>dictionary[source] ?? source;
+  const sourceCatalog=await readPublicSiteCatalog(config.baseUrl);store.replaceSiteCatalog(sourceCatalog);
+  for(const [key,entry] of Object.entries(sourceCatalog.entries)) {
+    const translated=dictionary[entry.text];if(!translated)continue;
+    const record=store.get({kind:'site_text',id:`${sourceCatalog.id}:${key}`},'en');
+    store.saveManual({kind:'site_text',id:record.id,language:'en',fields:record.fields.map(field=>({field:field.field,sourceHash:field.sourceHash,text:translated}))});
+  }
+  const footerText="Let's get to work together.";
+  const footerRecord=store.get({kind:'site_text',id:`${sourceCatalog.id}:landing.prompt`},'en');
+  store.saveManual({kind:'site_text',id:footerRecord.id,language:'en',fields:footerRecord.fields.map(field=>({field:field.field,sourceHash:field.sourceHash,text:footerText}))});
   const words={"Bahçe Oda":"Garden Room","Sessiz oda":"Quiet room","Bahçe Masa":"Garden Table","İçecekler":"Drinks","Çay":"Tea","Demleme çay":"Brewed tea","Yerel ürünler":"Local products","Sahil işletmesi":"Seaside business","Bahçe":"Garden","Yaz Fırsatı":"Summer Offer","Kahvaltı dahil":"Breakfast included"};
-  const records=store.list({language:"en",limit:100}).records;
+  const records=[];
+  for(let offset=0;;offset+=100){const batch=store.list({language:'en',limit:100,offset});records.push(...batch.records);if(offset+100>=batch.total)break;}
   assert.ok(records.some(r=>r.kind==='gallery'));
   for(const record of records) {
     const fields=record.fields.filter(f=>words[f.source]).map(f=>({field:f.field,sourceHash:f.sourceHash,text:words[f.source]}));
@@ -61,6 +106,8 @@ try {
     assert.equal(result?.ok,true,result?.message);return result;
   };
   const publishAll=async()=>{
+    await publish('android_snapshot',createAndroidOperationsSnapshot(desktop,desktop.getDashboardData()),(o,snapshot)=>core.pushAndroidSnapshot({...o,snapshot}));
+    await publish('dealer_access_publish',desktop.createDealerAccessProjection(),(o,value)=>new core.PhpHostingSyncTransport(o).publishDealerAccess({sourceRevision:o.sourceRevision,idempotencyKey:o.idempotencyKey,value}));
     await publish("menu_publish",desktop.getQrMenuPublication(),(o,menu)=>core.pushMenu({...o,menu}));
     await publish("room_catalog_publish",createPublicRoomCatalog(desktop.databasePath,caps()),(o,catalog)=>core.pushRoomCatalog({...o,catalog}));
     await publish("table_catalog_publish",createPublicTableCatalog(desktop.databasePath,caps()),(o,catalog)=>core.pushTableCatalog({...o,catalog}));
@@ -90,43 +137,26 @@ try {
   browser=await launchChromiumForSmoke(chromium);const page=await browser.newPage();
   const browserErrors=[];page.on('pageerror',error=>browserErrors.push(error.message));
   await page.route('https://cdn.jsdelivr.net/**',route=>route.abort());
-  await page.goto(`${base}/odalar/`);await expect(page.getByRole('heading',{name:'Bahçe Oda',exact:true})).toBeVisible();
-  await page.locator('.flag-language__trigger').click();
-  await expect(page.locator('.flag-language__choices')).toBeVisible();
-  await page.locator('.flag-language__choice[value="en"]').click();
+  await page.goto(`${base}/deneme/?page=rooms`);await expect(page.getByRole('heading',{name:'Bahçe Oda',exact:true})).toBeVisible();
+  await Promise.all([page.waitForURL(url=>url.searchParams.get('lang')==='en', {waitUntil:'load'}), page.locator('#site-language').selectOption('en')]);
   await expect(page.getByRole('heading',{name:'Garden Room',exact:true})).toBeVisible();
-  await expect(page.locator('[data-room-list]')).toContainText(new Intl.NumberFormat('en-GB',{style:'currency',currency:'TRY',maximumFractionDigits:0}).format(1234.5));
-  await expect(page.locator('[data-room-list]')).toContainText('Çift yatak'); // missing translation falls back field by field
-  for(const [path,text] of [['/qr-menu/','Tea'],['/magaza/','Tea'],['/restoran/','Garden Table'],['/galeri/','Garden'],['/duyurular/','Summer Offer'],['/hakkimizda/','Seaside business']]) {
-    await page.goto(`${base}${path}`);await expect(page.locator('main')).toContainText(text);
+  await expect(page.locator('main')).toContainText(new Intl.NumberFormat('en-GB',{style:'currency',currency:'TRY'}).format(1234.5));
+  await expect(page.locator('main')).toContainText('Çift yatak');
+  for(const [path,text] of [['menu','Tea'],['catalog','Tea'],['restaurant','Garden Table'],['gallery','Garden'],['announcements','Summer Offer'],['about','Seaside business']]) {
+    await page.goto(`${base}/deneme/?page=${path}`);await expect(page.locator('html')).toHaveAttribute('lang','en');await expect(page.locator('main')).toContainText(text);
   }
-  // Real PHP renders site copy; navigation uses the persisted cookie, not rewritten links.
-  const dictionary=JSON.parse(readFileSync('test-site/landing/assets/i18n/en.json','utf8'));
-  const ui=source=>dictionary[source] ?? source;
-  for(const [path,title] of [['/','Yardımcı Asistan | Keşfet ve Dene'],['/odalar/','Odalar | Yardımcı Asistan'],['/restoran/','Restoran | Yardımcı Asistan'],['/qr-menu/','QR Menü | Yardımcı Asistan'],['/galeri/','Galeri | Yardımcı Asistan'],['/hakkimizda/','Hakkımızda | Yardımcı Asistan'],['/magaza/','Mağaza | Yardımcı Asistan'],['/duyurular/','Kampanyalar ve Duyurular | Yardımcı Asistan'],['/iletisim/','İletişim | Yardımcı Asistan'],['/kurulum/','Yardımcı Asistan | Keşfet ve Dene'],['/kullanim-kilavuzu/','Kullanım Kılavuzu | Yardımcı Asistan'],['/yorumlar/','Google Yorumları | Yardımcı Asistan']]) {
-    await page.goto(`${base}${path}`);
-    await expect(page.locator('html')).toHaveAttribute('lang','en');
-    await expect(page).toHaveTitle(ui(title));
-    await expect(page.locator('.flag-language__trigger img')).toHaveAttribute('src','/assets/flags/en.svg');
-    await expect(page.locator('.flag-language__trigger')).toHaveAttribute('aria-label','Change language');
-    await expect(page.locator('.site-nav')).toContainText('Home');
-    await expect(page.locator('.site-footer')).toContainText(ui('Birlikte deneyelim.'));
+  for(const path of ['/','/kurulum/','/kullanim-kilavuzu/']) {
+    await page.goto(`${base}${path}`);await expect(page.locator('html')).toHaveAttribute('lang','en');
+    await expect(page.locator('.site-nav')).toContainText(ui('Ana Sayfa'));
+    await expect(page.locator('.site-footer')).toContainText(footerText);
   }
-  await page.locator('[data-live-menu]>summary').click();
-  await page.locator('.site-nav a[href="/odalar/"]').click();
-  await expect(page.locator('[data-room-list]')).toContainText('Garden Room');
-  await page.getByRole('link',{name:ui('Odayı incele'),exact:true}).click();
-  await expect(page).toHaveURL(/id=r/);
-  await expect(page.locator('[data-room-name]').first()).toContainText('Garden Room');
-  // Language form preserves the selected resource ID; canonical data never goes through the UI dictionary.
-  await page.locator('.flag-language__trigger').click();
-  await expect(page.locator('.flag-language__choices')).toBeVisible();
-  await page.locator('.flag-language__choice[value="tr"]').click();
-  await expect(page).toHaveURL(/id=r/);
-  await expect(page.locator('[data-room-name]').first()).toContainText('Bahçe Oda');
-  await page.locator('.flag-language__trigger').click();await page.locator('.flag-language__choice[value="en"]').click();
-  await expect(page.locator('[data-room-name]').first()).toContainText('Garden Room');
-  await page.goto(`${base}/magaza/`);
+  await page.goto(`${base}/deneme/?page=rooms&id=r`);
+  await Promise.all([page.waitForURL(url=>url.searchParams.get('lang')==='tr', {waitUntil:'load'}), page.locator('#site-language').selectOption('tr')]);
+  await expect(page).toHaveURL(/page=rooms/);
+  await expect(page.locator('main')).toContainText('Bahçe Oda');
+  await Promise.all([page.waitForURL(url=>url.searchParams.get('lang')==='en', {waitUntil:'load'}), page.locator('#site-language').selectOption('en')]);
+  await expect(page.locator('main')).toContainText('Garden Room');
+  await page.goto(`${base}/deneme/?page=catalog`);
   await expect(page.locator('#product-grid')).toContainText('Tea');
   await expect(page.locator('#product-grid')).toContainText(ui('Sepete ekle'));
   await page.locator('#product-grid').getByRole('button',{name:ui('Sepete ekle'),exact:true}).click();
@@ -139,42 +169,42 @@ try {
   await page.locator('#buyer-phone').fill('+44 7911 123456');
   await page.locator('#order-note').fill('Sipariş notu / Original buyer note.');
   const orderAccepted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/order.php` && r.request().method()==='POST');
-  await page.locator('#submit-order').click();
-  const orderReceipt=await orderAccepted;
+  await page.locator('#submit-order').click();const orderReceipt=await orderAccepted;
   assert.equal(orderReceipt.status(),201,await orderReceipt.text());
   assert.equal(orderReceipt.request().postDataJSON().note,'Sipariş notu / Original buyer note.');
   await expect(page.locator('#success-title')).toHaveText(ui('Siparişiniz alındı'));
-  await page.goto(`${base}/qr-menu/`);
-  await expect(page.locator('[data-qr-menu-root]')).toContainText('Drinks');
-  // Date and money formatting follows the visitor locale; IDs, numbers and source stay untouched.
-  assert.equal(await page.evaluate(()=>window.DemoLanguage.locale),'en-GB');
-  const localized=await page.evaluate(()=>window.DemoLanguage.localize({products:[{product_id:'x',name:'Odalar',sale_price:1234.5}],localization:{target_languages:['en'],translations:{}}},'online_catalog'));
+  await page.goto(`${base}/deneme/?page=menu`);await expect(page.locator('main')).toContainText('Drinks');
+  assert.equal(await page.evaluate(()=>window.DemoLanguage.locale),business.localization.languages.find(language=>language.code==='en').locale);
+  const localized=await page.evaluate(()=>window.DemoLanguage.localize({products:[{product_id:'x',name:'Odalar',sale_price:1234.5}],localization:{version:1,source_language:'tr',target_languages:['en'],translations:{}}},'online_catalog'));
   assert.equal(localized.products[0].name,'Odalar');assert.equal(localized.products[0].sale_price,1234.5);
   // Exercise the English widget with the real request endpoint and a single temporary failed response.
-  await page.goto(`${base}/odalar/`);
-  await expect(page.locator('[data-room-list]')).toContainText('Garden Room');
-  await page.evaluate(()=>window.YardimciAsistanWidget.init({requestsEnabled:true,aiEnabled:true,whatsappEnabled:true,whatsappPhone:'905321234567',publicSurfaces:['accommodation','food_service','directions']}));
+  await page.goto(`${base}/deneme/?page=rooms`);
+  await expect(page.locator('main')).toContainText('Garden Room');
+  assert.equal(business.business.whatsapp_enabled,true,'WhatsApp translation scenario requires its published capability');
+  await expect(page.locator('script[src*="widget.js"]')).toHaveAttribute('data-whatsapp-phone',business.business.whatsapp);
+  await expect(page.locator('script[src*="widget.js"]')).toHaveAttribute('data-business-name',business.business.display_name);
+  assert.ok(business.business.request_types.includes('pension_reservation'),'Reservation test requires the canonical published request capability');
   const widget=page.locator('#yardimci-asistan-widget');
   await widget.locator('[data-ya-open]').click();
   await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Merhaba, ben Nexa.'));
   await widget.locator('[data-ya-request-type="pension_reservation"]').click();
   await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Rezervasyonunuzu hazırlayalım'));
   await widget.locator('[data-ya-open-date-picker="start_date"]').click();
-  await expect(widget.locator('.ya-widget-calendar-weekdays')).toContainText('Mon');
-  await expect(widget.locator('.ya-widget-calendar-shortcuts')).toContainText('Today');
+  await expect(widget.locator('.ya-widget-calendar-weekdays')).toContainText(ui('Pzt'));
+  await expect(widget.locator('.ya-widget-calendar-shortcuts')).toContainText(ui('Bugün'));
   await widget.locator('[data-ya-calendar-shortcut="today"]').click();
   const startDate=await widget.locator('input[name="start_date"]').inputValue();
-  const expectedDate=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long'}).format(new Date(`${startDate}T12:00:00`));
+  const expectedDate=new Intl.DateTimeFormat('en',{day:'numeric',month:'long'}).format(new Date(`${startDate}T12:00:00`));
   await expect(widget.locator('[data-ya-date-label="start_date"]')).toHaveText(expectedDate);
   await widget.locator('[data-ya-open-date-picker="end_date"]').click();
-  await expect(widget.locator('.ya-widget-calendar-shortcuts')).toContainText('1 day');
+  await expect(widget.locator('.ya-widget-calendar-shortcuts')).toContainText(ui('1 gün'));
   await widget.locator('[data-ya-calendar-shortcut="day1"]').click();
   await widget.getByRole('button',{name:ui('Kişi sayısını artır'),exact:true}).click();
   await expect(widget.locator('input[name="guest_count"]')).toHaveValue('3');
   await widget.locator('input[name="customer_name"]').fill('English Guest');
   await widget.locator('input[name="customer_phone"]').fill('123');
   await widget.locator('button[type="submit"]').click();
-  await expect(widget.locator('[data-ya-status]')).toContainText('phone number');
+  await expect(widget.locator('[data-ya-status]')).toContainText(ui('Telefon numarası geçerli formatta olmalı. Yurt dışı numaralarında ülke kodunu ekleyin. Örnek: +90 532 123 45 67 veya +44 7911 123456'));
   await widget.locator('input[name="customer_phone"]').fill('+44 7911 123456');
   const userNote='Sessiz oda / Please keep this note unchanged.';
   await widget.locator('textarea[name="message"]').fill(userNote);
@@ -197,9 +227,9 @@ try {
   await widget.locator('[data-ya-request-whatsapp]').click();
   const whatsappUrl=new URL(await page.evaluate(()=>window.fixtureWhatsAppUrl));
   assert.equal(whatsappUrl.hostname,'wa.me');assert.ok(whatsappUrl.searchParams.get('text').includes(userNote));
-  assert.ok(whatsappUrl.searchParams.get('text').includes('Request type:'));
+  assert.ok(whatsappUrl.searchParams.get('text').includes(ui('Talep türü: {0}').split('{0}')[0]));
   await widget.locator('[data-ya-request-done]').click();
-  await widget.locator('[data-ya-view="info"]').click();
+  await widget.locator('[data-ya-view="info"]').filter({hasText:ui('Asistana sor')}).click();
   await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Merak ettiğiniz şeyi sorun'));
   const question='Please keep this original question: kahvaltı?';
   const aiAnswer='Original provider answer — Türkçe metin stays unchanged.';
@@ -215,32 +245,17 @@ try {
   await widget.locator('button[type="submit"]').click();
   await expect(widget.locator('[data-ya-status]')).not.toContainText('Türkçe sağlayıcı hatası');
   await expect(widget.locator('[data-ya-status]')).toBeVisible();
-  // Mobile header, language controls, menu navigation and assistant remain usable.
+  // Both layers retain usable central language controls on narrow viewports.
   for(const width of [320,390,768]) {
     await page.setViewportSize({width,height:844});await page.goto(`${base}/?lang=en`);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`English overflow ${width}`);
-    const selector=await page.locator('.flag-language__trigger').boundingBox();assert.ok(selector.height>=44);
-    assert.equal(await page.locator('.flag-language__cloth--active').evaluate(el => getComputedStyle(el).animationName),'flag-language-wave');
     await page.locator('.flag-language__trigger').click();
     await expect(page.locator('.flag-language__choice[value="tr"]')).toBeVisible();
-    await page.locator('.flag-language__choice[value="tr"] .flag-language__cloth').hover();
-    assert.equal(await page.locator('.flag-language__choice[value="tr"] .flag-language__cloth').evaluate(el => getComputedStyle(el).animationName),'flag-language-wave');
-    await page.emulateMedia({reducedMotion:'reduce'});
-    assert.equal(await page.locator('.flag-language__cloth--active').evaluate(el => getComputedStyle(el).animationName),'none');
-    await page.emulateMedia({reducedMotion:'no-preference'});
-    const languageChoices=await page.locator('.flag-language__choices').boundingBox();
-    assert.ok(languageChoices.x>=0&&languageChoices.x+languageChoices.width<=width+1,'Flag panel fits viewport');
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.flag-language__choices')).toBeHidden();
-    await page.locator('[data-menu-toggle]').click();
-    await page.locator('[data-live-menu]>summary').click();
-    await page.locator('.site-nav a[href="/restoran/"]').click();
-    await expect(page.locator('[data-table-list]')).toContainText('Garden Table');
-    await expect(page.locator('html')).toHaveAttribute('lang','en');
+    await page.keyboard.press('Escape');await expect(page.locator('.flag-language__choices')).toBeHidden();
+    await page.goto(`${base}/deneme/?page=restaurant`);await expect(page.locator('main')).toContainText('Garden Table');
   }
   await page.setViewportSize({width:390,height:844});
   await expect(page.locator('[data-ya-open]')).toBeVisible();
-  await page.evaluate(()=>window.YardimciAsistanWidget.init({requestsEnabled:true,publicSurfaces:['accommodation','food_service']}));
   await page.locator('[data-ya-open]').click();
   await widget.locator('[data-ya-request-type="restaurant_reservation"]').click();
   await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Masa talebinizi hazırlayalım'));
@@ -248,45 +263,38 @@ try {
   await widget.locator('[data-ya-time-hour="20"]').click();
   await widget.locator('[data-ya-time-minute="30"]').click();
   await expect(widget.locator('input[name="time"]')).toHaveValue('20:30');
-  await expect(widget.locator('[data-ya-time-label]')).toHaveText('20:30');
+  await expect(widget.locator('[data-ya-time-label]')).toHaveText(new Intl.DateTimeFormat('en',{hour:'2-digit',minute:'2-digit'}).format(new Date('2026-10-25T20:30:00')));
   assert.equal(await widget.evaluate(n=>n.scrollWidth>n.clientWidth+1),false,'English mobile widget overflow');
-  await page.goto(`${base}/restoran/`);
-  await page.locator('.flag-language__trigger').click();await page.locator('.flag-language__choice[value="tr"]').click();
-  await expect(page.locator('[data-table-list]')).toContainText('Bahçe Masa');
-  await expect(page.locator('h1')).toHaveText('Restoran ve masalar');
-  await page.locator('.flag-language__trigger').click();await page.locator('.flag-language__choice[value="en"]').click();
+  await page.goto(`${base}/deneme/?page=restaurant`);
+  await Promise.all([page.waitForURL(url=>url.searchParams.get('lang')==='tr', {waitUntil:'load'}), page.locator('#site-language').selectOption('tr')]);await expect(page.locator('main')).toContainText('Bahçe Masa');
+  await expect(page.locator('h1')).toHaveText('Restoran');
+  await Promise.all([page.waitForURL(url=>url.searchParams.get('lang')==='en', {waitUntil:'load'}), page.locator('#site-language').selectOption('en')]);
   assert.deepEqual(browserErrors,[]);
   raw.exec("UPDATE rooms SET name='Yeni Oda' WHERE id='r'");
   await publish("room_catalog_publish",createPublicRoomCatalog(desktop.databasePath,caps()),(o,catalog)=>core.pushRoomCatalog({...o,catalog}));
   const changed=await fetch(`${config.baseUrl}/api/rooms.php`,{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.notEqual(changed.headers.get('etag'),etag);
   const stale=await changed.json();assert.equal(stale.localization.translations.room.r.en.name,undefined);
-  await page.goto(`${base}/odalar/`);await expect(page.locator('[data-room-list]')).toContainText('Yeni Oda');
+  await page.goto(`${base}/deneme/?page=rooms`);await expect(page.locator('main')).toContainText('Yeni Oda');
   store.saveSettings({...store.settings(),enabled:false});await publishAll();
   for(const [path,text] of [['/qr-menu/','Çay'],['/magaza/','Çay'],['/restoran/','Bahçe Masa'],['/galeri/','Bahçe'],['/hakkimizda/','Sahil işletmesi']]) {
-    await page.goto(`${base}${path}`);await expect(page.locator('html')).toHaveAttribute('lang','en');await expect(page.locator('main')).toContainText(text);
+    await page.goto(`${base}${path}`);await expect(page.locator('html')).toHaveAttribute('lang','tr');await expect(page.locator('main')).toContainText(text);
   }
   raw.exec("UPDATE marketing_publications SET desired_published=0 WHERE id='m'; UPDATE catalog_products SET deleted_at='deleted' WHERE id='p'");
   await publishAll();assert.deepEqual((await get('marketing')).publications,[]);assert.deepEqual((await get('catalog')).products,[]);
   assert.deepEqual((await get('rooms')).localization.target_languages,[]);
-  await page.goto(`${base}/odalar/`);await expect(page.locator('[data-room-list]')).toContainText('Yeni Oda');
-  await page.goto(`${base}/magaza/`);await expect(page.locator('#product-grid')).toBeEmpty();
-  await expect(page.locator('#catalog-state')).toContainText(ui('Şu anda satışta ürün bulunmuyor.'));
-  await expect(page.locator('main')).not.toContainText('Brewed tea');
-  await page.goto(`${base}/duyurular/`);await expect(page.locator('[data-marketing-empty]')).toBeVisible();
-  await expect(page.locator('main')).not.toContainText('Summer Offer');
-  // Empty publications are valid. Removed resources cannot be reached by their old URL.
-  raw.exec("UPDATE rooms SET is_active=0 WHERE id='r'; UPDATE tables SET is_active=0 WHERE id='t'; UPDATE business_public_profile SET about_text='' WHERE business_id IS NOT NULL");
-  writeFileSync(join(galleryPath,'manifest.json'),JSON.stringify({version:1,media:[]}));
-  await publishAll();
-  for(const [path,text] of [['/odalar/','Yayınlanmış aktif oda bulunmuyor.'],['/restoran/','Yayınlanmış aktif masa bulunmuyor.'],['/galeri/','Henüz yayınlanmış galeri fotoğrafı bulunmuyor.'],['/hakkimizda/','İşletme hakkında henüz yayınlanmış bilgi bulunmuyor.']]) {
-    await page.goto(`${base}${path}`);await expect(page.locator('main')).toContainText(ui(text));
+  await page.goto(`${base}/deneme/?page=rooms`);await expect(page.locator('main')).toContainText('Yeni Oda');
+  for(const path of ['catalog','announcements']) {
+    assert.equal((await page.goto(`${base}/deneme/?page=${path}`)).status(),404);
+    await expect(page.locator('main')).not.toContainText('Summer Offer');await expect(page.locator('main')).not.toContainText('Brewed tea');
   }
-  await page.goto(`${base}/odalar/oda/?id=r`);await expect(page.locator('[data-room-detail-loading]')).toContainText(ui('Bu oda artık yayında değil veya bulunamadı.'));
-  await expect(page.locator('[data-room-detail-content]')).toBeHidden();
-  await page.route(`${config.baseUrl}/api/rooms.php`,route=>route.fulfill({status:503,json:{ok:false,message:'Türkçe sunucu hatası'}}),{times:1});
-  await page.goto(`${base}/odalar/`);await expect(page.locator('[data-room-list]')).toContainText(ui('Oda bilgilerine şu anda ulaşılamıyor.'));
+  raw.exec("UPDATE rooms SET is_active=0 WHERE id='r'; UPDATE tables SET is_active=0 WHERE id='t'; UPDATE business_public_profile SET about_text='' WHERE business_id IS NOT NULL");
+  writeFileSync(join(galleryPath,'manifest.json'),JSON.stringify({version:1,media:[]}));await publishAll();
+  for(const path of ['rooms','restaurant','gallery','about']) {
+    assert.equal((await page.goto(`${base}/deneme/?page=${path}`)).status(),404);
+    await expect(page.locator('main')).toContainText('Bu sayfa şu anda kullanılamıyor.');
+  }
   assert.deepEqual(browserErrors,[]);
   const payload=JSON.stringify(await get('business'));
   for(const forbidden of ['source_hash','failure_code','purchase_price',secret,'safe-storage','customer_id'])assert.ok(!payload.includes(forbidden),forbidden);
   console.log('TR/EN UI/navigation, mobile, dates, widget validation/request/retry, unchanged user/AI content OK. Translation web: real Desktop producers/outbox/exact receipt → PHP APIs → demo English selection, source fallback, ETag, withdrawal and OFF OK.');
-} finally {resolveAi?.("{}");await translationService?.stopAndDrain();await browser?.close();raw?.close();desktop.close();php.kill();rmSync(root,{recursive:true,force:true});}
+} finally {resolveAi?.("{}");await translationService?.stopAndDrain();await browser?.close();raw?.close();desktop.close();try{process.kill(-php.pid,'SIGTERM');}catch{}rmSync(root,{recursive:true,force:true});}

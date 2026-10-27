@@ -19,39 +19,27 @@ function npmCommand() {
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
-function stepsFor(action: ReleaseOperationRequest["action"]): Step[] {
+export function planReleaseSteps(action: ReleaseOperationRequest["action"]): Step[] {
   if (action === "package") {
-    return [
-      {
-        label: "Desktop + Android release paketleri",
-        command: npmCommand(),
-        args: ["run", "pack:desktop:all"]
-      },
-      {
-        label: "Bayi Android pilot APK, birim testleri ve lint",
-        command: npmCommand(),
-        args: ["run", "verify:check", "--", "dealer-android-build"]
-      },
-      {
-        label: "Web modülü paketi",
-        command: npmCommand(),
-        args: ["run", "pack:web-module"]
-      }
-    ];
+    return [{
+      label: "Windows x64/x86, Companion, Bayi release APK ve temiz web paketi",
+      command: npmCommand(),
+      args: ["run", "pack:release"]
+    }];
   }
 
   if (action === "preview") {
     return [{
-      label: "Landing + kurulum dosyaları dry-run",
+      label: "Demo + /deneme/ + temiz web modülü + kurulumlar dry-run",
       command: npmCommand(),
-      args: ["run", "deploy:landing", "--", "--dry-run", "--with-downloads"]
+      args: ["run", "deploy:landing", "--", "--dry-run", "--with-downloads", "--fresh-web-module", "--activate-updates"]
     }];
   }
 
   return [{
-    label: "Landing + kurulum dosyaları yayını",
+    label: "Demo, şablon, temiz web modülü ve kurulumların toplu yayını",
     command: npmCommand(),
-    args: ["run", "deploy:landing", "--", "--yes", "--with-downloads"]
+    args: ["run", "deploy:landing", "--", "--yes", "--with-downloads", "--fresh-web-module", "--activate-updates"]
   }];
 }
 
@@ -100,7 +88,7 @@ export class ReleaseRunner {
         return { accepted: false, message: error instanceof Error ? error.message : "Sürüm hazırlama başlatılamadı." };
       }
     } else {
-      steps = stepsFor(action);
+      steps = planReleaseSteps(action);
     }
     this.cancelled = false;
     this.state = {
@@ -120,7 +108,7 @@ export class ReleaseRunner {
       version: "Yeni sürüm hazırlanıyor. Test ve paketleme başlatılmayacak.",
       package: "Release paketleri oluşturuluyor.",
       preview: "Yayın farkı kontrol ediliyor.",
-      publish: "Kurulum dosyaları ve update feed yayınlanıyor."
+      publish: "Demo, temiz web modülü, kurulumlar ve update feed yayınlanıyor."
     } as const;
 
     return { accepted: true, message: labels[action] };

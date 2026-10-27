@@ -49,9 +49,9 @@ export async function accountFixture({smtp = true, siteSource, providers = false
   }
   const port = await new Promise(resolve=>{const server=http.createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});});
   const siteUrl=`http://127.0.0.1:${port}`, baseUrl=siteUrl+'/yardimci-asistan';
-  Object.assign(env,{YA_ACCOUNT_SITE_URL:siteUrl+'/hesabim/',YA_ACCOUNT_MODULE_URL:baseUrl});
+  Object.assign(env,{YA_ACCOUNT_SITE_URL:siteUrl+'/deneme/hesabim/',YA_SITE_API_ORIGIN:siteUrl,PHP_CLI_SERVER_WORKERS:'4',YA_ACCOUNT_MODULE_URL:baseUrl});
   if(providers) Object.assign(env,{YA_ACCOUNT_GOOGLE_CLIENT_ID:'fixture-google-id',YA_ACCOUNT_GOOGLE_CLIENT_SECRET:'fixture-google-secret',YA_ACCOUNT_FACEBOOK_CLIENT_ID:'fixture-facebook-id',YA_ACCOUNT_FACEBOOK_CLIENT_SECRET:'fixture-facebook-secret',YA_ACCOUNT_FACEBOOK_VERSION:'v24.0'});
-  const server=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{env,stdio:['ignore','pipe','pipe']});
+  const server=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{env,stdio:['ignore','pipe','pipe'],detached:true});
   let logs=''; for(const stream of [server.stdout,server.stderr])stream.on('data',chunk=>{logs+=chunk;});
   for(let i=0;;i++){try{if((await fetch(baseUrl+'/api/account/config.php')).ok)break;}catch{}if(i>100)throw new Error(logs);await new Promise(resolve=>setTimeout(resolve,30));}
   const desktop=createTemporaryDesktopDatabase('ya-account-desktop-'),{database}=desktop;
@@ -66,5 +66,5 @@ export async function accountFixture({smtp = true, siteSource, providers = false
   const login=async(email,client='web')=>{const result=await call('account/login',{email,password:accountPassword},'',{'X-YA-Client':client});assert.equal(result.status,200,JSON.stringify(result.body));assert.match(result.cookie,/ya_account_session=/);return result.cookie;};
   async function register(email,name='Account Fixture'){const result=await call('account/register',{email,fullName:name});assert.equal(result.status,200,JSON.stringify(result.body));const token=new URL(emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);assert.equal((await call('account/verify',{token,password:accountPassword})).status,200);return storage('echo json_encode($db->query("SELECT id FROM customer_accounts WHERE email = " . $db->quote($argv[2]))->fetchColumn());',[email]);}
   return {root,hosting,siteUrl,baseUrl,secret,database,transport,storage,call,login,register,publish,emails,logs:()=>logs,
-    async cleanup(){server.kill();if(smtpServer)await new Promise(resolve=>smtpServer.close(resolve));desktop.cleanup();rmSync(root,{recursive:true,force:true});}};
+    async cleanup(){try{process.kill(-server.pid,'SIGTERM');}catch{}if(smtpServer)await new Promise(resolve=>smtpServer.close(resolve));desktop.cleanup();rmSync(root,{recursive:true,force:true});}};
 }

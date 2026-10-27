@@ -1033,21 +1033,21 @@ function Release({
             <PackageCheck size={22} />
             <div>
               <strong>3 · Paketleri Oluştur</strong>
-              <small>Windows x64/x86, Linux, Android APK ve web modülü.</small>
+              <small>Windows x64/x86, Companion, Bayi release APK ve temiz web modülü.</small>
             </div>
           </button>
           <button className="release-action-card" disabled={busy} onClick={() => void startReleaseAction("preview")}>
             <ShieldCheck size={22} />
             <div>
               <strong>4 · Yayın Farkını Gör</strong>
-              <small>Landing + downloads dry-run; canlıya yazmaz.</small>
+              <small>Demo, /deneme/, temiz web modülü ve kurulumlar; canlıya yazmaz.</small>
             </div>
           </button>
           <button className="release-action-card release-action-card--danger" disabled={busy} onClick={() => setConfirmPublish(true)}>
             <Rocket size={22} />
             <div>
               <strong>5 · Kurulumları Yayınla</strong>
-              <small>Landing, installer dosyaları ve update feed canlıya gider.</small>
+              <small>Demo, temiz web modülü, kurulumlar ve update feed birlikte yayınlanır.</small>
             </div>
           </button>
         </div>
@@ -1059,13 +1059,13 @@ function Release({
             <TriangleAlert size={22} />
             <div>
               <p className="panel-kicker">RELEASE YAYIN ONAYI</p>
-              <h2>Güncel kurulum dosyaları ve update feed canlıya yayınlanacak.</h2>
+              <h2>Demo, web modülü ve kurulumlar temiz release olarak yayınlanacak.</h2>
             </div>
           </div>
           <div className="deployment-impact">
-            <div>• Landing sayfası güncellenir; web modülü dizinine dokunulmaz.</div>
-            <div>• Windows x64/x86 installer ve Android APK /downloads altına atomik yüklenir.</div>
-            <div>• Windows update manifestleri /updates/stable altında güncellenir.</div>
+            <div>• Tanıtım ve /deneme/ güncellenir; web modülü temiz kurulur, eski test verileri taşınmaz.</div>
+            <div>• Windows x64/x86, Companion ve Bayi release APK dosyaları atomik yüklenir.</div>
+            <div>• Windows update feed’leri tüm site ve paket kontrollerinden sonra etkinleşir.</div>
             <div>• İşlem sonunda HTTP ve artifact doğrulaması çalışır.</div>
           </div>
           <div className="deployment-confirm-actions">

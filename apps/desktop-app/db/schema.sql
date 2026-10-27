@@ -3110,9 +3110,15 @@ CREATE TABLE public_translation_settings (
   automatic INTEGER NOT NULL DEFAULT 0 CHECK(automatic IN (0,1)),
   updated_at TEXT NOT NULL
 );
+CREATE TABLE public_site_translation_catalogs (
+  business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+  target_url TEXT NOT NULL,
+  catalog_json TEXT NOT NULL,
+  PRIMARY KEY(business_id,target_url)
+);
 CREATE TABLE public_translations (
   business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
-  record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing')),
+  record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing','site_text')),
   record_id TEXT NOT NULL, field TEXT NOT NULL, target_language TEXT NOT NULL,
   source_text TEXT NOT NULL, source_hash TEXT NOT NULL,
   translated_text TEXT NOT NULL DEFAULT '',

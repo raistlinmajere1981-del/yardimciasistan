@@ -8,6 +8,7 @@ require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/public-request-guard.php';
 require_once YA_BASE_DIR . '/lib/public-request-submission.php';
 require_once YA_BASE_DIR . '/lib/request-documents.php';
+require_once YA_BASE_DIR . '/lib/public-request-policy.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
@@ -25,7 +26,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     ]);
 }
 
-if (!ya_request_feature_enabled($businessConfig)) {
+$runtimeCapabilities = ya_public_runtime_capabilities();
+if (!ya_public_requests_enabled($runtimeCapabilities)) {
     ya_json_response(403, [
         'ok' => false,
         'code' => 'requests_disabled',
@@ -44,8 +46,13 @@ if (!$payloadResult['ok']) {
 }
 
 $payload = $payloadResult['data'];
-$isApplication = ($payload['request_type'] ?? '') === 'dealer_application';
+$requestType = ya_string($payload['request_type'] ?? 'general_info');
+$isApplication = $requestType === 'dealer_application';
 if ($isApplication && !ya_dealer_application_enabled()) ya_json_response(403, ['ok' => false, 'code' => 'dealer_application_disabled', 'message' => 'Online bayi başvurusu kapalı.']);
+if (array_key_exists($requestType, ya_public_request_type_requirements())
+    && !in_array($requestType, ya_public_request_types($runtimeCapabilities, $isApplication), true)) {
+    ya_json_response(403, ['ok' => false, 'code' => 'request_type_disabled', 'message' => 'Bu talep türü işletmede etkin değil.']);
+}
 if ($isApplication) {
     $payload['customer_name'] = ya_string($payload['authorized_person'] ?? '');
     $payload['guest_count'] = 1; $payload['adult_count'] = 0; $payload['child_count'] = 0;
@@ -129,25 +136,6 @@ try {
 }
 
 ya_json_response(201, $result);
-
-function ya_request_feature_enabled(array $businessConfig): bool
-{
-    try {
-        $publication = ya_storage_get_publication('android_snapshot', []);
-        $capabilities = $publication['business_capabilities'] ?? null;
-        if (is_array($capabilities)) {
-            return in_array('customer.requests', array_map(
-                static fn (mixed $capability): string => trim((string) $capability),
-                $capabilities
-            ), true);
-        }
-    } catch (Throwable) {
-        // Fall back to the current profile defaults until a runtime manifest is published.
-    }
-
-    $profileId = ya_string($businessConfig['profile_id'] ?? '');
-    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant'], true);
-}
 
 function ya_merge_business_public_context(array $config): array
 {
@@ -254,17 +242,7 @@ function ya_validate_request_payload(array $payload): array
 {
     $errors = [];
     $requestType = ya_string($payload['request_type'] ?? 'general_info');
-    $allowedTypes = [
-        'dealer_application',
-        'general_info',
-        'pension_reservation',
-        'restaurant_reservation',
-        'breakfast_request',
-        'qr_menu_question',
-        'location_question',
-        'price_question',
-        'other'
-    ];
+    $allowedTypes = array_keys(ya_public_request_type_requirements());
 
     if (!in_array($requestType, $allowedTypes, true)) {
         $errors[] = [
@@ -330,7 +308,7 @@ function ya_validate_request_payload(array $payload): array
                 'message' => 'Rezervasyon saati HH:MM biçiminde olmalı.'
             ];
         }
-    } elseif ($requestType !== 'dealer_application' && $dateText === '' && $startDate === '') {
+    } elseif ($requestType === 'breakfast_request' && $dateText === '' && $startDate === '') {
         $errors[] = [
             'field' => 'date_text',
             'message' => 'Tarih bilgisi gerekli.'

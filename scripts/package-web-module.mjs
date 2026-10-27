@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { join, relative } from "node:path";
 import process from "node:process";
 import { readProductVersion } from "./product-version.mjs";
+import { createWebModuleTarget, validateWebModuleTarget } from "./lib/release-artifacts.mjs";
 
 const API_PACKAGE_FILE = /^(?:\.user\.ini|api\/.*\.php|lib\/.*\.(?:php|json)|config\/(?:\.htaccess|ai\.php|business\.json|version\.json)|data\/(?:\.htaccess|ai-conversations\.json)|knowledge\/(?:\.htaccess|[^/]+\.md)|media\/\.htaccess|README\.md)$/;
 
@@ -124,6 +125,13 @@ const appliedOverrides = applyPackageOverrides();
 const packageFiles = listFiles(packageRoot);
 const businessConfig = JSON.parse(readFileSync(join(packageRoot, "config", "business.json"), "utf8"));
 validateBusinessConfig(businessConfig, "paket config/business.json");
+const deploymentTarget = process.env.YARDIMCI_ASISTAN_DEPLOY_MODULE_URL ? createWebModuleTarget({
+  installationId: process.env.YARDIMCI_ASISTAN_DEPLOY_INSTALLATION_ID || '',
+  moduleUrl: process.env.YARDIMCI_ASISTAN_DEPLOY_MODULE_URL,
+  siteOrigin: businessConfig.website,
+  allowedOrigins: businessConfig.allowed_origins
+}) : null;
+if (deploymentTarget) validateWebModuleTarget(deploymentTarget, null, businessConfig);
 const archives = createArchives();
 const canonicalVersion = readProductVersion(repoRoot);
 const versionMetadata = JSON.parse(readFileSync(join(packageRoot, "config", "version.json"), "utf8"));
@@ -131,6 +139,7 @@ const manifest = {
   package_name: "yardimci-asistan",
   product_version: canonicalVersion.version,
   web_module_version: canonicalVersion.webModuleVersion,
+  deployment_target: deploymentTarget,
   source: relative(repoRoot, sourceRoot),
   output: relative(repoRoot, packageRoot),
   generated_at: new Date().toISOString(),

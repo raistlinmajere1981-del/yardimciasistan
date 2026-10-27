@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-demo-two-layer.mjs",
+  "scripts/smoke-web-site-template.mjs",
   "scripts/smoke-customer-accounts.mjs",
   "scripts/smoke-desktop-visible-updater.mjs",
   "scripts/smoke-entity-single-card.mjs",
@@ -264,6 +266,12 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("web-account-session", "Ortak web hesabı ve özel görünüm yaşam döngüsü", "node", ["--test", "scripts/test-helpers/account-session.test.mjs"], {
+    phase: 5, presets: ["full"], domains: ["web", "dealer-access"]
+  }),
+  check("account-order-receipt", "Hesap kapsamında salt okunur sipariş sonucu kurtarma", "node", ["scripts/test-account-order-receipt.mjs"], {
+    phase: 50, presets: ["full"], domains: ["web", "commerce", "dealer-access"]
+  }),
   check("dealer-android-tests", "Bayi Android birim testleri ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "lintDebug"], {
     phase: 27, domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
   }),
@@ -364,11 +372,17 @@ const BASE_CHECKS = [
   }),
   check("package-desktop-dir", "Desktop unpacked paket üretimi", "npm", ["run", "pack:dir", "-w", "@yardimci-asistan/desktop-app"], {
     phase: 86, presets: ["release"], domains: ["desktop", "release"],
-    requires: ["build-desktop", "version-check"]
+    requires: ["build-desktop", "version-check", "android-release-apk"]
   }),
   check("android-release-apk", "Android release APK", "npm", ["run", "android:release-apk"], {
     phase: 87, presets: ["release"], domains: ["android", "release"],
     requires: ["version-check"]
+  }),
+  check("dealer-android-release-apk", "Bayi Android kalıcı imzalı release APK", "npm", ["run", "dealer:android:release-apk"], {
+    phase: 87, presets: ["release"], domains: ["android", "release"], requires: ["version-check"]
+  }),
+  check("release-tooling-tests", "Release paket ve toplu deploy sözleşmeleri", "node", ["--test", "scripts/test-release-artifacts.mjs"], {
+    phase: 5, presets: ["full"], domains: ["platform", "release"]
   }),
   check("android-release-aab", "Android release AAB", "npm", ["run", "android:release-aab"], {
     phase: 88, presets: ["release"], domains: ["android", "release"],
@@ -600,6 +614,9 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-demo-two-layer.mjs") return ["build-desktop", "build-demo", "php-lint"];
+  // Copied PHP site/hosting plus isolated Desktop translation fixtures; no Demo build.
+  if (file === "scripts/smoke-web-site-template.mjs") return ["build-desktop"];
   if (file === "scripts/smoke-entity-single-card.mjs") return ["build-desktop"];
   if (file === "scripts/smoke-dealer-android-device.mjs") return ["build-desktop", "php-lint"];
   // Own disposable native fixture build; does not consume the customer APK or Desktop.
@@ -640,6 +657,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-demo-two-layer.mjs") return ["web", "translations", "commerce"];
   if (file.startsWith("scripts/smoke-product-photos")) return ["desktop", "commerce", "web", "product-identity"];
   if (file === "scripts/smoke-entity-single-card.mjs") return ["desktop", "commerce", "customers", "hospitality"];
   if (file.startsWith("scripts/smoke-data-transfer")) return ["desktop", "customers", "commerce", "product-identity"];

@@ -1,2 +1,4 @@
-<?php require_once dirname(__DIR__) . '/inc/site.php'; $pageTitle = site_text('Kampanyalar ve Duyurular | Yardımcı Asistan'); require dirname(__DIR__) . '/inc/header.php'; render_site_hero(site_text('Şu anda yayında'), site_text('Kampanyalar ve duyurular'), site_text('Paylaşılan güncel haberleri ve kampanyaları inceleyin.')); ?>
-<link rel="stylesheet" href="/assets/css/marketing.css"><section class="section"><div class="shell"><div data-marketing-surface hidden aria-label="<?= site_e(site_text('Kampanyalar ve duyurular')) ?>"></div><p data-marketing-empty><?= site_e(site_text('Henüz paylaşılmış bir kampanya yok. Yeni duyurular burada yer alacak.')) ?></p></div></section><script src="/assets/js/marketing.js" data-api-base="/yardimci-asistan/" defer></script><?php require dirname(__DIR__) . '/inc/footer.php'; ?>
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__, 1) . '/inc/retired-route.php';
+redirect_demo_route('announcements');

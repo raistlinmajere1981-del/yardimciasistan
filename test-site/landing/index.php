@@ -1,59 +1,119 @@
 <?php
-require_once __DIR__ . '/inc/site.php';
-require_once __DIR__ . '/inc/showcase-content.php';
-$pageTitle = 'Yardımcı Asistan | Keşfet ve Dene';
-$pageScript = '';
-$isShowcaseHome = true;
-$features = showcase_features(); $profiles = showcase_profiles();
-require __DIR__ . '/inc/header.php';
+declare(strict_types=1);
+
+if (($_GET['resource'] ?? '') === 'translation-source') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-cache');
+    header('X-Content-Type-Options: nosniff');
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') { http_response_code(405); header('Allow: GET'); exit; }
+    require_once __DIR__ . '/deneme/core/i18n.php';
+    echo json_encode(\YaSite\source_catalog(__DIR__), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    exit;
+}
+
+require_once __DIR__ . '/inc/upper-shell.php';
+require_once __DIR__ . '/inc/discovery.php';
+use function YaLanding\t;
+use function YaLanding\e;
+
+$bizPath = __DIR__ . '/yardimci-asistan/config/business.json';
+$bizConfig = is_file($bizPath) ? json_decode((string)@file_get_contents($bizPath), true) : [];
+$demoSecret = is_array($bizConfig) ? trim((string)($bizConfig['sync_secret'] ?? '')) : '';
+
+$lang = YaLanding\resolve_language();
+$pageTitle = t('landing.title');
+
+YaLanding\render_header(
+    'home',
+    $pageTitle,
+    t('landing.lead')
+);
 ?>
-<div class="showcase-v2">
-<section class="showcase-hero" data-showcase-section="welcome"><div class="shell showcase-hero-grid">
-    <div class="hero-copy"><p class="eyebrow"><?= site_e(site_text('Tanıtım ve test merkezi')) ?></p>
-        <h1><?= site_e(site_text('Yardımcı Asistan’ı tanıyın,')) ?><br><?= site_e(site_text('uygulamadan deneyin.')) ?></h1>
-        <p class="hero-lead"><?= site_e(site_text('Konaklama, restoran, perakende ve toptan işlemlerini örnek ekranlarda inceleyin. Desktop’ı bağlayın, kendi yayınlarınızı web ve Android ile test edin.')) ?></p>
-        <div class="hero-actions"><a class="button button-primary" href="#profiller"><?= site_e(site_text('Profilleri incele')) ?> <span aria-hidden="true">↗</span></a><a class="button button-outline" href="#kurulum"><?= site_e(site_text('İndir ve Kur')) ?></a></div>
-        <p class="hero-caption"><?= site_e(site_text('Gerçek uygulama ekranları. Örnek verilerle, yakından inceleyin.')) ?></p>
+<section class="hero-section" aria-labelledby="intro-title">
+  <div class="shell hero-grid">
+    <div class="hero-content">
+      <span class="eyebrow"><span class="status-dot" aria-hidden="true"></span><?= e(t('intro.eyebrow')) ?></span>
+      <h1 id="intro-title"><?= e(t('intro.headline_a')) ?><br><?= e(t('intro.headline_b')) ?><br><em><?= e(t('intro.headline_c')) ?></em></h1>
+      <p class="hero-lead"><?= e(t('landing.lead')) ?></p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#ai-ile-calis"><?= e(t('intro.explore')) ?><?= YaLanding\icon('arrow') ?></a>
+        <a class="btn btn-secondary" href="/kurulum/"><?= e(t('landing.cta_install')) ?></a>
+        <a class="text-link hero-demo-link" href="/deneme/" target="_blank" rel="noopener noreferrer"><?= e(t('landing.cta_demo')) ?> ↗</a>
+      </div>
+      <p class="hero-reassurance"><?= YaLanding\icon('check') ?><a href="#ucretsiz-ai"><?= e(t('intro.free_link')) ?></a><span><?= e(t('intro.local')) ?></span></p>
     </div>
-    <figure class="hero-workspace"><div class="hero-visuals">
-        <a class="hero-image-frame showcase-image" href="<?= site_e(site_hero_image()) ?>" data-gallery-image data-gallery-title="<?= site_e(site_text('Günlük çalışma ekranı')) ?>" aria-label="<?= site_e(site_text('Günlük çalışma ekranı') . ' · ' . site_text('Görseli büyüt')) ?>"><img class="showcase-hero-image" src="<?= site_e(site_hero_image()) ?>" alt="<?= site_e(site_text('Yardımcı Asistan günlük çalışma ekranı')) ?>" width="1116" height="663" fetchpriority="high"><span class="image-zoom" aria-hidden="true">↗</span></a>
-        <a class="hero-phone showcase-image" href="<?= site_e(site_asset('showcase/dealer.webp')) ?>" data-gallery-image data-gallery-title="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı')) ?>" aria-label="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı') . ' · ' . site_text('Görseli büyüt')) ?>"><img src="<?= site_e(site_asset('showcase/dealer.webp')) ?>" alt="<?= site_e(site_text('Bayi Android · Pilot giriş ekranı')) ?>" width="500" height="889"><span><?= site_e(site_text('Bayi Android · Pilot')) ?></span></a>
-    </div><div class="hero-connections"><div data-showcase-avatar data-showcase-size="144"></div><figcaption><span class="platform-labels"><span>Desktop</span><i aria-hidden="true">↔</i><span>Android</span><i aria-hidden="true">↔</i><span>Web</span></span><p><?= site_e(site_text('Aynı işin farklı yüzleri.')) ?></p><a class="text-link" href="#canli-yuzeyler"><?= site_e(site_text('Web bağlantısını incele')) ?> →</a></figcaption></div></figure>
-</div></section>
-
-<section class="section profile-section" id="profiller" data-showcase-section="profiles"><div class="shell">
-    <div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('İşiniz farklı, yardımcınız aynı')) ?></p><h2><?= site_e(site_text('İşletmene göre şekillenir')) ?></h2></div><p><?= site_e(site_text('Bir profil seçin, çalışma alanlarına bakın.')) ?></p></div>
-    <div class="profile-grid"><?php $index = 0; foreach ($profiles as $id=>$profile): $index++; ?>
-        <button type="button" class="profile-card" data-profile="<?= site_e($id) ?>" aria-controls="profile-details" aria-expanded="false"><span class="profile-number">0<?= $index ?></span><img src="<?= site_e(site_asset('showcase/' . $profile['cover'] . '.webp')) ?>" alt="" width="1116" height="663" loading="lazy"><strong><?= site_e(site_text($profile['title'])) ?></strong><span><?= site_e(site_text($profile['text'])) ?></span><span class="profile-open"><?= site_e(site_text('Ekranları keşfet')) ?> <i aria-hidden="true">↗</i></span></button>
-    <?php endforeach; ?></div>
-    <div class="profile-details" id="profile-details" hidden tabindex="-1"><button type="button" class="profile-close" data-profile-close aria-label="<?= site_e(site_text('Profil detayını kapat')) ?>">×</button>
-        <?php foreach ($profiles as $id=>$profile): ?><div data-profile-panel="<?= site_e($id) ?>" hidden><div class="section-heading"><p class="eyebrow"><?= site_e(site_text('Bu profilde')) ?></p><h3><?= site_e(site_text($profile['title'])) ?></h3><p><?= site_e(site_text($profile['optional'])) ?></p></div><div class="profile-screens"><?php foreach ($profile['features'] as $featureId): $feature = $features[$featureId]; ?><figure><?php showcase_image($feature['image'], $feature['title']); ?><figcaption><?= site_e(site_text($feature['title'])) ?></figcaption></figure><?php endforeach; ?></div></div><?php endforeach; ?>
+    <div class="nexa-workbench">
+      <div class="workbench-label"><span class="status-dot" aria-hidden="true"></span><strong><?= e(t('intro.meet')) ?></strong><span class="workbench-index" aria-hidden="true">YA / 01</span></div>
+      <div class="nexa-scene">
+        <span class="scene-orbit" aria-hidden="true"></span>
+        <span class="scene-tag scene-tag-one"><?= YaLanding\icon('people') ?><?= e(t('intro.scene_customers')) ?></span>
+        <span class="scene-tag scene-tag-two"><?= YaLanding\icon('box') ?><?= e(t('intro.scene_stock')) ?></span>
+        <span class="scene-tag scene-tag-three"><?= YaLanding\icon('chart') ?><?= e(t('intro.scene_reports')) ?></span>
+        <div data-showcase-avatar data-showcase-size="240" data-greeting="<?= e(t('intro.greeting')) ?>"><p class="nexa-static-greeting"><?= e(t('intro.greeting')) ?></p><img src="/assets/assistant/assets/nexa/states/nexa-ready-256.webp" width="240" height="240" alt="Nexa"></div>
+      </div>
+      <div class="nexa-topics" data-nexa-topics hidden>
+        <?php foreach (['ai', 'tree', 'devices'] as $topic): ?><button type="button" data-nexa-message="<?= e(t('intro.message_' . $topic)) ?>" aria-pressed="false"><?= e(t('intro.prompt_' . $topic)) ?><span aria-hidden="true">↗</span></button><?php endforeach; ?>
+      </div>
+      <p class="scripted-note"><?= e(t('intro.scripted')) ?></p>
     </div>
-</div></section>
+  </div>
+  <nav class="shell chapter-nav" aria-label="<?= e(t('intro.explore')) ?>">
+    <?php foreach (['ai' => 'ai-ile-calis', 'tree' => 'yetenekler', 'devices' => 'cihazlar', 'free' => 'ucretsiz-ai'] as $key => $anchor): ?><a href="#<?= e($anchor) ?>"><span aria-hidden="true">0<?= array_search($key, ['ai', 'tree', 'devices', 'free']) + 1 ?></span><?= e(t('intro.chapter_' . $key)) ?><?= YaLanding\icon('arrow') ?></a><?php endforeach; ?>
+  </nav>
+</section>
 
-<section class="section feature-section" id="ozellikler" data-showcase-section="features"><div class="shell">
-    <div class="section-heading"><p class="eyebrow"><?= site_e(site_text('Daha az dağınıklık, daha çok iş')) ?></p><h2><?= site_e(site_text('Günlük işlerini tek yerden yönet')) ?></h2></div>
-    <div class="feature-filters" role="group" aria-label="<?= site_e(site_text('Özellikleri filtrele')) ?>"><button type="button" data-feature-filter="featured" aria-pressed="false" hidden><?= site_e(site_text('Öne çıkanlar')) ?></button><?php foreach (['all'=>'Tümü','daily'=>'Günlük iş','hospitality'=>'Konaklama ve servis','sales'=>'Satış ve stok','mobile'=>'Android'] as $filter=>$label): ?><button type="button" data-feature-filter="<?= site_e($filter) ?>" aria-pressed="<?= $filter === 'all' ? 'true' : 'false' ?>"><?= site_e(site_text($label)) ?></button><?php endforeach; ?></div>
-    <div class="feature-grid"><?php foreach ($features as $id=>$feature): ?><article class="feature-card" data-feature-id="<?= site_e($id) ?>" data-featured="<?= !empty($feature['featured']) ? 'true' : 'false' ?>" data-feature-group="<?= site_e($feature['group']) ?>"><?php showcase_image($feature['image'], $feature['title']); ?><div class="feature-copy"><?php if (!empty($feature['note'])): ?><span class="content-tag"><?= site_e(site_text($feature['note'])) ?></span><?php endif; ?><h3><?= site_e(site_text($feature['title'])) ?></h3><p><?= site_e(site_text($feature['text'])) ?></p><?php if ($feature['guide'] !== ''): ?><a class="text-link" href="/kullanim-kilavuzu/#<?= site_e($feature['guide']) ?>"><?= site_e(site_text('Nasıl yapılır?')) ?> →</a><?php endif; ?></div></article><?php endforeach; ?></div>
-</div></section>
-
-<section class="section live-section" id="canli-yuzeyler" data-showcase-section="web"><div class="shell">
-    <div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('Uygulamadan web’e')) ?></p><h2><?= site_e(site_text('Web siten de sistemin bir parçası')) ?></h2></div><p><?= site_e(site_text('Yayınlanan içerik web’de görünür; talepler ve siparişler işinize geri döner.')) ?></p></div>
-    <div class="web-story"><?php showcase_store_image(); ?><div class="web-path"><span>Desktop</span><i aria-hidden="true">↓</i><strong><?= site_e(site_text('Menü · oda · ürün · duyuru')) ?></strong><i aria-hidden="true">↓</i><span>Web</span><p><?= site_e(site_text('Rezervasyon talebi · müşteri talebi · sipariş')) ?></p><i aria-hidden="true">↩ Desktop</i></div></div>
-    <div class="sample-catalog" data-showcase-catalog aria-labelledby="sample-catalog-title">
-        <div class="section-heading split-heading"><div><p class="eyebrow"><?= site_e(site_text('Örnek katalog · 18 ürün')) ?></p><h3 id="sample-catalog-title"><?= site_e(site_text('Mağaza görünümünü inceleyin')) ?></h3></div><p><?= site_e(site_text('Bu ürünler yalnızca tanıtım örneğidir; canlı mağazaya eklenmez ve sipariş oluşturmaz. Ürün çizimleri temsilidir.')) ?></p></div>
-        <ul class="sample-product-grid"><?php foreach (showcase_sample_products() as $product): ?><li data-showcase-product><div class="sample-product-visual" data-product-kind="<?= site_e($product['kind']) ?>"><?php showcase_product_icon($product['kind']); ?><span><?= site_e(site_text($product['group'])) ?></span></div><strong><?= site_e(site_text($product['name'])) ?></strong><small><?= site_e(site_text($product['unit'])) ?></small></li><?php endforeach; ?></ul>
+<section class="section ai-section" id="ai-ile-calis" aria-labelledby="ai-title">
+  <div class="shell">
+    <div class="section-heading"><span class="eyebrow"><?= e(t('ai.eyebrow')) ?></span><h2 id="ai-title"><?= e(t('ai.title')) ?></h2><p><?= e(t('ai.lead')) ?></p></div>
+    <div class="ai-story-grid">
+      <?php foreach (['identity' => 'people', 'stock' => 'box', 'report' => 'chart', 'marketing' => 'message', 'translation' => 'language', 'daily' => 'calendar'] as $story => $symbol): ?>
+      <article class="ai-story">
+        <div class="story-top"><span class="icon-tile"><?= YaLanding\icon($symbol) ?></span><span class="ai-label"><?= YaLanding\icon('spark') ?><?= e(t('tree.ai')) ?></span></div>
+        <p class="story-quote"><?= e(t('ai.' . $story . '.quote')) ?></p>
+        <h3><?= e(t('ai.' . $story . '.title')) ?></h3><p><?= e(t('ai.' . $story . '.body')) ?></p>
+        <span class="story-platform"><?= e(t(in_array($story, ['identity', 'stock'], true) ? 'ai.platform_camera' : 'ai.platform_desktop')) ?></span>
+      </article>
+      <?php endforeach; ?>
     </div>
-    <div class="section-heading"><h3><?= site_e(site_text('Kendi yayınlarınızla test edin')) ?></h3><p><?= site_e(site_text('Aşağıdaki sayfalar yalnız Desktop’tan yayınladığınız verileri gösterir. Yayın yoksa boş görünür; içerik kaldırıldığında sayfadan da kalkar. Hesap işlemleri Online Satış gerektirir; bayi yetkisi müşteri kartından yönetilir.')) ?></p></div>
-    <div class="demo-surface-grid"><?php foreach (showcase_web_surfaces() as $surface): ?><article class="demo-surface-card"><span class="demo-status-chip"><?= site_e(site_text('Desktop yayınıyla test')) ?></span><h3><?= site_e(site_text($surface['title'])) ?></h3><p><?= site_e(site_text($surface['text'])) ?></p><a class="text-link" href="<?= site_e($surface['path']) ?>"><?= site_e(site_text('Test sayfasını aç')) ?> →</a></article><?php endforeach; ?></div>
-</div></section>
+    <div class="human-control"><?= YaLanding\icon('check') ?><div><strong><?= e(t('ai.control')) ?></strong><p><?= e(t('ai.requirement')) ?></p></div></div>
+  </div>
+</section>
 
-<section class="section service-section" id="servisler" data-showcase-section="services"><div class="shell">
-    <div class="section-heading"><p class="eyebrow"><?= site_e(site_text('İhtiyacınız olduğunda, yanınızda')) ?></p><h2><?= site_e(site_text('Akıllı yardımcı ve servisler')) ?></h2><p><?= site_e(site_text('Servisler kendi hesaplarınız, bağlantılarınız ve izinlerinizle etkinleşir.')) ?></p></div>
-    <div class="service-grid"><?php foreach (showcase_services() as $service): ?><article><span class="content-tag"><?= site_e(site_text($service['status'])) ?></span><h3><?= site_e(site_text($service['title'])) ?></h3><p><?= site_e(site_text($service['text'])) ?></p></article><?php endforeach; ?></div>
-    <div class="showcase-tools"><?php foreach (showcase_tools() as $tool): ?><article><h3><?= site_e(site_text($tool['title'])) ?></h3><p><?= site_e(site_text($tool['text'])) ?></p></article><?php endforeach; ?></div>
-    <div class="service-assistant"><p><?= site_e(site_text('Sağ alttaki yardımcıya sorun veya canlı örneklerden birini açın.')) ?></p><a class="text-link" href="/iletisim/"><?= site_e(site_text('Birlikte deneyelim.')) ?> →</a></div>
-</div></section>
-<?php require __DIR__ . '/inc/demo-installation.php'; render_demo_installation(); ?>
-</div>
-<?php require __DIR__ . '/inc/footer.php'; ?>
+<section class="section discovery-section" id="yetenekler" aria-labelledby="tree-title">
+  <div class="shell">
+    <div class="section-heading"><span class="eyebrow"><?= e(t('tree.eyebrow')) ?></span><h2 id="tree-title"><?= e(t('tree.title')) ?></h2><p><?= e(t('tree.lead')) ?></p></div>
+    <?php YaLanding\render_discovery_tree(); ?>
+  </div>
+</section>
+
+<section class="section devices-section" id="cihazlar" aria-labelledby="devices-title">
+  <div class="shell">
+    <div class="section-heading"><span class="eyebrow"><?= e(t('devices.eyebrow')) ?></span><h2 id="devices-title"><?= e(t('devices.title')) ?></h2><p><?= e(t('devices.lead')) ?></p></div>
+    <div class="connection-selector" data-connection-selector hidden role="group" aria-label="<?= e(t('devices.diagram_label')) ?>"><?php foreach (['local', 'internet', 'cloud'] as $connection): ?><button type="button" data-connection="<?= e($connection) ?>" aria-pressed="false"><?= e(t('devices.' . $connection)) ?></button><?php endforeach; ?></div>
+    <div class="ecosystem" role="group" aria-label="<?= e(t('devices.diagram_label')) ?>">
+      <article class="device-hub"><span class="icon-tile"><?= YaLanding\icon('desktop') ?></span><span class="eyebrow"><?= e(t('devices.center_label')) ?></span><h3><?= e(t('platform.desktop')) ?></h3><p><?= e(t('devices.desktop_desc')) ?></p><span class="hub-line" aria-hidden="true"></span></article>
+      <div class="device-branches">
+        <?php foreach (['companion' => 'phone', 'web' => 'web', 'dealer' => 'phone'] as $device => $symbol): ?>
+        <article class="device-card" data-device-path="<?= $device === 'companion' ? 'local' : 'internet' ?>"><div class="connection-label <?= $device === 'companion' ? 'local-line' : '' ?>"><span aria-hidden="true"><?= $device === 'companion' ? '↔' : '↗' ?></span><?= e(t($device === 'companion' ? 'devices.link_local' : 'devices.link_web')) ?></div><span class="icon-tile"><?= YaLanding\icon($symbol) ?></span><h3><?= e(t('platform.' . $device)) ?></h3><p><?= e(t('devices.' . $device . '_desc')) ?></p></article>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <p class="diagram-note"><?= e(t('devices.diagram_note')) ?></p>
+    <div class="connection-notes"><?php foreach (['local', 'internet', 'cloud'] as $connection): ?><div data-connection-note="<?= e($connection) ?>"><h3><span class="connection-dot dot-<?= e($connection) ?>" aria-hidden="true"></span><?= e(t('devices.' . $connection)) ?></h3><p><?= e(t('devices.' . $connection . '_desc')) ?></p></div><?php endforeach; ?></div>
+  </div>
+</section>
+
+<section class="section free-section" id="ucretsiz-ai" aria-labelledby="free-title">
+  <div class="shell free-layout">
+    <div class="section-heading"><span class="eyebrow"><?= e(t('free.eyebrow')) ?></span><h2 id="free-title"><?= e(t('free.title')) ?></h2><p><?= e(t('free.lead')) ?></p><a class="btn btn-primary" href="/kullanim-kilavuzu/#ai-baslangic"><?= e(t('free.setup')) ?><?= YaLanding\icon('arrow') ?></a></div>
+    <div class="provider-list">
+      <?php foreach (['gemini' => 'https://ai.google.dev/gemini-api/docs/pricing', 'cloudflare' => 'https://developers.cloudflare.com/workers-ai/platform/pricing/', 'other' => null] as $provider => $url): ?><article class="provider-card"><span class="provider-symbol" aria-hidden="true"><?= $provider === 'gemini' ? '✳' : ($provider === 'cloudflare' ? '☁' : '+') ?></span><div><h3><?= e(t('free.' . $provider)) ?></h3><p><?= e(t('free.' . $provider . '_desc')) ?></p><?php if ($url): ?><a href="<?= e($url) ?>" target="_blank" rel="noopener"><?= e(t('free.provider_docs')) ?> ↗</a><?php endif; ?></div></article><?php endforeach; ?>
+    </div>
+    <div class="free-notes"><p><?= e(t('free.limits')) ?></p><p><?= e(t('free.data')) ?></p></div>
+  </div>
+</section>
+
+<section class="closing-section"><div class="shell closing-inner"><div><span class="eyebrow"><?= e(t('landing.tagline')) ?></span><h2><?= e(t('close.title')) ?></h2><p><?= e(t('close.body')) ?></p></div><div class="closing-actions"><a class="btn btn-primary" href="/kurulum/"><?= e(t('landing.cta_install')) ?><?= YaLanding\icon('arrow') ?></a><a class="text-link" href="/deneme/" target="_blank" rel="noopener noreferrer"><?= e(t('landing.cta_demo')) ?> ↗</a></div></div></section>
+<input id="demo-sync-secret" readonly value="<?= e($demoSecret) ?>" hidden>
+<script src="/assets/assistant/showcase.js" defer></script>
+<?php YaLanding\render_footer(); ?>

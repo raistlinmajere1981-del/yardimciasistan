@@ -48,7 +48,8 @@ try {
   await page.evaluate(() => {
     window.YardimciAsistanWidget?.init({
       businessName: "Fallback Firma",
-      logoUrl: ""
+      logoUrl: "",
+      aiEnabled: true, forceVisible: true
     });
   });
   await expect(page.locator('.ya-widget-button [data-nexa-role="launcher"] svg')).toHaveAttribute("data-expression", "idle");
@@ -61,7 +62,9 @@ try {
       businessName: "Logo Firma",
       profileId: "pension_restaurant",
       logoUrl: "/assets/yardimci-asistan-symbol.png",
-      apiBaseUrl: "https://demo.test/yardimci-asistan"
+      apiBaseUrl: "https://demo.test/yardimci-asistan",
+      aiEnabled: true, requestsEnabled: true, requestTypes: ["restaurant_reservation"],
+      publicSurfaces: ["food_service"], forceVisible: true
     });
   });
 

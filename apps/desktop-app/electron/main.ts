@@ -478,9 +478,10 @@ const marketingMediaService = new MarketingMediaService(getDatabase, () => getDa
 const instagramOAuthService = new InstagramOAuthService(getDatabase, fetch, assertAppSessionUnlocked);
 const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()), refreshInstagram: () => instagramOAuthService.refreshIfNeeded() });
 const publicTranslationService = new PublicTranslationService(getDatabase, {
-  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked())
-    && hasBusinessCapability(enabledBusinessCapabilities(), C.AI),
-  onChanged: () => syncCoordinator?.scheduleSoon()
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
+  aiAllowed: () => hasBusinessCapability(enabledBusinessCapabilities(), C.AI),
+  catalogTarget: () => getWebSyncConfig(getDatabase().getSetupData()).baseUrl,
+  onChanged: () => getSyncCoordinator().scheduleSoon(undefined, true)
 });
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
 function publishPendingMarketingWebsiteIntent() {
@@ -558,7 +559,7 @@ const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
   registerDataTransferIpc({ databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, onMutation: () => { syncCoordinator?.scheduleSoon(); } });
-  registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => syncCoordinator?.scheduleSoon()});
+  registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => getSyncCoordinator().scheduleSoon(0, true)});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });

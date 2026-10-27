@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Languages, RefreshCw, Search, Sparkles, CheckSquare, ListChecks } from "lucide-react";
-import type { TranslationFilter, TranslationJob, TranslationPage, TranslationRecord, TranslationIdentity, TranslationSettings } from "@yardimci-asistan/shared";
+import { PUBLIC_LANGUAGES, type TranslationFilter, TranslationJob, TranslationPage, TranslationRecord, TranslationIdentity, TranslationSettings } from "@yardimci-asistan/shared";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import type { WorkspacePresentation } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
@@ -10,7 +10,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { DataList, DataListButton } from "../ui/DataList";
 import { Panel } from "../ui/Panel";
 
-const categories: Array<[NonNullable<TranslationFilter["category"]>, string]> = [["all","Tümü"],["products","Ürünler"],["menu","Menü"],["room","Odalar"],["table","Masalar"],["gallery","Galeri"],["marketing","Kampanyalar"],["business","İşletme Bilgileri"]];
+const categories: Array<[NonNullable<TranslationFilter["category"]>, string]> = [["all","Tümü"],["products","Ürünler"],["menu","Menü"],["room","Odalar"],["table","Masalar"],["gallery","Galeri"],["marketing","Kampanyalar"],["business","İşletme Bilgileri"],["site_text","Site Metinleri"]];
 const states: Array<[NonNullable<TranslationFilter["state"]>, string]> = [["all","Tümü"],["missing","Eksik"],["ready","Hazır"],["stale","Güncellenecek"],["manual","Manuel"],["failed","Başarısız"]];
 const fieldLabels: Record<string,string> = {name:"Ad",description:"Açıklama",about_text:"Hakkımızda",directions_note:"Yol tarifi",policy_note:"Kurallar",payment_note:"Ödeme açıklaması",title:"Başlık",text:"Metin",bed_info:"Yatak bilgisi",price_note:"Fiyat açıklaması",area:"Alan"};
 const keyOf = (r: {kind:string;id:string}) => `${r.kind}:${r.id}`;
@@ -129,7 +129,7 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
     actions={<div className="language-workspace__header-actions">
       {filter.language && <select aria-label="Yayın dili" title="Yayın dili" value={filter.language} disabled={blocked}
         onChange={e => changeFilter({language:e.target.value})}>
-        {settings.targetLanguages.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+        {settings.targetLanguages.map(l => <option key={l} value={l}>{PUBLIC_LANGUAGES.find(v => v.code === l)?.name ?? l}</option>)}
       </select>}
       <IconButton aria-label="Yenile" title="Yenile" disabled={blocked} onClick={() => setRevision(v=>v+1)}>
         <RefreshCw size={17} aria-hidden="true"/>

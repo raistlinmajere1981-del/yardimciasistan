@@ -142,6 +142,18 @@ try {
 
   await expect(createDialog.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Ada Bayi");
   await expect(createDialog.getByLabel("Yetkili kişi", { exact: true })).toHaveValue("Ada Bayi");
+  const createDealerStatus = createDialog.getByLabel("Bayi durumu", { exact: true });
+  const createPriceGroup = createDialog.getByLabel("Fiyat grubu", { exact: true });
+  await expect(createDealerStatus).toHaveValue("inactive");
+  await expect(createPriceGroup).toHaveValue("retail");
+  await expect(createPriceGroup.locator("option")).toHaveText(["Perakende"]);
+  await createDealerStatus.selectOption("active");
+  await expect(createPriceGroup).toHaveValue("dealer_a");
+  await expect(createPriceGroup.locator("option")).toHaveText(["Bayi A", "Bayi B"]);
+  await createPriceGroup.selectOption("dealer_b");
+  await createDealerStatus.selectOption("inactive");
+  await expect(createPriceGroup).toHaveValue("retail");
+  await expect(createPriceGroup.locator("option")).toHaveText(["Perakende"]);
 
   await createDialog.getByLabel("Firma / unvan", { exact: true }).fill("Ada Gıda Ltd. Şti.");
   await createDialog.getByLabel("Yetkili kişi", { exact: true }).fill("Ada Bayi");
@@ -151,8 +163,9 @@ try {
   await createDialog.getByLabel("Fiyat grubu", { exact: true }).selectOption("dealer_a");
   await createDialog.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("30");
   await createDialog.getByLabel("Not", { exact: true }).fill("İlk bayi profili.");
-  // Unified create/detail keeps the saved customer in the same workspace.
   await createDialog.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
+  await expect(createDialog).toHaveCount(0);
+  await page.locator(".customer-record-row__open", { hasText: "Ada Bayi" }).click();
   let workspace = page.locator("dialog.customer-workspace-frame");
   await expect(workspace.getByRole("heading", { name: "Ada Bayi", exact: true })).toBeVisible();
   await expect(workspace).toBeVisible();
@@ -215,11 +228,41 @@ try {
   assert.equal(createdRow.price_group, "dealer_a");
   assert.equal(Number(createdRow.payment_term_days), 30);
 
+  const dealerStatus = workspace.getByLabel("Bayi durumu", { exact: true });
+  const priceGroup = workspace.getByLabel("Fiyat grubu", { exact: true });
+  const saveCustomerCard = workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true });
+  const savedCommercialState = () => raw.prepare(
+    "SELECT dealer_status, price_group FROM customer_commercial_profiles WHERE customer_id = ?"
+  ).get(customerId);
+  await priceGroup.selectOption("dealer_b");
+  await saveCustomerCard.click();
+  await expect(workspace).toHaveCount(0);
+  assert.deepEqual({ ...savedCommercialState() }, { dealer_status: "active", price_group: "dealer_b" });
+  await page.locator(".customer-record-row__open", { hasText: "Ada Bayi" }).click();
+  await dealerStatus.selectOption("inactive");
+  await expect(priceGroup).toHaveValue("retail");
+  await expect(priceGroup.locator("option")).toHaveText(["Perakende"]);
+  await workspace.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
+  await expect(dealerStatus).toHaveValue("active");
+  await expect(priceGroup).toHaveValue("dealer_b");
+  await dealerStatus.selectOption("inactive");
+  await saveCustomerCard.click();
+  await expect(workspace).toHaveCount(0);
+  assert.deepEqual({ ...savedCommercialState() }, { dealer_status: "inactive", price_group: "retail" });
+  await page.locator(".customer-record-row__open", { hasText: "Ada Bayi" }).click();
+  await expect(dealerStatus).toHaveValue("inactive");
+  await expect(priceGroup).toHaveValue("retail");
+  await dealerStatus.selectOption("active");
+  await expect(priceGroup).toHaveValue("dealer_a");
+  await expect(priceGroup.locator("option")).toHaveText(["Bayi A", "Bayi B"]);
+
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
   await workspace.getByLabel("Not", { exact: true }).fill("Vade güncellendi.");
   await expect(workspace.getByRole("button", { name: "Geçmiş", exact: true })).toBeDisabled();
   await expect(accessPanel.getByRole("button", { name: /Davet/ })).toHaveCount(0);
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
+  await expect(workspace).toHaveCount(0);
+  await page.locator(".customer-record-row__open", { hasText: "Ada Bayi" }).click();
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
 
   const updatedRow = raw.prepare(`
@@ -258,6 +301,8 @@ try {
   await workspace.getByLabel("Ad soyad", { exact: true }).fill("Ada Bayi Güncel");
   const saveCallCountBeforeBasicEdit = calls.filter((call) => call.method === "saveCustomer").length;
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
+  await expect(workspace).toHaveCount(0);
+  await page.locator(".customer-record-row__open", { hasText: "Ada Bayi Güncel" }).click();
   await expect(workspace.getByRole("heading", { name: "Ada Bayi Güncel", exact: true })).toBeVisible();
 
   const basicEditCall = calls.filter((call) => call.method === "saveCustomer").at(-1);
@@ -309,6 +354,8 @@ try {
   const normalCreate = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
   await normalCreate.getByLabel("Ad soyad", { exact: true }).fill("Normal Müşteri");
   await normalCreate.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
+  await expect(normalCreate).toHaveCount(0);
+  await page.locator(".customer-record-row__open", { hasText: "Normal Müşteri" }).click();
   await expect(page.locator("dialog.customer-workspace-frame").getByRole("heading", { name: "Normal Müşteri", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Müşteri Hesabı" })).toBeVisible();
   assert.deepEqual(pageErrors, []);

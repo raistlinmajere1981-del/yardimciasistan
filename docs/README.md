@@ -24,6 +24,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `EVENTS.md` — event sözleşmeleri.
 - `FINANCE_MODEL.md` — Kasa / oda hesabı / ön muhasebe modeli.
 - `architecture/WEB_DATA_SERVICE_CONTRACT_V1.md` — API-only web hizmeti ve site sunumu sahipliği.
+- `architecture/WEB_SITE_TEMPLATE_V1.md` — bağımsız ortak site şablonu, tema/dil/efekt ve kontrollü güncelleme sınırları.
 - [Product Photos V2](architecture/PRODUCT_PHOTOS_V2.md) — canonical ürün fotoğraf arşivi, kapak ve perakende yayın entegrasyonu.
 - `AUTOMATIC_SYNC.md` — hosting ↔ desktop ↔ Android senkron mimarisi.
 - `desktop-sync-identity.md` — desktop sync kimliği.
@@ -51,6 +52,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 
 - `DEVELOPMENT_SETUP.md`
 - `WEB_MODULE_INSTALLATION.md`
+- `dev/RELEASE_WORKFLOW.md` — canonical paket kontrolü ve operatörün çalıştıracağı toplu temiz yayın sırası.
 - `ANDROID_DISTRIBUTION.md`
 - `PILOT_FIELD_TEST.md`
 - `WINDOWS_HOSTING_FIELD_TEST.md`

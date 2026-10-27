@@ -15,7 +15,7 @@ function Harness() {
     <button onClick={() => setEnabled(current => !current)}>Online Satış Değiştir</button>
     <WorkspaceHost definition={productWorkspaceDefinition} context={{
       products, categories: [], inventoryEnabled: false, productDataEnabled: false, onlineSalesEnabled: enabled,
-      busy: false, onReload: async () => {}, onProductSaved: (saved: CatalogProduct) => setProducts(current => [...current.filter(p => p.id !== saved.id), saved]), onStateChange: () => {}
+      busy: false, onReload: async () => {}, onProductSaved: (saved: CatalogProduct) => { control.__product = saved; setProducts(current => [...current.filter(p => p.id !== saved.id), saved]); }, onStateChange: () => {}
     }} />
   </>;
 }

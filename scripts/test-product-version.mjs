@@ -112,3 +112,16 @@ test("bump patch/minor/major canonical sürümü ilerletir", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("dealer release metadata follows canonical bump and mismatched dealer version fails",()=>{
+  const root=fixture();
+  try {
+    setProductVersion("2.0.11",root);
+    const path=join(root,"test-site/landing/release.json");
+    const release=JSON.parse(readFileSync(path,"utf8"));
+    assert.equal(release.dealerAndroidVersion,"2.0.11");
+    writeJson(path,{...release,dealerAndroidVersion:"2.0.10"});
+    assert.throws(()=>checkProductVersion(root),/landing download 3/);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});

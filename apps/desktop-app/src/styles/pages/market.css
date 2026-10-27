@@ -69,7 +69,7 @@
 
 .market-workspace--products .market-two-column {
   align-items: stretch;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 10fr) minmax(300px, 3fr);
 }
 
 .market-workspace--products .market-panel {
@@ -204,6 +204,27 @@
 .market-category-create h3 {
   margin: 0;
   font-size: var(--text-md);
+}
+
+.market-category-create-heading {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.market-category-create-heading .form-check {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.market-category-create .form-field--span {
+  grid-column: 1;
+}
+
+.market-category-create .market-category-actions {
+  align-self: end;
 }
 
 .market-workspace--products .market-panel > :is(header, .market-product-toolbar, .market-product-bulk-actions, .choice-chips) {
@@ -1164,23 +1185,40 @@ button.market-list-row {
 }
 
 .market-catalog-products--comfortable {
+  --market-product-card-image-height: 9rem;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .market-catalog-products--balanced {
+  --market-product-card-image-height: 7rem;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
 .market-catalog-products--dense {
+  --market-product-card-image-height: 5rem;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-}
-
-.market-catalog-products:not(.market-catalog-products--list) .market-list-row {
-  flex-wrap: wrap;
 }
 
 .market-catalog-products--list {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.market-catalog-products--list .market-list-row {
+  --market-product-thumb-width: calc(2 * var(--interaction-target-min) + var(--space-1));
+  position: relative;
+}
+
+.market-catalog-products--list .market-list-row:has(.market-list-product-thumb) {
+  padding-inline-start: calc(var(--market-product-thumb-width) + var(--space-3));
+}
+
+.market-catalog-products--list .market-list-product-thumb {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--market-product-thumb-width);
+  height: 100%;
+  padding: 0;
 }
 
 .market-category-chips {
@@ -1420,6 +1458,17 @@ button.market-list-row {
   font-size: var(--text-xs);
 }
 
+.market-catalog-products > .market-catalog-record {
+  grid-template-columns: var(--interaction-target-min) minmax(0, 1fr) auto;
+}
+
+.market-product-controls {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  gap: var(--space-1);
+}
+
 .market-product-selection {
   display: grid;
   place-items: center;
@@ -1437,6 +1486,83 @@ button.market-list-row {
 .market-catalog-products .market-list-row {
   grid-column: 2;
   grid-row: 1;
+  align-self: stretch;
+}
+
+.market-product-delete {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) > .market-catalog-record {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-product-controls {
+  display: flex;
+  align-items: center;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-product-selection {
+  min-width: var(--interaction-target-min);
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-product-delete {
+  grid-column: 2;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-list-row {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .list-row__main {
+  flex: 0 0 auto;
+  width: 100%;
+  gap: var(--space-2);
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .list-row__heading {
+  display: grid;
+  align-items: start;
+}
+
+.market-catalog-products.has-product-images:not(.market-catalog-products--list) .list-row__heading {
+  grid-template-rows: var(--market-product-card-image-height) auto;
+}
+
+.market-catalog-products.has-product-images:not(.market-catalog-products--list) .list-row__title {
+  grid-row: 2;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .market-list-product-thumb {
+  grid-row: 1;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-1);
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .list-row__title {
+  display: -webkit-box;
+  min-block-size: 2lh;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .list-row__meta {
+  overflow-wrap: anywhere;
+}
+
+.market-catalog-products:not(.market-catalog-products--list) .list-row__trailing {
+  align-self: flex-start;
+  margin-block-start: auto;
 }
 
 .market-record-actions {
@@ -1526,8 +1652,7 @@ button.market-list-row {
 }
 
 .product-workspace-frame > .workspace-frame__footer { padding: var(--space-3); border-top: 0; }
-.product-workspace-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; min-width: 0; margin: 0; padding: var(--space-3); }
-.product-workspace-actions .form-status { margin: 0; overflow-wrap: anywhere; }
+.product-workspace-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); width: 100%; min-width: 0; margin: 0; padding: var(--space-3); }
 
 .market-catalog-pagination {
   display: flex;
