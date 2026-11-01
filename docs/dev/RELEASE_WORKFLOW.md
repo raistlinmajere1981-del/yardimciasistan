@@ -64,6 +64,18 @@ cd /home/raistlin/YardimciWorkspace/YardimciAsistan
    dosya/arşiv hashleri ve ortak demo şablon bütünlüğü doğrulanır. Eksik veya eski
    dosya başarı sayılmaz; değerler için hata mesajı ve exit code 1 üretilir.
 
+   Windows kontrolü ayrıca her NSIS EXE içindeki mimariye ait 7z payload'undan
+   `app.asar` ve native image dosyasını doğrudan okur; eski `win-unpacked` dizinine
+   güvenmez. Native dosya, paketleme sırasında indirilen ve lockfile SHA-512 ile
+   doğrulanan tarball ile karşılaştırılır. Bu nedenle ignored
+   `apps/desktop-app/resources/native-image/` önbelleği kontrol sırasında mevcut
+   olmalıdır; eksikse Windows paket hazırlığını yeniden çalıştırın. 7-Zip aracı
+   electron-builder toolset'inden sağlanır.
+
+   Bu statik denetim Windows'ta açılışı kanıtlamaz: yayın öncesi her iki mimariyi
+   uygun temiz Windows ortamında kurup uygulama açılışını ve görsel işlemesini elle
+   doğrulayın. `--dir` paketi ve Linux üstündeki testler bu kontrolün yerine geçmez.
+
 5. Aynı toplu planın dry-run'ı:
 
    ```fish

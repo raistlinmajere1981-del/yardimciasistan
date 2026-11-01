@@ -39,6 +39,9 @@ firm-template/web-module/data/*.legacy-backup-v1
 apps/desktop-app/resources/android/*
 !apps/desktop-app/resources/android/.gitkeep
 
+# Generated, lockfile-verified Windows image binaries and download cache
+apps/desktop-app/resources/native-image/
+
 # Local admin/deploy credential backend (never commit secrets)
 config/credentials.local.json
 .superdesign
@@ -53,3 +56,5 @@ test-site/landing/assets/assistant/
 # Independent dealer pilot build output and local configuration
 apps/dealer-android-app/build/
 apps/dealer-android-app/local.properties
+
+apps/admin-control-center/public/effect-studio/

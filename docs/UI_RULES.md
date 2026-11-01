@@ -80,8 +80,13 @@ aynı dış panelde, mevcut kayıt sahipleriyle sunar. İşletme Yapısı ve Öz
 ve staged capability seçimini sahiplenir. Oda/Masa Yönetimi yalnız kalıcı kurulum ve
 runtime capability sonrasında İşletme Bilgileri içindeki düğmelerden açılır; tek modal
 sınırında kendi BusinessLayout Kaydet/Geri Al ve ayrılma korumasını kullanır.
-İlk kurulumda firma adı isteğe bağlıdır. Otomatik eşitleme açıksa aynı web bağlantısı
-ana süreçte test edilmiş olmalıdır; kapalıysa web anahtarı ve testi gerekmez.
+İlk kurulumda firma adı isteğe bağlıdır. Web bağlantısı ortak işletme taslağına dahildir:
+barın sağında tek Etkin kutusu bulunur; kapalıyken yalnız başlık ve kutu görünür.
+Açıkken adres, anahtar, Bağlan ve otomatik eşitle tercihi bağlantı alanındadır.
+Bağlan ana süreç testi ve yayın kaynağı doğrulamasını yapar; kurulum kaydetmez.
+Yeni/değişen dolu bağlantı ortak Kaydet öncesinde doğrulanmalıdır. Kayda kadar
+kapat/aç taslağı korur; kapalıyken Kaydet yalnız yerel web transport ayarlarını temizler,
+uzak yayınları silmez. Geri Al son kayıtlı Web tercihlerini geri getirir.
 
 Galeri Yönetimi yaklaşık 600px genişlikli, fotoğraf sayısından bağımsız sabit
 boyutlu bir medya listesidir. Fotoğraflar önizleme kaynağı hazırlanırken de en-boy
@@ -93,7 +98,7 @@ Oda, Masa ve Galeri Yönetiminde kaydedilmemiş değişiklikler varken Kapat/X p
 Escape ve pencere dışına tıklama da kapatmaz. İkinci bir ayrılma onay ekranı yoktur.
 Kaydet veya Değişiklikleri Geri Al başarılı olup taslak temizlenince Kapat yeniden açılır.
 
-Alt Kaydet yalnız işletme/sektör/yetenekler ve public profile içindir; servisleri
+Alt Kaydet işletme/sektör/yetenekler, Web bağlantısı ve public profile içindir; servisleri
 kaydetmez. Servis kaydı yalnız kendi alanlarını güncel kalıcı snapshot'a birleştirir,
 diğer sahiplerin taslaklarını korur. Arama aynı servis detayını açar; kategori
 geçişi yoktur. Appearance immediate preference'tır. Backup, update, password ve cihaz revoke gibi

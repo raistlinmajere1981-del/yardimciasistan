@@ -5,10 +5,11 @@
 Speech recognition returns editable text. It never submits a form, executes a
 command, mutates business data or creates an Android action. The user reviews text
 and explicitly submits it through the existing operation and permission boundary.
-Desktop and Android upload audio **directly to Hosting**; Desktop never relays
+Desktop sends audio **directly to the saved STT provider** (Gemini, OpenAI or
+Cloudflare). Android uploads audio directly to Hosting; Desktop never relays
 phone audio. Local TTS remains the default. Optional Freya is future work.
 
-## S2A: saved preference and hosted service
+## S2A: saved preference and provider services
 
 `ai_service_profiles.stt_model` is the canonical per-provider SQLite preference.
 Empty means disabled. Setup/preload uses active `aiSttModel` and profile
@@ -21,9 +22,9 @@ no silent reset, data deletion or auto-migration is performed.
 
 | Service | Verified model allowlist | Provider request |
 | --- | --- | --- |
-| OpenAI | `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1` | Multipart `POST /v1/audio/transcriptions`, `CURLFile`, JSON response |
+| OpenAI | `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1` | Multipart `POST /v1/audio/transcriptions`, generated file name, JSON response |
 | Google AI Studio | `gemini-2.5-flash` | REST `POST /v1beta/models/{model}:generateContent`, base64 `inline_data`, text output |
-| Cloudflare Workers AI | Candidate `@cf/openai/whisper-large-v3-turbo`; account/Turkish quality require live verification | REST `POST /client/v4/accounts/{account}/ai/run/{model}`, base64 `audio`, `task=transcribe`, `language=tr` |
+| Cloudflare Workers AI | `@cf/openai/whisper-large-v3-turbo`; account/Turkish quality require live verification | REST `POST /client/v4/accounts/{account}/ai/run/{model}`, base64 `audio`, `task=transcribe`, `language=tr` |
 | Groq / OpenRouter / custom | Disabled in S2A | No verified adapter/model contract installed |
 
 Gemini is an audio-capable multimodal model, not a dedicated transcription model.
@@ -36,10 +37,11 @@ Evidence: [OpenAI transcription API](https://developers.openai.com/api/reference
 [Gemini 2.5 Flash modalities/access](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash),
 [Gemini audio formats](https://ai.google.dev/gemini-api/docs/audio),
 [Gemini generateContent schema](https://ai.google.dev/api/generate-content).
+Cloudflare model schema: [Whisper large v3 turbo](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/).
 Additional models/providers require audio support evidence, authority validation,
-adapter tests and matching Hosting policy; name patterns alone are insufficient.
+adapter tests and matching provider policy; name patterns alone are insufficient.
 
-## Durable publication
+## Durable publication (Android/Hosting)
 
 The existing private `ai_settings` body carries active `stt_model`. Other profiles
 remain local until selected. STT-only changes invalidate the existing outbox.
@@ -55,6 +57,8 @@ they never enter public projections, phone responses or logs.
 
 ## Endpoint contract
 
+The existing hosted route remains available for Android and authenticated legacy
+Desktop clients. The current Desktop application does not call it.
 `POST api/audio-transcribe.php` accepts multipart `source=desktop` and exactly one
 `audio` file, at most **5 MiB** (5 × 1024 × 1024 bytes), authenticated with the
 existing `X-YA-Sync-Secret` Desktop credential. Other methods return 405
@@ -107,9 +111,10 @@ and auth-header capture disabled; application code cannot control upstream traci
 
 `SpeechTextField` reuses existing field draft owners in the marketing instruction
 and share-text editors. Its microphone appears only after main reports an unlocked
-session, persisted `service.ai`, a saved supported STT model/provider, enabled web
-sync, usable HTTPS Hosting configuration from `getWebSyncConfig`, matching successful
-audio-test evidence and the saved Desktop opt-in. Draft Settings never enable capture.
+session, persisted `service.ai`, saved AI enablement, a supported STT model/provider
+and exact official HTTPS API root, a usable OS-encrypted provider key, matching
+successful audio-test evidence and the saved Desktop opt-in. Web URL, sync secret,
+automatic Web sync and AI publication are independent and never gate Desktop STT. Draft Settings never enable capture.
 Local MediaRecorder support and a secure context are also required.
 Electron grants explicit audio-only media requests only to its trusted Desktop
 window with the same saved gates; camera checks remain independent. Microphone
@@ -120,28 +125,45 @@ fingerprint bound to the successful verification timestamp; main reads and atomi
 replaces it. Default is OFF. Each new successful test requires an explicit opt-in Save.
 This device preference neither changes SQLite schema nor publishes Android activation.
 
-“STT Bağlantısını Dene” explicitly sends one 250ms silent PCM WAV through the normal
-Hosting audio endpoint. It may be billed; there is no automatic probe or retry.
-Text/image AI tests never grant STT evidence. Main hashes the saved private provider,
-model, credentials and timeout; Hosting checks that binding before provider transport
-and returns it only after successful audio processing. A missing binding from an
-older Hosting endpoint fails verification. This proves model/audio access, not speech
-quality. The existing main-owned `service_settings_verifications` stores `desktop_stt`
-evidence bound also to AI activation/model choices and effective HTTPS web credentials.
-Settings changes withdraw evidence in the Setup transaction; an in-flight stale test
-cannot restore it. Failed explicit tests clear evidence. Capture/opt-in also require
-matching current configuration, while ordinary runtime failures preserve preferences.
-Turning Desktop dictation OFF preserves the per-provider STT model and Android's
-independent `voice.dictation` permission and readiness projection.
+“STT Bağlantısını Dene” explicitly sends one 250ms silent PCM WAV directly to the
+saved provider. It may be billed; there is no automatic probe or retry. Text/image
+AI tests never grant STT evidence. The replaceable main-owned
+`desktop-stt-direct.ts` adapter handles all three supported providers through one
+bounded HTTPS transport with an injected main/test-only HTTP seam. Renderer IPC
+never accepts provider URLs, keys or transport overrides. It reads the saved
+private key only through `getEffectiveAiApiKey`.
+
+OpenAI receives multipart `file`, an application-generated filename, allowlisted
+`model` and `response_format=json`, authenticated by Bearer header. Gemini receives
+`systemInstruction` (transcription only), base64 `inline_data`, temperature 0 and
+thinkingBudget 0, authenticated by `x-goog-api-key`; only completed candidate text
+is accepted, excluding thought/tool outputs. Cloudflare receives JSON base64
+`audio`, `task=transcribe`, `language=tr` at the official account/model path,
+authenticated by Bearer header; only a successful envelope with string result text
+is accepted. The shared STT allowlists govern models and exact official roots.
+
+The existing main-owned `service_settings_verifications` stores `desktop_stt`
+evidence bound only to provider, service, official base URL, STT model, effective
+private key, timeout and saved AI enablement. Setup withdraws evidence atomically
+for changes to those fields; chat/image models and Web configuration, auto-sync
+or publication changes do not withdraw it. In-flight stale tests cannot restore
+evidence. Failed explicit tests clear evidence. Each successful test requires an
+explicit opt-in Save; an older opt-in cannot reactivate on new evidence. This
+proves model/audio access, not speech quality. Ordinary runtime failures preserve
+preferences. Turning Desktop dictation OFF preserves the per-provider STT model
+and Android's independent `voice.dictation` permission and readiness projection.
 
 Clicking Dikte Başlat explicitly requests microphone permission and records only
 audio with a runtime-supported WebM/Opus, Ogg/Opus or MP4 MIME. Only Durdur uploads;
 İptal, device errors, 2-minute/5-MiB limits, field/context replacement, hidden browser
 tab and unmount stop all tracks without initiating an upload. Audio stays in memory.
 The bounded base64 IPC sends no credentials. Main rechecks current saved gates and
-container signature before its HTTPS multipart POST. Transport verifies TLS, follows
-no redirects, retries nothing, caps response at 128 KiB and aborts at 70 seconds.
-Hosting remains responsible for content decoding, published gates and provider auth.
+container signature before the provider POST. Transport verifies TLS, follows
+no redirects, ignores proxy environment, retries nothing, caps response at 128 KiB
+and aborts at the saved timeout capped at 60 seconds (outer service guard: 70s).
+Audio is bounded at 5 MiB and transcript at 16,000 Unicode characters; control
+characters, HTML tags and exact credential echoes are sanitized before IPC.
+Provider decoding errors fail safely; there is no hosted or alternate-provider fallback.
 
 Main owns transient serial revisions and sender-bound cancellation. Settings Save
 and lock invalidate in-flight work; upload, response and explicit Metni Kullan
@@ -211,7 +233,8 @@ smoke. No live provider calls or recording-quality claims. Localhost/browser
 restrictions are blocked checks, never hidden skips/passes. Full pre-main, real
 devices/recordings and live deployment are outside S2A verification claims.
 
-S2B.1 adds `voice-stt-desktop` (real IPC/service/capture modules, fake HTTPS/media)
+S2B.1 adds `voice-stt-desktop` (real IPC/service/capture modules and all three direct
+provider adapters, fake HTTPS/media, Web OFF/unconfigured/unpublished regressions)
 and `voice-stt-desktop-ui` (real Settings/editor UI, route callbacks and fake native
 media/voice), plus existing TTS/settings/camera regressions. Browser checks require
 an allowed localhost listener and installed Chromium. No real microphone, Hosting

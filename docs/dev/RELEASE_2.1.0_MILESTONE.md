@@ -35,3 +35,16 @@ Araç yalnız site-owned yapılandırmasını günceller, web modülüne veya
 SQLite kayıtlarına dokunmaz, shared core'u fork etmez. Ayrıca bilinmeyen
 kurulum kimliği, farklı domain veya yanlış sunucu kökü uyuşmazlığını reddeder.
 market-pilot ve teknikel hedefleri de desteklenir.
+
+## 1 Kasım 2026 — yeni oturum öncesi durum / Android güncelleme hedefi
+
+- Companion kuponlu nakit satış: Samsung J700F ile gerçek 100 TRY → 10 TRY indirim → 90 TRY Finance, stok/kupon tek kullanım ve ACK **PASS** (bkz. `CONTINUATION_BACKLOG_2026-10-29.md` dosyasının son C22 kayıtları). Pilot veritabanı ve iki Android uygulama verisi sonrasında bilinçli olarak sıfırlandı; bu yeni test durumu boş işletmedir.
+- Manuel backup/list/restore/delete, reset öncesi otomatik güvenlik yedeği ve şema uyumsuzluğunda onaylı `legacy-data` arşivine geçiş **korunacak**; C23'teki kaldırma denemesi C24'te geri alındı. Güncel uygulamada migration/fallback temizliği yalnız gerçek kullanım dışı kodu hedefler.
+- Companion ve Bayi için **uygulama içi Android APK güncelleme V1 eklenecek** (henüz geliştirilmedi). Mevcut Windows manifest/HTTPS download/imza doğrulama altyapısı genişletilecek, imzalı APK sistem kurulumuyla kullanıcı onayına sunulacak; Play/ADB/root gerekmez. Plan: `docs/architecture/ANDROID_IN_APP_UPDATES_V1.md`.
+- Yeni session işleri: pre-main hatalarının kapatılması (bu session), Android updater, Bayi Android Phase C gerçek hesap/özel fiyat/sepet/offline E2E, kalan desktop belge/baskı/STT/iade kontrolleri, web/test alanı ve sayfa UX düzeni, Windows kabulü; en son release/commit/deploy. Eski 27 Ekim doğrulama toplamları yeni kaynakların güncel sonucu olarak kullanılmaz.
+
+## 1 Kasım 2026 — C27 kapanışı (pre-main hedefli düzeltmeler)
+
+- `2026-10-31T21-40-11-627Z.json` tam pre-main raporu: 263 PASS / 8 FAIL / 0 SKIP; kaynak ve test fixture düzeltmelerinden sonra **aynı 8 kontrolün hedefli yeniden çalıştırması 8/8 PASS**. Yedi kontrolün yanı sıra Companion points ingress'in C20d–C20p sentetik akışı da PASS; gerçek HTTPS pozitif Puan, cash earn, kupon/ACK, Windows native image regresyonları PASS.
+- Güncel registry planı 290 benzersiz kontrol; eklenen 19 smoke ayrı ayrı PASS ama **290'lık yeni tam pre-main topluca tekrar çalıştırılmadı**. Release öncesi kullanıcı tetiklemeli tam doğrulama zorunlu.
+- Yeni oturum önceliği: `docs/architecture/ANDROID_IN_APP_UPDATES_V1.md` plana göre **Companion ve Bayi kullanıcı onaylı, imzalı APK güncelleme**, ardından Bayi E2E, desktop/sayfa/web görsel düzeni ve son yayın. Git commit, installer release, canlı deploy yok. Manuel backup/restore ve `legacy-data` arşiv mekanizması korunur. Ayrıntı: `docs/dev/CONTINUATION_BACKLOG_2026-10-29.md` C27.

@@ -110,3 +110,7 @@ sepet ve sipariş kabul testi yapılmış olduğu anlamına gelmez.
 Google Play'e geçiş ayrı bir yayın kararıdır. AAB/Play App Signing kurulumunu
 [Android app signing](https://developer.android.com/studio/publish/app-signing)
 sözleşmesine göre ayrıca değerlendirin; bu repo komutları Play'e upload yapmaz.
+
+## Uygulama içi güncelleme (Android OTA-benzeri V1, geliştirme aşamasında)
+
+2026-11-01 ürün kararı: Companion ve Bayi, masaüstündeki güncelleme deneyimine benzer biçimde kendi Ayarlar ekranından güncellemeyi denetleyip, mevcut HTTPS dağıtım sitesinden doğrulanmış imzalı APK'yı indirerek **Android'in normal paket yükleyicisinde kullanıcı onayıyla** güncelleyebilecek. Güncelleme manifesti üreticisi, iki Android uygulamasındaki ortak güncelleme istemcisi ve ayar kontrolü geliştirme ağacına eklendi; **henüz Android stable feed canlıya alınmadı ve release→release cihaz testi yapılmadı**. Bugünkü canlı yayın yalnız APK indirme/normal manuel kurulum destekler. Güncelleme sırasında uygulama verileri, Companion eşleşmesi ve Bayi offline sepeti korunacaktır. Google Play, root ve ADB zorunlu olmayacak. Ortak sürüm/imza otoritesi ve yeni Android manifest/atomic publish tasarımı için [`architecture/ANDROID_IN_APP_UPDATES_V1.md`](architecture/ANDROID_IN_APP_UPDATES_V1.md) geçerlidir.

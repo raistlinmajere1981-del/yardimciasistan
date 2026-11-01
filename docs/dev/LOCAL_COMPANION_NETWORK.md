@@ -57,11 +57,12 @@ Servis TXT metadata'sının minimum alanları:
 
 - `protocol=1`
 - `desktop_id=desktop-<UUID>`
+- `scheme=https` (adres ipucu; kimlik doğrulaması değildir)
 
 Port sabit kimlik değildir. Masaüstü uygun bir portta dinler ve gerçek port discovery
 kaydıyla duyurulur. Android IP veya portu kalıcı hedef kimliği olarak kabul etmez.
 
-HTTP API prefix:
+HTTPS API prefix:
 
 ```text
 /local/v1
@@ -76,7 +77,7 @@ POST /local/v1/action
 POST /local/v1/pair
 ```
 
-İlk sürüm request/response HTTP kullanır. WebSocket/SSE zorunlu değildir. Gerçek push
+Ürün tek HTTPS dinleyicisinde request/response kullanır. WebSocket/SSE zorunlu değildir. Gerçek push
 gereksinimi oluşursa aynı kimlik ve yetki modeli korunarak ayrıca eklenebilir.
 
 ## Kimlik ve güvenlik sınırı
@@ -92,21 +93,50 @@ remote credential: yat_...
 local credential:  yal_...
 ```
 
-İlk eşleştirme kullanıcı kodu gerektirmez. Android web kimliğiyle hosting'den
-kısa ömürlü, `desktop_id + device_id` bağlı HMAC imzalı `yalp1...` ticket alır.
-Aynı ağda mDNS ile bulunan masaüstü ticket'ı mevcut işletme sync secret ile doğrular
-ve yalnız o zaman `yal_...` local credential üretir. Başarılı eşleştirme sonrasında:
+Masaüstü eşleştirmesi varsayılan olarak kapalıdır. Güvenilir ana renderer,
+kilit açıkken ve kalıcı `service.android` + `localNetworkEnabled` kapıları açıkken
+`androidDevice:beginLocalPairing(deviceId)` çağırır. Masaüstü CSPRNG ile 256-bit
+`yald1.<64 hex>` credential üretir. Oturum RAM'de `desktop_id + device_id` kimliklerine
+bağlıdır; en fazla 120 saniye yaşar (monotonic süre), beş hatalı credential/cihaz
+başvurusunda kapanır. Yeni begin önceki oturumu değiştirir. Read/cancel aynı trusted
+main-frame, kilit, capability ve LAN IPC kapılarından geçer. Credential yalnız açık
+başlatma sonrasında masaüstü Android ayarlarında gösterilir; public status, mDNS,
+log, SQLite, outbox veya Web yayınına eklenmez.
 
-- telefon `desktop_id` + local credential saklar;
-- masaüstü local credentialın yalnız hash'ini saklar;
-- ticket nonce'u başarılı kullanımda tek kullanımlıdır;
-- istekler kalıcı `device_id` taşır;
-- masaüstü mevcut Android cihaz rolü/aktiflik/izin kontrollerini tekrar kullanır;
-- pairing cihazı otomatik aktif etmez; mevcut cihaz onay sınırı korunur;
-- cihaz revoke edildiğinde local credential da geçersiz kılınır.
+Telefon `POST /local/v1/pair` isteğinde `pairing_ticket` alanına bu credentialı,
+`device_id`, `device_name`, `app_version` alanlarına kendi bilgilerini koyar. Yeni yol
+Web URL veya sync secret okumaz. Servis her başvuruda kilit/capability/LAN kapılarını,
+masaüstü ve telefon kimliğini, süreyi ve credentialı doğrular; session başarıdan önce
+senkron olarak tüketilir. Başarısız DB yazımı da yeni açık begin gerektirir. Kilit,
+servis stop, uygulama kapanışı ve LAN/capability kapatılması oturumu iptal eder.
 
-Local HTTP ilk geliştirme ve güvenilir işletme LAN'ı için kullanılabilir. Protokol
-tasarımı daha sonra TLS/certificate pinning eklenmesini engellememelidir.
+Başarılı eşleştirme sonrasında:
+
+- telefon `desktop_id` + `yal_...` local credential saklar;
+- masaüstü local credentialın yalnız SHA-256 hash'ini mevcut tabloda saklar;
+- yeni cihaz pasif/onay bekleyen kayıttır; eşleştirme operasyon yetkisi vermez;
+- önceden onaylı cihazın rolü/aktifliği/izinleri korunur; yeniden eşleşme tokenı değiştirir;
+- `/summary` cihaz profiline göre redakte edilir; `/action` mevcut domain izinlerini kullanır;
+- revoke mevcut transaction içinde local credentialı geçersiz kılar; tekrar eşleştirme
+  revoke'u kaldırmaz, önce masaüstünden yeniden yetkilendirme gerekir.
+
+**S3 ürün geçişi:** Masaüstü uygulama hazır olduğunda `app.getPath('userData')` ve
+Electron safeStorage ile tek kurulumluk P-256 kimliği oluşturulur/yüklenir. Pair,
+status, summary ve action aynı HTTPS dinleyicisini kullanır; HTTP fallback yoktur.
+QR (`yapair3`) yalnız çalışan dinleyicinin gerçek portu, erişilebilir özel IPv4 adresi
+ve SPKI pininden üretilir. USB tether arayüzü Wi-Fi'dan önce seçilir. QR öncesinde,
+resume sırasında ve arayüz değişikliği kontrolünde (5 saniye) sertifika SAN'ları aynı
+anahtarla yenilenir. Yeniden başlatma ve sertifika yenilemesi pini değiştirmez.
+Hosting imzalı `yalp1` artık kabul edilmez; yalnız açık `yald1` oturumu geçerlidir.
+
+**Güvenlik sınırı:** Android TLS doğrulaması credential gönderilmeden önce persisted
+SPKI pini, sertifika geçerliliği ve IP SAN'ını kontrol eder. mDNS yalnız HTTPS adres
+ipucudur; eşleştirme güveni oluşturmaz. Web sitesi, USB debugging, ADB veya root
+QR + USB internet paylaşımı / Wi-Fi akışı için gerekmez. Linux'ta safeStorage
+kullanılamıyorsa veya `basic_text` ise LAN kapalı kalır; QR paneli GNOME Keyring /
+KWallet açılıp uygulamanın yeniden başlatılmasını ister. Bozuk/kayıp kayıt otomatik
+yeniden üretilmez. Bu backend sorunu dış ortam engelidir; güvensiz depolama açılmaz.
+Geçersiz JSON hatalarında payload/secret içerebilen ham exception loglanmaz.
 
 ## Kritik mevcut uyumluluk işleri
 
@@ -164,7 +194,7 @@ kalabilir.
 
 ### Faz 3 — Desktop Local Companion API
 
-- Electron main process içinde yalnız LAN'a hizmet eden küçük HTTP server ekle;
+- Electron main process içinde yalnız LAN'a hizmet eden tek HTTPS server kullan;
 - snapshot üretimini `main.ts` dışındaki ortak servise taşı;
 - local action endpointini mevcut `applyAndroidAction` / permission sınırına bağla;
 - yeni bir action uygulama motoru veya ikinci izin sistemi oluşturma;
@@ -176,7 +206,7 @@ kalabilir.
 - local token biçimi `yal_<64 hex>`; plaintext yalnız başarılı pairing yanıtında telefona verilir, masaüstünde yalnız SHA-256 hash tutulur;
 - yeni local-only cihaz eşleşince pasif/onay bekleyen Android cihaz kaydı açılır; pairing tek başına operasyon yetkisi vermez;
 - pairing secret kısa ömürlü ve başarılı kullanımda tek kullanımlıktır;
-- yanlış secret denemesi kullanıcının açık pairing penceresini iptal etmez;
+- ilk dört yanlış credential/cihaz denemesi oturumu korur; beşinci deneme kapatır;
 - cihaz revoke akışı local credentialı da aynı transaction içinde kapatır;
 - yeniden etkinleştirilen revoke edilmiş cihaz eski local tokenı kullanamaz; yeniden pairing gerekir;
 - mevcut geliştirme verisi migrate edilmez; baseline şema değiştiği için gerçek pairing testi öncesi temiz veri/reset kabul edilir;
@@ -186,7 +216,7 @@ kalabilir.
 
 - desktop DNS-SD/mDNS ilanı;
 - Android `NsdManager` discovery;
-- hosting ticket ile doğrulanmış `desktop_id` için otomatik local bağlantı;
+- mevcut local credential ile `desktop_id` için otomatik bağlantı; ilk/yeniden eşleştirmede açık masaüstü oturumu;
 - kısa local timeout sonrası hosting fallback;
 - local ve hosting hata durumlarını kullanıcıya tek bir sync hatası gibi yansıtmama.
 
@@ -243,3 +273,27 @@ Daha yüksek yetenek bütçesi şu noktalara saklanmalıdır:
 - foreground/background reconnect yarışları;
 - firewall ve çoklu network interface davranışları;
 - pairing/security threat-model kaynaklı karmaşık entegrasyon hataları.
+
+### 3A hedefli doğrulama
+
+`npx tsc -p apps/desktop-app/tsconfig.electron.json` ardından
+`node scripts/smoke-local-companion-server.mjs --contracts-only`, socket açmadan
+gerçek pairing/SQLite, IPC güvenlik kapıları, request handler, pending/redaction,
+revoke, mDNS ve log gizliliği sözleşmelerini çalıştırır. Flagsiz aynı smoke ayrıca
+yalnız `NODE_ENV=test` + `testOnlyHttp` ile localhost HTTP mock listenerını doğrular.
+Ürün bu seçeneği kullanmaz. Sandbox `listen EPERM` verirse listener testleri
+yeniden denenmez; flagsiz smoke ve `node scripts/smoke-android-device-token.mjs`
+host ortamında çalıştırılmalıdır. S3 için ayrıca:
+
+```sh
+node scripts/smoke-local-companion-tls.mjs --contracts-only
+node scripts/smoke-local-pairing-qr.mjs
+node scripts/smoke-local-pairing-security.mjs
+```
+
+S3 security smoke gerçek main/IPC/reconcile kodunu ve TLS kimliğini, mock soket ile
+çalıştırır. Gerçek backend ve ağ handshake kanıtı değildir. Normal host üzerinde
+flagsiz TLS/server smoke tekrar kontrol edildikten ve güvenli safeStorage backend'i
+doğrulandıktan sonra fiziksel telefonda QR → pending/onay/izinler → yeniden başlatma,
+USB/Wi-Fi/DHCP değişimi → yanlış pin/SAN reddi → revoke → offline outbox/receipt
+replay doğrulanmalıdır. Telefon kurulumu ve büyük doğrulama setleri kullanıcıya aittir.

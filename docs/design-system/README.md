@@ -12,6 +12,13 @@ Kullanıcı her etkileşimde şu zinciri anlayabilmelidir:
 Yeni feature CSS kendi renk, radius, control yüksekliği, badge/chip veya button dili
 icat etmez. Önce token ve shared primitive kullanılır.
 
+`quality/design-audit-baseline.json` içindeki sınırlı inline-style sayıları,
+belge şablonu önizlemesinde sayfa ve alanların oransal geometrisi (3) ile form
+görseli köşe noktalarının konumu (1) içindir. Bunlar kullanıcı verisine göre
+hesaplanan konumlardır; renk veya etkileşim görünümü için istisna değildir.
+Strict audit dosya başına bu sayıları aşan yeni kullanımları ve ortak görsel
+sahiplik ihlallerini kontrol etmeye devam eder.
+
 ## Stil ağacı
 
 Tek giriş noktası:

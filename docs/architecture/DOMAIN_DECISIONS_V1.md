@@ -1497,8 +1497,18 @@ reads may still report unconfigured or disconnected after a previously valid act
 KBS retains its existing test semantics: EGM readiness is not authenticated portal login,
 and Jandarma endpoint reachability is not proof of account authorization.
 
-The required Web transport retains its bootstrap lifecycle. Normal saves with automatic
-sync enabled require successful evidence for the effective transport configuration.
+Web is optional for local setup and business capabilities. `setup_completed` alone
+controls returning to setup. Empty Web URL **and** secret mean Web is not used; saving
+that choice clears only this computer's transport and disables passive sync. It does
+not withdraw remote publications, revoke a source, or delete pending durable jobs.
+A retained URL/secret with passive sync OFF still permits explicit Web publication.
+No new persisted preference or schema migration is needed for these two states.
+Connecting/changing a non-empty transport requires successful main-owned test evidence,
+including when passive sync is OFF, and retains explicit publication-source activation.
+Changing only passive sync or unrelated local settings needs no connection test.
+Local Setup/settings success returns after local commit without waiting for hosting;
+publication intent joins the existing durable outbox/coordinator, including explicit
+publication when passive sync is OFF. A hosting failure cannot become a local save failure.
 Delivery has one staged enabled preference in the existing Setup transaction. When enabled,
 at least one method is required and shipping reuses provider-owned readiness. Disabling
 delivery withdraws guest ordering and dealer catalogs through existing publication owners;
