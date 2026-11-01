@@ -48,10 +48,13 @@ try {
   await expect(page).toHaveURL(/page=account/);await expect(page.locator('#account-login')).toBeVisible();
   assert.equal((await f.call('account/login',{email:'registered-ui@example.test',password:accountPassword})).status,200);
   await page.locator('#account-login [name=email]').fill('browser@example.test');await page.locator('#account-login [name=password]').fill(accountPassword);
+  const loginResponse=page.waitForResponse(response=>response.url().endsWith('/api/account/login.php')&&response.request().method()==='POST');
   await page.locator('#account-login button').click();
+  assert.equal((await loginResponse).status(),200,'browser sign-in must succeed before checking the dealer view');
+  await expect.poll(()=>page.evaluate(()=>window.YaAccount?.state.status)).toBe('authenticated');
   await expect(page.getByRole('heading',{name:'Hesabım',exact:true})).toBeVisible();
-  await expect(page.locator('#account-dealer-badge')).toHaveText('Bayi');
   await expect(page.locator('#account-dealer-badge')).toBeVisible();
+  await expect(page.locator('#account-dealer-badge')).toHaveText('Bayi');
   await expect(page.locator('#account-profile')).toBeVisible();
   await page.goto(f.siteUrl+'/deneme/?page=catalog');
   await expect(page.getByRole('heading',{name:'Browser Product'})).toBeVisible();await expect(page.locator('.price')).toContainText('80');

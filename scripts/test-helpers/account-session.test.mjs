@@ -124,3 +124,46 @@ test('reload preserves uncertain logout as unavailable until explicit successful
   await reloaded.owner.request('login', {}); reloaded.owner.unlock(); await reloaded.owner.refresh();
   assert.equal(reloaded.owner.state.status, 'authenticated'); assert.equal(sessionCalls, 1);
 });
+
+test('browser login waits for a guest refresh and blocks concurrent session rotation', async () => {
+  let sessions = 0, logins = 0, rotations = 0, finishGuestSession, finishLogin;
+  let loggedIn = false;
+  const f = fixture(async url => {
+    if (url.pathname.endsWith('/session.php')) {
+      sessions++;
+      if (sessions === 2) return new Promise(resolve => { finishGuestSession = resolve; });
+      return loggedIn ? response(200, {account: account({access_id: 'dealer-a'})})
+        : response(401, {code: 'login_required'});
+    }
+    if (url.pathname.endsWith('/refresh.php')) {
+      rotations++;
+      return response(401, {code: 'login_required'});
+    }
+    if (url.pathname.endsWith('/login.php')) {
+      logins++;
+      return new Promise(resolve => { finishLogin = resolve; });
+    }
+    return response(200, {ok: true});
+  });
+  await f.owner.ready;
+  const oldGuestRefresh = f.owner.refresh();
+  assert.equal(sessions, 2);
+  const signIn = f.owner.request('login', {email: 'a@example.test', password: 'test'});
+  await Promise.resolve();
+  assert.equal(logins, 0, 'login must not race with a guest session/refresh request');
+  finishGuestSession(response(401, {code: 'login_required'}));
+  await oldGuestRefresh;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(logins, 1);
+  f.events.pageshow();
+  await Promise.resolve();
+  assert.equal(sessions, 2, 'pageshow cannot start a session refresh while login is in flight');
+  loggedIn = true;
+  finishLogin(response(200, {ok: true}));
+  await signIn;
+  f.owner.unlock();
+  await f.owner.refresh();
+  assert.equal(f.owner.state.status, 'authenticated');
+  assert.equal(f.owner.state.account.dealer.access_id, 'dealer-a');
+  assert.equal(rotations, 2, 'only completed guest session checks may rotate cookies');
+});

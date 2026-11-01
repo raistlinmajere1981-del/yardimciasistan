@@ -8,7 +8,7 @@
   let blocked = false, logoutPending = false;
   try { const saved = sessionStorage.getItem(blockKey); blocked = Boolean(saved); logoutPending = saved === 'pending'; } catch {}
   let state = Object.freeze({status: logoutPending ? 'unavailable' : 'guest', account: null, generation: 0, reason:'initial'});
-  let pending = null, loginSucceeded = false;
+  let pending = null, loginSucceeded = false, loginInProgress = false;
   const identity = account => account ? JSON.stringify([account.id, account.dealer || null]) : '';
   const snapshot = () => state;
   const emit = () => { for (const listener of listeners) { try { listener(state); } catch { /* An observer cannot prevent other private views closing. */ } } };
@@ -38,7 +38,7 @@
     return value;
   }
   function refresh() {
-    if (blocked || document.hidden || navigator.onLine === false) return Promise.resolve(state);
+    if (loginInProgress || blocked || document.hidden || navigator.onLine === false) return Promise.resolve(state);
     if (pending) return pending;
     const started = state.generation;
     const operation = (async () => {
@@ -73,6 +73,12 @@
     if (!/^[a-z-]+$/.test(file)) throw new Error('invalid_account_endpoint');
     const publicFiles = ['config', 'login', 'register', 'recover', 'verify', 'reset', 'oauth'];
     if (blocked && !publicFiles.includes(file)) throw fenceError();
+    // A guest session refresh may be rotating cookies while the user signs in.
+    // Finish that operation first, then prevent background refreshes until login resolves.
+    if (file === 'login') {
+      if (pending) await pending;
+      loginInProgress = true;
+    }
     const started = state.generation;
     try {
       const value = await raw(file, body);
@@ -84,6 +90,8 @@
       if (error.status === 401 || error.status === 403) clear(error.status === 401 ? 'guest' : 'unavailable');
       else if (!error.status || error.status >= 500 || error.unavailable) clear('unavailable');
       throw error;
+    } finally {
+      if (file === 'login') loginInProgress = false;
     }
   }
   function unlock() {
