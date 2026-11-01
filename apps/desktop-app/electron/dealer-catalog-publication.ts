@@ -7,6 +7,9 @@ import { publicImageUrl } from "./commerce-online-catalog-publication";
 /** Called in the access publication read snapshot. Active catalog products are the dealer channel. */
 export function createDealerCatalogs(db: DatabaseSync, access: DealerAccessProjection): DealerCatalogProjection[] {
   if (!access.enabled) return [];
+  // Unlinked customers have no authenticated web account that could consume a private catalog.
+  const linkedDealers = access.dealers.filter(dealer => dealer.enabled && dealer.account_id !== "");
+  if (!linkedDealers.length) return [];
   const settings = db.prepare("SELECT business_id, online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE deleted_at = '' LIMIT 1").get()!;
   if (Number(settings.online_sales_delivery_enabled) !== 1) return [];
   const businessId = String(settings.business_id);
@@ -18,7 +21,7 @@ export function createDealerCatalogs(db: DatabaseSync, access: DealerAccessProje
   if (!deliveryMethods.length) throw new Error("Bayi teslimat ayarları geçersiz.");
   const rows = db.prepare(`SELECT p.id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url, p.category_id, p.brand, COALESCE(c.name, '') AS category_name FROM catalog_products p LEFT JOIN catalog_categories c ON c.id = p.category_id AND c.business_id = p.business_id AND c.deleted_at = ''
     WHERE p.business_id = ? AND p.is_active = 1 AND p.deleted_at = '' ORDER BY p.name, p.id`).all(businessId);
-  return access.dealers.filter(dealer => dealer.enabled).map(dealer => {
+  return linkedDealers.map(dealer => {
     const owner = db.prepare("SELECT customer_id FROM customer_web_access WHERE id = ? AND business_id = ?").get(dealer.access_id, businessId)!;
     const products = rows.map(row => {
       const resolved = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id), customerId: String(owner.customer_id) }, true);

@@ -20,6 +20,11 @@ try {
   for(const [customer,priceGroup] of [[a,'dealer_a'],[b,'dealer_b']])assert.equal(database.saveCustomer({...customer,commercialProfile:{companyName:customer.fullName,dealerStatus:'active',priceGroup}}).ok,true);
   const product=saveRuntimeCatalogProduct(database.databasePath,{name:'Private Price Fixture',sku:'ACCOUNT-1',brand:'Fixture',categoryId:'',salePrice:100,dealerPriceA:80,dealerPriceB:60,purchasePrice:30,currency:'TRY',unit:'piece',taxRate:20,trackInventory:false,isActive:true});
   database.saveCommerceProductPublication({productId:product.id,isPublished:true});
+  const unlinked=database.saveCustomer({fullName:'Unlinked Demo Dealer',email:'unlinked@example.test',phone:'',commercialProfile:{companyName:'Unlinked Demo Dealer',dealerStatus:'active',priceGroup:'dealer_a'}});
+  assert.equal(unlinked.ok,true,unlinked.message);
+  const beforeLink=database.createDealerAccessProjection();
+  assert.ok(beforeLink.dealers.some(dealer=>dealer.enabled && dealer.account_id===''));
+  assert.equal(beforeLink.catalogs.length,2,'never build private catalogs for unverified, unlinked web accounts');
   await f.publish();
   const ac=await f.login('a@example.test'),bc=await f.login('b@example.test','android'),oc=await f.login('ordinary@example.test');
   for(const [cookie,price] of [[ac,80],[bc,60]]) {
