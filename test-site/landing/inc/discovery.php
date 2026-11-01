@@ -87,6 +87,14 @@ function discovery_metadata(): array
       "companion"
     ]
   },
+  "document.printing": {
+    "key": "discovery.document.printing",
+    "platforms": ["desktop"]
+  },
+  "commerce.benefits": {
+    "key": "discovery.commerce.benefits",
+    "platforms": ["desktop"]
+  },
   "service.whatsapp": {
     "key": "discovery.service.whatsapp",
     "platforms": [
@@ -389,7 +397,7 @@ function discovery_groups(): array
         'sales' => ['icon' => 'chart', 'ids' => [
             'core.finance', 'core.reports', 'accommodation.folio', 'food_service.orders',
             'commerce.catalog', 'commerce.inventory', 'commerce.sales', 'commerce.orders',
-            'commerce.wholesale', 'commerce.customer_credit', 'retail.barcode', 'retail.purchasing',
+            'commerce.wholesale', 'commerce.customer_credit', 'commerce.benefits', 'retail.barcode', 'retail.purchasing',
             'retail.suppliers', 'retail.labels', 'integration.productData', 'integration.delivery', 'integration.shipping',
         ]],
         'publish' => ['icon' => 'message', 'ids' => [
@@ -398,7 +406,7 @@ function discovery_groups(): array
             'integration.instagram', 'integration.dealerPortal', 'integration.googleReviews',
         ]],
         'system' => ['icon' => 'desktop', 'ids' => [
-            'core.sync', 'core.backups', 'core.devices', 'service.ai', 'service.android',
+            'core.sync', 'core.backups', 'core.devices', 'document.printing', 'service.ai', 'service.android',
         ]],
     ];
 }

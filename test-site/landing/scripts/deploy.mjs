@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 import {tmpdir} from "node:os";
 import {demoRoutes, retiredDemoPaths, stageDemoDeployment, readHtmlInputValue} from "../../../scripts/lib/demo-deployment.mjs";
-import {createReleaseArtifacts,createWindowsUpdateManifests,validatePreparedWebModule} from "../../../scripts/lib/release-artifacts.mjs";
+import {createReleaseArtifacts,createWindowsUpdateManifests,createAndroidUpdateManifests,validatePreparedWebModule} from "../../../scripts/lib/release-artifacts.mjs";
 import { getInstallation } from "../../../scripts/lib/installation-registry.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -144,7 +144,7 @@ if (withDownloads) {
   if (activateUpdates) {
     mkdirSync(localDeployTmp, {recursive:true});
     const notes=String(process.env.YA_UPDATE_NOTES ?? '').split(/\r?\n/).map(note=>note.trim()).filter(Boolean).slice(0,20);
-    for(const manifest of createWindowsUpdateManifests(releaseProduct,downloadArtifacts,notes)) {
+    for(const manifest of [...createWindowsUpdateManifests(releaseProduct,downloadArtifacts,notes),...createAndroidUpdateManifests(releaseProduct,downloadArtifacts,notes)]) {
       const localPath=join(localDeployTmp,`release-${manifest.platformDir}.json`);
       writeFileSync(localPath,JSON.stringify(manifest.value,null,2)+'\n');
       updateManifests.push({...manifest,localPath});
@@ -154,7 +154,7 @@ if (withDownloads) {
 }
 
 if (args.has('--plan-local')) {
-  console.log(JSON.stringify({...localPlan,downloads:downloadArtifacts.map(({label,name,size,sha256})=>({label,name,size,sha256})),webModule:webPlan ?? null,activateUpdates,activationOrder:[...(freshWebModule?['web-module-fresh']:[]),'site',...(withDownloads?['downloads']:[]),'HTTP-and-SHA256',...(activateUpdates?['Windows-update-feeds']:[])]},null,2));
+  console.log(JSON.stringify({...localPlan,downloads:downloadArtifacts.map(({label,name,size,sha256})=>({label,name,size,sha256})),webModule:webPlan ?? null,activateUpdates,activationOrder:[...(freshWebModule?['web-module-fresh']:[]),'site',...(withDownloads?['downloads']:[]),'HTTP-and-SHA256',...(activateUpdates?['Windows-and-Android-update-feeds']:[])]},null,2));
   process.exit(0);
 }
 
@@ -265,7 +265,7 @@ if (dryRun) {
         console.log(`${artifact.label}: farkli, guncellenecek -> /downloads/${artifact.name}`);
       }
     }
-    console.log(activateUpdates ? 'Windows feed etkinleşmesi: site ve tüm dosyaların HTTP+SHA-256 kontrolünden sonra.' : 'Windows feed etkinleştirme seçilmedi.');
+    console.log(activateUpdates ? 'Windows ve Android feed etkinleşmesi: site ve tüm dosyaların HTTP+SHA-256 kontrolünden sonra.' : 'Güncelleme feed etkinleştirme seçilmedi.');
     for (const manifest of updateManifests) {
       console.log(`${manifest.label} update feed: /updates/stable/${manifest.platformDir}/release.json -> ${manifest.version}`);
     }
@@ -415,7 +415,7 @@ async function finalizePublishedRelease() {
     await smokeDownloads(publicUrl, downloadArtifacts, []);
     // An explicit flag is required; no feed is activated before all site/artifact checks pass.
     if (activateUpdates) {
-      step("Desktop guncelleme manifestleri yayinlaniyor");
+      step("Windows ve Android guncelleme manifestleri yayinlaniyor");
       for (const manifest of updateManifests) {
         const remoteDir = `${remoteUpdates}/${manifest.platformDir}`;
         const remoteTmp = `${remoteDir}/.release.${stamp}.json`;
@@ -426,7 +426,7 @@ async function finalizePublishedRelease() {
         console.log(`${manifest.label}: /updates/stable/${manifest.platformDir}/release.json`);
       }
       await smokeDownloads(publicUrl, [], updateManifests);
-    } else console.log('Windows update feed etkinleştirilmedi (--activate-updates seçilmedi).');
+    } else console.log('Güncelleme feed etkinleştirilmedi (--activate-updates seçilmedi).');
 
     if (activateUpdates) {
       step("Eski kurulum dosyalari temizleniyor");
@@ -575,6 +575,13 @@ async function smokeDownloads(base, artifacts, manifests) {
         body?.format !== "yardimci-asistan-update"
         || body?.appVersion !== manifest.version
         || body?.artifact?.sha256 !== manifest.sha256
+        || (manifest.applicationId && (
+          body?.platform !== 'android'
+          || body?.applicationId !== manifest.applicationId
+          || body?.versionName !== manifest.version
+          || body?.versionCode !== manifest.versionCode
+          || body?.artifact?.file !== manifest.file
+        ))
       ) {
         fail(`${manifest.label} update manifest icerigi dogrulanamadi.`);
       }

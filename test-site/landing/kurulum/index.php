@@ -67,6 +67,7 @@ $moduleUrl = $scheme . '://' . $host . '/yardimci-asistan';
         <?php endif; ?>
       <?php endforeach; ?>
     </div>
+    <p class="section-footnote"><?= e(t('install.companion_steps')) ?></p>
   </section>
 
   <p class="section-footnote"><?= e(t('install.android_clean_install')) ?></p>
