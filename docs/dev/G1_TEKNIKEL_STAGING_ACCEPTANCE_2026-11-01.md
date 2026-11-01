@@ -27,3 +27,17 @@ Yardımcı Asistan'a ait `yardimciasistantoptanci.alwaysdata.net` **yalnız test
 G1 Desktop yaması: `apps/desktop-app/electron/dealer-catalog-publication.ts` ve `scripts/smoke-commerce-dealer-orders.mjs`. Bu düzeltme bağlı olmayan bayinin private katalog fiyat verisini ve gereksiz büyük yayını atlar; bağlı doğrulanmış hesaplar için katalog akışı değişmez. Paralel demo oturumunun `test-site/landing/**` değişiklikleri G1 kapsamına **alınmaz**.
 
 İşletme demo ayarı: Online Satış ve Bayi portalı açık, yalnız `pickup` online teslimat aktif; kargo/ödeme açılmadı. Demo hesap şifreleri, sync secret veya diğer kimlik bilgileri bu kayda aktarılmadı.
+
+## 1 Kasım akşamı — G1 canlı durum güncellemesi
+
+Bu bölüm, yukarıdaki başlangıçta doğru olan **0 web hesabı / 0 private katalog** durumunun yerine geçen yeni gözlemleri kaydeder:
+
+- **İki doğrulanmış ve masaüstüne bağlanmış Teknikel test hesabı** mevcut; biri bayi A, diğeri bayi B fiyat grubunda. Hesap kimliği veya şifre bu belgeye yazılmadı.
+- Alwaysdata sunucusunda **iki ayrı private katalog, her birinde 849 ürün** yayınlandı. Fiyatların tamamı A/B gruplarında farklı; yetkisiz `dealer/catalog.php` ve `dealer/orders.php` çağrıları HTTP **401**.
+- İlk private yayın fotoğrafları atlamıştı. `prepareDealerProductMedia` üzerinden mevcut 1.694 medya yükleme makbuzu kullanılarak yeniden yayın yapıldı. Sunucu SQLite bağımsız denetiminde **her iki katalog: 849/849 kapak URL'si, 1.668 görsel referansı**. Gerçek tarayıcıda önce `Görsel yok` iken kullanıcı sonraki ekran görüntüsünde conta ve ventil fotoğraflarının doğru yüklendiğini doğruladı. Yeni ürün ithalatı gerekmedi.
+- Perakende web siparişi masaüstüne önceki çalışmada **tek** kayıtla alınmıştı (web imleci `1/1`). Bayi siparişi canlı hesap üzerinden **henüz gönderilmedi**; canlı login/sipariş/receipt E2E'nin tamamlandığı iddia edilmemeli.
+- `node scripts/smoke-commerce-dealer-orders.mjs` yeniden PASS: izole sentetik API/desktop senaryosunda A/B fiyat izolasyonu, web/Android oturumu, idempotency, makbuz kurtarma, canonical fulfillment ve yetki iptali.
+- Samsung SM-J700F Android 13, USB/ADB bağlı. Kurulu `com.yardimciasistan.dealer`: **2.1.5 / versionCode 21**; soğuk açılış `Status: ok`, ön planda ve logcat ilk bakışta çökmüyor. `com.yardimciasistan.android` Companion da kurulu. Varsayılan LTE bağlantısı `VALIDATED`, sistem HTTP proxy `null`, Teknikel alan adı ICMP/DNS erişimi başarılı. Bu **uygulama içinden canlı HTTPS login** kanıtı yerine geçmez.
+- Kod deposunda paralel demo tasarım session'ının `test-site/landing/**` dosyaları değişmekteydi; G1 bu dosyaları değiştirmedi veya stage etmedi.
+
+**Açık kalan canlı kabul:** İki bayi hesabıyla gerçek web oturumu üzerinden özel fiyat/ürün/fotoğraf → bayi sepeti → sipariş → aynı idempotency anahtarıyla replay → receipt → masaüstü canonical tek aktarım → Android Bayi mobil oturum/offline sipariş. Çalışma yöntemi izin vermezse kullanıcının test sitesinden tek bir demo siparişi göndermesi ve bunun ardından sipariş/makbuz/senkronun sadece okunarak doğrulanması en düşük müdahaleli yoldur. Tam pre-main/release ayrı kullanıcı tetiklemeli kapı olarak kalır.
