@@ -315,7 +315,41 @@ export type OverviewSnapshot = {
   };
 };
 
+export type EffectImageTarget = {
+  id: string;
+  name: string;
+  available: boolean;
+  hasDraft: boolean;
+  hasScene: boolean;
+  canPublish: boolean;
+  note: string;
+  width: number;
+  height: number;
+};
+export type EffectStudioProject = {
+  id: string;
+  name: string;
+  siteUrl: string;
+  images: EffectImageTarget[];
+};
+export type EffectScene = {
+  format: string;
+  version: number;
+  name: string;
+  seed: string;
+  photo: { src: string; width: number; height: number; name: string; credit?: string };
+  zones: unknown[];
+  effects: unknown[];
+};
+export type EffectStudioLoad = { scene: EffectScene; source: "draft" | "installed" | "new" };
+export type EffectStudioSave = { ok: boolean; message: string; effectCount: number };
+export type EffectStudioPublish = { ok: boolean; message: string; siteUrl: string };
+
 export type AdminBridge = {
+  listEffectProjects(): Promise<EffectStudioProject[]>;
+  loadEffectScene(id: string): Promise<EffectStudioLoad>;
+  saveEffectScene(id: string, scene: EffectScene): Promise<EffectStudioSave>;
+  publishEffectScene(id: string): Promise<EffectStudioPublish>;
   getOverview(): Promise<OverviewSnapshot>;
   getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
   syncInstallationCredential(installationId: string): Promise<{ ok: boolean; changed: boolean; verifiedLive: boolean; message: string }>;

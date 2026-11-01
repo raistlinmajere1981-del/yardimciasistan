@@ -7,6 +7,7 @@ import {
   EyeOff,
   ExternalLink,
   FlaskConical,
+  Waves,
   GitBranch,
   Globe2,
   Home,
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CREDENTIAL_FIELDS } from "../shared/contracts";
+import { EffectStudio } from "./EffectStudio";
 import type {
   DependencyUpdateReport,
   CredentialField,
@@ -46,7 +48,7 @@ import type {
   VerificationRunState
 } from "../shared/contracts";
 
-type Section = "overview" | "installations" | "release" | "tests" | "deploy" | "support" | "system";
+type Section = "overview" | "installations" | "release" | "tests" | "deploy" | "effects" | "support" | "system";
 
 function normalizeVerificationRunState(state: VerificationRunState): VerificationRunState {
   return { ...state, totalPlanned: state.totalPlanned ?? 0, checks: Array.isArray(state.checks) ? state.checks : [] };
@@ -73,6 +75,7 @@ const NAV_ITEMS: Array<{ id: Section; label: string; icon: typeof Home }> = [
   { id: "release", label: "Release", icon: Rocket },
   { id: "tests", label: "Testler", icon: FlaskConical },
   { id: "deploy", label: "Deploy", icon: CloudUpload },
+  { id: "effects", label: "Efekt Atölyesi", icon: Waves },
   { id: "support", label: "Destek", icon: LifeBuoy },
   { id: "system", label: "Sistem", icon: Settings }
 ];
@@ -2871,11 +2874,13 @@ export default function App() {
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "deploy" && data ? (
           <Deploy data={data} onRefresh={() => void loadOverview()} />
+        ) : section === "effects" && data ? (
+          <EffectStudio />
         ) : section === "support" && data ? (
           <Support productVersion={data.product.version} />
         ) : section === "system" && data ? (
           <System data={data} />
-        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "deploy" || section === "support" || section === "system" ? (
+        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "deploy" || section === "effects" || section === "support" || section === "system" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…

@@ -8,6 +8,7 @@ import {
   saveInstallationCredential
 } from "./services/credentials-service";
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
+import { runEffectStudio } from "./services/effect-studio-service";
 import { getOverviewSnapshot } from "./services/overview-service";
 import { ReleaseRunner } from "./services/release-runner";
 import {
@@ -32,6 +33,7 @@ const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
 const verificationRunner = new VerificationRunner(REPO_ROOT);
 const deploymentRunner = new DeploymentRunner(REPO_ROOT);
 const releaseRunner = new ReleaseRunner(REPO_ROOT);
+let effectPublishBusy = false;
 
 verificationRunner.subscribe((state) => {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -85,6 +87,17 @@ function createWindow() {
   else void window.loadFile(join(APP_ROOT, "dist-renderer", "index.html"));
 }
 
+ipcMain.handle("admin:effects-projects", () => runEffectStudio(REPO_ROOT, "list"));
+ipcMain.handle("admin:effects-load", (_event, id: string) => runEffectStudio(REPO_ROOT, "load", { id }));
+ipcMain.handle("admin:effects-save", (_event, id: string, scene: unknown) =>
+  runEffectStudio(REPO_ROOT, "save", { id, scene }));
+ipcMain.handle("admin:effects-publish", async (_event, id: string) => {
+  if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
+      releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
+  effectPublishBusy = true;
+  try { return await runEffectStudio(REPO_ROOT, "publish", { id }); }
+  finally { effectPublishBusy = false; }
+});
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
 ipcMain.handle("admin:get-installation-credentials", (_event, installationId: string) =>
   getInstallationCredentials(REPO_ROOT, installationId)
@@ -106,7 +119,8 @@ function busyOperationMessage(exclude: "verification" | "deployment" | "release"
   const active = [
     exclude !== "verification" && verificationRunner.getState().running ? "doğrulama" : "",
     exclude !== "deployment" && deploymentRunner.getState().running ? "deploy" : "",
-    exclude !== "release" && releaseRunner.getState().running ? "release" : ""
+    exclude !== "release" && releaseRunner.getState().running ? "release" : "",
+    effectPublishBusy ? "efekt yayını" : ""
   ].find(Boolean);
 
   return active ? `Önce çalışan ${active} işlemini tamamlayın veya iptal edin.` : "";
