@@ -15,6 +15,7 @@ import static com.yardimciasistan.android.AndroidPresentation.shortTimestamp;
 final class AndroidConnectionSettingsPanel {
   interface Listener {
     void onSyncRequested();
+    void onPairRequested();
   }
 
   private final ComponentActivity activity;
@@ -62,7 +63,25 @@ final class AndroidConnectionSettingsPanel {
     boolean canEditSettings = !embeddedConnectionLocked
         && (!data.permissionsResolved || data.hasPermission("settings.edit"));
 
-    if (canEditSettings) {
+    LinearLayout localCard = UiKit.card(activity);
+    localCard.addView(UiKit.text(activity, "Masaüstü bul ve eşleştir", 16, UiKit.TEXT, Typeface.BOLD));
+    localCard.addView(UiKit.text(activity,
+        "USB internet paylaşımını veya aynı Wi-Fi ağını kullanın. Masaüstünde Ayarlar → Servisler → Android bölümünden QR açın.",
+        13, UiKit.SECONDARY, Typeface.NORMAL));
+    Button scan = UiKit.button(activity, "QR okut", UiKit.PRIMARY, view -> listener.onPairRequested());
+    scan.setEnabled(!loading && (!data.permissionsResolved || data.hasPermission("settings.edit")));
+    localCard.addView(scan);
+    if (ConnectionSettings.isLocalOnly(preferences)) {
+      Button sync = UiKit.outlineButton(activity, "Veriyi yenile", view -> listener.onSyncRequested());
+      sync.setEnabled(!loading);
+      localCard.addView(sync);
+    }
+    page.addView(localCard);
+
+    // Existing hosted installations keep their optional online settings. A fresh
+    // local installation does not have to choose a transport or enter a Web key.
+    if (!ConnectionSettings.isLocalOnly(preferences)
+        && !ConnectionSettings.syncSecret(preferences).isEmpty() && canEditSettings) {
       LinearLayout connection = UiKit.card(activity);
       connection.addView(UiKit.text(
           activity,
@@ -125,7 +144,8 @@ final class AndroidConnectionSettingsPanel {
       );
       connection.addView(refreshButton);
       page.addView(connection);
-    } else {
+    } else if (!ConnectionSettings.isLocalOnly(preferences)
+        && !ConnectionSettings.syncSecret(preferences).isEmpty()) {
       LinearLayout readOnly = UiKit.card(activity);
       readOnly.addView(UiKit.text(
           activity,
@@ -148,27 +168,6 @@ final class AndroidConnectionSettingsPanel {
       page.addView(readOnly);
     }
 
-    ConnectionSettings.LocalConnection localConnection =
-        ConnectionSettings.localConnection(preferences);
-    LinearLayout localConnectionCard = UiKit.card(activity);
-    localConnectionCard.addView(UiKit.text(
-        activity,
-        "Yerel ağ",
-        14,
-        UiKit.TEXT,
-        Typeface.BOLD
-    ));
-    localConnectionCard.addView(UiKit.text(
-        activity,
-        localConnection.isComplete()
-            ? "Aynı ağda masaüstü bulunduğunda yerel bağlantı otomatik kullanılır; ulaşılamazsa web bağlantısına geçilir."
-            : "Yerel bağlantı kullanıcı işlemi gerektirmez. Masaüstü aynı ağda bulunduğunda otomatik hazırlanır.",
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    page.addView(localConnectionCard);
-
     page.addView(UiKit.sectionTitle(activity, "Bağlantı durumu"));
     LinearLayout state = UiKit.card(activity);
     state.addView(settingLine(
@@ -183,14 +182,14 @@ final class AndroidConnectionSettingsPanel {
         ConnectionSettings.localConnection(preferences);
     state.addView(settingLine(
         "Yerel masaüstü",
-        localSummary.isComplete()
+        localSummary.isPaired()
             ? (localSummary.hasEndpoint()
                 ? "Eşleşti · ağda bulundu"
                 : "Eşleşti · ağda aranıyor")
             : (localSummary.hasEndpoint()
                 ? "Bulundu · eşleştirme bekliyor"
                 : "Henüz bulunmadı"),
-        localSummary.isComplete() && localSummary.hasEndpoint()
+        localSummary.isPaired() && localSummary.hasEndpoint()
             ? UiKit.SUCCESS
             : UiKit.MUTED
     ));

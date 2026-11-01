@@ -6,9 +6,9 @@ import org.json.JSONObject;
 
 final class CompanionOperationsRouter implements AndroidOperationsTransport {
   private final SharedPreferences preferences;
-  private final HostingAndroidOperationsTransport hostingTransport;
-  private final HostingSyncClient pairingHostingClient = new HostingSyncClient();
-  private final LocalCompanionPairingClient pairingClient = new LocalCompanionPairingClient();
+  interface LocalTransportFactory { AndroidOperationsTransport create(String desktopId); }
+  private final AndroidOperationsTransport hostingTransport;
+  private final LocalTransportFactory localTransports;
 
   CompanionOperationsRouter(SharedPreferences preferences) {
     this(preferences, new HostingAndroidOperationsTransport());
@@ -16,15 +16,24 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
 
   CompanionOperationsRouter(
       SharedPreferences preferences,
-      HostingAndroidOperationsTransport hostingTransport
+      AndroidOperationsTransport hostingTransport
   ) {
+    this(preferences, hostingTransport, desktopId -> new LocalDesktopOperationsTransport(preferences, desktopId));
+  }
+
+  CompanionOperationsRouter(SharedPreferences preferences, AndroidOperationsTransport hostingTransport,
+      LocalTransportFactory localTransports) {
     this.preferences = preferences;
     this.hostingTransport = hostingTransport;
+    this.localTransports = localTransports;
   }
 
   @Override
   public String preferredSourceKey(String baseUrl, String credential) {
-    String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    String targetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
+    if (ConnectionSettings.isLocalOnly(preferences)) {
+      return CompanionConnectionIdentity.localSourceKey(ConnectionSettings.localConnection(preferences).desktopId);
+    }
     if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
       return hostingTransport.preferredSourceKey(baseUrl, credential);
     }
@@ -42,7 +51,12 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       DeviceIdentity identity,
       long knownServerRevision
   ) throws TransportException {
-    String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    String targetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
+    if (ConnectionSettings.isLocalOnly(preferences)) {
+      ConnectionSettings.LocalConnection paired = requireLocal();
+      return localTransports.create(paired.desktopId)
+          .fetchOperations(paired.baseUrl, paired.localToken, identity, knownServerRevision);
+    }
     if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
       FetchResult hostingResult = hostingTransport.fetchOperations(
           baseUrl,
@@ -54,18 +68,16 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       return hostingResult;
     }
 
-    boolean pairedNow = ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
-      LocalDesktopOperationsTransport localTransport =
-          new LocalDesktopOperationsTransport(local.desktopId);
+      AndroidOperationsTransport localTransport = localTransports.create(local.desktopId);
       try {
         return localTransport.fetchOperations(
             local.baseUrl,
             local.localToken,
             identity,
-            pairedNow ? 0L : knownServerRevision
+            knownServerRevision
         );
       } catch (TransportException error) {
         if (!error.allowsHostingFallback()) {
@@ -97,7 +109,27 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       String actionType,
       JSONObject actionPayload
   ) throws TransportException {
-    String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    String targetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
+    // A coupon permit is minted only by the paired desktop over pinned TLS. It
+    // must never be forwarded to the Web/hosting action path or replayed after a
+    // local failure, where its discount and receipt evidence do not exist.
+    if (actionPayload != null && actionPayload.has("couponPermitId")) {
+      if (!ConnectionSettings.isLocalOnly(preferences)) {
+        ConnectionSettings.LocalConnection local = ConnectionSettings.localConnectionForTarget(preferences, targetKey);
+        if (!local.isComplete() || ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
+          throw new TransportException(
+              "Kuponlu satış yalnız eşleşmiş masaüstü TLS bağlantısında kullanılabilir; Web bağlantısına düşmez.",
+              "local_coupon_tls_required", 0, null);
+        }
+        return localTransports.create(local.desktopId).enqueueAction(
+            local.baseUrl, local.localToken, identity, actionId, actionType, actionPayload);
+      }
+    }
+    if (ConnectionSettings.isLocalOnly(preferences)) {
+      ConnectionSettings.LocalConnection paired = requireLocal();
+      return localTransports.create(paired.desktopId)
+          .enqueueAction(paired.baseUrl, paired.localToken, identity, actionId, actionType, actionPayload);
+    }
     if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
       OperationData.ActionRecord accepted = hostingTransport.enqueueAction(
           baseUrl,
@@ -111,12 +143,10 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       return accepted;
     }
 
-    ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
-      LocalDesktopOperationsTransport localTransport =
-          new LocalDesktopOperationsTransport(local.desktopId);
+      AndroidOperationsTransport localTransport = localTransports.create(local.desktopId);
       try {
         return localTransport.enqueueAction(
             local.baseUrl,
@@ -146,44 +176,18 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
     return accepted;
   }
 
-  private boolean ensureAutomaticLocalPairing(
-      String baseUrl,
-      String credential,
-      DeviceIdentity identity,
-      String targetKey
-  ) {
-    ConnectionSettings.LocalConnection current =
-        ConnectionSettings.localConnectionForTarget(preferences, targetKey);
-    if (current.isComplete()) {
-      return false;
+  private ConnectionSettings.LocalConnection requireLocal() throws TransportException {
+    ConnectionSettings.LocalConnection local = ConnectionSettings.localConnection(preferences);
+    if (ConnectionSettings.hasAnyHostingActionBarrier(preferences)) {
+      throw new TransportException("Önceki Web bağlantısında sonucu beklenen işlem var.", "target_barrier", 0, null);
     }
-
-    ConnectionSettings.LocalConnection discovered = ConnectionSettings.localConnection(preferences);
-    if (!discovered.hasEndpoint()) {
-      return false;
+    if (LocalPinnedHttps.decodePin(local.spkiSha256) == null) {
+      throw new TransportException("Güvenli masaüstü eşleştirmesi gerekli. Masaüstünde yeni QR açıp okutun.", "local_tls_pairing_required", 0, null);
     }
-
-    try {
-      HostingSyncClient.LocalPairingTicketResult ticket =
-          pairingHostingClient.requestLocalPairingTicket(baseUrl, credential, identity);
-      pairingClient.pairWithTicket(
-          preferences,
-          identity,
-          baseUrl,
-          ticket
-      );
-      return ConnectionSettings.localConnectionForTarget(preferences, targetKey).isComplete();
-    } catch (HostingSyncClient.SyncException error) {
-      if ("local_network_disabled".equals(error.code)) {
-        ConnectionSettings.clearLocalEndpoint(preferences);
-      }
-      return false;
-    } catch (LocalCompanionPairingClient.PairingException error) {
-      if ("local_network_disabled".equals(error.code)) {
-        ConnectionSettings.clearLocalEndpoint(preferences);
-      }
-      return false;
+    if (!local.isComplete() || !local.targetKey.equals(CompanionConnectionIdentity.localActionTargetKey(local.desktopId))) {
+      throw new TransportException("Masaüstü bağlantısı bekleniyor. Aynı ağa bağlanın; gerekirse QR ile yeniden eşleştirin.", "local_unreachable", 0, null);
     }
+    return local;
   }
 
   private void clearBarrierWhenHostingDrained(String targetKey, FetchResult result) {

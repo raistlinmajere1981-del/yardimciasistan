@@ -47,6 +47,7 @@ final class BarcodeCameraScanner {
 
   private final ComponentActivity activity;
   private final boolean continuous;
+  private final boolean qrMode;
   private final Listener listener;
   private final PreviewView previewView;
   private final TextView statusView;
@@ -65,13 +66,17 @@ final class BarcodeCameraScanner {
       ComponentActivity activity,
       String title,
       boolean continuous,
+      boolean qrMode,
       Listener listener
   ) {
+    this.qrMode = qrMode;
     this.activity = activity;
     this.continuous = continuous;
     this.listener = listener;
 
-    BarcodeScannerOptions options = new BarcodeScannerOptions.Builder()
+    BarcodeScannerOptions options = qrMode
+        ? new BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        : new BarcodeScannerOptions.Builder()
         .setBarcodeFormats(
             Barcode.FORMAT_EAN_13,
             Barcode.FORMAT_EAN_8,
@@ -128,7 +133,7 @@ final class BarcodeCameraScanner {
 
     statusView = UiKit.text(
         activity,
-        continuous
+        qrMode ? "Kamerayı masaüstündeki eşleştirme QR koduna doğrultun." : continuous
             ? "Kamerayı ürün barkoduna doğrultun. Okunan ürünler masaüstüne otomatik gönderilir."
             : "Kamerayı barkoda doğrultun. Barkod algılandığında otomatik devam edilir.",
         12,
@@ -145,6 +150,7 @@ final class BarcodeCameraScanner {
         .create();
 
     dialog.setOnShowListener(ignored -> {
+      if (qrMode) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setVisibility(View.GONE);
       dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> {
         close();
         listener.onManualEntry();
@@ -160,8 +166,12 @@ final class BarcodeCameraScanner {
       boolean continuous,
       Listener listener
   ) {
-    BarcodeCameraScanner scanner = new BarcodeCameraScanner(activity, title, continuous, listener);
+    BarcodeCameraScanner scanner = new BarcodeCameraScanner(activity, title, continuous, false, listener);
     scanner.dialog.show();
+  }
+
+  static void showQr(ComponentActivity activity, Listener listener) {
+    new BarcodeCameraScanner(activity, "Masaüstü QR kodu", false, true, listener).dialog.show();
   }
 
   @androidx.annotation.OptIn(markerClass = androidx.camera.core.ExperimentalGetImage.class)
@@ -187,7 +197,8 @@ final class BarcodeCameraScanner {
             analysis
         );
       } catch (Exception error) {
-        reportError("Kamera başlatılamadı. Barkodu elle girebilirsiniz.");
+        reportError(qrMode ? "Kamera başlatılamadı. Kamera iznini kontrol edip yeniden deneyin."
+            : "Kamera başlatılamadı. Barkodu elle girebilirsiniz.");
       }
     }, ContextCompat.getMainExecutor(activity));
   }
@@ -243,7 +254,7 @@ final class BarcodeCameraScanner {
 
     activity.runOnUiThread(() -> {
       if (closed) return;
-      statusView.setText(continuous
+      statusView.setText(qrMode ? "QR okundu" : continuous
           ? "Okundu: " + emitted + " · sonraki ürün için kamerayı yeni barkoda doğrultun."
           : "Okundu: " + emitted);
       previewView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);

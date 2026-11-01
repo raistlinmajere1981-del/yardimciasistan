@@ -34,8 +34,37 @@ final class AndroidActionPolicy {
     }
     if (MarketUiRules.ACTION_SALE.equals(actionType) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(actionType)) {
       if (actionPayload == null) return "Satış veya tahsilat bilgileri eksik.";
+      boolean sale = MarketUiRules.ACTION_SALE.equals(actionType);
+      String[] allowed = sale
+          ? new String[]{"lines", "location_id", "settlement", "customer_id", "payment_method", "external_payment_confirmed", "requestedPointsMinor", "couponPermitId"}
+          : new String[]{"customer_id", "amount_minor", "currency", "expected_balance_minor", "payment_method", "external_payment_confirmed"};
+      if (!hasOnlyKeys(actionPayload, allowed)) return "Mobil işlem desteklenmeyen alan içeriyor.";
+      if (sale && !"paid".equals(actionPayload.optString("settlement"))
+          && !"credit".equals(actionPayload.optString("settlement"))) return "Satış ödeme seçimi geçersiz.";
       String method = actionPayload.optString("payment_method", "");
       boolean credit = MarketUiRules.ACTION_SALE.equals(actionType) && "credit".equals(actionPayload.optString("settlement"));
+      if (sale && actionPayload.has("requestedPointsMinor")) {
+        Object rawPoints = actionPayload.opt("requestedPointsMinor");
+        // A JSON amount is an intent, not a trusted permission to deduct points.
+        if (!(rawPoints instanceof Integer || rawPoints instanceof Long)
+            || ((Number) rawPoints).longValue() < 0 || ((Number) rawPoints).longValue() > 9007199254740991L)
+          return "Mobil Puan tutarı geçersiz.";
+        if (((Number) rawPoints).longValue() > 0 && (credit || actionPayload.optString("customer_id", "").isEmpty()))
+          return "Puan için müşterili ücretli satış gerekli.";
+      }
+      boolean coupon = sale && actionPayload.has("couponPermitId");
+      if (coupon) {
+        Object rawCoupon = actionPayload.opt("couponPermitId");
+        if (!(rawCoupon instanceof String) || !((String) rawCoupon)
+            .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))
+          return "Kupon izni geçersiz.";
+        if (!"paid".equals(actionPayload.optString("settlement")) || !"cash".equals(method)
+            || actionPayload.optString("customer_id", "").isEmpty())
+          return "Kupon yalnız müşterili nakit satışta kullanılabilir.";
+        if (actionPayload.has("requestedPointsMinor")
+            && ((Number) actionPayload.opt("requestedPointsMinor")).longValue() > 0)
+          return "Kupon ile Puan birlikte kullanılamaz.";
+      }
       if ((!credit && !java.util.Arrays.asList("cash", "card", "bank", "other").contains(method))
           || (credit && (!method.isEmpty() || actionPayload.optString("customer_id").isEmpty()))) return "Ödeme türü veya müşteri eksik.";
       if ("card".equals(method) && !Boolean.TRUE.equals(actionPayload.opt("external_payment_confirmed"))) return "Harici POS ödemesini onaylayın.";
@@ -44,8 +73,17 @@ final class AndroidActionPolicy {
         if (lines == null || lines.length() == 0 || lines.length() > 200) return "Satış ürünleri eksik.";
         for (int i = 0; i < lines.length(); i++) {
           JSONObject line = lines.optJSONObject(i);
-          if (line == null || line.optString("product_id").isEmpty() || line.optString("expected_updated_at").isEmpty()
-              || !line.optString("expected_currency").matches("[A-Z]{3}") || !line.has("expected_unit_price")) return "Güncel ürün fiyatı ve sürümü gerekli.";
+          if (line == null || !hasOnlyKeys(line, new String[]{"product_id", "quantity", "expected_unit_price", "expected_currency", "expected_updated_at"}))
+            return "Mobil satış satırı desteklenmeyen alan içeriyor.";
+          Object quantityValue = line.opt("quantity");
+          Object priceValue = line.opt("expected_unit_price");
+          double quantity = quantityValue instanceof Number ? ((Number) quantityValue).doubleValue() : Double.NaN;
+          double price = priceValue instanceof Number ? ((Number) priceValue).doubleValue() : Double.NaN;
+          if (!Double.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000
+              || Math.abs(quantity * 10_000 - Math.rint(quantity * 10_000)) > 0.00001
+              || !Double.isFinite(price) || price < 0) return "Satış miktarı veya fiyatı geçersiz.";
+          if (line.optString("product_id").isEmpty() || line.optString("expected_updated_at").isEmpty()
+              || !line.optString("expected_currency").matches("[A-Z]{3}")) return "Güncel ürün fiyatı ve sürümü gerekli.";
         }
       } else if (!actionPayload.has("expected_balance_minor") || actionPayload.optLong("expected_balance_minor", 0) <= 0
           || actionPayload.optLong("amount_minor", 0) <= 0 || !actionPayload.optString("currency").matches("[A-Z]{3}")) return "Tahsilat tutarı ve güncel bakiye gerekli.";
@@ -61,6 +99,13 @@ final class AndroidActionPolicy {
     }
     if (KbsUiRules.isAction(actionType)) return KbsUiRules.validationError(data, actionType, actionPayload);
     return "";
+  }
+
+  private static boolean hasOnlyKeys(JSONObject payload, String[] allowed) {
+    java.util.Set<String> keys = new java.util.HashSet<>(java.util.Arrays.asList(allowed));
+    java.util.Iterator<String> present = payload.keys();
+    while (present.hasNext()) if (!keys.contains(present.next())) return false;
+    return true;
   }
 
   static boolean actionAllowedByCapabilities(

@@ -39,7 +39,7 @@ android {
   sourceSets {
     main {
       manifest.srcFile "AndroidManifest.xml"
-      java.srcDirs = ["src/main/java", generatedConnectionDirectory]
+      java.srcDirs = ["src/main/java", "../android-update-core/src/main/java", generatedConnectionDirectory]
       res.srcDirs = ["src/main/res"]
     }
   }

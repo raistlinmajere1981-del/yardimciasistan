@@ -72,10 +72,10 @@ public final class SyncJobService extends JobService {
     DeviceIdentity identity = DeviceIdentity.loadOrCreate(this, preferences);
     baseUrl = baseUrl == null ? "" : baseUrl.trim();
     syncSecret = syncSecret == null ? "" : syncSecret.trim();
-    if (baseUrl.isEmpty() || syncSecret.isEmpty() || identity.deviceId.isEmpty()) {
+    if (!ConnectionSettings.isComplete(preferences) || identity.deviceId.isEmpty()) {
       return;
     }
-    String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
     AndroidOperationsTransport client = new CompanionOperationsRouter(preferences);
     String preferredSourceKey = client.preferredSourceKey(baseUrl, syncSecret);
     if (actionTargetKey.isEmpty() || preferredSourceKey.isEmpty()) {
@@ -88,15 +88,19 @@ public final class SyncJobService extends JobService {
     List<ActionOutbox.PendingAction> pendingActions = outbox.load();
     for (ActionOutbox.PendingAction pending : pendingActions) {
       if (!pending.matchesTarget(actionTargetKey)) {
-        continue;
+        throw new Exception("Önceki bağlantıya ait bekleyen işlemler korunuyor.");
       }
+    }
+    for (ActionOutbox.PendingAction pending : pendingActions) {
       try {
-        client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
+        OperationData.ActionRecord accepted = client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
+        cache.recordActionResult(accepted, actionTargetKey);
         outbox.remove(pending.id);
       } catch (AndroidOperationsTransport.TransportException error) {
         if (!error.invalidatesPendingAction()) {
           throw error;
         }
+        cache.recordActionResult(AndroidActionDispatcher.failedRecord(pending, error.getMessage()), actionTargetKey);
         outbox.remove(pending.id);
         if (error.disablesAndroidService()) {
           clearDisabledAndroidState(cache, outbox, notifications, previousData);

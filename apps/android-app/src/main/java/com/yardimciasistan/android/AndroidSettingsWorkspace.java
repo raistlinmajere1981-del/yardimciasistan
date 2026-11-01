@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity;
 final class AndroidSettingsWorkspace {
   interface Listener {
     void onSyncRequested();
+    void onPairRequested();
     void onAppearanceChanged(AppearancePreferences next);
     void refreshNotifications(OperationData data);
     int localPendingActionCount();
@@ -52,6 +53,8 @@ final class AndroidSettingsWorkspace {
         !data.permissionsResolved || data.hasPermission("settings.view");
 
     page.addView(UiKit.title(activity, "Ayarlar"));
+    page.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
+        activity, "android-companion", ".fileprovider"));
     page.addView(sectionLabel("Görünüm"));
     LinearLayout appearance = UiKit.card(activity);
     appearance.addView(settingLine("Tema", themeLabel, UiKit.PRIMARY));
@@ -77,7 +80,10 @@ final class AndroidSettingsWorkspace {
         connectionState,
         loading,
         listener.localPendingActionCount(),
-        listener::onSyncRequested
+        new AndroidConnectionSettingsPanel.Listener() {
+          @Override public void onSyncRequested() { listener.onSyncRequested(); }
+          @Override public void onPairRequested() { listener.onPairRequested(); }
+        }
     );
     connectionPanel.appendTo(page);
 

@@ -40,9 +40,11 @@ public final class DealerActivity extends ComponentActivity {
   private final Map<String, TextView> cartPrices = new LinkedHashMap<>();
   private final Map<String, String> quantityDrafts = new LinkedHashMap<>();
   private final Map<String, Integer> positions = new HashMap<>();
+  private static final String PENDING_CARTS =
+      "Bekleyen sipariş kesinleşene kadar sepetler kilitli. Aynı siparişi tekrar deneyin.";
   private String tab = "Katalog", detail = "", renderedKey = "", message = "", query = "",
                  category = "Tüm kategoriler", brand = "Tüm markalar", connectionInput = "", accountEmail = "";
-  private boolean busy, favoritesOnly, storageFailed, accessVerified;
+  private boolean busy, favoritesOnly, storageFailed, accessVerified, freshScroll;
   private JSONObject accountConfig;
   private int page;
   private final Locale locale = new Locale("tr", "TR");
@@ -69,6 +71,7 @@ public final class DealerActivity extends ComponentActivity {
     ui = new DealerUi(this);
     setTheme(ui.dark ? R.style.DealerThemeDark : R.style.DealerTheme);
     super.onCreate(saved);
+    com.yardimciasistan.update.AndroidUpdates.confirmInstalledOnLaunch(this);
     try {
       DealerDisk disk = new DealerDisk(this);
       state = new DealerState(disk.read(), disk);
@@ -393,7 +396,10 @@ public final class DealerActivity extends ComponentActivity {
   private void render() {
     if (storageFailed)
       return;
-    rememberPosition();
+    if (freshScroll)
+      freshScroll = false;
+    else
+      rememberPosition();
     if (photos != null && photos.active()) {
       photos.show();
       return;
@@ -535,6 +541,17 @@ public final class DealerActivity extends ComponentActivity {
     form.addView(businessLogo(72)); ui.label(form, DealerBranding.displayName(businessBrand()), 14, ui.muted);
     ui.label(form, "Müşteri hesabınıza giriş", 26, ui.ink).setTypeface(null, Typeface.BOLD);
     notice = ui.label(form, message, 14, ui.danger); notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+    if (!state.text("cookie").isEmpty() && state.object("cart").length() > 0) {
+      ui.label(form, "Çevrimdışı sepet (salt okunur)", 18, ui.ink);
+      ui.label(form, "Sipariş göndermek için bayi erişimini doğrulayın.", 13, ui.muted);
+      JSONObject cart = state.object("cart");
+      for (Iterator<String> it = cart.keys(); it.hasNext();) {
+        String id = it.next();
+        JSONObject product = state.product(id);
+        String name = product == null ? id : product.optString("name", id);
+        ui.label(form, name + " × " + number(cart.optDouble(id)), 15, ui.ink);
+      }
+    }
     String base = state.text("connection_base");
     if (base.isEmpty() || accountConfig == null) {
       EditText connection = field(form, "İşletme bağlantısı", connectionInput.isEmpty() ? base : connectionInput,
@@ -586,6 +603,9 @@ public final class DealerActivity extends ComponentActivity {
       ui.button(form, "İşletmeyi değiştir", () -> safely(() -> { state.put("connection_base", ""); accountConfig = null; render(); }), false);
     }
     ui.button(form, "Yerel oturumu temizle", () -> safely(() -> { state.invalidateSession(); accessVerified = false; message = "Yerel oturum kapatıldı."; render(); }), false);
+    // Public release feed remains accessible without an active dealer account.
+    form.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
+        this, "android-dealer", ".files"));
     loading(busy);
   }
   private void authenticate(String base, String endpoint, JSONObject credentials) {
@@ -812,6 +832,7 @@ public final class DealerActivity extends ComponentActivity {
     return input;
   }
   private void cart() {
+    cartSelector();
     JSONObject cart = state.object("cart");
     if (cart.length() == 0) {
       ui.label(body, "Sepetiniz boş", 24, ui.ink);
@@ -907,6 +928,152 @@ public final class DealerActivity extends ComponentActivity {
       ui.label(body, "Gönderim doğrulanamadı. Sipariş içeriğiniz korunuyor.", 14, ui.accent);
     sendButton = ui.button(body, pending ? "Aynı siparişi tekrar dene" : "Siparişi gönder",
         () -> safely(this::submit), true);
+  }
+  private void cartSelector() {
+    JSONArray carts;
+    try {
+      carts = state.carts();
+    } catch (Exception error) {
+      fatalStorage();
+      return;
+    }
+    boolean locked = state.data.has("pending");
+    ui.label(body, "Sepetler", 13, ui.muted);
+    HorizontalScrollView strip = new HorizontalScrollView(this);
+    strip.setHorizontalScrollBarEnabled(false);
+    LinearLayout names = ui.row();
+    strip.addView(names);
+    body.addView(strip);
+    for (int i = 0; i < carts.length(); i++) {
+      JSONObject entry = carts.optJSONObject(i);
+      if (entry == null)
+        continue;
+      String id = entry.optString("id");
+      String name = entry.optString("name", "Sepet");
+      boolean active = entry.optBoolean("active");
+      Button choice = ui.choice(names, name, active, () -> {});
+      choice.setTextSize(13);
+      choice.setPadding(dp(10), dp(6), dp(10), dp(6));
+      choice.setContentDescription("Sepet: " + name + (active ? ", etkin" : ""));
+      choice.setEnabled(!locked);
+      if (!active)
+        choice.setOnClickListener(view -> safely(() -> switchCart(id)));
+      LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) choice.getLayoutParams();
+      params.setMargins(0, 0, dp(8), 0);
+      choice.setLayoutParams(params);
+    }
+    TextView current = ui.label(body, "Etkin sepet: " + state.activeCartName(), 15, ui.ink);
+    current.setTypeface(null, Typeface.BOLD);
+    LinearLayout actions = ui.row();
+    body.addView(actions);
+    Button create = ui.button(actions, "Yeni", () -> safely(this::newCart), false);
+    Button rename = ui.button(actions, "Adlandır", () -> safely(this::renameCart), false);
+    Button delete = ui.button(actions, "Sil", () -> safely(this::removeCart), false);
+    create.setEnabled(!locked);
+    rename.setEnabled(!locked);
+    delete.setEnabled(!locked);
+    if (locked)
+      ui.label(body, PENDING_CARTS, 13, ui.accent);
+  }
+  private void switchCart(String id) throws Exception {
+    if (state.data.has("pending"))
+      throw new IllegalStateException(PENDING_CARTS);
+    state.selectCart(id);
+    message = "";
+    resetCart();
+  }
+  private void newCart() throws Exception {
+    if (state.data.has("pending"))
+      throw new IllegalStateException(PENDING_CARTS);
+    if (state.carts().length() >= DealerState.MAX_CARTS)
+      throw new IllegalArgumentException(
+          "En fazla " + DealerState.MAX_CARTS + " sepet oluşturulabilir.");
+    cartName("Yeni sepet", "", "Oluştur", value -> {
+      state.newCart(value);
+      message = "Yeni sepet oluşturuldu.";
+      resetCart();
+    });
+  }
+  private void renameCart() throws Exception {
+    if (state.data.has("pending"))
+      throw new IllegalStateException(PENDING_CARTS);
+    String id = state.activeCartId();
+    cartName("Sepeti adlandır", state.activeCartName(), "Kaydet", value -> {
+      state.renameCart(id, value);
+      message = "Sepet adı güncellendi.";
+      resetCart();
+    });
+  }
+  private void removeCart() {
+    if (state.data.has("pending")) {
+      showMessage(PENDING_CARTS);
+      return;
+    }
+    String id = state.activeCartId();
+    new AlertDialog.Builder(this)
+        .setTitle("Sepet silinsin mi?")
+        .setMessage("“" + state.activeCartName() + "” sepeti ve içeriği silinecek.")
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton(
+            "Sepeti sil",
+            (dialog, which) -> safely(() -> {
+              state.deleteCart(id);
+              message = "Sepet silindi.";
+              resetCart();
+            }))
+        .show();
+  }
+  /** Fresh active cart: drop drafts, field bindings and cached scroll offsets. */
+  private void resetCart() {
+    quantityDrafts.clear();
+    cartFields.clear();
+    positions.clear();
+    freshScroll = true;
+    render();
+  }
+  private interface CartName {
+    void run(String name) throws Exception;
+  }
+  private void cartName(String title, String initial, String confirm, CartName action) {
+    EditText input = new EditText(this);
+    input.setContentDescription("Sepet adı");
+    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+    input.setSingleLine(true);
+    input.setTextSize(16);
+    input.setTextColor(ui.ink);
+    input.setHintTextColor(ui.muted);
+    input.setHint("En fazla " + DealerState.MAX_CART_NAME + " karakter");
+    input.setPadding(dp(12), dp(10), dp(12), dp(10));
+    input.setBackground(ui.shape(ui.surface, ui.border, 12));
+    input.setFilters(new android.text.InputFilter[] {
+        new android.text.InputFilter.LengthFilter(DealerState.MAX_CART_NAME)});
+    input.setText(initial);
+    input.setSelection(initial.length());
+    FrameLayout frame = new FrameLayout(this);
+    frame.setPadding(dp(20), dp(4), dp(20), 0);
+    frame.addView(input, new FrameLayout.LayoutParams(-1, -2));
+    AlertDialog dialog = new AlertDialog.Builder(this)
+        .setTitle(title)
+        .setView(frame)
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton(confirm, null)
+        .create();
+    dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        .setOnClickListener(view -> {
+          try {
+            action.run(input.getText().toString().trim());
+            dialog.dismiss();
+          } catch (IllegalArgumentException | IllegalStateException error) {
+            input.setError(error.getMessage());
+          } catch (Exception error) {
+            dialog.dismiss();
+            fatalStorage();
+          }
+        }));
+    dialog.getWindow().setSoftInputMode(
+        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+    dialog.show();
+    input.requestFocus();
   }
   private void updateCartTotal() {
     if (cartTotal == null)
@@ -1005,6 +1172,8 @@ public final class DealerActivity extends ComponentActivity {
     }
   }
   private void account() {
+    body.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
+        this, "android-dealer", ".files"));
     DealerAppearance selected = ui.appearance;
     choices(body, "Tema", new String[] {"Sistem", "Açık", "Koyu"},
         new String[] {"system", "light", "dark"}, selected.theme,
@@ -1130,7 +1299,7 @@ public final class DealerActivity extends ComponentActivity {
     return ui.dp(value);
   }
   private String price(JSONObject product) {
-    return money(product.optDouble("price"), product.optString("currency"));
+    return "Kayıtlı fiyat (değişebilir): " + money(product.optDouble("price"), product.optString("currency"));
   }
   private String money(double amount, String currency) {
     NumberFormat format = NumberFormat.getNumberInstance(locale);

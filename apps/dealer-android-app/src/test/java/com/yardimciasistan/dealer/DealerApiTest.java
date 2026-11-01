@@ -55,7 +55,7 @@ public class DealerApiTest {
     final int[] count = {0};
     DealerApi api = new DealerApi("https://firma.example/", url -> {
       count[0]++; assertTrue(url.toString().endsWith("receipt.php"));
-      Connection connection = new Connection(url); connection.response = "{\"ok\":true,\"receipt\":{\"ok\":true,\"order_id\":\"original\",\"accepted_at\":\"2026-01-01T10:00:00+00:00\"}}"; return connection;
+      Connection connection = new Connection(url); connection.response = "{\"ok\":true,\"receipt\":{\"ok\":true,\"order_id\":\"original\",\"accepted_at\":\"2026-01-01T10:00:00+00:00\",\"quoted_total\":0,\"currency\":\"TRY\"}}"; return connection;
     });
     assertEquals("original", api.submit(new JSONObject().put("idempotencyKey", "same-key-123456789"), "").getString("order_id")); assertEquals(1, count[0]);
   }
@@ -64,7 +64,7 @@ public class DealerApiTest {
     DealerApi api = new DealerApi("https://firma.example/", url -> {
       Connection connection = new Connection(url);
       if (count[0]++ == 0) { assertTrue(url.toString().endsWith("receipt.php")); connection.response = "{\"ok\":true,\"receipt\":null}"; }
-      else { assertTrue(url.toString().endsWith("order.php")); connection.response = "{\"ok\":true,\"order_id\":\"created\",\"accepted_at\":\"2026-01-01T10:00:00+00:00\"}"; }
+      else { assertTrue(url.toString().endsWith("order.php")); connection.response = "{\"ok\":true,\"order_id\":\"created\",\"accepted_at\":\"2026-01-01T10:00:00+00:00\",\"quoted_total\":24.7,\"currency\":\"TRY\"}"; }
       return connection;
     });
     assertEquals("created", api.submit(request, "").getString("order_id")); assertEquals(2, count[0]);
@@ -82,6 +82,22 @@ public class DealerApiTest {
         connection.response = url.toString().endsWith("receipt.php") ? "{\"ok\":true,\"receipt\":null}" : malformed; return connection;
       });
       assertThrows(DealerApi.Failure.class, () -> api.submit(new JSONObject().put("idempotencyKey", "same-key-123456789"), ""));
+    }
+  }
+  @Test public void missingServerQuoteNeverAcceptsOrderOrRecoveredReceipt() throws Exception {
+    String incomplete = "{\"ok\":true,\"order_id\":\"accepted\",\"accepted_at\":\"2026-01-01T10:00:00Z\"}";
+    for (boolean recovered : new boolean[]{false, true}) {
+      final int[] calls = {0};
+      DealerApi api = new DealerApi("https://firma.example/", url -> {
+        calls[0]++;
+        Connection connection = new Connection(url);
+        connection.response = url.toString().endsWith("receipt.php")
+            ? (recovered ? "{\"ok\":true,\"receipt\":" + incomplete + "}" : "{\"ok\":true,\"receipt\":null}")
+            : incomplete;
+        return connection;
+      });
+      assertThrows(DealerApi.Failure.class, () -> api.submit(new JSONObject().put("idempotencyKey", "same-key-123456789"), ""));
+      assertEquals(recovered ? 1 : 2, calls[0]);
     }
   }
   @Test public void applicationIsPublicMultipartAndSharesRequestTypeWithWidget() throws Exception {

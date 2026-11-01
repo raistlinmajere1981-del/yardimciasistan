@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="application_camera" path="application-camera/" />
     <cache-path name="comparison_camera" path="photo-comparison/" />
+    <cache-path name="verified_updates" path="updates/" />
 </paths>

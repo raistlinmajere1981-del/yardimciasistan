@@ -1,6 +1,9 @@
 package com.yardimciasistan.android;
 
 import static org.junit.Assert.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -65,6 +68,22 @@ public final class AndroidSyncPresentationTest {
     assertTrue(AndroidOperationsSyncController.shouldRender(false, false, pending, next));
     assertFalse(AndroidOperationsSyncController.shouldRender(false, false,
         AndroidOperationsSyncController.presentationStatus(next), next));
+  }
+
+  @Test public void completedOrFailedSyncRerendersVisibleMarketToReleaseLoadingDisabledActions() throws Exception {
+    String activity = new String(Files.readAllBytes(Paths.get("src/main/java/com/yardimciasistan/android/MainActivity.java")), StandardCharsets.UTF_8);
+    int success = activity.indexOf("public void onSuccess(AndroidOperationsSyncController.SyncResult result)");
+    int failure = activity.indexOf("public void onFailure(");
+    int helper = activity.indexOf("private boolean marketViewVisible()");
+    assertTrue(success >= 0 && failure > success && helper > failure);
+    String successMethod = activity.substring(success, activity.indexOf("\n      @Override", success + 1));
+    String failureMethod = activity.substring(failure, helper);
+    assertTrue(successMethod.contains("boolean wasLoading = loading;"));
+    assertTrue(successMethod.contains("wasLoading && marketViewVisible()"));
+    assertTrue(failureMethod.contains("boolean wasLoading = loading;"));
+    assertTrue(failureMethod.contains("wasLoading && marketViewVisible()"));
+    assertTrue(activity.substring(helper, activity.indexOf("\n  private ", helper + 1))
+        .contains("TAB_MARKET.equals(navigation.tab()) && !navigation.settingsOpen()"));
   }
 
   @Test public void cacheStillAdvancesRevisionWithoutNeedingAViewReplacement() throws Exception {

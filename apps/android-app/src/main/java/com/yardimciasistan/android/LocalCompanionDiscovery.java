@@ -26,6 +26,18 @@ final class LocalCompanionDiscovery {
   private NsdManager.DiscoveryListener discoveryListener;
   private WifiManager.MulticastLock multicastLock;
   private boolean resolving;
+  private String expectedDesktopId = "";
+  private boolean restartRequested;
+  private java.util.function.Consumer<String> endpointListener;
+
+  void setEndpointListener(java.util.function.Consumer<String> listener) { endpointListener = listener; }
+
+  synchronized void startForDesktop(String desktopId) {
+    expectedDesktopId = desktopId;
+    if (discoveryListener == null) { start(); return; }
+    restartRequested = true;
+    stopInternal();
+  }
 
   LocalCompanionDiscovery(Context context, SharedPreferences preferences) {
     this.context = context.getApplicationContext();
@@ -94,6 +106,11 @@ final class LocalCompanionDiscovery {
   }
 
   synchronized void stop() {
+    restartRequested = false;
+    stopInternal();
+  }
+
+  private synchronized void stopInternal() {
     NsdManager.DiscoveryListener listener = discoveryListener;
     handler.removeCallbacksAndMessages(null);
     if (listener == null || nsdManager == null) {
@@ -147,6 +164,7 @@ final class LocalCompanionDiscovery {
       return;
     }
 
+    if (!expectedDesktopId.isEmpty() && !expectedDesktopId.equals(desktopId)) return;
     ConnectionSettings.LocalConnection existing = ConnectionSettings.localConnection(preferences);
     if (!existing.localToken.isEmpty()
         && !existing.desktopId.isEmpty()
@@ -164,25 +182,18 @@ final class LocalCompanionDiscovery {
     if (hostText == null || hostText.trim().isEmpty()) {
       return;
     }
-    int zoneIndex = hostText.indexOf('%');
-    if (zoneIndex >= 0) {
-      hostText = hostText.substring(0, zoneIndex);
-    }
-    if (host instanceof Inet6Address) {
-      hostText = "[" + hostText + "]";
-    }
-
-    String baseUrl = "http://" + hostText + ":" + port;
-    if (ConnectionSettings.storeDiscoveredLocalEndpoint(
-        preferences,
-        desktopId,
-        baseUrl
-    )) {
-      Log.i(TAG, "NSD local desktop accepted: " + desktopId + " @ " + baseUrl);
-      stop();
-    } else {
-      Log.w(TAG, "NSD local desktop could not be stored: " + desktopId + " @ " + baseUrl);
-    }
+    // IPv4 HTTPS only in v3. mDNS is a hint: authenticate the persisted pin
+    // and desktop status on a worker before changing the reconnect endpoint.
+    if (host instanceof Inet6Address) return;
+    String baseUrl = "https://" + hostText + ":" + port;
+    java.util.concurrent.ForkJoinPool.commonPool().execute(() -> {
+      if (new LocalCompanionPairingClient().refreshDiscoveredEndpoint(preferences, desktopId, baseUrl)) {
+        handler.post(() -> {
+          if (endpointListener != null) endpointListener.accept(desktopId);
+          stop();
+        });
+      }
+    });
   }
 
   private static String attribute(NsdServiceInfo serviceInfo, String key) {
@@ -207,10 +218,10 @@ final class LocalCompanionDiscovery {
     discoveryListener = null;
     resolving = false;
     handler.removeCallbacksAndMessages(null);
-    if (releaseImmediately) {
-      releaseMulticastLock();
-    } else {
-      releaseMulticastLock();
+    releaseMulticastLock();
+    if (restartRequested) {
+      restartRequested = false;
+      handler.post(this::start);
     }
   }
 

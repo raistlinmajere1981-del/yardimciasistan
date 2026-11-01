@@ -80,18 +80,18 @@ final class AndroidOperationsSyncController {
   }
 
   void sync(String baseUrl, String syncSecret, OperationData fallbackData, Listener listener) {
-    if (baseUrl == null || baseUrl.trim().isEmpty()) {
+    if (!ConnectionSettings.isLocalOnly(preferences) && (baseUrl == null || baseUrl.trim().isEmpty())) {
       listener.onRejected("Web modül adresi gerekli.");
       return;
     }
-    if (syncSecret == null || syncSecret.trim().isEmpty()) {
+    if (!ConnectionSettings.isLocalOnly(preferences) && (syncSecret == null || syncSecret.trim().isEmpty())) {
       listener.onRejected("Güvenlik anahtarı gerekli.");
       return;
     }
 
-    final String normalizedBaseUrl = baseUrl.trim();
-    final String normalizedSecret = syncSecret.trim();
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(normalizedBaseUrl);
+    final String normalizedBaseUrl = baseUrl == null ? "" : baseUrl.trim();
+    final String normalizedSecret = syncSecret == null ? "" : syncSecret.trim();
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(preferences, normalizedBaseUrl);
     final String preferredSourceKey = operationsTransport.preferredSourceKey(normalizedBaseUrl, normalizedSecret);
     if (actionTargetKey.isEmpty() || preferredSourceKey.isEmpty()) {
       listener.onRejected("Bağlantı hedefi doğrulanamadı.");
@@ -117,10 +117,11 @@ final class AndroidOperationsSyncController {
         ? pendingToRetry.get(pendingToRetry.size() - 1).type
         : "";
 
-    preferences.edit()
-        .putString(ConnectionSettings.KEY_WEB_MODULE_URL, normalizedBaseUrl)
-        .putString(ConnectionSettings.KEY_SYNC_SECRET, normalizedSecret)
-        .apply();
+    if (!ConnectionSettings.isLocalOnly(preferences)) {
+      preferences.edit()
+          .putString(ConnectionSettings.KEY_WEB_MODULE_URL, normalizedBaseUrl)
+          .putString(ConnectionSettings.KEY_SYNC_SECRET, normalizedSecret).apply();
+    }
 
     listener.onStarted(
         pendingToRetry.isEmpty()
@@ -207,7 +208,8 @@ final class AndroidOperationsSyncController {
             fetchedSourceKey.startsWith("local:"),
             fetched.payload.optBoolean("local_network_enabled", true),
             shouldRender(snapshotChanged, !pendingToRetry.isEmpty(), previousStatus, nextData),
-            fetchedSourceKey.startsWith("local:") ? "Yerel ağ bağlı" : "Web bağlantısı hazır"
+            fetched.payload.optBoolean("approval_required", false) ? "Masaüstü onayı bekleniyor"
+                : fetchedSourceKey.startsWith("local:") ? "Yerel ağ bağlı" : "Web bağlantısı hazır"
         );
         activity.runOnUiThread(() -> listener.onSuccess(result));
       } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException | OperationCache.CacheException error) {

@@ -30,7 +30,7 @@ final class OperationCache {
       }
       try {
         org.json.JSONArray results = payload.optJSONArray("action_results");
-        String target = CompanionConnectionIdentity.actionTargetKey(ConnectionSettings.webModuleUrl(preferences));
+        String target = CompanionConnectionIdentity.actionTargetKey(preferences, ConnectionSettings.webModuleUrl(preferences));
         if (results != null) for (int i = 0; i < results.length() && i < 40; i++) {
           JSONObject row = results.optJSONObject(i);
           if (row != null) recordActionResult(OperationData.ActionRecord.fromJson(row), target);
@@ -147,7 +147,7 @@ final class OperationCache {
   }
 
   synchronized void mergeActionResults(OperationData data) throws CacheException {
-    String target = CompanionConnectionIdentity.actionTargetKey(ConnectionSettings.webModuleUrl(preferences));
+    String target = CompanionConnectionIdentity.actionTargetKey(preferences, ConnectionSettings.webModuleUrl(preferences));
     for (OperationData.ActionRecord action : data.actions) recordActionResult(action, target);
     try {
       org.json.JSONArray results = new org.json.JSONArray(preferences.getString(KEY_ACTION_RESULTS, "[]"));
@@ -175,6 +175,20 @@ final class OperationCache {
   private static long actionTime(String value) {
     try { return java.time.Instant.parse(value).toEpochMilli(); }
     catch (Exception ignored) { return 0; }
+  }
+
+  synchronized boolean hasUnresolvedActionResults(String targetKey) throws CacheException {
+    try {
+      org.json.JSONArray rows = new org.json.JSONArray(preferences.getString(KEY_ACTION_RESULTS, "[]"));
+      for (int i = 0; i < rows.length(); i++) {
+        JSONObject row = rows.getJSONObject(i);
+        String status = row.optString("status");
+        if (targetKey.equals(row.optString("target_key")) && ("pending".equals(status) || "unknown".equals(status))) return true;
+      }
+      return false;
+    } catch (Exception error) {
+      throw new CacheException("Önceki bağlantının işlem sonuçları doğrulanamadı.");
+    }
   }
 
   synchronized org.json.JSONArray pendingActionResultIds(String targetKey) {

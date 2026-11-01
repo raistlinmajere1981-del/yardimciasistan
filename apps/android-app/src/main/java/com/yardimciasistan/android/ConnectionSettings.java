@@ -4,10 +4,12 @@ import android.content.SharedPreferences;
 
 final class ConnectionSettings {
   static final String PREFS_NAME = "yardimci_asistan_android";
+  static final String KEY_CONNECTION_MODE = "connection_mode_v1";
   static final String KEY_WEB_MODULE_URL = "web_module_url";
   static final String KEY_SYNC_SECRET = "sync_secret";
   static final String KEY_LOCAL_DESKTOP_ID = "local_desktop_id_v1";
   static final String KEY_LOCAL_BASE_URL = "local_base_url_v1";
+  static final String KEY_LOCAL_SPKI_SHA256 = "local_spki_sha256_v3";
   static final String KEY_LOCAL_TOKEN = "local_token_v1";
   static final String KEY_LOCAL_TARGET_KEY = "local_target_key_v1";
   static final String KEY_LOCAL_LAST_SEEN_AT = "local_last_seen_at_v1";
@@ -20,6 +22,7 @@ final class ConnectionSettings {
   private ConnectionSettings() {}
 
   static void ensureDefaults(SharedPreferences preferences) {
+    if (isLocalOnly(preferences)) return;
     if (isEmbeddedConnectionLocked() && !isDebugConnectionOverrideActive(preferences)) {
       String storedUrl = storedValue(preferences, KEY_WEB_MODULE_URL);
       String storedCredential = storedValue(preferences, KEY_SYNC_SECRET);
@@ -64,11 +67,13 @@ final class ConnectionSettings {
   }
 
   static String webModuleUrl(SharedPreferences preferences) {
+    if (isLocalOnly(preferences)) return "";
     String stored = storedValue(preferences, KEY_WEB_MODULE_URL);
     return stored.isEmpty() ? ConnectionDefaults.WEB_MODULE_URL : stored;
   }
 
   static String syncSecret(SharedPreferences preferences) {
+    if (isLocalOnly(preferences)) return "";
     String stored = storedValue(preferences, KEY_SYNC_SECRET);
     return stored.isEmpty() ? ConnectionDefaults.SYNC_SECRET : stored;
   }
@@ -100,10 +105,12 @@ final class ConnectionSettings {
     return preferences.edit()
         .putString(KEY_WEB_MODULE_URL, normalizedUrl)
         .putString(KEY_BOOTSTRAP_TICKET, normalizedTicket)
+        .remove(KEY_CONNECTION_MODE)
         .remove(KEY_SYNC_SECRET)
         .remove(KEY_LOCAL_DESKTOP_ID)
         .remove(KEY_LOCAL_BASE_URL)
         .remove(KEY_LOCAL_TOKEN)
+        .remove(KEY_LOCAL_SPKI_SHA256)
         .remove(KEY_LOCAL_TARGET_KEY)
         .remove(KEY_LOCAL_LAST_SEEN_AT)
         .remove(KEY_HOSTING_ACTION_BARRIER_TARGET)
@@ -134,13 +141,21 @@ final class ConnectionSettings {
   }
 
   static LocalConnection localConnection(SharedPreferences preferences) {
+    // One SharedPreferences snapshot, so a reader cannot mix two pairing commits.
+    java.util.Map<String, ?> values = preferences.getAll();
     return new LocalConnection(
-        storedValue(preferences, KEY_LOCAL_DESKTOP_ID),
-        storedValue(preferences, KEY_LOCAL_BASE_URL),
-        storedValue(preferences, KEY_LOCAL_TOKEN),
-        storedValue(preferences, KEY_LOCAL_TARGET_KEY),
-        storedValue(preferences, KEY_LOCAL_LAST_SEEN_AT)
+        snapshotValue(values, KEY_LOCAL_DESKTOP_ID),
+        snapshotValue(values, KEY_LOCAL_BASE_URL),
+        snapshotValue(values, KEY_LOCAL_TOKEN),
+        snapshotValue(values, KEY_LOCAL_TARGET_KEY),
+        snapshotValue(values, KEY_LOCAL_LAST_SEEN_AT),
+        snapshotValue(values, KEY_LOCAL_SPKI_SHA256)
     );
+  }
+
+  private static String snapshotValue(java.util.Map<String, ?> values, String key) {
+    Object value = values.get(key);
+    return value instanceof String ? ((String) value).trim() : "";
   }
 
   static LocalConnection localConnectionForTarget(SharedPreferences preferences, String targetKey) {
@@ -181,7 +196,8 @@ final class ConnectionSettings {
       String desktopId,
       String baseUrl,
       String targetKey,
-      String token
+      String token,
+      String spkiSha256
   ) {
     String normalizedDesktopId = normalizeDesktopId(desktopId);
     String normalizedBaseUrl = normalizeLocalBaseUrl(baseUrl);
@@ -189,7 +205,10 @@ final class ConnectionSettings {
     String normalizedToken = token == null ? "" : token.trim();
     if (normalizedDesktopId.isEmpty()
         || normalizedBaseUrl.isEmpty()
+        || LocalPinnedHttps.decodePin(spkiSha256) == null
         || normalizedTargetKey.isEmpty()
+        || (normalizedTargetKey.startsWith("companion:local:")
+            && !normalizedTargetKey.equals(CompanionConnectionIdentity.localActionTargetKey(normalizedDesktopId)))
         || !normalizedToken.matches("yal_[a-f0-9]{64}")) {
       return false;
     }
@@ -199,6 +218,9 @@ final class ConnectionSettings {
         .putString(KEY_LOCAL_BASE_URL, normalizedBaseUrl)
         .putString(KEY_LOCAL_TARGET_KEY, normalizedTargetKey)
         .putString(KEY_LOCAL_TOKEN, normalizedToken)
+        .putString(KEY_LOCAL_SPKI_SHA256, spkiSha256)
+        .putString(KEY_CONNECTION_MODE, normalizedTargetKey.startsWith("companion:local:") ? "local" : "hosted")
+        .remove(KEY_BOOTSTRAP_TICKET)
         .putString(KEY_LOCAL_LAST_SEEN_AT, String.valueOf(System.currentTimeMillis()))
         .commit();
   }
@@ -222,6 +244,7 @@ final class ConnectionSettings {
         .remove(KEY_LOCAL_DESKTOP_ID)
         .remove(KEY_LOCAL_BASE_URL)
         .remove(KEY_LOCAL_TOKEN)
+        .remove(KEY_LOCAL_SPKI_SHA256)
         .remove(KEY_LOCAL_TARGET_KEY)
         .remove(KEY_LOCAL_LAST_SEEN_AT)
         .apply();
@@ -251,8 +274,19 @@ final class ConnectionSettings {
     }
   }
 
+  static boolean isLocalOnly(SharedPreferences preferences) {
+    String mode = storedValue(preferences, KEY_CONNECTION_MODE);
+    return "local".equals(mode) || (mode.isEmpty()
+        && storedValue(preferences, KEY_WEB_MODULE_URL).isEmpty() && !hasPendingBootstrap(preferences));
+  }
+
   static boolean isComplete(SharedPreferences preferences) {
-    return !webModuleUrl(preferences).isEmpty() && !syncSecret(preferences).isEmpty();
+    return isLocalOnly(preferences) ? localConnection(preferences).isPaired()
+        : !webModuleUrl(preferences).isEmpty() && !syncSecret(preferences).isEmpty();
+  }
+
+  static boolean hasAnyHostingActionBarrier(SharedPreferences preferences) {
+    return !storedValue(preferences, KEY_HOSTING_ACTION_BARRIER_TARGET).isEmpty();
   }
 
   static boolean isEmbeddedConnectionLocked() {
@@ -285,14 +319,7 @@ final class ConnectionSettings {
   }
 
   private static String normalizeLocalBaseUrl(String value) {
-    String normalized = value == null ? "" : value.trim();
-    while (normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-    if (!normalized.matches("http://[^/\\s]+:[0-9]{1,5}")) {
-      return "";
-    }
-    return normalized;
+    return LocalPinnedHttps.normalizeBaseUrl(value);
   }
 
   private static String storedValue(SharedPreferences preferences, String key) {
@@ -306,33 +333,40 @@ final class ConnectionSettings {
     final String localToken;
     final String targetKey;
     final String lastSeenAt;
+    final String spkiSha256;
 
     LocalConnection(
         String desktopId,
         String baseUrl,
         String localToken,
         String targetKey,
-        String lastSeenAt
+        String lastSeenAt,
+        String spkiSha256
     ) {
       this.desktopId = desktopId == null ? "" : desktopId.trim();
       this.baseUrl = baseUrl == null ? "" : baseUrl.trim();
       this.localToken = localToken == null ? "" : localToken.trim();
       this.targetKey = targetKey == null ? "" : targetKey.trim();
+      this.spkiSha256 = spkiSha256 == null ? "" : spkiSha256;
       this.lastSeenAt = lastSeenAt == null ? "" : lastSeenAt.trim();
     }
 
     static LocalConnection empty() {
-      return new LocalConnection("", "", "", "", "");
+      return new LocalConnection("", "", "", "", "", "");
     }
 
     boolean hasEndpoint() {
-      return !desktopId.isEmpty() && !baseUrl.isEmpty();
+      return !normalizeDesktopId(desktopId).isEmpty() && !normalizeLocalBaseUrl(baseUrl).isEmpty();
+    }
+
+    boolean isPaired() {
+      return !normalizeDesktopId(desktopId).isEmpty()
+          && LocalPinnedHttps.decodePin(spkiSha256) != null
+          && localToken.matches("yal_[a-f0-9]{64}") && !targetKey.isEmpty();
     }
 
     boolean isComplete() {
-      return hasEndpoint()
-          && localToken.matches("yal_[a-f0-9]{64}")
-          && !targetKey.isEmpty();
+      return hasEndpoint() && isPaired();
     }
   }
 }

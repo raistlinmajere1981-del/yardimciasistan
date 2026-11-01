@@ -44,12 +44,28 @@ public final class MainActivity extends ComponentActivity {
   private AndroidOperationsTransport operationsTransport;
   private final ProductDataLookupClient productDataLookupClient = new ProductDataLookupClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private PointPreviewGuard activePointConnection;
+  private Dialog pointCustomerDialog;
+  private View pointCustomerAction;
+  private String pointCustomerId = "";
+  private long pointDialogGeneration;
+  private long pointConnectionGeneration;
+  private boolean pointForeground;
+  private final android.content.SharedPreferences.OnSharedPreferenceChangeListener pointConnectionListener = (prefs, key) -> {
+    if (ConnectionSettings.KEY_CONNECTION_MODE.equals(key) || ConnectionSettings.KEY_WEB_MODULE_URL.equals(key)
+        || ConnectionSettings.KEY_LOCAL_DESKTOP_ID.equals(key) || ConnectionSettings.KEY_LOCAL_BASE_URL.equals(key)
+        || ConnectionSettings.KEY_LOCAL_TOKEN.equals(key) || ConnectionSettings.KEY_LOCAL_TARGET_KEY.equals(key)
+        || ConnectionSettings.KEY_LOCAL_SPKI_SHA256.equals(key) || ConnectionSettings.KEY_HOSTING_ACTION_BARRIER_TARGET.equals(key)) {
+      runOnUiThread(() -> { activePointConnection = null; pointConnectionGeneration++; pointDialogGeneration++; refreshPointAction(); });
+    }
+  };
   private SharedPreferences preferences;
   private AppTheme.Mode themeMode = AppTheme.Mode.NIGHT;
   private ActionOutbox actionOutbox;
   private OperationCache operationCache;
   private LocalNotificationCenter localNotifications;
   private LocalCompanionDiscovery localCompanionDiscovery;
+  private AndroidLocalPairingController localPairingController;
   private MarketWorkspace marketWorkspace;
   private OperationData data = new OperationData();
   private DeviceIdentity identity;
@@ -92,11 +108,13 @@ public final class MainActivity extends ComponentActivity {
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
+    preferences.registerOnSharedPreferenceChangeListener(pointConnectionListener);
     connectionController = new AndroidConnectionController(this, preferences);
     connectionController.resetDebugAppStateIfRequested(getIntent());
     themeMode = AppTheme.load(preferences);
     setTheme(themeStyleResource(themeMode));
     super.onCreate(savedInstanceState);
+    com.yardimciasistan.update.AndroidUpdates.confirmInstalledOnLaunch(this);
     provisioningController = new AndroidProvisioningController(
         this,
         preferences,
@@ -229,6 +247,29 @@ public final class MainActivity extends ComponentActivity {
         }
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
+    localPairingController = new AndroidLocalPairingController(this, preferences, identity,
+        localCompanionDiscovery, executor, new AndroidLocalPairingController.Listener() {
+          @Override public void onStarted() {
+            loading = true;
+            clearError();
+            connectionState = "Masaüstü eşleştiriliyor";
+            render();
+          }
+          @Override public void onPaired(boolean approvalRequired) {
+            loading = false;
+            data = new OperationData();
+            clearError();
+            connectionState = approvalRequired ? "Masaüstü onayı bekleniyor" : "Yerel eşleştirme tamamlandı";
+            render();
+            syncOperations(false);
+          }
+          @Override public void onError(String message) {
+            loading = false;
+            connectionState = "Eşleştirme tamamlanamadı";
+            showError(message);
+            render();
+          }
+        });
     voiceController = new AndroidVoiceController(this, preferences, identity, syncClient, () -> data,
         () -> { if (navigation.settingsOpen() && shell != null) render(); });
     identityImageWorkflow = new IdentityImageWorkflow(
@@ -360,6 +401,12 @@ public final class MainActivity extends ComponentActivity {
         this,
         voiceController,
         new AndroidDetailDialogCoordinator.Listener() {
+          @Override public void onCustomerDialogOpened(Dialog dialog, OperationData.CustomerRecord customer) {
+            pointCustomerDialog = dialog; pointCustomerId = customer.id; pointDialogGeneration++;
+          }
+          @Override public boolean canQueryPoints() { return canQueryCustomerPoints(); }
+          @Override public void onPointActionCreated(View action) { pointCustomerAction = action; }
+          @Override public void onQueryPoints(Dialog dialog, OperationData.CustomerRecord customer) { queryCustomerPoints(dialog, customer); }
           @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { shell.addDetailHeaderActions(header, dialog, reopen); }
           @Override public void configureFullDialog(Dialog dialog) { MainActivity.this.configureFullDialog(dialog); }
           @Override public void configureBottomDialog(Dialog dialog) { MainActivity.this.configureBottomDialog(dialog); }
@@ -531,12 +578,20 @@ public final class MainActivity extends ComponentActivity {
             } else if (CompanionUiRules.isDecision(feedbackActionType) && actionRemainsQueued) {
               connectionState = errorMessage;
               clearError();
-              Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
-            } else if (actionRemainsQueued && marketWorkspace != null) {
+              Toast.makeText(MainActivity.this,
+                  marketQueuedMessage != null ? marketQueuedMessage : "İşlem kuyrukta bekliyor; bağlantı geldiğinde gönderilecek.",
+                  Toast.LENGTH_SHORT).show();
+            } else if (actionRemainsQueued && marketQueuedMessage != null && marketWorkspace != null) {
               connectionState = errorMessage;
               clearError();
               marketWorkspace.onSubmissionQueued(feedbackActionType, marketQueuedMessage);
               Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
+            } else if (actionRemainsQueued) {
+              connectionState = errorMessage;
+              clearError();
+              Toast.makeText(MainActivity.this,
+                  "İşlem kuyrukta bekliyor; bağlantı geldiğinde gönderilecek.",
+                  Toast.LENGTH_LONG).show();
             } else {
               showError(
                   accepted.isEmpty()
@@ -590,7 +645,10 @@ public final class MainActivity extends ComponentActivity {
         new AndroidSettingsWorkspace.Listener() {
           @Override
           public void onSyncRequested() {
-            syncOperations(true);
+            syncOperations(!ConnectionSettings.isLocalOnly(preferences));
+          }
+          @Override public void onPairRequested() {
+            if (!loading && (!data.permissionsResolved || data.hasPermission("settings.edit"))) localPairingController.scan();
           }
           @Override
           public void onAppearanceChanged(AppearancePreferences next) {
@@ -643,6 +701,20 @@ public final class MainActivity extends ComponentActivity {
         localNotifications
     );
     marketWorkspace = new MarketWorkspace(this, new MarketWorkspace.Listener() {
+      @Override public void onCustomerSalePreviewRequested(SalePreviewRequest request, java.util.function.Consumer<SalePreviewApproval> callback) {
+        requestCustomerSalePreview(request, callback);
+      }
+      @Override public void onPointSpendQuoteRequested(PointSpendQuoteRequest request, java.util.function.Consumer<PointSpendQuote> callback) {
+        requestPointSpendQuote(request, callback);
+      }
+      @Override public void onCouponPermitRequested(CouponPermitRequest request, java.util.function.Consumer<CouponPermit> callback) {
+        requestCouponPermit(request, callback);
+      }
+      @Override
+      public boolean onSubmitWithActionId(String actionId, String actionType, JSONObject actionPayload,
+          String acceptedMessage, String queuedMessage) {
+        return sendMarketAction(actionId, actionType, actionPayload, acceptedMessage, queuedMessage);
+      }
       @Override
       public boolean onSubmit(
           String actionType,
@@ -712,6 +784,8 @@ public final class MainActivity extends ComponentActivity {
       navigation.open(data, savedInstanceState.getString("navigation_return", TAB_TODAY));
       openRoute(savedInstanceState.getString("navigation_route", TAB_TODAY));
     } else applyNotificationIntent(getIntent());
+    if (!hasConnectionSettings() && !ConnectionSettings.hasPendingBootstrap(preferences)
+        && !navigation.settingsOpen()) navigation.toggleSettings(data);
     shell.restoreScrollState(savedInstanceState);
     shell.build();
     render();
@@ -721,19 +795,26 @@ public final class MainActivity extends ComponentActivity {
     } else if (hasConnectionSettings()) {
       syncOperations(false);
     } else {
-      showError("Canlı veriyi görmek için Ayarlar'dan bağlantıyı tamamlayın.");
+      connectionState = "Masaüstüyle QR üzerinden eşleştirin";
+      render();
     }
   }
 
   @Override
   protected void onResume() {
     super.onResume();
+    pointForeground = true;
     if (voiceController != null) voiceController.resume();
     foregroundSyncController.resume();
   }
 
   @Override
   protected void onPause() {
+    if (marketWorkspace != null) marketWorkspace.invalidateSaleLifecycle();
+    pointForeground = false;
+    pointDialogGeneration++;
+    activePointConnection = null;
+    refreshPointAction();
     if (voiceController != null) voiceController.pause();
     foregroundSyncController.pause();
     super.onPause();
@@ -772,8 +853,10 @@ public final class MainActivity extends ComponentActivity {
 
   @Override
   protected void onDestroy() {
+    preferences.unregisterOnSharedPreferenceChangeListener(pointConnectionListener);
     if (voiceController != null) voiceController.destroy();
     foregroundSyncController.destroy();
+    if (localPairingController != null) localPairingController.destroy();
     executor.shutdownNow();
     if (imageCaptureController != null) {
       imageCaptureController.destroy();
@@ -946,6 +1029,9 @@ public final class MainActivity extends ComponentActivity {
     if (navigation.normalize(data)) applyNavigationRoute(previousRoute);
     boolean inactiveDevice = data.permissionsResolved && !data.deviceActive;
     if (inactiveDevice) navigation.open(data, TAB_TODAY);
+    if (marketWorkspace != null && (inactiveDevice || navigation.settingsOpen() || !TAB_MARKET.equals(navigation.tab()))) {
+      marketWorkspace.invalidateSaleLifecycle();
+    }
 
     String screenKey = currentScreenKey(inactiveDevice);
     shell.updateChrome(
@@ -1093,6 +1179,184 @@ public final class MainActivity extends ComponentActivity {
 
   private void showCustomerDetail(OperationData.CustomerRecord customer) {
     detailDialogCoordinator.showCustomerDetail(data, customer);
+  }
+
+  private String pointTarget() {
+    return CompanionConnectionIdentity.actionTargetKey(preferences, ConnectionSettings.webModuleUrl(preferences));
+  }
+
+  private void requestCustomerSalePreview(SalePreviewRequest request, java.util.function.Consumer<SalePreviewApproval> callback) {
+    if (callback == null) return;
+    runOnUiThread(() -> {
+      ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+      String target = pointTarget();
+      boolean mode = ConnectionSettings.isLocalOnly(preferences);
+      if (request == null || !salePreviewConnectionActive(pairing, target, mode)
+          || marketWorkspace == null || !marketWorkspace.matchesSalePreviewScope(request)) {
+        callback.accept(null); return;
+      }
+      long connectionGeneration = pointConnectionGeneration;
+      MarketSalePreviewGuard guard = new MarketSalePreviewGuard(pairing, mode, target, request.customer,
+          request.payment, request.snapshotVersion, request.lines(), request.generation);
+      if (!guard.matches(pairing, mode, target, request.customer, request.payment, request.snapshotVersion,
+          request.lines(), request.generation, true, true)) { callback.accept(null); return; }
+      LocalDesktopOperationsTransport transport = new LocalDesktopOperationsTransport(preferences, pairing.desktopId);
+      executor.execute(() -> {
+        JSONObject preview = null;
+        try { preview = transport.fetchCustomerSalePreview(pairing.baseUrl, pairing.localToken, identity, request.customer, request.lines()); }
+        catch (AndroidOperationsTransport.TransportException ignored) { }
+        JSONObject result = preview;
+        runOnUiThread(() -> {
+          Object timestamp = result == null ? null : result.opt("generatedAtMs");
+          if (!(timestamp instanceof Integer || timestamp instanceof Long)) { callback.accept(null); return; }
+          long generatedAt = ((Number) timestamp).longValue();
+          SalePreviewApproval approval = new SalePreviewApproval(result, () -> {
+            if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) return false;
+            ConnectionSettings.LocalConnection current = ConnectionSettings.localConnection(preferences);
+            boolean active = connectionGeneration == pointConnectionGeneration
+                && salePreviewConnectionActive(current, pointTarget(), ConnectionSettings.isLocalOnly(preferences))
+                && marketWorkspace != null && marketWorkspace.matchesSalePreviewScope(request);
+            return active && generatedAt > 0 && generatedAt <= 9007199254740991L
+                && Math.abs(System.currentTimeMillis() - generatedAt) <= 60000L
+                && guard.matches(current, ConnectionSettings.isLocalOnly(preferences), pointTarget(), request.customer,
+                    request.payment, request.snapshotVersion, request.lines(), request.generation, active, active);
+          });
+          callback.accept(approval.isCurrent() ? approval : null);
+        });
+      });
+    });
+  }
+
+  /** Advisory quote only; the desktop owner still rejects every positive spend until its paid writer is ready. */
+  private void requestPointSpendQuote(PointSpendQuoteRequest request, java.util.function.Consumer<PointSpendQuote> callback) {
+    if (callback == null) return;
+    runOnUiThread(() -> {
+      ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+      String target = pointTarget();
+      boolean mode = ConnectionSettings.isLocalOnly(preferences);
+      SalePreviewRequest scope = request == null ? null : new SalePreviewRequest(request.customer, request.payment,
+          request.snapshotVersion, request.generation, request.lines());
+      if (scope == null || !salePreviewConnectionActive(pairing, target, mode)
+          || marketWorkspace == null || !marketWorkspace.matchesSalePreviewScope(scope)) {
+        callback.accept(null); return;
+      }
+      long connectionGeneration = pointConnectionGeneration;
+      MarketSalePreviewGuard guard = new MarketSalePreviewGuard(pairing, mode, target, request.customer,
+          request.payment, request.snapshotVersion, request.lines(), request.generation);
+      if (!guard.matches(pairing, mode, target, request.customer, request.payment, request.snapshotVersion,
+          request.lines(), request.generation, true, true)) { callback.accept(null); return; }
+      LocalDesktopOperationsTransport transport = new LocalDesktopOperationsTransport(preferences, pairing.desktopId);
+      executor.execute(() -> {
+        PointSpendQuote quote = null;
+        try {
+          JSONObject raw = transport.fetchPointSpendQuote(pairing.baseUrl, pairing.localToken, identity,
+              request.customer, request.lines(), request.currency);
+          long expiry = ((Number) raw.opt("expiresAtMs")).longValue();
+          quote = new PointSpendQuote(raw, () -> {
+            if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) return false;
+            ConnectionSettings.LocalConnection current = ConnectionSettings.localConnection(preferences);
+            boolean active = connectionGeneration == pointConnectionGeneration
+                && salePreviewConnectionActive(current, pointTarget(), ConnectionSettings.isLocalOnly(preferences))
+                && marketWorkspace != null && marketWorkspace.matchesSalePreviewScope(scope);
+            return active && System.currentTimeMillis() < expiry
+                && guard.matches(current, ConnectionSettings.isLocalOnly(preferences), pointTarget(),
+                    request.customer, request.payment, request.snapshotVersion, request.lines(),
+                    request.generation, active, active);
+          });
+        } catch (Exception ignored) { }
+        PointSpendQuote result = quote;
+        runOnUiThread(() -> callback.accept(result != null && result.isCurrent() ? result : null));
+      });
+    });
+  }
+
+  /** TLS-only coupon preauthorization; the plaintext code only lives in this call. */
+  private void requestCouponPermit(CouponPermitRequest request, java.util.function.Consumer<CouponPermit> callback) {
+    if (callback == null) return;
+    runOnUiThread(() -> {
+      ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+      String target = pointTarget();
+      boolean mode = ConnectionSettings.isLocalOnly(preferences);
+      SalePreviewRequest scope = request == null ? null : new SalePreviewRequest(request.customer, request.payment,
+          request.snapshotVersion, request.generation, request.lines());
+      if (request == null || !request.isComplete() || scope == null || !salePreviewConnectionActive(pairing, target, mode)
+          || marketWorkspace == null || !marketWorkspace.matchesSalePreviewScope(scope)) {
+        callback.accept(null); return;
+      }
+      long connectionGeneration = pointConnectionGeneration;
+      MarketSalePreviewGuard guard = new MarketSalePreviewGuard(pairing, mode, target, request.customer,
+          request.payment, request.snapshotVersion, request.lines(), request.generation);
+      if (!guard.matches(pairing, mode, target, request.customer, request.payment, request.snapshotVersion,
+          request.lines(), request.generation, true, true)) { callback.accept(null); return; }
+      LocalDesktopOperationsTransport transport = new LocalDesktopOperationsTransport(preferences, pairing.desktopId);
+      executor.execute(() -> {
+        CouponPermit permit = null;
+        try {
+          JSONObject raw = transport.fetchCouponAttempt(pairing.baseUrl, pairing.localToken, identity,
+              request.actionId, request.customer, request.lines(), request.couponCode, request.payment);
+          permit = new CouponPermit(raw, request.actionId, request.customer, request.payment, request.currency,
+              request.lines(), () -> {
+                if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) return false;
+                ConnectionSettings.LocalConnection current = ConnectionSettings.localConnection(preferences);
+                boolean active = connectionGeneration == pointConnectionGeneration
+                    && salePreviewConnectionActive(current, pointTarget(), ConnectionSettings.isLocalOnly(preferences))
+                    && marketWorkspace != null && marketWorkspace.matchesSalePreviewScope(scope);
+                return active && guard.matches(current, ConnectionSettings.isLocalOnly(preferences), pointTarget(),
+                    request.customer, request.payment, request.snapshotVersion, request.lines(),
+                    request.generation, active, active);
+              });
+        } catch (Exception ignored) { }
+        CouponPermit result = permit;
+        runOnUiThread(() -> callback.accept(result != null && result.isCurrent() ? result : null));
+      });
+    });
+  }
+
+  private boolean salePreviewConnectionActive(ConnectionSettings.LocalConnection pairing, String target, boolean mode) {
+    return !isFinishing() && !isDestroyed() && pointForeground && activePointConnection != null
+        && TAB_MARKET.equals(navigation.tab()) && !navigation.settingsOpen()
+        && PointPreviewGuard.available(pairing, true, MarketUiRules.canSelectPaidCustomer(data))
+        && activePointConnection.matches(pairing, mode, target, "", 0, true, true);
+  }
+
+  private boolean canQueryCustomerPoints() {
+    ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+    return pointForeground && activePointConnection != null && PointPreviewGuard.available(pairing, true, data.hasBusinessCapability("commerce.benefits"))
+        && activePointConnection.matches(pairing, ConnectionSettings.isLocalOnly(preferences), pointTarget(), "", 0, true, true);
+  }
+
+  private void refreshPointAction() {
+    if (pointCustomerAction != null) pointCustomerAction.setVisibility(canQueryCustomerPoints() ? View.VISIBLE : View.GONE);
+  }
+
+  private void queryCustomerPoints(Dialog dialog, OperationData.CustomerRecord customer) {
+    if (!canQueryCustomerPoints() || dialog != pointCustomerDialog || !dialog.isShowing()) return;
+    new android.app.AlertDialog.Builder(this).setTitle("Para birimi seçin")
+        .setItems(new String[]{"TRY", "USD", "EUR", "GBP"}, (choice, which) -> {
+          if (!canQueryCustomerPoints() || dialog != pointCustomerDialog || !dialog.isShowing()) return;
+          String currency = new String[]{"TRY", "USD", "EUR", "GBP"}[which];
+          ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+          PointPreviewGuard guard = new PointPreviewGuard(pairing, ConnectionSettings.isLocalOnly(preferences), pointTarget(), customer.id, pointDialogGeneration);
+          LocalDesktopOperationsTransport transport = new LocalDesktopOperationsTransport(preferences, pairing.desktopId);
+          executor.execute(() -> {
+            LocalDesktopOperationsTransport.PointBalance balance = null;
+            try { balance = transport.fetchPointBalance(pairing.baseUrl, pairing.localToken, identity, customer.id, currency); }
+            catch (AndroidOperationsTransport.TransportException ignored) { }
+            LocalDesktopOperationsTransport.PointBalance result = balance;
+            runOnUiThread(() -> {
+              if (isFinishing() || isDestroyed() || dialog != pointCustomerDialog || !canQueryCustomerPoints()
+                  || !guard.matches(ConnectionSettings.localConnection(preferences), ConnectionSettings.isLocalOnly(preferences), pointTarget(), pointCustomerId,
+                      pointDialogGeneration, dialog.isShowing(), data.hasBusinessCapability("commerce.benefits"))) return;
+              String message = "Puan bakiyesi şu anda kullanılamıyor.";
+              if (result != null) {
+                String amount = java.math.BigDecimal.valueOf(result.availableMinor, 2).toPlainString();
+                String time = java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(result.generatedAtMs));
+                message = "Sorgu anındaki bakiye: " + amount + " " + currency + " · " + time;
+              }
+              android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
+            });
+          });
+        }).setNegativeButton("İptal", null).show();
   }
 
   private void showCustomerForm(OperationData.CustomerRecord existing) {
@@ -1275,6 +1539,8 @@ public final class MainActivity extends ComponentActivity {
 
     operationsSyncController.sync(baseUrl, syncSecret, data, new AndroidOperationsSyncController.Listener() {
       private long voiceSyncTicket;
+      private PointPreviewGuard syncPointConnection;
+      private long syncPointGeneration;
       @Override
       public void onRejected(String message) {
         showError(message);
@@ -1282,6 +1548,12 @@ public final class MainActivity extends ComponentActivity {
 
       @Override
       public void onStarted(String nextConnectionState) {
+        activePointConnection = null;
+        refreshPointAction();
+        syncPointGeneration = pointConnectionGeneration;
+        ConnectionSettings.LocalConnection pairing = ConnectionSettings.localConnection(preferences);
+        syncPointConnection = PointPreviewGuard.available(pairing, true, true)
+            ? new PointPreviewGuard(pairing, ConnectionSettings.isLocalOnly(preferences), pointTarget(), "", 0) : null;
         voiceSyncTicket = voiceController.syncStarted();
         loading = true;
         connectionState = nextConnectionState;
@@ -1291,6 +1563,10 @@ public final class MainActivity extends ComponentActivity {
 
       @Override
       public void onSuccess(AndroidOperationsSyncController.SyncResult result) {
+        boolean wasLoading = loading;
+        activePointConnection = pointForeground && syncPointGeneration == pointConnectionGeneration && result.usedLocalTransport && syncPointConnection != null
+            && syncPointConnection.matches(ConnectionSettings.localConnection(preferences), ConnectionSettings.isLocalOnly(preferences), pointTarget(), "", 0, true, true)
+            ? syncPointConnection : null;
         if (!result.usedLocalTransport) {
           if (result.webAllowsLocalNetwork) {
             foregroundSyncController.requestLocalDiscovery(false);
@@ -1301,6 +1577,7 @@ public final class MainActivity extends ComponentActivity {
 
         boolean recovered = operationsSyncFailed;
         data = result.data;
+        refreshPointAction();
         voiceController.synced(voiceSyncTicket);
         loading = false;
         operationsSyncFailed = false;
@@ -1317,7 +1594,7 @@ public final class MainActivity extends ComponentActivity {
             );
           }
         }
-        if (result.shouldRender || (recovered && companionViewVisible())) {
+        if (result.shouldRender || (recovered && companionViewVisible()) || (wasLoading && marketViewVisible())) {
           renderSyncUpdate();
         } else {
           updateSyncStatus();
@@ -1326,6 +1603,8 @@ public final class MainActivity extends ComponentActivity {
 
       @Override
       public void onAndroidDisabled(OperationData disabledData, String message) {
+        activePointConnection = null;
+        refreshPointAction();
         data = disabledData;
         voiceController.syncFailed();
         loading = false;
@@ -1341,6 +1620,9 @@ public final class MainActivity extends ComponentActivity {
           boolean retryingOnlyMarketActions,
           String retriedMarketActionType
       ) {
+        boolean wasLoading = loading;
+        activePointConnection = null;
+        refreshPointAction();
         boolean firstFailure = !operationsSyncFailed;
         loading = false;
         operationsSyncFailed = true;
@@ -1355,11 +1637,15 @@ public final class MainActivity extends ComponentActivity {
           render();
         } else {
           showError(message);
-          if (firstFailure && companionViewVisible()) render();
+          if ((firstFailure && companionViewVisible()) || (wasLoading && marketViewVisible())) render();
           else updateSyncStatus();
         }
       }
     });
+  }
+
+  private boolean marketViewVisible() {
+    return !isFinishing() && !isDestroyed() && TAB_MARKET.equals(navigation.tab()) && !navigation.settingsOpen();
   }
 
   private boolean companionViewVisible() {
@@ -1393,6 +1679,14 @@ public final class MainActivity extends ComponentActivity {
   ) {
     ArrayList<AndroidActionDispatcher.Command> actions = new ArrayList<>();
     actions.add(new AndroidActionDispatcher.Command(actionType, actionPayload));
+    return actionDispatcher.send(actions, acceptedMessage, queuedMessage, data);
+  }
+
+  /** Coupon path only: the preauthorization action id is submitted verbatim. */
+  private boolean sendMarketAction(String actionId, String actionType, JSONObject actionPayload,
+      String acceptedMessage, String queuedMessage) {
+    ArrayList<AndroidActionDispatcher.Command> actions = new ArrayList<>();
+    actions.add(AndroidActionDispatcher.Command.preassigned(actionId, actionType, actionPayload));
     return actionDispatcher.send(actions, acceptedMessage, queuedMessage, data);
   }
 

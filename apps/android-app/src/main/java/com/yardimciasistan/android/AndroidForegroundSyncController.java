@@ -28,6 +28,7 @@ final class AndroidForegroundSyncController {
         return;
       }
 
+      requestLocalDiscovery(false);
       if (!listener.isBusy()) {
         if (listener.hasPendingBootstrap()) {
           listener.onBootstrapDue();

@@ -11,6 +11,10 @@ import org.json.JSONObject;
 
 final class AndroidDetailDialogCoordinator {
   interface Listener {
+    void onCustomerDialogOpened(Dialog dialog, OperationData.CustomerRecord customer);
+    boolean canQueryPoints();
+    void onPointActionCreated(View action);
+    void onQueryPoints(Dialog dialog, OperationData.CustomerRecord customer);
     void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen);
     void configureFullDialog(Dialog dialog);
     void configureBottomDialog(Dialog dialog);
@@ -64,6 +68,10 @@ final class AndroidDetailDialogCoordinator {
         data,
         customer,
         new CustomerDetailDialog.Listener() {
+          @Override public void onCustomerDialogOpened(Dialog dialog, OperationData.CustomerRecord customer) { listener.onCustomerDialogOpened(dialog, customer); }
+          @Override public boolean canQueryPoints() { return listener.canQueryPoints(); }
+          @Override public void onPointActionCreated(View action) { listener.onPointActionCreated(action); }
+          @Override public void onQueryPoints(Dialog dialog, OperationData.CustomerRecord customer) { listener.onQueryPoints(dialog, customer); }
           @Override
           public void addHeaderActions(
               LinearLayout header,

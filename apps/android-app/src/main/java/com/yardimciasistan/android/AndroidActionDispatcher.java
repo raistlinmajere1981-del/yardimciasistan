@@ -17,7 +17,20 @@ final class AndroidActionDispatcher {
     final JSONObject payload;
 
     Command(String type, JSONObject payload) {
-      this.id = ActionOutbox.createActionId();
+      this(ActionOutbox.createActionId(), type, payload, true);
+    }
+
+    /** Narrow explicit-id path. The id is used verbatim and never regenerated. */
+    static Command preassigned(String id, String type, JSONObject payload) {
+      return new Command(id, type, payload, false);
+    }
+
+    private Command(String id, String type, JSONObject payload, boolean generated) {
+      String normalized = id == null ? "" : id;
+      if (!normalized.matches("[A-Za-z0-9_-]{8,120}") || (!generated && !normalized.equals(normalized.trim()))) {
+        throw new IllegalArgumentException("İşlem kimliği geçersiz.");
+      }
+      this.id = normalized;
       this.type = type == null ? "" : type;
       this.payload = payload == null ? new JSONObject() : payload;
     }
@@ -104,12 +117,12 @@ final class AndroidActionDispatcher {
 
     String baseUrl = ConnectionSettings.webModuleUrl(preferences);
     String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+    if (!ConnectionSettings.isComplete(preferences)) {
       listener.onError("İşlem gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
       return false;
     }
 
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
     if (actionTargetKey.isEmpty()) {
       listener.onError("İşlem hedefi doğrulanamadı.");
       return false;
@@ -200,7 +213,26 @@ final class AndroidActionDispatcher {
           }
         }
 
-        final boolean actionRemainsQueued = !rejected && (marketQueuedMessage != null || KbsUiRules.isAction(feedbackActionType));
+        // Every action type uses the same durable outbox. A failed transport
+        // must not present a persisted room/task action as lost, which could
+        // cause the user to submit the same business operation twice.
+        boolean stillStored = false;
+        if (!rejected) {
+          try {
+            for (ActionOutbox.PendingAction stored : actionOutbox.load()) {
+              for (ActionOutbox.PendingAction submitted : pendingActions) {
+                if (stored.id.equals(submitted.id)) {
+                  stillStored = true;
+                  break;
+                }
+              }
+              if (stillStored) break;
+            }
+          } catch (ActionOutbox.OutboxException ignored) {
+            // Never claim an operation was queued without confirming its storage.
+          }
+        }
+        final boolean actionRemainsQueued = stillStored;
         activity.runOnUiThread(() -> listener.onActionsFailed(
             accepted,
             feedbackActionType,
@@ -234,12 +266,12 @@ final class AndroidActionDispatcher {
 
     String baseUrl = ConnectionSettings.webModuleUrl(preferences);
     String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+    if (!ConnectionSettings.isComplete(preferences)) {
       listener.onError("Barkod gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
       return false;
     }
 
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(preferences, baseUrl);
     if (actionTargetKey.isEmpty()) {
       listener.onError("Barkod gönderim hedefi doğrulanamadı.");
       return false;

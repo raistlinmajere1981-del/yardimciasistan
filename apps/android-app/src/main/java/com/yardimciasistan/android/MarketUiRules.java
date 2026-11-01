@@ -125,6 +125,56 @@ final class MarketUiRules {
     return canViewCredit(data) && data.hasPermission(PERMISSION_CREDIT_PAYMENT);
   }
 
+  static boolean canSelectPaidCustomer(OperationData data) {
+    return canCompleteSale(data) && data.hasBusinessCapability("core.customers") && data.hasPermission("customer.view");
+  }
+
+  static OperationData.CustomerRecord paidCustomer(OperationData data, String customerId) {
+    if (!canSelectPaidCustomer(data) || customerId == null || customerId.isEmpty()) return null;
+    for (OperationData.CustomerRecord customer : data.customers) {
+      if (customerId.equals(customer.id)) return customer;
+    }
+    return null;
+  }
+
+  /** Rows for the paid-customer chooser; row 0 is the explicit "no customer" choice. */
+  static List<OperationData.CustomerRecord> selectablePaidCustomers(OperationData data) {
+    List<OperationData.CustomerRecord> selectable = new ArrayList<>();
+    if (!canSelectPaidCustomer(data)) return selectable;
+    for (OperationData.CustomerRecord customer : data.customers) {
+      if (!customer.id.isEmpty()) selectable.add(customer);
+    }
+    return selectable;
+  }
+
+  static String[] paidCustomerLabels(List<OperationData.CustomerRecord> customers) {
+    String[] labels = new String[customers.size() + 1];
+    labels[0] = "Müşteri seçilmedi";
+    for (int index = 0; index < customers.size(); index++) {
+      labels[index + 1] = customers.get(index).fullName;
+    }
+    return labels;
+  }
+
+  static int paidCustomerPosition(List<OperationData.CustomerRecord> customers, String customerId) {
+    if (customerId == null || customerId.isEmpty()) return 0;
+    for (int index = 0; index < customers.size(); index++) {
+      if (customerId.equals(customers.get(index).id)) return index + 1;
+    }
+    return 0;
+  }
+
+  /** Only the current authorized projection may become the persisted sale customer. */
+  static String paidCustomerIdAt(
+      OperationData data,
+      List<OperationData.CustomerRecord> customers,
+      int position
+  ) {
+    if (position <= 0 || position > customers.size()) return "";
+    String id = customers.get(position - 1).id;
+    return paidCustomer(data, id) == null ? "" : id;
+  }
+
   static OperationData.CustomerCreditAccount creditAccount(OperationData data, String customerId) {
     if (!canViewCredit(data)) return null;
     for (OperationData.CustomerCreditAccount account : data.market.customerCreditAccounts) {
@@ -547,11 +597,35 @@ final class MarketUiRules {
 
     JSONObject toSalePayload(OperationData data, String settlement, String customerId, String method,
         boolean externalConfirmed) throws ValidationException {
+      return toSalePayload(data, settlement, customerId, method, externalConfirmed, null);
+    }
+
+    /** Preview is volatile input, not proof of its customer, origin, or checkout authority. */
+    JSONObject toSalePayload(OperationData data, String settlement, String customerId, String method,
+        boolean externalConfirmed, JSONObject serverPreview) throws ValidationException {
+      return toSalePayload(data, settlement, customerId, method, externalConfirmed, serverPreview, 0);
+    }
+
+    /** Explicit opt-in intent only. A live owner quote, not this number, must authorize spending. */
+    JSONObject toSalePayload(OperationData data, String settlement, String customerId, String method,
+        boolean externalConfirmed, JSONObject serverPreview, long requestedPointsMinor) throws ValidationException {
+      if (requestedPointsMinor < 0 || requestedPointsMinor > 9007199254740991L)
+        throw new ValidationException("Mobil Puan tutarı geçersiz.");
+      if (requestedPointsMinor > 0 && (!"paid".equals(settlement) || customerId == null || customerId.isEmpty() || serverPreview == null))
+        throw new ValidationException("Puan için canlı önizlemeli müşterili ücretli satış gerekli.");
       if (!canCompleteSale(data)) throw new ValidationException("Mobil satış yetkiniz yok.");
       if (!"paid".equals(settlement) && !"credit".equals(settlement)) throw new ValidationException("Ödeme seçimi geçersiz.");
+      boolean customerPaid = "paid".equals(settlement) && customerId != null && !customerId.isEmpty();
+      if (serverPreview != null && !customerPaid) throw new ValidationException("Önizleme yalnız müşterili ücretli satış içindir.");
       if ("credit".equals(settlement)) {
         if (creditAccount(data, customerId) == null) throw new ValidationException("Veresiye için kayıtlı müşteri seçin.");
-      } else { validatePayment(method, externalConfirmed); }
+      } else {
+        validatePayment(method, externalConfirmed);
+        if (customerId != null && !customerId.isEmpty() && paidCustomer(data, customerId) == null)
+          throw new ValidationException("Güncel yetkili müşteri kaydını seçin.");
+        if (customerPaid && serverPreview == null)
+          throw new ValidationException("Müşterili satış için canlı fiyat önizleme henüz kullanılamıyor. Müşterisiz satış seçin veya masaüstünü kullanın.");
+      }
       if (data.hasBusinessCapability(CAPABILITY_INVENTORY) && data.market.primaryLocationId.isEmpty()) throw new ValidationException("Stok konumunu yenileyin.");
       JSONObject payload = toPayload();
       payload.remove("note");
@@ -559,17 +633,124 @@ final class MarketUiRules {
       String currency = "";
       int index = 0;
       try {
+        JSONArray previewLines = null;
+        long subtotal = 0;
+        if (customerPaid) {
+          Object timestamp = serverPreview.opt("generatedAtMs");
+          Object previewCurrency = serverPreview.opt("currency");
+          previewLines = serverPreview.optJSONArray("lines");
+          long now = System.currentTimeMillis();
+          if (serverPreview.length() != 4 || !safePreviewInteger(timestamp) || ((Number) timestamp).longValue() == 0
+              || Math.abs(now - ((Number) timestamp).longValue()) > 60000L
+              || !(previewCurrency instanceof String) || !((String) previewCurrency).matches("[A-Z]{3}")
+              || !safePreviewInteger(serverPreview.opt("subtotalMinor")) || previewLines == null || previewLines.length() != lines.size())
+            throw new ValidationException("Satış önizlemesi geçersiz veya eski.");
+        }
         for (CartLine line : lines.values()) {
           if (!currency.isEmpty() && !currency.equals(line.currency)) throw new ValidationException("Tek satışta birden fazla para birimi kullanılamaz.");
           currency = line.currency;
-          if (line.updatedAt.isEmpty() || !Double.isFinite(line.unitPrice) || productById(data, line.productId) == null) throw new ValidationException("Güncel ürün bilgilerini yenileyin.");
-          serialized.getJSONObject(index++).put("expected_unit_price", line.unitPrice).put("expected_currency", line.currency).put("expected_updated_at", line.updatedAt);
+          OperationData.MarketProduct currentProduct = productById(data, line.productId);
+          if (line.updatedAt.isEmpty() || !Double.isFinite(line.unitPrice) || currentProduct == null
+              || !currentProduct.active || !line.updatedAt.equals(currentProduct.updatedAt)
+              || Double.compare(line.unitPrice, currentProduct.salePrice) != 0
+              || !line.currency.equals(currentProduct.currency)) {
+            throw new ValidationException("Sepetteki ürün bilgileri değişmiş. Ürünü sepetten çıkarıp yeniden ekleyin.");
+          }
+          double expectedPrice = line.unitPrice;
+          if (customerPaid) {
+            JSONObject previewLine = previewLines.getJSONObject(index);
+            Object quantity = previewLine.opt("quantity"), price = previewLine.opt("unitPriceMinor");
+            if (previewLine.length() != 5 || !line.productId.equals(previewLine.opt("productId"))
+                || !(quantity instanceof Number) || !Double.isFinite(((Number) quantity).doubleValue())
+                || Double.compare(line.quantity, ((Number) quantity).doubleValue()) != 0
+                || line.quantity > 1000000 || Math.abs(line.quantity * 10000 - Math.rint(line.quantity * 10000)) > 0.00001
+                || !line.currency.matches("[A-Z]{3}") || !line.currency.equals(serverPreview.opt("currency"))
+                || !line.currency.equals(previewLine.opt("currency")) || !line.updatedAt.equals(previewLine.opt("updatedAt"))
+                || !safePreviewInteger(price)) throw new ValidationException("Satış önizleme satırı geçersiz.");
+            expectedPrice = ((Number) price).longValue() / 100.0;
+            double lineMinor = Math.floor((expectedPrice * line.quantity + Math.ulp(1.0)) * 100.0 + 0.5);
+            if (!Double.isFinite(lineMinor) || lineMinor > 9007199254740991L
+                || lineMinor < 0 || subtotal > 9007199254740991L - (long) lineMinor)
+              throw new ValidationException("Satış önizleme toplamı geçersiz.");
+            subtotal += (long) lineMinor;
+          }
+          serialized.getJSONObject(index++).put("expected_unit_price", expectedPrice).put("expected_currency", line.currency).put("expected_updated_at", line.updatedAt);
         }
-        return payload.put("location_id", data.market.primaryLocationId).put("settlement", settlement)
-            .put("customer_id", "credit".equals(settlement) ? customerId : "")
+        if (customerPaid && subtotal != ((Number) serverPreview.opt("subtotalMinor")).longValue())
+          throw new ValidationException("Satış önizleme toplamı uyuşmuyor.");
+        if (requestedPointsMinor > 0 && requestedPointsMinor > subtotal)
+          throw new ValidationException("Puan satış tutarını aşamaz.");
+        JSONObject sale = payload.put("location_id", data.market.primaryLocationId).put("settlement", settlement)
+            .put("customer_id", customerId == null ? "" : customerId)
             .put("payment_method", "credit".equals(settlement) ? "" : method).put("external_payment_confirmed", externalConfirmed);
+        if (requestedPointsMinor > 0) sale.put("requestedPointsMinor", requestedPointsMinor);
+        return sale;
       } catch (ValidationException error) { throw error; }
       catch (Exception error) { throw new ValidationException("Satış hazırlanamadı."); }
+    }
+
+    /**
+     * Coupon preauthorization payload. The plaintext coupon code never enters the
+     * action: only the opaque, server-issued permit id does. Prices remain the
+     * current snapshot expectations and are revalidated by the desktop owner; the
+     * permit quote must also match this cart, so a stale sale is refused rather
+     * than silently submitted at full price.
+     */
+    JSONObject toCouponSalePayload(OperationData data, String settlement, String customerId, String method,
+        boolean externalConfirmed, CouponPermit permit) throws ValidationException {
+      if (permit == null || !permit.isCurrent())
+        throw new ValidationException("Kupon izni süresi doldu; yeni bir kupon kodu girip yeniden doğrulayın.");
+      if (!"paid".equals(settlement) || !"cash".equals(method) || customerId == null || customerId.isEmpty())
+        throw new ValidationException("Kupon yalnız müşterili nakit satışta kullanılabilir.");
+      if (!canCompleteSale(data)) throw new ValidationException("Mobil satış yetkiniz yok.");
+      if (paidCustomer(data, customerId) == null) throw new ValidationException("Güncel yetkili müşteri kaydını seçin.");
+      if (data.hasBusinessCapability(CAPABILITY_INVENTORY) && data.market.primaryLocationId.isEmpty())
+        throw new ValidationException("Stok konumunu yenileyin.");
+      JSONObject payload = toPayload();
+      payload.remove("note");
+      JSONArray serialized = payload.optJSONArray("lines");
+      JSONArray scope = new JSONArray();
+      String currency = "";
+      int index = 0;
+      long subtotal = 0;
+      try {
+        for (CartLine line : lines.values()) {
+          if (!currency.isEmpty() && !currency.equals(line.currency))
+            throw new ValidationException("Tek satışta birden fazla para birimi kullanılamaz.");
+          currency = line.currency;
+          OperationData.MarketProduct currentProduct = productById(data, line.productId);
+          if (line.updatedAt.isEmpty() || !Double.isFinite(line.unitPrice) || currentProduct == null
+              || !currentProduct.active || !line.updatedAt.equals(currentProduct.updatedAt)
+              || Double.compare(line.unitPrice, currentProduct.salePrice) != 0
+              || !line.currency.equals(currentProduct.currency)
+              || line.quantity <= 0 || line.quantity > 1000000
+              || Math.abs(line.quantity * 10000 - Math.rint(line.quantity * 10000)) > 0.00001)
+            throw new ValidationException("Sepetteki ürün bilgileri değişmiş. Ürünü sepetten çıkarıp yeniden ekleyin.");
+          double lineMinor = Math.floor((line.unitPrice * line.quantity + Math.ulp(1.0)) * 100.0 + 0.5);
+          if (!Double.isFinite(lineMinor) || lineMinor < 0 || lineMinor > 9007199254740991L
+              || subtotal > 9007199254740991L - (long) lineMinor)
+            throw new ValidationException("Satış toplamı geçersiz.");
+          subtotal += (long) lineMinor;
+          serialized.getJSONObject(index++).put("expected_unit_price", line.unitPrice)
+              .put("expected_currency", line.currency).put("expected_updated_at", line.updatedAt);
+          scope.put(new JSONObject().put("productId", line.productId).put("quantity", line.quantity));
+        }
+        if (currency.isEmpty() || !permit.matches(customerId, method, scope, currency)
+            || permit.subtotalMinor() != subtotal)
+          throw new ValidationException("Kupon fiyatı sepetle uyuşmuyor; kuponu yenileyin.");
+        JSONObject sale = payload.put("location_id", data.market.primaryLocationId).put("settlement", settlement)
+            .put("customer_id", customerId).put("payment_method", method)
+            .put("external_payment_confirmed", externalConfirmed)
+            .put("couponPermitId", permit.permitId());
+        if (!permit.isCurrent()) throw new ValidationException("Kupon izni süresi doldu; yeni bir kupon kodu girin.");
+        return sale;
+      } catch (ValidationException error) { throw error; }
+      catch (Exception error) { throw new ValidationException("Kuponlu satış hazırlanamadı."); }
+    }
+
+    private static boolean safePreviewInteger(Object value) {
+      return (value instanceof Integer || value instanceof Long) && ((Number) value).longValue() >= 0
+          && ((Number) value).longValue() <= 9007199254740991L;
     }
 
     void clear() {
@@ -601,6 +782,21 @@ final class MarketUiRules {
       this.currency = text(currency).isEmpty() ? "TRY" : text(currency);
       this.unit = text(unit).isEmpty() ? "piece" : text(unit);
       this.quantity = quantity;
+    }
+  }
+
+  /** Empty input is the normal sale; a typed amount is an explicit opt-in, not an authorization. */
+  static long parsePointAmountMinor(String text) throws ValidationException {
+    String normalized = text == null ? "" : text.trim().replace(',', '.');
+    if (normalized.isEmpty()) return 0;
+    try {
+      java.math.BigDecimal amount = new java.math.BigDecimal(normalized);
+      if (amount.signum() < 0 || amount.scale() > 2) throw new ArithmeticException();
+      long minor = amount.setScale(2, java.math.RoundingMode.UNNECESSARY).movePointRight(2).longValueExact();
+      if (minor > 9007199254740991L) throw new ArithmeticException();
+      return minor;
+    } catch (ArithmeticException | NumberFormatException error) {
+      throw new ValidationException("Puan tutarı en fazla iki ondalıklı, negatif olmayan bir sayı olmalı.");
     }
   }
 

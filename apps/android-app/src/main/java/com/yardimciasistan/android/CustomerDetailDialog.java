@@ -18,6 +18,10 @@ import static com.yardimciasistan.android.AndroidPresentation.*;
 
 final class CustomerDetailDialog {
   interface Listener {
+    void onCustomerDialogOpened(Dialog dialog, OperationData.CustomerRecord customer);
+    boolean canQueryPoints();
+    void onPointActionCreated(View action);
+    void onQueryPoints(Dialog dialog, OperationData.CustomerRecord customer);
     void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen);
     void configureFullDialog(Dialog dialog);
     void onDial(String phone);
@@ -47,6 +51,7 @@ final class CustomerDetailDialog {
 
   void show() {
     Dialog dialog = new Dialog(activity);
+    listener.onCustomerDialogOpened(dialog, customer);
     LinearLayout shell = UiKit.column(activity);
     shell.setBackgroundColor(UiKit.BG);
     shell.setPadding(UiKit.dp(activity, 16), UiKit.dp(activity, 14), UiKit.dp(activity, 16), UiKit.dp(activity, 20));
@@ -72,6 +77,10 @@ final class CustomerDetailDialog {
       summary.addView(detailLine("E-posta", customer.email));
     }
     page.addView(summary);
+    Button pointAction = UiKit.outlineButton(activity, "Puan sorgula", view -> listener.onQueryPoints(dialog, customer));
+    pointAction.setVisibility(listener.canQueryPoints() ? View.VISIBLE : View.GONE);
+    listener.onPointActionCreated(pointAction);
+    page.addView(pointAction);
 
     if (hasCustomerIdentityDetails(customer)) {
       page.addView(sectionLabel("Kimlik bilgileri"));

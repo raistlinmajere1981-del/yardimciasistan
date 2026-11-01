@@ -9,53 +9,34 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import javax.net.ssl.SSLException;
 import java.nio.charset.StandardCharsets;
 
 final class LocalCompanionPairingClient {
+  interface ConnectionFactory extends LocalPinnedHttps.ConnectionFactory {}
+  private final ConnectionFactory connections;
+
+  LocalCompanionPairingClient() { this(LocalPinnedHttps.CONNECTIONS::open); }
+  LocalCompanionPairingClient(ConnectionFactory connections) { this.connections = connections; }
+
   private static final int CONNECT_TIMEOUT_MS = 1500;
   private static final int READ_TIMEOUT_MS = 3500;
 
-  PairResult pairWithTicket(
+  PairResult pairWithQr(
       SharedPreferences preferences,
       DeviceIdentity identity,
-      String hostingBaseUrl,
-      HostingSyncClient.LocalPairingTicketResult ticketResult
+      String qrPayload
   ) throws PairingException {
-    String targetKey = CompanionConnectionIdentity.actionTargetKey(hostingBaseUrl);
-    if (targetKey.isEmpty()) {
-      throw new PairingException("Web bağlantı hedefi belirlenemedi.", "local_target_invalid");
-    }
-
-    ConnectionSettings.LocalConnection discovered = ConnectionSettings.localConnection(preferences);
-    if (!discovered.hasEndpoint()) {
-      throw new PairingException(
-          "Aynı ağdaki masaüstü henüz bulunamadı.",
-          "local_desktop_not_found"
-      );
-    }
-
-    String expectedDesktopId = ticketResult == null ? "" : ticketResult.desktopId;
-    if (expectedDesktopId.isEmpty()) {
-      throw new PairingException("Web modülü yerel masaüstü kimliği vermedi.", "local_desktop_unavailable");
-    }
-    if (!expectedDesktopId.equals(discovered.desktopId)) {
-      if (!discovered.localToken.isEmpty()) {
-        ConnectionSettings.clearLocalConnection(preferences);
-      } else {
-        ConnectionSettings.clearLocalEndpoint(preferences);
-      }
-      throw new PairingException(
-          "Bulunan masaüstü bu işletmenin web kaydıyla eşleşmiyor.",
-          "local_desktop_mismatch"
-      );
-    }
-
-    probeStatus(discovered, expectedDesktopId);
+    LocalPairingQr qr = LocalPairingQr.parse(qrPayload);
+    String targetKey = CompanionConnectionIdentity.localActionTargetKey(qr.desktopId);
+    assertTargetAvailable(preferences, identity, targetKey);
+    assertPinChangeAvailable(preferences, identity, qr);
+    String expectedDesktopId = qr.desktopId;
+    probeStatus(qr.baseUrl, qr.spkiSha256, expectedDesktopId);
 
     JSONObject request = new JSONObject();
     try {
-      request.put("pairing_ticket", ticketResult.ticket);
+      request.put("pairing_ticket", qr.credential);
       request.put("device_id", identity.deviceId);
       request.put("device_name", identity.deviceName);
       request.put("app_version", identity.appVersion);
@@ -63,7 +44,7 @@ final class LocalCompanionPairingClient {
       throw new PairingException("Yerel eşleştirme isteği hazırlanamadı.", error);
     }
 
-    JSONObject response = post(discovered.baseUrl + LocalCompanionProtocol.PAIR_PATH, request);
+    JSONObject response = post(qr.baseUrl + LocalCompanionProtocol.PAIR_PATH, qr.spkiSha256, request);
     String desktopId = response.optString("desktop_id", "").trim();
     String token = response.optString("local_token", "").trim();
     if (!expectedDesktopId.equals(desktopId)) {
@@ -72,36 +53,102 @@ final class LocalCompanionPairingClient {
           "local_desktop_mismatch"
       );
     }
+    // Recheck after network I/O before clearing any cache or changing trust.
+    assertTargetAvailable(preferences, identity, targetKey);
+    assertPinChangeAvailable(preferences, identity, qr);
+    boolean targetChanged = !targetKey.equals(CompanionConnectionIdentity.actionTargetKey(
+        preferences, ConnectionSettings.webModuleUrl(preferences)));
     if (!ConnectionSettings.storeLocalPairing(
         preferences,
         desktopId,
-        discovered.baseUrl,
+        qr.baseUrl,
         targetKey,
-        token
+        token,
+        qr.spkiSha256
     )) {
       throw new PairingException("Yerel bağlantı anahtarı telefonda saklanamadı.");
     }
 
+    if (targetChanged) {
+      try { new OperationCache(preferences, identity.deviceId).clear(); }
+      catch (OperationCache.CacheException error) { throw new PairingException(error.getMessage()); }
+    }
     return new PairResult(
         desktopId,
         response.optBoolean("approval_required", true),
-        response.optString("message", "Telefon yerel ağa otomatik bağlandı.").trim()
+        response.optBoolean("approval_required", true)
+            ? "Eşleşti. Masaüstünden telefonu onaylayıp izinlerini seçin." : "Yerel eşleştirme tamamlandı."
     );
   }
 
-  private static void probeStatus(
-      ConnectionSettings.LocalConnection discovered,
+  static void assertTargetAvailable(SharedPreferences preferences, DeviceIdentity identity, String targetKey) throws PairingException {
+    if (ConnectionSettings.hasAnyHostingActionBarrier(preferences)) {
+      throw new PairingException("Önceki Web bağlantısında sonucu beklenen işlemler var. Önce o bağlantıda tamamlayın.", "target_barrier");
+    }
+    ConnectionSettings.LocalConnection existing = ConnectionSettings.localConnection(preferences);
+    if (ConnectionSettings.isLocalOnly(preferences) && !existing.desktopId.isEmpty()
+        && !targetKey.equals(CompanionConnectionIdentity.localActionTargetKey(existing.desktopId))) {
+      throw new PairingException("Bu telefon başka bir masaüstüyle eşleşmiş. Bağlantı değişikliği için yöneticiye başvurun.", "target_barrier");
+    }
+    try {
+      for (ActionOutbox.PendingAction pending : new ActionOutbox(preferences).load()) {
+        if (!pending.matchesTarget(targetKey)) {
+          throw new PairingException("Önceki bağlantıya ait bekleyen işlemler korunuyor. Önce o bağlantıda tamamlayın.", "target_barrier");
+        }
+      }
+      String previous = CompanionConnectionIdentity.actionTargetKey(preferences, ConnectionSettings.webModuleUrl(preferences));
+      if (!previous.equals(targetKey) && new OperationCache(preferences, identity.deviceId).hasUnresolvedActionResults(previous)) {
+        throw new PairingException("Önceki bağlantıda sonucu doğrulanmamış işlem var.", "target_barrier");
+      }
+    } catch (ActionOutbox.OutboxException | OperationCache.CacheException error) {
+      throw new PairingException(error.getMessage(), "target_barrier");
+    }
+  }
+
+  private static void assertPinChangeAvailable(SharedPreferences preferences, DeviceIdentity identity, LocalPairingQr qr) throws PairingException {
+    ConnectionSettings.LocalConnection existing = ConnectionSettings.localConnection(preferences);
+    if (!existing.desktopId.equals(qr.desktopId) || existing.spkiSha256.equals(qr.spkiSha256)) return;
+    try {
+      String target = CompanionConnectionIdentity.localActionTargetKey(qr.desktopId);
+      if (!new ActionOutbox(preferences).load().isEmpty()
+          || new OperationCache(preferences, identity.deviceId).hasUnresolvedActionResults(target)) {
+        throw new PairingException("Masaüstü güvenlik kimliği değişti. Bekleyen işlemler korunuyor; önce eski masaüstünde tamamlayın.", "target_barrier");
+      }
+    } catch (ActionOutbox.OutboxException | OperationCache.CacheException error) {
+      throw new PairingException("Bekleyen işlemler doğrulanamadı; bağlantı kimliği korunuyor.", "target_barrier");
+    }
+  }
+
+  /** Discovery may propose an address, but cannot replace the QR trust anchor. */
+  boolean refreshDiscoveredEndpoint(SharedPreferences preferences, String desktopId, String baseUrl) {
+    ConnectionSettings.LocalConnection before = ConnectionSettings.localConnection(preferences);
+    if (!before.isPaired() || !before.desktopId.equals(desktopId)) return false;
+    try {
+      probeStatus(baseUrl, before.spkiSha256, desktopId);
+      ConnectionSettings.LocalConnection current = ConnectionSettings.localConnection(preferences);
+      if (!before.desktopId.equals(current.desktopId) || !before.spkiSha256.equals(current.spkiSha256)
+          || !before.localToken.equals(current.localToken)) return false;
+      return ConnectionSettings.storeDiscoveredLocalEndpoint(preferences, desktopId, baseUrl);
+    } catch (PairingException error) { return false; }
+  }
+
+  private void probeStatus(
+      String baseUrl,
+      String pin,
       String expectedDesktopId
   ) throws PairingException {
     HttpURLConnection connection = null;
-    String endpoint = discovered.baseUrl + LocalCompanionProtocol.STATUS_PATH;
+    String endpoint = baseUrl + LocalCompanionProtocol.STATUS_PATH;
     try {
-      connection = (HttpURLConnection) new URL(endpoint).openConnection();
+      connection = LocalPinnedHttps.open(endpoint, pin, connections);
+      connection.setInstanceFollowRedirects(false);
       connection.setRequestMethod("GET");
       connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
       connection.setReadTimeout(READ_TIMEOUT_MS);
       connection.setRequestProperty("Accept", "application/json");
+      LocalPinnedHttps.authenticate(connection, pin);
       int status = connection.getResponseCode();
+      LocalPinnedHttps.rejectRedirect(status);
       String responseText = readAll(
           status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream()
       );
@@ -109,7 +156,7 @@ final class LocalCompanionPairingClient {
       String desktopId = response.optString("desktop_id", "").trim();
       if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
         throw new PairingException(
-            "Masaüstü bulundu ancak yerel HTTP servisi hazır değil.",
+            "Masaüstü bulundu ancak güvenli HTTPS servisi hazır değil.",
             "local_status_failed"
         );
       }
@@ -127,9 +174,11 @@ final class LocalCompanionPairingClient {
       }
     } catch (PairingException error) {
       throw error;
+    } catch (SSLException error) {
+      throw tlsError(error);
     } catch (Exception error) {
       throw new PairingException(
-          "Masaüstü bulundu fakat yerel HTTP adresine ulaşılamadı.",
+          "Masaüstü bulundu fakat güvenli HTTPS adresine ulaşılamadı.",
           "local_desktop_unreachable",
           error
       );
@@ -140,10 +189,11 @@ final class LocalCompanionPairingClient {
     }
   }
 
-  private static JSONObject post(String endpoint, JSONObject payload) throws PairingException {
+  private JSONObject post(String endpoint, String pin, JSONObject payload) throws PairingException {
     HttpURLConnection connection = null;
     try {
-      connection = (HttpURLConnection) new URL(endpoint).openConnection();
+      connection = LocalPinnedHttps.open(endpoint, pin, connections);
+      connection.setInstanceFollowRedirects(false);
       connection.setRequestMethod("POST");
       connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
       connection.setReadTimeout(READ_TIMEOUT_MS);
@@ -152,11 +202,13 @@ final class LocalCompanionPairingClient {
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);
+      LocalPinnedHttps.authenticate(connection, pin);
       try (OutputStream output = connection.getOutputStream()) {
         output.write(body);
       }
 
       int status = connection.getResponseCode();
+      LocalPinnedHttps.rejectRedirect(status);
       InputStream stream = status >= 200 && status < 300
           ? connection.getInputStream()
           : connection.getErrorStream();
@@ -169,16 +221,17 @@ final class LocalCompanionPairingClient {
       }
 
       if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
-        String message = response.optString("message", "").trim();
         String code = response.optString("code", "").trim();
         throw new PairingException(
-            message.isEmpty() ? "Otomatik yerel eşleştirme başarısız oldu." : message,
+            pairingErrorMessage(code),
             code
         );
       }
       return response;
     } catch (PairingException error) {
       throw error;
+    } catch (SSLException error) {
+      throw tlsError(error);
     } catch (Exception error) {
       throw new PairingException(
           "Aynı ağdaki masaüstüne otomatik eşleştirme için ulaşılamadı.",
@@ -189,6 +242,23 @@ final class LocalCompanionPairingClient {
       if (connection != null) {
         connection.disconnect();
       }
+    }
+  }
+
+  private static PairingException tlsError(Exception error) {
+    return new PairingException("Masaüstünün güvenli kimliği doğrulanamadı. Doğru masaüstünde yeni QR açıp yeniden eşleştirin.", "local_tls_authentication_failed", error);
+  }
+
+  private static String pairingErrorMessage(String code) {
+    switch (code) {
+      case "local_pairing_session_closed":
+      case "local_pairing_ticket_replayed": return "QR kodunun süresi dolmuş veya kullanılmış. Masaüstünde yeni QR açın.";
+      case "local_pairing_credential_invalid": return "QR kodu geçerli değil. Masaüstünde yeni QR açın.";
+      case "app_locked": return "Eşleştirme için masaüstü kilidini açın.";
+      case "device_revoked": return "Telefon erişimi kaldırılmış. Masaüstü yöneticisine başvurun.";
+      case "android_capability_disabled": return "Masaüstünde Android servisini etkinleştirin.";
+      case "local_network_disabled": return "Masaüstünde yerel ağ bağlantısını etkinleştirin.";
+      default: return "Eşleştirme tamamlanamadı. Masaüstünde yeni QR açıp tekrar deneyin.";
     }
   }
 

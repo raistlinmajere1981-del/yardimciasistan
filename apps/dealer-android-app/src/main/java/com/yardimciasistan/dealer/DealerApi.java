@@ -36,7 +36,7 @@ final class DealerApi {
     JSONObject receipt = previous == null ? call("order", request, cookie).body : previous;
     boolean valid = Boolean.TRUE.equals(receipt.opt("ok")) && receipt.optString("order_id").matches("[A-Za-z0-9_-]{1,180}");
     try { java.time.OffsetDateTime.parse(receipt.getString("accepted_at")); } catch (Exception error) { valid = false; }
-    if (receipt.has("quoted_total")) valid = valid && receipt.opt("quoted_total") instanceof Number
+    valid = valid && receipt.opt("quoted_total") instanceof Number
         && Double.isFinite(receipt.optDouble("quoted_total")) && receipt.optDouble("quoted_total") >= 0
         && receipt.optString("currency").matches("[A-Z]{3}");
     if (!valid) throw new Failure(502, "Sipariş sonucu doğrulanamadı. Aynı siparişi tekrar deneyin.");

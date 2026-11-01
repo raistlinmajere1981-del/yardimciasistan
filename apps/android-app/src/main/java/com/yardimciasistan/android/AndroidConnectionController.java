@@ -90,7 +90,12 @@ final class AndroidConnectionController {
       return new ApplyResult(false, error.getMessage());
     }
 
+    if (ConnectionSettings.isLocalOnly(preferences)
+        && ConnectionSettings.localConnection(preferences).isPaired()) {
+      return new ApplyResult(false, "Yerel eşleşme korunuyor. Hedef değişikliği için açık geliştirme sıfırlaması gerekli.");
+    }
     preferences.edit()
+        .putString(ConnectionSettings.KEY_CONNECTION_MODE, "hosted")
         .putString(ConnectionSettings.KEY_WEB_MODULE_URL, normalizedUrl)
         .putString(ConnectionSettings.KEY_SYNC_SECRET, normalizedSecret)
         .apply();

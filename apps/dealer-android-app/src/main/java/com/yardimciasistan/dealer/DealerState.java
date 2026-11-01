@@ -9,6 +9,10 @@ import java.util.UUID;
 /** Device drafts/cache only. All prices/statuses originate from the authenticated API. */
 final class DealerState {
   interface Persistence { void write(String json) throws Exception; }
+  static final int MAX_CARTS = 5;
+  static final int MAX_CART_NAME = 40;
+  private static final String DEFAULT_CART_ID = "cart-1";
+  private static final String[] CART_FIELDS = {"cart", "note", "delivery", "address"};
   final JSONObject data;
   private final Persistence persistence;
   DealerState(String json, Persistence persistence) throws Exception {
@@ -31,13 +35,13 @@ final class DealerState {
     String owner = base + "|" + dealer.getString("access_id");
     if (!owner.equals(text("owner"))) {
       JSONObject drafts = object("saved_drafts");
-      String[] draftFields = {"cart", "pending", "note", "address", "delivery", "favorites"};
-      if (!text("owner").isEmpty() && (object("cart").length() > 0 || data.has("pending"))) {
+      String[] draftFields = {"cart", "carts", "cart_id", "cart_name", "pending", "note", "address", "delivery", "favorites"};
+      if (!text("owner").isEmpty() && (object("cart").length() > 0 || object("carts").length() > 0 || data.has("pending"))) {
         JSONObject previous = new JSONObject();
         for (String key : draftFields) if (data.has(key)) previous.put(key, data.get(key));
         drafts.put(text("owner"), new JSONObject(previous.toString()));
       }
-      for (String key : new String[]{"catalog", "orders", "cart", "favorites", "pending", "last_receipt", "note", "address", "delivery", "catalog_at", "orders_at"}) data.remove(key);
+      for (String key : new String[]{"catalog", "orders", "cart", "carts", "cart_id", "cart_name", "favorites", "pending", "last_receipt", "note", "address", "delivery", "catalog_at", "orders_at"}) data.remove(key);
       JSONObject restored = drafts.optJSONObject(owner);
       if (restored != null) for (String key : draftFields) if (restored.has(key)) data.put(key, restored.get(key));
       drafts.remove(owner);
@@ -72,9 +76,15 @@ final class DealerState {
     for (java.util.Iterator<String> it = cart.keys(); it.hasNext();) {
       String id = it.next(); JSONObject product = product(id);
       if (product == null) throw new IllegalArgumentException("Sepette artık sunulmayan ürün var. Ürünü sepetten çıkarın.");
-      if (currency != null && !currency.equals(product.getString("currency"))) throw new IllegalArgumentException("Farklı para birimleri aynı siparişte kullanılamaz.");
-      currency = product.getString("currency");
-      total = total.add(new BigDecimal(product.get("price").toString()).multiply(new BigDecimal(cart.get(id).toString())).setScale(2, RoundingMode.HALF_UP));
+      String productCurrency = product.optString("currency", "");
+      if (!productCurrency.matches("[A-Z]{3}")) throw new IllegalArgumentException("Bayi ürününün para birimi geçersiz. Kataloğu yenileyin.");
+      if (currency != null && !currency.equals(productCurrency)) throw new IllegalArgumentException("Farklı para birimleri aynı siparişte kullanılamaz.");
+      currency = productCurrency;
+      BigDecimal unitPrice;
+      try { unitPrice = new BigDecimal(product.get("price").toString()); }
+      catch (Exception error) { throw new IllegalArgumentException("Bayi ürününün fiyatı geçersiz. Kataloğu yenileyin."); }
+      if (unitPrice.signum() < 0) throw new IllegalArgumentException("Bayi ürününün fiyatı geçersiz. Kataloğu yenileyin.");
+      total = total.add(unitPrice.multiply(new BigDecimal(cart.get(id).toString())).setScale(2, RoundingMode.HALF_UP));
     }
     return total;
   }
@@ -103,7 +113,10 @@ final class DealerState {
     data.put("pending", new JSONObject(request.toString())); save(); return object("pending");
   }
   void accepted(JSONObject receipt) throws Exception {
-    data.put("last_receipt", receipt); data.remove("pending"); data.remove("cart"); data.remove("note"); save();
+    JSONObject next = new JSONObject(data.toString());
+    next.put("last_receipt", receipt); next.remove("pending"); next.remove("cart"); next.remove("note");
+    persistence.write(next.toString());
+    data.put("last_receipt", receipt); data.remove("pending"); data.remove("cart"); data.remove("note");
   }
   int reorder(JSONArray items) throws Exception {
     if (data.has("pending")) throw new IllegalStateException("Bekleyen siparişi önce aynı kimlikle tekrar deneyin.");
@@ -120,6 +133,100 @@ final class DealerState {
     if (favorites.has(id)) favorites.remove(id); else favorites.put(id, true);
     put("favorites", favorites);
   }
+
+  /** Active cart id, synthesized in memory for legacy state without an explicit identity. */
+  String activeCartId() { String id = text("cart_id"); return id.isEmpty() ? DEFAULT_CART_ID : id; }
+  /** Active cart name, synthesized in memory for legacy state without an explicit name. */
+  String activeCartName() { String name = text("cart_name").trim(); return name.isEmpty() ? "Sepet 1" : name; }
+
+  /** All carts of the current owner; the active one is listed first. */
+  JSONArray carts() throws Exception {
+    JSONArray list = new JSONArray();
+    list.put(new JSONObject().put("id", activeCartId()).put("name", activeCartName()).put("active", true));
+    JSONObject others = object("carts");
+    for (java.util.Iterator<String> it = others.keys(); it.hasNext();) {
+      String id = it.next(); JSONObject entry = others.optJSONObject(id);
+      if (entry != null) list.put(new JSONObject().put("id", id).put("name", entry.optString("name", "")).put("active", false));
+    }
+    return list;
+  }
+
+  /** Creates an independent named cart and makes it active. Returns the new cart id. */
+  String newCart(String name) throws Exception {
+    requireNoPending();
+    String clean = cleanCartName(name);
+    // The active cart is snapshotted, not replaced, so its name must stay unique too.
+    requireUniqueCartName(clean, null);
+    JSONObject next = new JSONObject(data.toString());
+    JSONObject others = next.optJSONObject("carts"); if (others == null) others = new JSONObject();
+    if (1 + others.length() >= MAX_CARTS) throw new IllegalArgumentException("En fazla " + MAX_CARTS + " sepet oluşturulabilir.");
+    others.put(activeCartId(), snapshotOf(next, activeCartName()));
+    String id = UUID.randomUUID().toString();
+    clearCartFields(next);
+    next.put("carts", others).put("cart_id", id).put("cart_name", clean);
+    commit(next); return id;
+  }
+
+  /** Switches the active cart, keeping every other cart snapshot intact. */
+  void selectCart(String id) throws Exception {
+    requireNoPending();
+    String target = requireCartId(id);
+    if (target.equals(activeCartId())) return;
+    JSONObject next = new JSONObject(data.toString());
+    JSONObject others = next.optJSONObject("carts");
+    JSONObject entry = others == null ? null : others.optJSONObject(target);
+    if (entry == null) throw new IllegalArgumentException("Sepet bulunamadı.");
+    others.put(activeCartId(), snapshotOf(next, activeCartName()));
+    others.remove(target);
+    clearCartFields(next);
+    putCartFields(next, entry);
+    next.put("carts", others).put("cart_id", target).put("cart_name", entry.optString("name", "Sepet"));
+    commit(next);
+  }
+
+  /** Renames the active or a stored cart. */
+  void renameCart(String id, String name) throws Exception {
+    requireNoPending();
+    String target = requireCartId(id);
+    String clean = cleanCartName(name);
+    requireUniqueCartName(clean, target);
+    JSONObject next = new JSONObject(data.toString());
+    if (target.equals(activeCartId())) next.put("cart_name", clean);
+    else {
+      JSONObject others = next.optJSONObject("carts");
+      JSONObject entry = others == null ? null : others.optJSONObject(target);
+      if (entry == null) throw new IllegalArgumentException("Sepet bulunamadı.");
+      entry.put("name", clean);
+    }
+    commit(next);
+  }
+
+  /** Deletes a cart; deleting the active one promotes the next stored cart. */
+  void deleteCart(String id) throws Exception {
+    requireNoPending();
+    String target = requireCartId(id);
+    JSONObject next = new JSONObject(data.toString());
+    JSONObject others = next.optJSONObject("carts"); if (others == null) others = new JSONObject();
+    if (!target.equals(activeCartId())) {
+      others.remove(target);
+      next.put("carts", others);
+      commit(next); return;
+    }
+    clearCartFields(next);
+    others.remove(target);
+    if (others.length() > 0) {
+      String promoted = others.keys().next();
+      JSONObject entry = others.optJSONObject(promoted);
+      others.remove(promoted);
+      putCartFields(next, entry);
+      next.put("cart_id", promoted).put("cart_name", entry.optString("name", "Sepet"));
+    } else {
+      next.put("cart_id", "").put("cart_name", "");
+    }
+    next.put("carts", others);
+    commit(next);
+  }
+
   void logout() throws Exception {
     JSONObject drafts = object("saved_drafts");
     String connection = text("connection_base");
@@ -134,5 +241,56 @@ final class DealerState {
           .put("branding_at", lastBrandAt);
     }
     save();
+  }
+
+  private void requireNoPending() {
+    if (data.has("pending")) throw new IllegalStateException("Bekleyen siparişi önce aynı kimlikle tekrar deneyin.");
+  }
+  private String cleanCartName(String name) {
+    String clean = name == null ? "" : name.trim();
+    if (clean.isEmpty()) throw new IllegalArgumentException("Sepet adı boş olamaz.");
+    if (clean.length() > MAX_CART_NAME) throw new IllegalArgumentException("Sepet adı en fazla " + MAX_CART_NAME + " karakter olabilir.");
+    return clean;
+  }
+  private void requireUniqueCartName(String name, String exceptId) {
+    if (!activeCartId().equals(exceptId) && name.equalsIgnoreCase(activeCartName())) throw new IllegalArgumentException("Bu sepet adı zaten kullanılıyor.");
+    JSONObject others = object("carts");
+    for (java.util.Iterator<String> it = others.keys(); it.hasNext();) {
+      String id = it.next(); if (id.equals(exceptId)) continue;
+      JSONObject entry = others.optJSONObject(id);
+      if (entry != null && name.equalsIgnoreCase(entry.optString("name", "").trim())) throw new IllegalArgumentException("Bu sepet adı zaten kullanılıyor.");
+    }
+  }
+  private String requireCartId(String id) {
+    String cartId = id == null ? "" : id.trim();
+    if (cartId.isEmpty()) throw new IllegalArgumentException("Geçersiz sepet kimliği.");
+    if (cartId.equals(activeCartId())) return cartId;
+    if (!object("carts").has(cartId)) throw new IllegalArgumentException("Sepet bulunamadı.");
+    return cartId;
+  }
+  private static JSONObject snapshotOf(JSONObject source, String name) throws Exception {
+    JSONObject entry = new JSONObject().put("name", name);
+    for (String key : CART_FIELDS) if (source.has(key)) entry.put(key, copy(source.get(key)));
+    return entry;
+  }
+  private static void clearCartFields(JSONObject target) {
+    for (String key : CART_FIELDS) target.remove(key);
+  }
+  private static void putCartFields(JSONObject target, JSONObject entry) throws Exception {
+    for (String key : CART_FIELDS) if (entry.has(key)) target.put(key, copy(entry.get(key)));
+  }
+  private static Object copy(Object value) throws Exception {
+    if (value instanceof JSONObject) return new JSONObject(value.toString());
+    if (value instanceof JSONArray) return new JSONArray(value.toString());
+    return value;
+  }
+  /** Copy-on-write: persist first, only then replace live state. */
+  private void commit(JSONObject next) throws Exception {
+    persistence.write(next.toString());
+    java.util.List<String> keys = new java.util.ArrayList<>(); data.keys().forEachRemaining(keys::add);
+    for (String key : keys) data.remove(key);
+    for (java.util.Iterator<String> it = next.keys(); it.hasNext();) {
+      String key = it.next(); data.put(key, next.get(key));
+    }
   }
 }

@@ -12,6 +12,9 @@ android {
     versionCode = productVersion.androidVersionCode.toInteger()
     versionName = productVersion.version
   }
+  sourceSets {
+    main { java.srcDirs += ["../android-update-core/src/main/java"] }
+  }
   buildTypes {
     debug { versionNameSuffix = "-debug" }
     release { minifyEnabled = false }

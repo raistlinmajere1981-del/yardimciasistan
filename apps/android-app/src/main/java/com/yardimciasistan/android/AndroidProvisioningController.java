@@ -49,6 +49,17 @@ final class AndroidProvisioningController {
       return;
     }
 
+    try {
+      if (ConnectionSettings.localConnection(preferences).isPaired()
+          || ConnectionSettings.hasAnyHostingActionBarrier(preferences)
+          || !new ActionOutbox(preferences).load().isEmpty()) {
+        listener.onCaptureError("Mevcut bağlantı ve bekleyen işlemler korunuyor. Hedef değişikliği için yöneticiye başvurun.");
+        return;
+      }
+    } catch (ActionOutbox.OutboxException error) {
+      listener.onCaptureError(error.getMessage());
+      return;
+    }
     if (!ConnectionSettings.storeBootstrapProvisioning(preferences, baseUrl, ticket)) {
       listener.onCaptureError("Masaüstünden gelen Android kurulum bilgisi geçersiz.");
       return;

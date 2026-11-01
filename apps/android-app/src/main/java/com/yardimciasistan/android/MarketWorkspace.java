@@ -28,6 +28,24 @@ final class MarketWorkspace {
     void onProductImageRequested(String productId, String provider, String imageUrl);
 
     void onRenderRequested();
+
+    default void onCustomerSalePreviewRequested(SalePreviewRequest request, java.util.function.Consumer<SalePreviewApproval> callback) {
+      callback.accept(null);
+    }
+
+    default void onPointSpendQuoteRequested(PointSpendQuoteRequest request, java.util.function.Consumer<PointSpendQuote> callback) {
+      callback.accept(null);
+    }
+
+    default void onCouponPermitRequested(CouponPermitRequest request, java.util.function.Consumer<CouponPermit> callback) {
+      callback.accept(null);
+    }
+
+    /** Coupon sales must reuse the exact preauthorization action id, never a new one. */
+    default boolean onSubmitWithActionId(String actionId, String actionType, JSONObject payload,
+        String acceptedMessage, String queuedMessage) {
+      return false;
+    }
   }
 
   static final String SCREEN_HOME = "home";
@@ -59,10 +77,12 @@ final class MarketWorkspace {
   private final MarketCreditFlow credit;
 
   private OperationData data = new OperationData();
+  private String observedSnapshotVersion = "";
   private String screen = SCREEN_HOME;
   private String resultReturnScreen = SCREEN_HOME;
   private String barcodeResult = "";
   private String barcodeResultProductId = "";
+  private int saleScrollY;
 
   MarketWorkspace(Context context, Listener listener) {
     this.context = context;
@@ -81,7 +101,14 @@ final class MarketWorkspace {
   }
 
   ScrollView create(OperationData nextData, int nextLocalPendingCount, boolean nextLoading) {
+    String nextSnapshotVersion = nextData == null ? "" : nextData.snapshotUpdatedAt;
+    // Rebuilt OperationData objects can represent the very same snapshot. Do not
+    // discard an open financial confirmation merely because a sync rerendered
+    // its presentation; true snapshot revisions still invalidate and recheck.
+    if (!observedSnapshotVersion.equals(nextSnapshotVersion)) checkout.invalidateSale();
+    observedSnapshotVersion = nextSnapshotVersion;
     data = nextData == null ? new OperationData() : nextData;
+    checkout.reconcileCustomer();
     feedback.update(nextLocalPendingCount, nextLoading);
     enforceVisibleScreen();
 
@@ -105,11 +132,22 @@ final class MarketWorkspace {
     } else {
       page = homeScreen();
     }
+    if (SCREEN_SALE.equals(screen)) {
+      // A tall checkout must remain scrollable above bottom navigation on
+      // small Android phones, including after a quote/sync rerender.
+      ScrollView saleScroll = UiKit.scroll(context, page, 104);
+      int previousY = saleScrollY;
+      saleScroll.setOnScrollChangeListener((view, x, y, oldX, oldY) -> saleScrollY = y);
+      saleScroll.post(() -> saleScroll.scrollTo(0, previousY));
+      return saleScroll;
+    }
+    saleScrollY = 0;
     return UiKit.scroll(context, page);
   }
 
   boolean handleBack() {
     if (SCREEN_HOME.equals(screen)) return false;
+    checkout.invalidateSale();
     if (SCREEN_SALE.equals(screen)) {
       screen = SCREEN_CART;
     } else if (SCREEN_CREDIT.equals(screen)) {
@@ -126,6 +164,11 @@ final class MarketWorkspace {
 
   String screenKey() {
     return screen;
+  }
+
+  void invalidateSaleLifecycle() { checkout.invalidateSale(); }
+  boolean matchesSalePreviewScope(SalePreviewRequest request) {
+    return SCREEN_SALE.equals(screen) && checkout.matchesSalePreviewScope(request);
   }
 
   void onSubmissionAccepted(String type, String message, String id) { feedback.onSubmissionAccepted(type, message, id); }
@@ -463,6 +506,10 @@ final class MarketWorkspace {
   }
 
   private void openScreen(String next) {
+    if (!next.equals(screen)) {
+      checkout.invalidateSale();
+      saleScrollY = 0;
+    }
     screen = next;
     feedback.formError = "";
     listener.onRenderRequested();

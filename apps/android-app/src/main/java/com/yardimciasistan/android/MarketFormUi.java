@@ -142,10 +142,33 @@ final class MarketFormUi {
     picker.setOnItemSelectedListener(new SimpleItemSelectedListener(changed)); page.addView(picker);
   }
 
+  /**
+   * Native dialog-backed single choice for flows where a Spinner dropdown cannot be trusted:
+   * an explicit item click is the only event that can change the persisted value, so a rebuilt
+   * screen cannot reset it through an initial {@code onItemSelected} callback.
+   */
+  void addSelectionDialog(LinearLayout page, String label, String[] labels, int selected, PositionListener changed) {
+    int safeSelected = selected >= 0 && selected < labels.length ? selected : 0;
+    UiKit.fieldLabel(context, page, label);
+    Button picker = UiKit.outlineButton(context, labels[safeSelected] + "  ▾", view ->
+        new AlertDialog.Builder(context)
+            .setTitle(label)
+            .setSingleChoiceItems(labels, safeSelected, (dialog, position) -> {
+              dialog.dismiss();
+              if (position != safeSelected) changed.onSelected(position);
+            })
+            .setNegativeButton("Vazgeç", null)
+            .show());
+    picker.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+    picker.setContentDescription(label + ": " + labels[safeSelected]);
+    picker.setLayoutParams(fieldParams(50));
+    page.addView(picker);
+  }
+
   void addPaymentPicker(LinearLayout page, String selectedMethod, String[] methods, ValueListener changed) {
     String[] labels = new String[methods.length]; int selected = 0;
     for (int i = 0; i < methods.length; i++) { labels[i] = paymentLabel(methods[i]); if (methods[i].equals(selectedMethod)) selected = i; }
-    addChoicePicker(page, "Ödeme türü", labels, selected, position -> changed.onValue(methods[position]));
+    addSelectionDialog(page, "Ödeme türü", labels, selected, position -> changed.onValue(methods[position]));
   }
 
   String paymentLabel(String method) {
@@ -210,7 +233,25 @@ final class MarketFormUi {
   }
 
   void confirmFinancial(String title, String detail, java.util.function.BooleanSupplier blocked, Runnable submit) {
-    new AlertDialog.Builder(context).setTitle(title).setMessage(detail + "\n\nMasaüstü fiyat, stok ve yetkiyi doğrulamadan kayıt tamamlanmaz.")
-        .setNegativeButton("Vazgeç", null).setPositiveButton("Onayla", (dialog, which) -> { if (!blocked.getAsBoolean()) submit.run(); }).show();
+    confirmFinancial(title, detail, blocked, submit, () -> {});
+  }
+
+  AlertDialog confirmFinancial(String title, String detail, java.util.function.BooleanSupplier blocked, Runnable submit, Runnable dismissed) {
+    AlertDialog dialog = new AlertDialog.Builder(context).setTitle(title).setMessage(detail + "\n\nMasaüstü fiyat, stok ve yetkiyi doğrulamadan kayıt tamamlanmaz.")
+        .setNegativeButton("Vazgeç", null).setPositiveButton("Onayla", null).create();
+    dialog.setOnDismissListener(ignored -> dismissed.run());
+    // Keep the confirmation visible while sync/outbox is busy; Android's default
+    // positive callback auto-dismissed it even when no financial action was sent.
+    dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+      if (blocked.getAsBoolean()) {
+        android.widget.Toast.makeText(context,
+            "Senkronizasyon devam ediyor; tamamlanınca yeniden onaylayın.", android.widget.Toast.LENGTH_LONG).show();
+        return;
+      }
+      submit.run();
+      dialog.dismiss();
+    }));
+    dialog.show();
+    return dialog;
   }
 }

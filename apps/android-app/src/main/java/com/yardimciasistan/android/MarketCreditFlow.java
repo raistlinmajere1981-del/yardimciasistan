@@ -83,7 +83,7 @@ final class MarketCreditFlow {
     int selected = 0; String[] currencies = new String[debts.size()];
     for (int i = 0; i < debts.size(); i++) { currencies[i] = debts.get(i).currency; if (currencies[i].equals(creditCurrency)) selected = i; }
     creditCurrency = currencies[selected];
-    ui.addChoicePicker(page, "Tahsilat para birimi", currencies, selected, position -> creditCurrency = currencies[position]);
+    ui.addSelectionDialog(page, "Tahsilat para birimi", currencies, selected, position -> creditCurrency = currencies[position]);
     EditText amount = UiKit.labeledInput(context, page, "Tahsilat tutarı", "0,00");
     amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     ui.bind(amount, creditAmountText, value -> creditAmountText = value);

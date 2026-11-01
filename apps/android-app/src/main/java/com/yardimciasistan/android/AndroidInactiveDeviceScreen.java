@@ -30,8 +30,8 @@ final class AndroidInactiveDeviceScreen {
     page.addView(androidEnabled
         ? screenIntro(
             "ERİŞİM DURUMU",
-            "Bu cihaz pasifleştirildi",
-            "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ bağlantısı aynı ağda otomatik hazırlanır; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir."
+            "Masaüstü onayı gerekli",
+            "İşletme işlemleri için masaüstünden telefonu etkinleştirin ve izinlerini seçin."
         )
         : screenIntro(
             "ERİŞİM DURUMU",
@@ -48,8 +48,8 @@ final class AndroidInactiveDeviceScreen {
       localCard.addView(UiKit.text(
           activity,
           inactiveLocal.isComplete()
-              ? "Bu telefon masaüstüyle yerel ağ için otomatik bağlandı. İşletme işlemleri için cihazı masaüstünden etkinleştirin."
-              : "Masaüstü aynı ağda bulunursa yerel bağlantı otomatik hazırlanır.",
+              ? "Telefon eşleşti. İşlemler için masaüstü onayı ve cihaz izinleri gerekiyor."
+              : "Telefonu masaüstündeki QR kodunu okutarak eşleştirin.",
           12,
           UiKit.SECONDARY,
           Typeface.NORMAL

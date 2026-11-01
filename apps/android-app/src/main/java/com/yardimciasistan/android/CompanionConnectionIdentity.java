@@ -25,6 +25,17 @@ final class CompanionConnectionIdentity {
     return normalized.isEmpty() ? "" : "companion:" + normalized;
   }
 
+  static String localActionTargetKey(String desktopId) {
+    String normalized = desktopId == null ? "" : desktopId.trim();
+    return normalized.matches("desktop-[A-Za-z0-9._:-]{8,120}") ? "companion:local:" + normalized : "";
+  }
+
+  static String actionTargetKey(android.content.SharedPreferences preferences, String hostingBaseUrl) {
+    return ConnectionSettings.isLocalOnly(preferences)
+        ? localActionTargetKey(ConnectionSettings.localConnection(preferences).desktopId)
+        : actionTargetKey(hostingBaseUrl);
+  }
+
   private static String normalizedHostingBaseUrl(String value) {
     String endpoint = HostingSyncClient.toSyncEndpoint(value == null ? "" : value.trim());
     if (!endpoint.endsWith(HOSTING_SYNC_SUFFIX)) {
