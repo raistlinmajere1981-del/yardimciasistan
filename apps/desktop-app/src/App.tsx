@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
+import { isWebAvailable, WebAvailabilityProvider } from "./app/web-availability";
+import { NetworkSignalProvider } from "./app/network-signal";
 import { runtimeHasCapability } from "./app/capabilities";
 import { createDesktopDashboardProjector } from "./app/capability-projection";
 import { buildDesktopNotifications } from "./app/notifications";
@@ -84,7 +86,9 @@ function App() {
     getNotificationCount: () => buildDesktopNotifications(
       desktopSyncController.dashboardData,
       desktopSyncController.automaticSyncStatus,
-      desktopSyncController.businessCapabilities?.enabledCapabilities ?? []
+      desktopSyncController.businessCapabilities?.enabledCapabilities ?? [],
+      undefined,
+      isWebAvailable(setupController.setupData)
     ).length,
     onPasswordConfiguredChange: setupController.setPasswordConfigured
   });
@@ -143,6 +147,8 @@ function App() {
   });
 
   return (
+    <WebAvailabilityProvider available={isWebAvailable(setupController.setupData)}>
+    <NetworkSignalProvider>
     <BusinessCapabilityRuntimeProvider
       value={{
         snapshot: desktopSyncController.businessCapabilities
@@ -173,6 +179,8 @@ function App() {
         deviceController={deviceController}
       />
     </BusinessCapabilityRuntimeProvider>
+    </NetworkSignalProvider>
+    </WebAvailabilityProvider>
   );
 }
 

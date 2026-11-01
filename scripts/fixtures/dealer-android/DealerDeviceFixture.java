@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.*;
 import android.provider.MediaStore;
 import android.view.*;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
 import androidx.core.content.FileProvider;
 import androidx.exifinterface.media.ExifInterface;
@@ -168,6 +169,53 @@ public final class DealerDeviceFixture extends Instrumentation {
       screenshot("cart-light");
       restart();
       settle("Yenile");
+      // Named independent carts on the real device; the original cart stays canonical for the order flow.
+      click("Sepet (1)");
+      requireText("Tahmini toplam 75,00 TL");
+      requireText("Sepetler");
+      requireText("Sepet 1");
+      requireText("Etkin sepet: Sepet 1");
+      main(() -> findDescription("Sepet: Sepet 1, etkin"));
+      click("Yeni");
+      dialogSetText("Sepet adı", "İkinci Sepet");
+      dialogClick("Oluştur");
+      requireText("İkinci Sepet");
+      requireText("Etkin sepet: İkinci Sepet");
+      requireText("Sepetiniz boş");
+      click("Katalogdan ürün seç");
+      clickDescription("Fixture Görselsiz ürününü incele");
+      setText("Eklenecek miktar (adet)", "1");
+      click("Sepete ekle");
+      requireText("Ürün sepetinize eklendi.");
+      click("‹ Katalog");
+      click("Sepet (1)");
+      requireText("Tahmini toplam 5,00 TL");
+      click("Sepet 1");
+      requireText("Tahmini toplam 75,00 TL");
+      requireText("Etkin sepet: Sepet 1");
+      restart();
+      settle("Yenile");
+      click("Sepet (1)");
+      requireText("Tahmini toplam 75,00 TL");
+      requireText("Sepet 1");
+      requireText("İkinci Sepet");
+      click("İkinci Sepet");
+      requireText("Tahmini toplam 5,00 TL");
+      requireText("Etkin sepet: İkinci Sepet");
+      click("Adlandır");
+      dialogSetText("Sepet adı", "Tedarik Sepeti");
+      dialogClick("Kaydet");
+      requireText("Tedarik Sepeti");
+      requireText("Etkin sepet: Tedarik Sepeti");
+      main(() -> check(findButton("İkinci Sepet") == null, "Renamed cart kept its old label"));
+      click("Sil");
+      dialogClick("Sepeti sil");
+      requireText("Etkin sepet: Sepet 1");
+      requireText("Tahmini toplam 75,00 TL");
+      main(() -> check(findButton("Tedarik Sepeti") == null, "Deleted cart still listed"));
+      JSONObject stored = new JSONObject(disk.read());
+      check(stored.getJSONObject("carts").length() == 0, "Deleted cart retained on disk");
+      check(stored.getJSONObject("cart").getDouble("p") == 3, "Original cart was not restored");
       click("Sepet (1)");
       requireText("Tahmini toplam 75,00 TL");
       click("Siparişler");
@@ -194,6 +242,15 @@ public final class DealerDeviceFixture extends Instrumentation {
       main(()
                -> check(!findDescription("Fixture Parça miktarı").isEnabled(),
                    "Uncertain submission cart must be frozen"));
+      main(() -> {
+        check(!findButton("Yeni").isEnabled(), "Cart creation must freeze while pending");
+        check(!findButton("Adlandır").isEnabled(), "Cart rename must freeze while pending");
+        check(!findButton("Sil").isEnabled(), "Cart delete must freeze while pending");
+        check(!findDescription("Sepet: Sepet 1, etkin").isEnabled(),
+            "Cart selector must freeze while pending");
+      });
+      requireText(
+          "Bekleyen sipariş kesinleşene kadar sepetler kilitli. Aynı siparişi tekrar deneyin.");
       appearance();
       result.putString("stream",
           "dealer-native-device-ok: real local TLS/PHP shared login, refresh, independent web logout, canonical dealer prices/order retry, demotion, Online Sales and revocation; business connection VIEW/SEND and synthetic account authorization; private storage; large "
@@ -597,6 +654,44 @@ public final class DealerDeviceFixture extends Instrumentation {
   }
   private void requireText(String text) {
     main(() -> check(find(root(), text, false, false) != null, "Missing text: " + text));
+  }
+  private void dialogSetText(String caption, String text) throws Exception {
+    AccessibilityNodeInfo node = awaitNode(caption, true);
+    Bundle arguments = new Bundle();
+    arguments.putCharSequence(
+        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
+    check(node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments),
+        "Dialog text could not be set: " + caption);
+    waitForIdleSync();
+  }
+  private void dialogClick(String text) throws Exception {
+    AccessibilityNodeInfo node = awaitNode(text, false);
+    check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK),
+        "Dialog action could not be clicked: " + text);
+    waitForIdleSync();
+  }
+  private AccessibilityNodeInfo awaitNode(String text, boolean description) throws Exception {
+    for (int i = 0; i < 100; i++) {
+      AccessibilityNodeInfo found = findNode(getUiAutomation().getRootInActiveWindow(), text, description);
+      if (found != null)
+        return found;
+      Thread.sleep(50);
+    }
+    throw new AssertionError("Missing dialog node: " + text);
+  }
+  private AccessibilityNodeInfo findNode(
+      AccessibilityNodeInfo node, String text, boolean description) {
+    if (node == null)
+      return null;
+    CharSequence value = description ? node.getContentDescription() : node.getText();
+    if (value != null && text.equalsIgnoreCase(value.toString().trim()))
+      return node;
+    for (int i = 0; i < node.getChildCount(); i++) {
+      AccessibilityNodeInfo found = findNode(node.getChild(i), text, description);
+      if (found != null)
+        return found;
+    }
+    return null;
   }
   private void main(Runnable action) {
     final Throwable[] failure = {null};

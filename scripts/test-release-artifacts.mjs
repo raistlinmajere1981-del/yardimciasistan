@@ -4,7 +4,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,chmodSync
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {createReleaseArtifacts,createWindowsUpdateManifests,createWebModuleTarget,validateWebModuleTarget,validatePreparedWebModule,verifyAndroidRelease,fileDigest} from './lib/release-artifacts.mjs';
+import {createReleaseArtifacts,createWindowsUpdateManifests,createAndroidUpdateManifests,createWebModuleTarget,validateWebModuleTarget,validatePreparedWebModule,verifyAndroidRelease,fileDigest} from './lib/release-artifacts.mjs';
 import {readWindowsInstallerVersion} from './lib/windows-installer-version.mjs';
 import {readHtmlInputValue} from './lib/demo-deployment.mjs';
 import {getInstallation} from './lib/installation-registry.mjs';
@@ -41,7 +41,7 @@ function fixture(){
   write(join(bin,'aapt2'),`#!${process.execPath}\nconst p=JSON.parse(require('fs').readFileSync(process.argv.at(-1)));console.log(\`package: name='\${p.id}' versionCode='\${p.code}' versionName='\${p.version}'\`);if(p.debuggable)console.log('application-debuggable');`);
   write(join(bin,'apksigner'),`#!${process.execPath}\nconst p=JSON.parse(require('fs').readFileSync(process.argv.at(-1)));console.log('Number of signers: '+(p.extraSigner?2:1));console.log((p.legacy?'Signer #1':'V2 Signer:')+' certificate SHA-256 digest: '+p.certificate);if(p.extraSigner)console.log('V2 Signer: certificate SHA-256 digest: '+p.certificate);if(!p.valid)process.exit(1);`);
   for(const tool of ['aapt2','apksigner'])chmodSync(join(bin,tool),0o755);
-  const options={certificateProvider:()=>certificate,verifyAndroid:(path,metadata,expectation)=>verifyAndroidRelease(path,metadata,expectation,{aapt2:join(bin,'aapt2'),apksigner:join(bin,'apksigner')})};
+  const options={verifyWindowsNative:async()=>{},certificateProvider:()=>certificate,verifyAndroid:(path,metadata,expectation)=>verifyAndroidRelease(path,metadata,expectation,{aapt2:join(bin,'aapt2'),apksigner:join(bin,'apksigner')})};
   return {root,paths,options,dispose:()=>rmSync(root,{recursive:true,force:true})};
 }
 
@@ -68,6 +68,62 @@ test('release verifies real PE resources, APK identities, Gradle versions and si
     const feeds=createWindowsUpdateManifests(product,artifacts,['Release ready'],'2026-10-25T00:00:00Z');
     assert.deepEqual(feeds.map(feed=>feed.value.arch),['x64','ia32']);
     for(const feed of feeds){const artifact=artifacts.find(a=>a.sha256===feed.sha256);assert.equal(feed.value.artifact.sha256,artifact.sha256);assert.equal(feed.value.appVersion,version);}
+  }finally{f.dispose();}
+});
+
+test('Android stable feeds bind exact package, versionCode, signed APK hash and same-origin download',async()=> {
+  const f=fixture();try{
+    const {product,artifacts}=await createReleaseArtifacts(f.root,f.options);
+    const feeds=createAndroidUpdateManifests(product,artifacts,['Özet'],'2026-11-01T00:00:00.000Z');
+    assert.deepEqual(feeds.map(feed=>feed.platformDir),['android-companion','android-dealer']);
+    assert.deepEqual(feeds.map(feed=>feed.applicationId),['com.yardimciasistan.android','com.yardimciasistan.dealer']);
+    assert.equal(feeds.length,2);
+    for(const feed of feeds){
+      const apk=artifacts.find(artifact=>artifact.applicationId===feed.applicationId);
+      assert.ok(apk?.signatureVerified);
+      assert.equal(feed.value.format,'yardimci-asistan-update');
+      assert.equal(feed.value.version,1);
+      assert.equal(feed.value.channel,'stable');
+      assert.equal(feed.value.platform,'android');
+      assert.equal(feed.value.appVersion,version);
+      assert.equal(feed.value.versionName,version);
+      assert.equal(feed.value.versionCode,code);
+      assert.equal(feed.value.artifact.file,apk.name);
+      assert.equal(feed.value.artifact.sha256,apk.sha256);
+      assert.equal(feed.value.artifact.size,apk.size);
+      assert.deepEqual(feed.value.notes,['Özet']);
+      const base=`https://example.org/updates/stable/${feed.platformDir}/release.json`;
+      const url=new URL(feed.value.artifact.url,base);
+      assert.equal(url.origin,'https://example.org');
+      assert.equal(url.pathname,`/downloads/${apk.name}`);
+      assert.equal(url.protocol,'https:');
+    }
+    const windows=createWindowsUpdateManifests(product,artifacts);
+    assert.deepEqual(windows.map(item=>item.platformDir),['win-x64','win-x86']);
+  }finally{f.dispose();}
+});
+
+test('Android stable feeds fail closed for missing or mismatched trusted release metadata',async()=> {
+  const f=fixture();try{
+    const {product,artifacts}=await createReleaseArtifacts(f.root,f.options);
+    for(const mutate of [
+      entries=>entries.filter(a=>a.applicationId!=='com.yardimciasistan.dealer'),
+      entries=>entries.map(a=>a.applicationId==='com.yardimciasistan.dealer'?{...a,signatureVerified:false}:a),
+      entries=>entries.map(a=>a.applicationId==='com.yardimciasistan.dealer'?{...a,versionCode:code-1}:a),
+      entries=>entries.map(a=>a.applicationId==='com.yardimciasistan.dealer'?{...a,name:'../../bad.apk'}:a),
+      entries=>entries.map(a=>a.applicationId==='com.yardimciasistan.dealer'?{...a,sha256:'incorrect'}:a),
+      entries=>entries.concat(entries.find(a=>a.applicationId==='com.yardimciasistan.dealer')),
+    ])assert.throws(()=>createAndroidUpdateManifests(product,mutate(artifacts)),/Android update:/);
+    assert.throws(()=>createAndroidUpdateManifests({...product,androidVersionCode:code-1},artifacts),/Android update:/);
+  }finally{f.dispose();}
+});
+
+test('native installer preflight runs for both architectures and blocks release on failure',async()=>{
+  const f=fixture();try{
+    const seen=[];
+    await createReleaseArtifacts(f.root,{...f.options,verifyWindowsNative:async(_root,_path,arch)=>{seen.push(arch);}});
+    assert.deepEqual(seen,['x64','ia32']);
+    await assert.rejects(createReleaseArtifacts(f.root,{...f.options,verifyWindowsNative:async()=>{throw Error('native payload missing');}}),/native payload missing/);
   }finally{f.dispose();}
 });
 
@@ -177,6 +233,8 @@ test('combined deploy dry-run uses the same prepared artifacts and only read-onl
     // release metadata to this isolated fixture's deliberately older version.
     write(join(f.root,'test-site/landing/release.json'),{desktopVersion:version,androidVersion:version,dealerAndroidVersion:version});
     for(const path of ['scripts/sync-demo-template.mjs','scripts/product-version.mjs','scripts/lib/demo-deployment.mjs','scripts/lib/installation-registry.mjs','scripts/lib/release-artifacts.mjs','scripts/lib/windows-installer-version.mjs','config/installations.json']){mkdirSync(dirname(join(f.root,path)),{recursive:true});cpSync(join(repository,path),join(f.root,path));}
+    // This transport-only fixture has synthetic PE files, not NSIS installers.
+    write(join(f.root,'scripts/lib/windows-installer-native.mjs'),'export async function verifyWindowsReleaseNative() {}');
     write(join(f.root,'package.json'),{private:true,scripts:{'build:demo':'node -e "process.exit(0)"'}});
     const moduleUrl=getInstallation('ya',f.root).webModuleUrl;
     await webFixture(f.root,{target:{installationId:'ya',moduleUrl,siteOrigin:new URL(getInstallation('landing',f.root).siteUrl).origin}});
@@ -189,6 +247,8 @@ test('combined deploy dry-run uses the same prepared artifacts and only read-onl
     const result=spawnSync(process.execPath,[join(f.root,'test-site/landing/scripts/deploy.mjs'),'--with-downloads','--fresh-web-module','--activate-updates','--dry-run'],{cwd:f.root,env:{...process.env,PATH:bin+':'+process.env.PATH,ANDROID_HOME:join(f.root,'sdk'),TEST_CALLS:log,TEST_WEB_CALL:join(f.root,'web-call.txt')},encoding:'utf8',maxBuffer:4*1024*1024});
     assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
     assert.match(result.stdout,/Dry-run tamamlandi/);assert.ok(!result.stdout.includes('fixture-key'));
+    for(const feed of ['win-x64','win-x86','android-companion','android-dealer'])
+      assert.match(result.stdout,new RegExp(`/updates/stable/${feed}/release\\.json`));
     assert.match(readFileSync(join(f.root,'web-call.txt'),'utf8'),/--fresh --skip-pack --dry-run/);
     const calls=readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));
     assert.equal(calls.some(call=>call.tool==='scp'),false);

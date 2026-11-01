@@ -116,8 +116,9 @@ const navigationContributions = [
   marketContribution,
   {
     pageId: "marketing", icon: Megaphone, order: 64, contentScroll: "workspace",
-    condition: { allOf: [C.MARKETING_STUDIO] },
-    presentation: {label: "Pazarlama", title: "Pazarlama"}
+    condition: { anyOf: [C.MARKETING_STUDIO, { allOf: [C.COMMERCE_BENEFITS, C.SALES] }, { allOf: [C.COMMERCE_BENEFITS, C.ORDERS] }] },
+    presentation: (capabilities: BusinessCapabilitySnapshot | null | undefined) => runtimeHasCapability(capabilities, C.MARKETING_STUDIO)
+      ? { label: "Pazarlama", title: "Pazarlama" } : { label: "İndirim ve Puan", title: "İndirim ve Puan" }
   },
   menuContribution,
   reportsContribution,

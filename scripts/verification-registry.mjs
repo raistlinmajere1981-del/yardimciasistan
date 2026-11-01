@@ -1,4 +1,47 @@
 const SMOKE_FILES = [
+  "scripts/smoke-companion-points-ingress.mjs",
+  "scripts/smoke-c19-android-fixture.mjs",
+  "scripts/smoke-document-output-render-snapshot.mjs",
+  "scripts/smoke-form-image-perspective.mjs",
+  "scripts/smoke-document-output-management.mjs",
+  "scripts/smoke-document-output.mjs",
+  "scripts/smoke-document-output-sale-source.mjs",
+  "scripts/smoke-document-output-sale-job.mjs",
+  "scripts/smoke-document-output-pdf.mjs",
+  "scripts/smoke-print-management-ui.mjs",
+  "scripts/smoke-table-order-benefits-ui.mjs",
+  "scripts/smoke-table-order-benefits.mjs",
+  "scripts/smoke-commerce-benefits-management.mjs",
+  "scripts/smoke-commerce-benefits-management-ui.mjs",
+  "scripts/smoke-commerce-benefits.mjs",
+  "scripts/smoke-commerce-order-benefits.mjs",
+  "scripts/smoke-commerce-order-benefits-ui.mjs",
+  "scripts/smoke-market-sale-benefits.mjs",
+  "scripts/smoke-market-sale-full-refund.mjs",
+  "scripts/smoke-market-sale-full-refund-preview.mjs",
+  "scripts/smoke-market-sale-full-refund-ui.mjs",
+  "scripts/smoke-market-sale-benefits-preview.mjs",
+  "scripts/smoke-market-sale-benefits-ui.mjs",
+  "scripts/smoke-android-benefits-financial-boundary.mjs",
+  "scripts/smoke-android-benefits-spend-grants.mjs",
+  "scripts/smoke-android-customer-sale-preview.mjs",
+  "scripts/smoke-android-customer-sale-preview-server.mjs",
+  "scripts/smoke-android-device-authorization-epoch.mjs",
+  "scripts/smoke-android-local-business-summary.mjs",
+  "scripts/smoke-android-point-spend-quote.mjs",
+  "scripts/smoke-android-point-spend-quote-server.mjs",
+  "scripts/smoke-android-sale-ack-https.mjs",
+  "scripts/smoke-android-sale-action-receipt.mjs",
+  "scripts/smoke-android-sale-history.mjs",
+  "scripts/smoke-android-sale-owner-refund.mjs",
+  "scripts/smoke-android-sale-source-boundary.mjs",
+  "scripts/smoke-android-sale-source-schema-compatibility.mjs",
+  "scripts/smoke-companion-benefits-parent-contract.mjs",
+  "scripts/smoke-companion-coupon-permit.mjs",
+  "scripts/smoke-companion-coupon-sale.mjs",
+  "scripts/smoke-companion-points-principal.mjs",
+  "scripts/smoke-companion-points-production-path.mjs",
+  "scripts/smoke-connection-status.mjs",
   "scripts/smoke-demo-two-layer.mjs",
   "scripts/smoke-web-site-template.mjs",
   "scripts/smoke-customer-accounts.mjs",
@@ -164,6 +207,9 @@ const SMOKE_FILES = [
   "scripts/smoke-kbs-domain.mjs",
   "scripts/smoke-live-ai.mjs",
   "scripts/smoke-local-companion-server.mjs",
+  "scripts/smoke-local-companion-tls.mjs",
+  "scripts/smoke-local-pairing-qr.mjs",
+  "scripts/smoke-local-pairing-security.mjs",
   "scripts/smoke-manual-reservation.mjs",
   "scripts/smoke-manual-restaurant-reservation.mjs",
   "scripts/smoke-market-android-foundation.mjs",
@@ -230,6 +276,8 @@ export const IGNORED_SMOKE_FILES = new Set([
 ]);
 
 const MANUAL_SMOKE_FILES = new Set([
+  // Native Electron PDF host check requires Linux utilities (pdfinfo/pdftotext).
+  "scripts/smoke-document-output-pdf.mjs",
   "scripts/smoke-dealer-android-device.mjs",
   // Requires a real Android device/ADB.
   "scripts/smoke-android-device-ui.mjs",
@@ -262,6 +310,8 @@ const PACKAGE_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const LINUX_ONLY_SMOKE_FILES = new Set([
+  "scripts/smoke-c19-android-fixture.mjs",
+  "scripts/smoke-document-output-pdf.mjs",
   "scripts/smoke-desktop-xvfb.mjs"
 ]);
 
@@ -614,6 +664,24 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-companion-points-ingress.mjs") return [];
+  if (file === "scripts/smoke-c19-android-fixture.mjs") return [];
+  if (file === "scripts/smoke-form-image-perspective.mjs" || file === "scripts/smoke-document-output-render-snapshot.mjs") return [];
+  if (file === "scripts/smoke-document-output-management.mjs" || file === "scripts/smoke-document-output.mjs" || file === "scripts/smoke-print-management-ui.mjs") return [];
+  if (["scripts/smoke-market-sale-full-refund.mjs", "scripts/smoke-market-sale-full-refund-preview.mjs", "scripts/smoke-market-sale-full-refund-ui.mjs"].includes(file)) return [];
+  if (file === "scripts/smoke-commerce-ipc-contract.mjs") return [];
+  if (file === "scripts/smoke-commerce-order-fulfillment.mjs") return [];
+  if (file === "scripts/smoke-table-order-benefits.mjs" || file === "scripts/smoke-table-order-benefits-ui.mjs") return [];
+  if (file === "scripts/smoke-commerce-order-benefits.mjs") return [];
+  if (file === "scripts/smoke-commerce-order-benefits-ui.mjs") return [];
+  if (file === "scripts/smoke-commerce-benefits-management.mjs" || file === "scripts/smoke-commerce-benefits-management-ui.mjs") return [];
+  if (file === "scripts/smoke-commerce-benefits.mjs") return [];
+  if (file === "scripts/smoke-market-sale-benefits.mjs" || file === "scripts/smoke-market-sale-benefits-preview.mjs" || file === "scripts/smoke-market-sale-benefits-ui.mjs") return [];
+  // Benefits/Companion source-level smokes compile current TypeScript owners; no dist build.
+  if (/^scripts\/smoke-(android-(benefits-|customer-sale-preview|point-spend-quote|sale-)|companion-)/.test(file)) return [];
+  if (file === "scripts/smoke-android-device-authorization-epoch.mjs" || file === "scripts/smoke-android-local-business-summary.mjs") return [];
+  if (file === "scripts/smoke-local-pairing-qr.mjs") return [];
+  if (file === "scripts/smoke-connection-status.mjs") return [];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["build-desktop", "build-demo", "php-lint"];
   // Copied PHP site/hosting plus isolated Desktop translation fixtures; no Demo build.
   if (file === "scripts/smoke-web-site-template.mjs") return ["build-desktop"];
@@ -657,6 +725,8 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-print-management-ui.mjs") return ["desktop", "settings"];
+  if (file === "scripts/smoke-table-order-benefits.mjs" || file === "scripts/smoke-table-order-benefits-ui.mjs") return ["desktop", "hospitality", "commerce", "finance", "customers"];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["web", "translations", "commerce"];
   if (file.startsWith("scripts/smoke-product-photos")) return ["desktop", "commerce", "web", "product-identity"];
   if (file === "scripts/smoke-entity-single-card.mjs") return ["desktop", "commerce", "customers", "hospitality"];
@@ -682,6 +752,7 @@ function smokeDomains(file) {
 }
 
 function smokeDomainsForGeneralOwnership(file) {
+  if (file === "scripts/smoke-connection-status.mjs") return ["desktop", "web", "platform"];
   if (file === "scripts/smoke-desktop-visible-updater.mjs") return ["desktop", "settings", "platform"];
   if (file.includes("desktop-tts")) return ["voice", "settings", "desktop", "platform"];
   if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];
@@ -700,6 +771,12 @@ function smokeDomainsForGeneralOwnership(file) {
   if (/^runtime-boundary-/.test(name)) return ["platform", "desktop", "hospitality", "finance", "customers", "android"];
   if (name === "runtime-application-operations") return ["platform", "desktop", "hospitality", "finance", "commerce"];
   const domains = new Set();
+  if (/^(companion-(benefits|coupon|points)|android-(benefits-|customer-sale-preview|point-spend-quote|sale-))/.test(name)) {
+    domains.add("android");
+    domains.add("commerce");
+    domains.add("customers");
+    if (/sale|refund|finance/.test(name)) domains.add("finance");
+  }
   if (/marketing-|showcase-|instagram-/.test(name)) domains.add("marketing");
   if (name === "marketing-log-privacy") domains.add("diagnostics");
   if (/messaging-dispatch/.test(name)) { domains.add("messaging-dispatch"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
@@ -740,7 +817,8 @@ function smokeDomainsForGeneralOwnership(file) {
     domains.add("platform");
   }
   if (name === "automatic-sync") domains.add("android");
-  if (name === "local-companion-server") {
+  if (name === "local-pairing-qr") { domains.add("android"); domains.add("settings"); }
+  if (name === "local-companion-server" || name === "local-companion-tls" || name === "local-pairing-security") {
     domains.add("android");
     domains.add("desktop");
   }

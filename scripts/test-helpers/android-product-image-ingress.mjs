@@ -103,7 +103,11 @@ function fixture(mode, action = productAction()) {
   }
   const manual = new (load("android-action-sync-service").AndroidActionSyncService)({ database: db,
     isSuspended: () => state.suspended, markLocalSnapshotDirty() {}, notifyDashboardChanged() {} });
-  const coordinator = new (load("sync-coordinator").SyncCoordinator)({ database: db, androidActions: manual, onStatusChanged() {} });
+  const coordinator = new (load("sync-coordinator").SyncCoordinator)({
+    database: db, androidActions: manual,
+    getSyncConfig: () => ({ baseUrl: "", syncSecret: "" }),
+    onStatusChanged() {}
+  });
   const runAutomatic = () => coordinator.processAndroidActions({ pullAndroidActions: pull, completeAndroidAction: complete });
   const runManual = () => manual.processQueue(false);
   const run = mode === "automatic" ? runAutomatic : runManual;

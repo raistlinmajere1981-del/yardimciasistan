@@ -30,6 +30,8 @@ import {
   TABLE_ORDER_STATUSES
 } from "./database/stock-utils.js";
 import { nextMutationTimestamp } from "./database/android-utils.js";
+import { readTableOrderTender, readTableSettlementSnapshot } from "./database/table-order-settlement-store";
+import { benefitsAssert } from "./commerce-benefits-engine";
 import { synchronizeFinanceSourceInTransaction } from "./finance.js";
 
 interface TableOrderMutationContext extends DomainMutationContext { newOrderId?: string; newItemId?: string }
@@ -541,53 +543,62 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
     return { ok: false, message: "Adisyon yalnızca ödendi veya iptal durumuyla kapatılabilir." };
   }
 
-  const now = context.now ?? new Date().toISOString();
   const tx = tableOrderTransaction(db);
   db.exec(tx.begin);
   try {
-    const current = db
-      .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-      .get(orderId) as { status?: string; table_id?: string } | undefined;
-    if (!current) {
-      db.exec(tx.rollback);
-      return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
-    }
-    if (status === "cancelled") {
-      const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, context.androidAction?.device_id ?? "", now);
-      if (!stockRestore.ok) {
-        db.exec(tx.rollback);
-        return stockRestore;
-      }
-    }
-    recalculateTableOrderTotalInTransaction(db, orderId, now);
-    const updateResult = db
-      .prepare(`
-          UPDATE table_orders
-          SET status = ?, closed_at = ?, updated_at = ?
-          WHERE id = ?
-            AND status IN ('open', 'preparing', 'served', 'payment')
-        `)
-      .run(status, now, now, orderId);
-    if (Number(updateResult.changes) !== 1) {
-      db.exec(tx.rollback);
-      return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
-    }
-    synchronizeFinanceSourceInTransaction(db, "restaurant_order", orderId);
-    updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now, context.androidAction);
-    insertDatabaseEvent(db, {
-      type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
-      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
-      entityType: "table_order",
-      entityId: orderId,
-      payload: { old_status: String(current.status ?? ""), status },
-      now
-    });
-    db.exec(tx.commit);
+    const result = closeTableOrderInTransaction(db, { orderId, status }, context);
+    db.exec(result.ok ? tx.commit : tx.rollback);
+    return result;
   } catch (error) {
     db.exec(tx.rollback);
     throw error;
   }
+}
 
+/** Canonical close writer; the caller owns the synchronous transaction and rollback. */
+export function closeTableOrderInTransaction(db: DatabaseSync, input: UpdateTableOrderStatusInput, context: DomainMutationContext = {}): DesktopTableOrderResult {
+  if (!db.isTransaction) throw new Error("Table close requires a transaction.");
+  const orderId = input.orderId;
+  const status = normalizeStatus(input.status, ["paid", "cancelled"]) as "paid" | "cancelled";
+  if (!status) return { ok: false, message: "Adisyon kapatma durumu geçersiz." };
+  const now = context.now ?? new Date().toISOString();
+  const current = db
+    .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+    .get(orderId) as { status?: string; table_id?: string } | undefined;
+  if (!current) {
+    return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
+  }
+  if (status === "cancelled") {
+    const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, context.androidAction?.device_id ?? "", now);
+    if (!stockRestore.ok) {
+      return stockRestore;
+    }
+  }
+  recalculateTableOrderTotalInTransaction(db, orderId, now);
+  const updateResult = db
+    .prepare(`
+        UPDATE table_orders
+        SET status = ?, closed_at = ?, updated_at = ?
+        WHERE id = ?
+          AND status IN ('open', 'preparing', 'served', 'payment')
+      `)
+    .run(status, now, now, orderId);
+  if (Number(updateResult.changes) !== 1) {
+    return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
+  }
+  const tender = readTableOrderTender(db, orderId);
+  if (tender) benefitsAssert(readTableSettlementSnapshot(db, orderId).customerId === tender.customer_id, "BENEFITS_SETTLEMENT_MISMATCH");
+  synchronizeFinanceSourceInTransaction(db, "restaurant_order", orderId);
+  if (tender) benefitsAssert(readTableSettlementSnapshot(db, orderId).customerId === tender.customer_id, "BENEFITS_SETTLEMENT_MISMATCH");
+  updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now, context.androidAction);
+  insertDatabaseEvent(db, {
+    type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
+    ...(context.androidAction ? { androidAction: context.androidAction } : {}),
+    entityType: "table_order",
+    entityId: orderId,
+    payload: { old_status: String(current.status ?? ""), status },
+    now
+  });
   return getTableOrderMutationResult(
     db,
     orderId,

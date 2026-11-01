@@ -1,3 +1,4 @@
+import { PrintManagementWorkspace } from "./PrintManagementWorkspace";
 import { TranslationSettingsSection, useTranslationSettings } from "./TranslationSettingsSection";
 import { LanguageManagementWorkspace } from "./LanguageManagementWorkspace";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
@@ -8,6 +9,7 @@ import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
 import { reportAppStatus } from "../../app/runtime-state";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { isWebAvailable, WebAvailabilityProvider } from "../../app/web-availability";
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
 import { useTtsSettings } from "../../app/use-tts-settings";
@@ -19,6 +21,7 @@ import {
   isSettingsSectionVisible,
   layoutSettingsDefinition,
   roomSettingsDefinition,
+  printSettingsDefinition,
   searchSettings,
 } from "../../app/settings-registry";
 import type { SettingsOperationResult, SettingsSetupSaveResult } from "../../app/settings-save";
@@ -77,6 +80,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const { snapshot: runtimeCapabilities } = useBusinessCapabilityRuntime();
 
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
+  const webAvailable = isWebAvailable(drafts.canonical);
   const tts = useTtsSettings();
   const dictation = useDesktopDictationSettings(props.setupData);
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
@@ -85,14 +89,16 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const translations = useTranslationSettings(initialized);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const printingEnabled = isSettingsSectionVisible(printSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const profile = useBusinessPublicProfileSettings({
     businessAddress: drafts.form.address,
     enabledCapabilities: capabilities,
-    enabled: initialized
+    enabled: initialized && webAvailable
   });
-  const googleReviews = useGoogleReviewsSettings(initialized && isBusinessServiceAvailable("googleReviews", capabilities));
+  const googleReviews = useGoogleReviewsSettings(initialized && webAvailable && isBusinessServiceAvailable("googleReviews", capabilities));
   const kbs = useKbsSettings(initialized && isBusinessServiceAvailable("kbs", capabilities), drafts.canonical.profileId);
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
@@ -109,6 +115,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   });
   const [layoutOpen, setLayoutOpen] = useState<"rooms" | "tables" | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  useEffect(() => {
+    if (!webAvailable) setGalleryOpen(false);
+  }, [webAvailable]);
   const [utility, setUtility] = useState<"security" | "data" | null>(null);
   const password = usePasswordSettings({
     configured: props.setupData.appPasswordConfigured,
@@ -118,7 +127,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const businessDirty = drafts.dirty.business || profile.dirty;
   const canSaveBusiness = businessDirty || !initialized;
   const profileRestartRequired = initialized && drafts.form.profileId !== drafts.canonical.profileId;
-  const businessBusy = drafts.busy || profile.saving;
+  const [webConnecting, setWebConnecting] = useState(false);
+  const businessBusy = drafts.busy || profile.saving || webConnecting;
   const allDirty = translations.dirty || businessDirty || drafts.dirty.services || googleReviews.dirty || kbs.dirty || tts.dirty || dictation.dirty || androidPermissions.dirty;
   const wasSetupRequired = useRef(props.setupData.setupRequired);
   const collapsePending = useRef(false);
@@ -132,7 +142,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     }
   }, [initialized, allDirty, serviceOpen]);
   const expanded = !initialized || structureExpanded;
-  const results = searchSettings(query, capabilities, initialized, runtimeCapabilities)
+  const results = searchSettings(query, capabilities, initialized, runtimeCapabilities, webAvailable)
     .filter(result => initialized || result.category === "business" || result.id === "settings-web");
 
   function serviceOwner(id: string): ServiceSettingsOwner {
@@ -170,10 +180,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   async function saveBusiness(): Promise<SettingsOperationResult> {
       const profileChanged = initialized && drafts.form.profileId !== drafts.canonical.profileId;
       let changed = false;
+      let message: string | undefined;
       if (drafts.dirty.business || !initialized) {
         const setupResult = await drafts.saveBusiness();
         if (!setupResult.ok) return setupResult;
         changed ||= setupResult.changed;
+        message = setupResult.message;
       }
       if (profile.dirty) {
         const profileResult = await profile.save();
@@ -192,7 +204,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           return { ok: true, changed, message: "Yeni sektör kaydedildi. Değişikliklerin tam uygulanması için uygulamayı yeniden başlatın." };
         }
       }
-      return { ok: true, changed };
+      return { ok: true, changed, ...(message ? { message } : {}) };
   }
 
   function discardBusiness() { drafts.discardBusiness(); profile.discard(); }
@@ -240,7 +252,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (!registerPageLeaveGuard) return;
 
     return registerPageLeaveGuard((destination, continueNavigation) => {
-      if (languageOpen || galleryOpen || layoutOpen || layout.dirty || serviceOpen) return false;
+      if (printOpen || languageOpen || (webAvailable && galleryOpen) || layoutOpen || layout.dirty || serviceOpen || webConnecting) return false;
       if (!businessDirty) return true;
       if (pendingTransition || guardBusy) return false;
       setPendingTransition({
@@ -249,10 +261,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       });
       return false;
     });
-  }, [businessDirty, guardBusy, pendingTransition, registerPageLeaveGuard, languageOpen, galleryOpen, layoutOpen, layout.dirty, serviceOpen]);
+  }, [businessDirty, guardBusy, pendingTransition, registerPageLeaveGuard, printOpen, languageOpen, galleryOpen, webAvailable, layoutOpen, layout.dirty, serviceOpen, webConnecting]);
 
   useEffect(() => {
     if (!focusTarget) return;
+    if (focusTarget === "settings-gallery-button" && webAvailable) setGalleryOpen(true);
+    if (focusTarget === "settings-print-button" && printingEnabled) setPrintOpen(true);
     if (focusTarget === "settings-rooms-button" || focusTarget === "settings-tables-button") {
       setLayoutOpen(focusTarget === "settings-rooms-button" ? "rooms" : "tables");
     }
@@ -260,10 +274,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: "start", behavior: "instant" });
     setFocusTarget("");
-  }, [focusTarget, expanded]);
+  }, [focusTarget, expanded, printingEnabled, webAvailable]);
 
   const pageScroll = usePageViewScroll("settings.scroll");
   return (
+    <WebAvailabilityProvider available={webAvailable}>
     <ServiceSettingsContext.Provider value={{ active: serviceOpen, open: setServiceOpen, owner: serviceOwner }}>
     <div ref={root} className="settings-workspace setup-capabilities">
       <div className="settings-search">
@@ -316,9 +331,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         )}
       </div>
 
-      <WebSettingsSection canonical={initialized ? drafts.canonical : drafts.form} onSave={drafts.saveWebConnection}
+      <WebSettingsSection canonical={drafts.canonical} web={drafts.form}
+        enabled={drafts.webEnabled} onEnabledChange={drafts.setWebActive}
+        resetVersion={drafts.webResetVersion}
+        onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
         disabled={drafts.busy || guardBusy} initialized={initialized}
-        onSetupChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
+        onChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
 
       <section className="settings-page-workspace" id="settings-panel-business" aria-label="İşletme ayarları">
         <div ref={pageScroll} className="settings-page-body">
@@ -344,7 +362,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 <fieldset className="settings-profile-options settings-services-panel">
                   <legend>Servisler</legend>
                   <div className="settings-services-grid">
-              {isBusinessServiceAvailable("googleReviews", capabilities) && (
+              {webAvailable && isBusinessServiceAvailable("googleReviews", capabilities) && (
                     <GoogleReviewsSettingsSection
                       controller={googleReviews}
                       disabled={drafts.busy || guardBusy}
@@ -359,6 +377,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 aiCapability={capabilities.includes(C.AI)} disabled={businessBusy || guardBusy} />
                 <ServicesSettingsSection
                   {...props}
+                  {...(props.onDashboardRefresh === undefined ? {} : { onRefreshAndroidDevices: () => void props.onDashboardRefresh?.().catch(() => reportAppStatus("error", "Telefon listesi yenilenemedi. Yeniden deneyin.")) })}
                   disabled={businessBusy || guardBusy}
                   onRevokeAndroidDevice={device => {
                     if (serviceOwner("settings-android").dirty) { reportAppStatus("error", "Önce Android değişikliklerini kaydedin veya İptal seçin."); return; }
@@ -396,13 +415,14 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                       <BusinessContactFields form={drafts.form} onFormChange={drafts.setDraft} />
                     </fieldset>
                     <div className="settings-company-management-actions">
+                      {printingEnabled && <ActionButton id="settings-print-button" variant="secondary" onClick={() => setPrintOpen(true)}>Baskı Yönetimi</ActionButton>}
                       {roomsEnabled && <ActionButton id="settings-rooms-button" variant="secondary" onClick={() => setLayoutOpen("rooms")}>Oda Yönetimi</ActionButton>}
                       {tablesEnabled && <ActionButton id="settings-tables-button" variant="secondary" onClick={() => setLayoutOpen("tables")}>Masa Yönetimi</ActionButton>}
                       {initialized && translations.saved.enabled && <ActionButton id="settings-language-button" variant="secondary" onClick={() => setLanguageOpen(true)}>Dil Yönetimi</ActionButton>}
-                      {initialized && <ActionButton id="settings-gallery-button" variant="secondary" onClick={() => setGalleryOpen(true)}>Galeri Yönetimi</ActionButton>}
+                      {initialized && webAvailable && <ActionButton id="settings-gallery-button" variant="secondary" onClick={() => setGalleryOpen(true)}>Galeri Yönetimi</ActionButton>}
                     </div>
                   </div>
-                  {initialized && <>
+                  {initialized && webAvailable && <>
                   <BusinessPublicProfileSection
                     controller={profile}
                     disabled={drafts.busy || guardBusy}
@@ -443,9 +463,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         )}
       </section>
 
+      {printOpen && <PrintManagementWorkspace initialized={initialized} whatsappEnabled={drafts.canonical.whatsappEnabled} onClose={() => setPrintOpen(false)} />}
       {layoutOpen && <BusinessLayoutOverlay kind={layoutOpen} controller={layout} onClose={() => setLayoutOpen(null)} />}
       {languageOpen && <LanguageManagementWorkspace settings={translations.saved} onClose={() => setLanguageOpen(false)} />}
-      {galleryOpen && <BusinessGalleryOverlay onClose={() => setGalleryOpen(false)} />}
+      {webAvailable && galleryOpen && <BusinessGalleryOverlay onClose={() => setGalleryOpen(false)} />}
       {profileRestartConfirmation && <ConfirmDialog
         tone="warning"
         eyebrow="Sektör değişikliği"
@@ -473,5 +494,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       />
     </div>
     </ServiceSettingsContext.Provider>
+    </WebAvailabilityProvider>
   );
 }

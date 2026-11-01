@@ -13,6 +13,7 @@ export const BUSINESS_CAPABILITIES = {
   BACKUPS: "core.backups",
   DEVICES: "core.devices",
 
+  PRINTING: "document.printing",
   WHATSAPP: "service.whatsapp",
   MARKETING_STUDIO: "marketing.studio",
   MESSAGING_CAMPAIGNS: "messaging.campaigns",
@@ -37,6 +38,7 @@ export const BUSINESS_CAPABILITIES = {
   ONLINE_SALES: "channel.online_sales",
   WHOLESALE: "commerce.wholesale",
   CUSTOMER_CREDIT: "commerce.customer_credit",
+  COMMERCE_BENEFITS: "commerce.benefits",
 
   RETAIL_BARCODE: "retail.barcode",
   RETAIL_PURCHASING: "retail.purchasing",
@@ -85,6 +87,8 @@ export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability
   [C.ONLINE_SALES]: [C.ORDERS],
   [C.WHOLESALE]: [C.CUSTOMERS, C.ORDERS],
   [C.CUSTOMER_CREDIT]: [C.CUSTOMERS, C.SALES, C.FINANCE],
+  // Profiles exposing this optional root already own Sales; runtime also accepts Orders.
+  [C.COMMERCE_BENEFITS]: [C.CATALOG, C.CUSTOMERS],
   [C.RETAIL_BARCODE]: [C.CATALOG],
   [C.RETAIL_PURCHASING]: [C.CATALOG, C.INVENTORY],
   [C.RETAIL_SUPPLIERS]: [C.RETAIL_PURCHASING],
@@ -104,7 +108,7 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.DEVICES
 ];
 
-const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS, C.MESSAGING_CAMPAIGNS, C.MARKETING_STUDIO];
+const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS, C.MESSAGING_CAMPAIGNS, C.MARKETING_STUDIO, C.PRINTING];
 const COMMON_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
 
 const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [
@@ -133,7 +137,8 @@ const FOOD_SERVICE_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.FOOD_RESERVATIONS,
   C.QR_MENU,
   C.INVENTORY,
-  C.ONLINE_SALES
+  C.ONLINE_SALES,
+  C.COMMERCE_BENEFITS
 ];
 
 const FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
@@ -155,7 +160,8 @@ const RETAIL_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.RETAIL_LABELS,
   C.CUSTOMER_CREDIT,
   C.WHOLESALE,
-  C.ONLINE_SALES
+  C.ONLINE_SALES,
+  C.COMMERCE_BENEFITS
 ];
 
 const RETAIL_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
@@ -221,6 +227,9 @@ export function validateBusinessCapabilitySet(
   for (const capability of enabled) {
     const missingDependencies = getBusinessCapabilityDependencies(capability)
       .filter((dependency) => !enabled.has(dependency));
+    if (capability === C.COMMERCE_BENEFITS && !enabled.has(C.SALES) && !enabled.has(C.ORDERS)) {
+      missingDependencies.push(C.SALES); // one of Sales / Orders is required
+    }
     if (missingDependencies.length > 0) {
       violations.push({ capability, missingDependencies: [...missingDependencies] });
     }

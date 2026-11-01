@@ -60,12 +60,30 @@ try {
   reject(action("bad_price", "market_sale_complete", { ...paid(), lines: [{ ...item(first.id), expected_unit_price: 1 }] }), /fiyat/);
   reject(action("missing_price", "market_sale_complete", { ...paid(), lines: [{ product_id: first.id, quantity: 1 }] }), /fiyat/);
   reject(action("arbitrary_price", "market_sale_complete", { ...paid(), lines: [{ ...item(first.id), sale_price: 1 }] }), /alan/);
+  // Financial Android commands cannot claim benefits or totals, even inside a sale line.
+  for (const [field, value] of Object.entries({ coupon_code: "fixture-code", points_minor: 100, discount_minor: 100, total_minor: 1 })) {
+    reject(action(`forged_sale_${field}`, "market_sale_complete", { ...paid(), [field]: value }), /alan/);
+    reject(action(`forged_line_${field}`, "market_sale_complete", { ...paid(), lines: [{ ...item(first.id), [field]: value }] }), /alan/);
+  }
+  // C20p-2p: the immutable Android intent can name Puan, but the live owner
+  // must never debit it from an unverified client-supplied number.
+  for (const [label, value] of [["negative", -1], ["fraction", 1.5], ["overflow", Number.MAX_SAFE_INTEGER + 1], ["string", "100"], ["null", null]]) {
+    reject(action(`points_${label}`, "market_sale_complete", { ...paid(), requestedPointsMinor: value }), /Puan/);
+  }
+  reject(action("points_no_customer", "market_sale_complete", { ...paid(), requestedPointsMinor: 1000 }), /müşterili/);
+  reject(action("points_credit", "market_sale_complete", { ...credit(), requestedPointsMinor: 1000 }), /müşterili/);
+  reject(action("points_guarded", "market_sale_complete", { ...paid(), customer_id: customerId, requestedPointsMinor: 1000 }), /Puan|yetki/);
   reject(action("no_location", "market_sale_complete", { ...paid(), location_id: "" }), /konum/);
   reject(action("wrong_location", "market_sale_complete", { ...paid(), location_id: "other-business-location" }), /konum/);
   reject(action("stock_rollback", "market_sale_complete", paid("cash", [item(first.id, 1), item(second.id, 99)])), /stok/);
   assert.equal(stock(first.id), 20); assert.equal(stock(second.id), 20);
   const sale = action("sale", "market_sale_complete", paid()); apply(sale); assert.equal(stock(first.id), 17.5); assert.equal(stock(second.id), 18);
   const beforeReplay = state(); assert.equal(apply(sale).alreadyApplied, true); assert.deepEqual(state(), beforeReplay);
+  // A zero-valued optional request is legacy cash; the immutable hash still
+  // distinguishes its JSON representation from an omitted field on replay.
+  const explicitZero = action("points_explicit_zero", "market_sale_complete", { ...paid("cash", [item(second.id, 1)]), requestedPointsMinor: 0 });
+  apply(explicitZero);
+  reject({ ...explicitZero, payload: { ...explicitZero.payload, requestedPointsMinor: 1 } }, /farklı/);
   reject({ ...sale, payload: { ...sale.payload, payment_method: "bank" } }, /farklı/);
   rights({ ...groups, market_sales: false }); reject(sale, /yetki/); rights(groups);
   for (const method of ["card", "bank", "other"]) apply(action(`paid_${method}`, "market_sale_complete", paid(method, [item(second.id, 1)])));
@@ -80,6 +98,10 @@ try {
   reject({ ...creditSale, payload: { ...creditSale.payload, customer_id: "another-customer" } }, /farklı/);
   const payment = (amount = 1000, method = "cash", debt = balance()) => ({ customer_id: customerId, amount_minor: amount,
     currency: "TRY", expected_balance_minor: debt, payment_method: method, external_payment_confirmed: method === "card" });
+  for (const [field, value] of Object.entries({ coupon_code: "fixture-code", points_minor: 100, discount_minor: 100, total_minor: 1 })) {
+    reject(action(`forged_payment_${field}`, "customer_credit_payment_add", { ...payment(), [field]: value }), /alan/);
+    assert.equal(balance(), 3725);
+  }
   rights({ ...groups, customer_credit_payment: false, customer_credit_view: true }); reject(action("pay_denied", "customer_credit_payment_add", payment()), /yetki/); rights(groups);
   reject(action("overpay", "customer_credit_payment_add", payment(3726)), /aşamaz/);
   reject(action("zero_pay", "customer_credit_payment_add", payment(0)), /Pozitif/);
@@ -122,10 +144,36 @@ try {
   assert.equal(account.full_name, "Mobil Cari Müşterisi"); assert.equal(account.entries.length, 6); assert.equal(account.balances[0].amount_minor, 2400);
   assert.equal(JSON.stringify(account).includes("PRIVATE"), false); assert.equal(JSON.stringify(account).includes("phone"), false);
   assert.equal(projected.market.customer_credit_accounts.some(a => a.customer_id === foreign.savedId || a.customer_id === deleted.savedId), false);
-  assert.deepEqual(projected.customers, [], "Cari personeli admin müşteri kimliklerini almamalı");
+  assert.equal(projected.customers.length, 1, "Market satış personeli yalnız işletmesinin müşteri seçicisini görmeli");
+  assert.equal(projected.customers[0].id, customerId);
+  assert.equal(projected.customers[0].full_name, "Mobil Cari Müşterisi");
+  for (const field of ["phone", "email", "notes", "address", "identity_number", "birth_date"]) {
+    assert.equal(projected.customers[0][field], "", field);
+  }
+  assert.equal(JSON.stringify(projected.customers).includes("PRIVATE"), false);
+  assert.equal(projected.customers.some(c => c.id === foreign.savedId || c.id === deleted.savedId), false,
+    "Diğer işletmenin müşterisi veya silinen müşteri personele gönderilmemeli");
   assert.deepEqual(projectLocalAndroidSnapshotForDevice(snapshot, "unknown-device").market.customer_credit_accounts, []);
   const polluted = structuredClone(snapshot); polluted.market.customer_credit_accounts[0].phone = "PRIVATE"; polluted.market.customer_credit_accounts[0].entries[0].note = "PRIVATE";
   assert.equal(JSON.stringify(projectLocalAndroidSnapshotForDevice(polluted, deviceId).market.customer_credit_accounts).includes("PRIVATE"), false);
+  // Credit access must not imply customer-management access, and every required
+  // capability must redact even an already populated private account snapshot.
+  const creditOnly = structuredClone(polluted);
+  creditOnly.androidPermissions[deviceId] = { role: "staff", is_active: true, permissions: ["customer_credit.view"] };
+  const creditOnlyProjection = projectLocalAndroidSnapshotForDevice(creditOnly, deviceId);
+  assert.equal(creditOnlyProjection.market.customer_credit_accounts.length, 1);
+  assert.deepEqual(creditOnlyProjection.customers, []);
+  assert.equal(JSON.stringify(creditOnlyProjection.market.customer_credit_accounts).includes("PRIVATE"), false);
+  for (const capability of [C.CUSTOMER_CREDIT, C.CUSTOMERS, C.SALES, C.CATALOG, C.FINANCE]) {
+    const disabled = { ...creditOnly, business_capabilities: creditOnly.business_capabilities.filter(value => value !== capability) };
+    assert.deepEqual(projectLocalAndroidSnapshotForDevice(disabled, deviceId).market.customer_credit_accounts, [], capability);
+    assert.deepEqual(projectAndroidOperationsSnapshot(polluted, disabled.business_capabilities, "2026-10-14").market.customer_credit_accounts, [], capability);
+  }
+  const noCreditPermission = structuredClone(creditOnly);
+  noCreditPermission.androidPermissions[deviceId].permissions = ["market.product.view", "market.sale.complete"];
+  assert.deepEqual(projectLocalAndroidSnapshotForDevice(noCreditPermission, deviceId).market.customer_credit_accounts, []);
+  creditOnly.androidPermissions[deviceId].is_active = false;
+  assert.deepEqual(projectLocalAndroidSnapshotForDevice(creditOnly, deviceId).market.customer_credit_accounts, []);
   rights({ ...groups, customer_credit_view: false, customer_credit_payment: false });
   assert.deepEqual(projectLocalAndroidSnapshotForDevice(createAndroidOperationsSnapshot(database, database.getDashboardData()), deviceId).market.customer_credit_accounts, []); rights(groups);
   const caps = database.getEnabledBusinessCapabilities();

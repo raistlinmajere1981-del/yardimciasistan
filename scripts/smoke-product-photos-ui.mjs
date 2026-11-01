@@ -25,6 +25,8 @@ try {
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   await page.addInitScript(product => {
     window.__product = product;
+    // Saved connection projection for this isolated renderer fixture; no live host.
+    window.__setup = { webModuleUrl: "https://photos.example.test", syncSecret: "photo-ui-fixture-secret" };
     const preview = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
     let revision = 0, photos = [{ id: "one", format: "image/png" }, { id: "two", format: "image/webp" }], sourceUrl = "";
     const snapshot = () => ({ productId: product.id, revision: String(revision), photos: [...photos], sourceUrl, sourceLicense: "" });

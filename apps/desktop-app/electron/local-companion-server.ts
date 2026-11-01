@@ -1,5 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "node:https";
 import type { AddressInfo } from "node:net";
+import { networkInterfaces } from "node:os";
+import type { LocalCompanionTlsIdentity, LocalCompanionTlsPublicIdentity } from "./local-companion-tls-identity";
 import {
   LOCAL_COMPANION_DEVICE_ID_HEADER,
   LOCAL_COMPANION_ENDPOINTS,
@@ -10,6 +13,93 @@ import {
 } from "@yardimci-asistan/sync-core";
 import { desktopLog } from "./desktop-logger";
 import { projectAndroidKbsForDevice } from "./android-kbs-projection.js";
+import type { previewAndroidCustomerSale } from "./android-customer-sale-preview.js";
+import type { quoteAndroidPointSpend } from "./android-point-spend-quote.js";
+import type { authorizeCompanionCouponAttempt } from "./companion-coupon-permit.js";
+import type { AndroidMarketSaleResultReceipt } from "./database-types.js";
+import type { DatabaseSync } from "node:sqlite";
+import type { TLSSocket } from "node:tls";
+import { readCompanionCashSalePreparationScope, readCompanionPointsPreparationScope, requireCompanionCashSalePrincipal, requireCompanionPointsPrincipal } from "./companion-points-principal.js";
+import { isLocalActionParentTransaction } from "./android-action-application-service.js";
+
+declare const localActionContextBrand: unique symbol;
+/** Opaque, request-scoped authority. No credentials or serializable evidence. */
+export interface LocalCompanionActionContext {
+  readonly [localActionContextBrand]: true;
+}
+
+// Only the authenticated HTTPS action handler can mint an entry. Neither JSON,
+// the shared action model nor a caller-supplied object can reproduce its identity.
+const localActionCredentials = new WeakMap<LocalCompanionActionContext, {
+  action: AndroidSyncAction; deviceId: string; token: string;
+}>();
+
+/** Internal pre-BEGIN key/source preparation. No credentials escape this module. */
+export function readLocalActionPointsPreparationScope(db: DatabaseSync, action: AndroidSyncAction,
+  context: LocalCompanionActionContext | undefined, customerId: string) {
+  const bound = context && localActionCredentials.get(context);
+  if (!context || !bound || bound.action !== action || bound.deviceId !== action.device_id
+      || action.action_type !== "market_sale_complete" || action.payload.settlement !== "paid"
+      || action.payload.customer_id !== customerId || db.isTransaction) {
+    throw Object.assign(new Error("Companion points authorization denied."), { code: "COMPANION_POINTS_DENIED" });
+  }
+  return readCompanionPointsPreparationScope(db, bound, customerId);
+}
+
+/** Internal pre-BEGIN zero-Puan paid-cash earn scope. No spend grant is required;
+ * the authenticated device, capability, customer and action binding remain. */
+export function readLocalActionCashSalePreparationScope(db: DatabaseSync, action: AndroidSyncAction,
+  context: LocalCompanionActionContext | undefined, customerId: string) {
+  const bound = context && localActionCredentials.get(context);
+  if (!context || !bound || bound.action !== action || bound.deviceId !== action.device_id
+      || action.action_type !== "market_sale_complete" || action.payload.settlement !== "paid"
+      || action.payload.payment_method !== "cash" || action.payload.customer_id !== customerId
+      || Number(action.payload.requestedPointsMinor ?? 0) !== 0 || db.isTransaction) {
+    throw Object.assign(new Error("Companion cash earn authorization denied."), { code: "COMPANION_CASH_EARN_DENIED" });
+  }
+  return readCompanionCashSalePreparationScope(db, bound, customerId);
+}
+
+/** Parent-write zero-Puan cash earn principal; never authorizes points spending. */
+export function requireLocalActionCashSalePrincipal(db: DatabaseSync, action: AndroidSyncAction,
+  context: LocalCompanionActionContext | undefined, customerId: string) {
+  const requireIngress = () => {
+    const bound = context && localActionCredentials.get(context);
+    if (!context || !bound || bound.action !== action || bound.deviceId !== action.device_id
+        || action.action_type !== "market_sale_complete" || action.payload.settlement !== "paid"
+        || action.payload.payment_method !== "cash" || action.payload.customer_id !== customerId
+        || Number(action.payload.requestedPointsMinor ?? 0) !== 0
+        || !isLocalActionParentTransaction(db, action, context)) {
+      throw Object.assign(new Error("Companion cash earn authorization denied."), { code: "COMPANION_CASH_EARN_DENIED" });
+    }
+    return bound;
+  };
+  const principal = requireCompanionCashSalePrincipal(db, requireIngress(), customerId);
+  return Object.freeze({ ...principal, assertAuthorized(): void {
+    requireIngress();
+    principal.assertAuthorized();
+  } });
+}
+
+/** Future parent-write consumer only; does not enable a spend route or settle. */
+export function requireLocalActionPointsPrincipal(db: DatabaseSync, action: AndroidSyncAction,
+  context: LocalCompanionActionContext | undefined, customerId: string) {
+  const requireIngress = () => {
+    const bound = context && localActionCredentials.get(context);
+    if (!context || !bound || bound.action !== action || bound.deviceId !== action.device_id
+        || action.action_type !== "market_sale_complete" || action.payload.settlement !== "paid"
+        || action.payload.customer_id !== customerId
+        || !isLocalActionParentTransaction(db, action, context)) {
+      throw Object.assign(new Error("Companion points authorization denied."), { code: "COMPANION_POINTS_DENIED" });
+    }
+    return bound;
+  };
+  const principal = requireCompanionPointsPrincipal(db, requireIngress(), customerId);
+  return Object.freeze({ ...principal, assertAuthorized(): void {
+    requireIngress();
+    principal.assertAuthorized();
+  } });
+}
 
 const DEFAULT_LOCAL_COMPANION_PORT = 47_831;
 const MAX_JSON_BODY_BYTES = 128 * 1024;
@@ -57,16 +147,59 @@ interface LocalCompanionBusinessInfo {
 export interface LocalCompanionServerOptions {
   desktopId: () => string;
   businessInfo: () => LocalCompanionBusinessInfo;
+  /** Canonical active business identity; never derived from the request. */
+  activeBusinessId?: () => string;
   createSummary: (deviceId: string) => AndroidOperationsSnapshot;
-  applyAction: (action: AndroidSyncAction) => LocalCompanionActionResult;
+  applyAction: (action: AndroidSyncAction, context?: LocalCompanionActionContext) => LocalCompanionActionResult;
+  readAuthorizedSaleReceipt?: (action: AndroidSyncAction, deviceId: string, token: string) => AndroidMarketSaleResultReceipt | undefined;
   authorize: (input: LocalCompanionAuthorizationInput) => boolean;
+  readBenefitsBalance?: (input: { deviceId: string; token: string; customerId: string; currency: string }) =>
+    { availableMinor: number; generatedAtMs: number } | null;
+  readCustomerSalePreview?: (input: { deviceId: string; token: string; customerId?: string; lines: Array<{ productId: string; quantity: number }> }) =>
+    ReturnType<typeof previewAndroidCustomerSale> | null;
+  readPointSpendQuote?: (input: { deviceId: string; token: string; customerId: string; lines: Array<{ productId: string; quantity: number }> }) =>
+    ReturnType<typeof quoteAndroidPointSpend>;
+  /** Server-owned coupon attempt authorization/quote; never a sale authorization. */
+  readCouponAttempt?: (input: { deviceId: string; token: string; actionId: string; customerId: string;
+    lines: Array<{ productId: string; quantity: number }>; couponCode: string; paymentMethod: string }) =>
+    ReturnType<typeof authorizeCompanionCouponAttempt>;
   enabled?: () => boolean;
   pair?: (input: LocalCompanionPairingRequest) => LocalCompanionPairingResponse;
+  onStopped?: () => void;
+  /** Product uses one HTTPS listener, including pairing and operations. */
+  httpsExperiment?: {
+    enabled: true;
+    identity: Pick<LocalCompanionTlsIdentity, "load">;
+  };
+  /** Legacy transport mock only; requires NODE_ENV=test and a loopback bind. */
+  testOnlyHttp?: true;
 }
 
 export interface LocalCompanionServerAddress {
   host: string;
   port: number;
+  protocol?: "https";
+}
+
+/** QR address must belong to the current interfaces AND the live certificate. */
+export function getLocalPairingEndpoint(
+  address: LocalCompanionServerAddress | null,
+  identity: LocalCompanionTlsPublicIdentity | null,
+  interfaces = networkInterfaces()
+): string {
+  if (address?.protocol !== "https" || !identity) throw new Error("local_secure_pairing_unavailable");
+  const matches = Object.entries(interfaces).flatMap(([name, entries]) =>
+    (entries ?? []).filter(entry => entry.family === "IPv4" && !entry.internal
+      && identity.ipAddresses.includes(entry.address)
+      && /^(?:10\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(entry.address)
+      && (address.host === "0.0.0.0" || address.host === entry.address))
+      .map(entry => ({ name, ip: entry.address }))
+  );
+  const rank = (name: string) => /usb|rndis|tether|^enx|^en.*u\d/i.test(name) ? 0
+    : /^(wl|wlan)/i.test(name) ? 1 : /^(en|eth)/i.test(name) ? 2 : 3;
+  matches.sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
+  if (!matches[0]) throw new Error("local_pairing_address_unavailable");
+  return `https://${matches[0].ip}:${address.port}`;
 }
 
 function headerValue(request: IncomingMessage, name: string): string {
@@ -242,8 +375,12 @@ function normalizeAction(body: Record<string, unknown>, deviceId: string): Andro
 
 export class LocalCompanionServer {
   private server: Server | null = null;
+  private starting: Promise<LocalCompanionServerAddress> | null = null;
+  private httpsServer: HttpsServer | null = null;
+  private publicTlsIdentity: LocalCompanionTlsPublicIdentity | null = null;
   private currentAddress: LocalCompanionServerAddress | null = null;
   private sourceRevision = Date.now();
+  private lastBusinessId: string | null = null;
 
   constructor(private readonly options: LocalCompanionServerOptions) {}
 
@@ -255,6 +392,23 @@ export class LocalCompanionServer {
     return this.sourceRevision;
   }
 
+  /** Live listener projection for QR; never includes the private key. */
+  get tlsIdentity(): LocalCompanionTlsPublicIdentity | null {
+    const identity = this.publicTlsIdentity;
+    return identity ? { ...identity, ipAddresses: [...identity.ipAddresses] } : null;
+  }
+
+  /** Same-key SAN/expiry renewal affects subsequent handshakes on this listener. */
+  async refreshTlsIdentity(): Promise<void> {
+    const server = this.httpsServer;
+    if (!server || !this.options.httpsExperiment) return;
+    const { privateKeyPem, ...identity } = await this.options.httpsExperiment.identity.load();
+    if (this.httpsServer !== server) return;
+    if (this.publicTlsIdentity?.spkiSha256 !== identity.spkiSha256) throw new Error("local_companion_tls_identity_changed");
+    server.setSecureContext({ key: privateKeyPem, cert: identity.certificatePem, minVersion: "TLSv1.2" });
+    this.publicTlsIdentity = identity;
+  }
+
   markSnapshotDirty(): number {
     this.sourceRevision = Math.max(Date.now(), this.sourceRevision + 1);
     return this.sourceRevision;
@@ -262,17 +416,37 @@ export class LocalCompanionServer {
 
   async start(host = "0.0.0.0", port = DEFAULT_LOCAL_COMPANION_PORT): Promise<LocalCompanionServerAddress> {
     if (this.server && this.currentAddress) return this.currentAddress;
+    if (this.starting) return this.starting;
+    this.starting = this.startListener(host, port).finally(() => { this.starting = null; });
+    return this.starting;
+  }
 
-    const server = createServer((request, response) => {
+  private async startListener(host: string, port: number): Promise<LocalCompanionServerAddress> {
+    const handler = (request: IncomingMessage, response: ServerResponse) => {
       void this.handleRequest(request, response);
-    });
+    };
+    let server: Server;
+    if (this.options.httpsExperiment !== undefined) {
+      // A malformed opt-in must never select plaintext as a fallback.
+      if (this.options.httpsExperiment.enabled !== true) throw new Error("local_companion_tls_experiment_required");
+      const { privateKeyPem, ...identity } = await this.options.httpsExperiment.identity.load();
+      this.httpsServer = createHttpsServer({ key: privateKeyPem, cert: identity.certificatePem, minVersion: "TLSv1.2" }, handler);
+      this.publicTlsIdentity = identity;
+      server = this.httpsServer;
+    } else {
+      if (this.options.testOnlyHttp !== true || process.env.NODE_ENV !== "test"
+          || !["127.0.0.1", "::1"].includes(host)) {
+        throw new Error("local_companion_https_required");
+      }
+      server = createServer(handler);
+    }
     this.server = server;
 
     try {
       await this.listen(server, host, port);
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code !== "EADDRINUSE" || port === 0) {
-        this.server = null;
+        this.clearListener();
         throw error;
       }
       desktopLog.warn({
@@ -282,15 +456,21 @@ export class LocalCompanionServer {
         meta: { port },
         error
       });
-      await this.listen(server, host, 0);
+      try {
+        await this.listen(server, host, 0);
+      } catch (retryError) {
+        this.clearListener();
+        throw retryError;
+      }
     }
 
     const address = server.address() as AddressInfo | null;
     if (!address) {
-      await this.stop();
+      this.clearListener();
+      server.close();
       throw new Error("Local companion server did not expose a listening address.");
     }
-    this.currentAddress = { host, port: address.port };
+    this.currentAddress = { host, port: address.port, ...(this.httpsServer ? { protocol: "https" as const } : {}) };
     desktopLog.info({
       scope: "local-companion",
       event: "local-companion.server.started",
@@ -301,9 +481,11 @@ export class LocalCompanionServer {
   }
 
   async stop(): Promise<void> {
+    this.options.onStopped?.();
+    // TLS initialization is async; never leave a listener alive after stop returns.
+    try { await this.starting; } catch { /* Startup already failed closed. */ }
     const server = this.server;
-    this.server = null;
-    this.currentAddress = null;
+    this.clearListener();
     if (!server?.listening) return;
     await new Promise<void>((resolve) => server.close(() => resolve()));
     desktopLog.info({
@@ -311,6 +493,13 @@ export class LocalCompanionServer {
       event: "local-companion.server.stopped",
       message: "Yerel companion sunucusu durduruldu."
     });
+  }
+
+  private clearListener(): void {
+    this.server = null;
+    this.httpsServer = null;
+    this.publicTlsIdentity = null;
+    this.currentAddress = null;
   }
 
   private listen(server: Server, host: string, port: number): Promise<void> {
@@ -338,6 +527,124 @@ export class LocalCompanionServer {
       }
 
       const url = new URL(request.url || "/", "http://local-companion.invalid");
+      if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.pointSpendQuote) {
+        const denied = () => writeJson(response, 403, { code: "point_spend_quote_denied" });
+        const deviceId = headerValue(request, LOCAL_COMPANION_DEVICE_ID_HEADER);
+        const token = headerValue(request, LOCAL_COMPANION_TOKEN_HEADER);
+        if (this.options.enabled?.() === false || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) || !token
+          || !this.options.authorize({ deviceId, token, remoteAddress })) { denied(); return; }
+        try {
+          const body = await readJsonBody(request);
+          if (this.options.enabled?.() === false || !this.options.authorize({ deviceId, token, remoteAddress })
+            || Object.keys(body).sort().join(",") !== "customerId,lines"
+            || typeof body.customerId !== "string" || !body.customerId || body.customerId !== body.customerId.trim()
+            || body.customerId.length > 128 || !Array.isArray(body.lines) || body.lines.length < 1 || body.lines.length > 200) { denied(); return; }
+          const lines: Array<{ productId: string; quantity: number }> = [];
+          for (const item of body.lines) {
+            const line = objectValue(item);
+            if (!line || Object.keys(line).sort().join(",") !== "productId,quantity" || typeof line.productId !== "string"
+              || !line.productId || line.productId !== line.productId.trim() || line.productId.length > 128
+              || typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0
+              || line.quantity > 1_000_000 || Math.abs(line.quantity * 10000 - Math.round(line.quantity * 10000)) > 0.00001) { denied(); return; }
+            lines.push({ productId: line.productId, quantity: line.quantity });
+          }
+          const result = this.options.readPointSpendQuote?.({ deviceId, token, customerId: body.customerId, lines });
+          if (!result) { denied(); return; }
+          writeJson(response, 200, { lines: result.lines.map(line => ({ productId: line.productId, quantity: line.quantity,
+            unitPriceMinor: line.unitPriceMinor, currency: line.currency, updatedAt: line.updatedAt })), subtotalMinor: result.subtotalMinor,
+          currency: result.currency, availablePointMinor: result.availablePointMinor, maxSpendableMinor: result.maxSpendableMinor,
+          generatedAtMs: result.generatedAtMs, expiresAtMs: result.expiresAtMs });
+        } catch { denied(); }
+        return;
+      }
+      if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.couponAttempt) {
+        // The coupon secret may only travel over authenticated TLS. Any other
+        // transport, malformed body or failed authorization returns one generic
+        // denial without reflecting the code or revealing whether it exists.
+        const denied = () => writeJson(response, 403, { code: "coupon_attempt_denied" });
+        const secure = this.httpsServer !== null && (request.socket as TLSSocket).encrypted === true;
+        const deviceId = headerValue(request, LOCAL_COMPANION_DEVICE_ID_HEADER);
+        const token = headerValue(request, LOCAL_COMPANION_TOKEN_HEADER);
+        if (!secure || this.options.enabled?.() === false || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) || !token
+          || !this.options.authorize({ deviceId, token, remoteAddress })) { denied(); return; }
+        try {
+          const body = await readJsonBody(request);
+          if (!secure || this.options.enabled?.() === false || !this.options.authorize({ deviceId, token, remoteAddress })
+            || Object.keys(body).sort().join(",") !== "actionId,couponCode,customerId,lines,paymentMethod"
+            || typeof body.actionId !== "string" || !/^[A-Za-z0-9_-]{8,120}$/.test(body.actionId)
+            || typeof body.couponCode !== "string" || !body.couponCode || body.couponCode.length > 256
+            || typeof body.customerId !== "string" || !body.customerId || body.customerId !== body.customerId.trim()
+            || body.customerId.length > 128
+            || typeof body.paymentMethod !== "string" || !body.paymentMethod || body.paymentMethod.length > 64
+            || !Array.isArray(body.lines) || body.lines.length < 1 || body.lines.length > 200) { denied(); return; }
+          const lines: Array<{ productId: string; quantity: number }> = [];
+          for (const item of body.lines) {
+            const line = objectValue(item);
+            if (!line || Object.keys(line).sort().join(",") !== "productId,quantity" || typeof line.productId !== "string"
+              || !line.productId || line.productId !== line.productId.trim() || line.productId.length > 128
+              || typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0
+              || line.quantity > 1_000_000 || Math.abs(line.quantity * 10000 - Math.round(line.quantity * 10000)) > 0.00001) { denied(); return; }
+            lines.push({ productId: line.productId, quantity: line.quantity });
+          }
+          const result = this.options.readCouponAttempt?.({ deviceId, token, actionId: body.actionId,
+            customerId: body.customerId, lines, couponCode: body.couponCode, paymentMethod: body.paymentMethod });
+          if (!result) { denied(); return; }
+          writeJson(response, 200, { permitId: result.permitId, expiresAtMs: result.expiresAtMs,
+            currency: result.quote.currency, subtotalMinor: result.quote.subtotalMinor,
+            discountMinor: result.quote.discountMinor, payableMinor: result.quote.payableMinor });
+        } catch { denied(); }
+        return;
+      }
+      if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.customerSalePreview) {
+        const denied = () => writeJson(response, 403, { code: "customer_sale_preview_denied" });
+        const deviceId = headerValue(request, LOCAL_COMPANION_DEVICE_ID_HEADER);
+        const token = headerValue(request, LOCAL_COMPANION_TOKEN_HEADER);
+        if (this.options.enabled?.() === false || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) || !token
+          || !this.options.authorize({ deviceId, token, remoteAddress })) { denied(); return; }
+        try {
+          const body = await readJsonBody(request);
+          const keys = Object.keys(body).sort().join(",");
+          if (this.options.enabled?.() === false || !this.options.authorize({ deviceId, token, remoteAddress })
+            || (keys !== "lines" && keys !== "customerId,lines")
+            || (body.customerId !== undefined && (typeof body.customerId !== "string" || body.customerId !== body.customerId.trim() || body.customerId.length > 128))
+            || !Array.isArray(body.lines) || body.lines.length < 1 || body.lines.length > 200) { denied(); return; }
+          const lines: Array<{ productId: string; quantity: number }> = [];
+          for (const item of body.lines) {
+            const line = objectValue(item);
+            if (!line || Object.keys(line).sort().join(",") !== "productId,quantity" || typeof line.productId !== "string"
+              || !line.productId || line.productId !== line.productId.trim() || line.productId.length > 128
+              || typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0
+              || line.quantity > 1_000_000 || Math.abs(line.quantity * 10000 - Math.round(line.quantity * 10000)) > 0.00001) { denied(); return; }
+            lines.push({ productId: line.productId, quantity: line.quantity });
+          }
+          const result = this.options.readCustomerSalePreview?.({ deviceId, token, customerId: typeof body.customerId === "string" ? body.customerId : "", lines });
+          if (!result) { denied(); return; }
+          writeJson(response, 200, { lines: result.lines.map(line => ({ productId: line.productId, quantity: line.quantity,
+            unitPriceMinor: line.unitPriceMinor, currency: line.currency, updatedAt: line.updatedAt })),
+          subtotalMinor: result.subtotalMinor, currency: result.currency, generatedAtMs: result.generatedAtMs });
+        } catch { denied(); }
+        return;
+      }
+      if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.benefitsBalance) {
+        const denied = () => writeJson(response, 403, { code: "benefits_balance_denied" });
+        const deviceId = headerValue(request, LOCAL_COMPANION_DEVICE_ID_HEADER);
+        const token = headerValue(request, LOCAL_COMPANION_TOKEN_HEADER);
+        if (this.options.enabled?.() === false || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) || !token
+          || !this.options.authorize({ deviceId, token, remoteAddress })) { denied(); return; }
+        try {
+          const body = await readJsonBody(request);
+          if (this.options.enabled?.() === false || !this.options.authorize({ deviceId, token, remoteAddress })
+            || Object.keys(body).sort().join(",") !== "currency,customerId"
+            || typeof body.customerId !== "string" || !body.customerId || body.customerId !== body.customerId.trim()
+            || body.customerId.length > 128 || typeof body.currency !== "string" || !/^[A-Z]{3}$/.test(body.currency)) {
+            denied(); return;
+          }
+          const result = this.options.readBenefitsBalance?.({ deviceId, token, customerId: body.customerId, currency: body.currency });
+          if (!result) { denied(); return; }
+          writeJson(response, 200, { availableMinor: result.availableMinor, generatedAtMs: result.generatedAtMs });
+        } catch { denied(); }
+        return;
+      }
       if (request.method === "GET" && url.pathname === LOCAL_COMPANION_ENDPOINTS.status) {
         writeJson(response, 200, {
           ok: true,
@@ -447,9 +754,24 @@ export class LocalCompanionServer {
       }
 
       const body = await readJsonBody(request);
+      // Lock/settings can change while the request body is arriving.
+      if (this.options.enabled?.() === false) {
+        writeJson(response, 403, { ok: false, code: "local_network_disabled", message: "Yerel bağlantı kullanılamıyor." });
+        return;
+      }
+      if (!this.options.authorize({ deviceId, token, remoteAddress })) {
+        writeJson(response, 401, { ok: false, code: "local_auth_failed", message: "Yerel cihaz doğrulaması başarısız." });
+        return;
+      }
       if (url.pathname === LOCAL_COMPANION_ENDPOINTS.summary) {
         const snapshot = this.options.createSummary(deviceId);
         const approvalRequired = !snapshot.androidPermissions[deviceId]?.is_active;
+        const rawBusinessId = this.options.activeBusinessId?.() ?? "";
+        const businessId = typeof rawBusinessId === "string" && rawBusinessId.length <= 128
+          && rawBusinessId === rawBusinessId.trim() ? rawBusinessId : "";
+        if (this.lastBusinessId !== null && this.lastBusinessId !== businessId) this.markSnapshotDirty();
+        this.lastBusinessId = businessId;
+        const businessIdentity = !approvalRequired && businessId ? { business_id: businessId } : {};
         const knownRevision = Math.max(0, Number(body.known_server_revision ?? 0) || 0);
         if (!approvalRequired && knownRevision > 0 && knownRevision === this.sourceRevision) {
           writeJson(response, 200, {
@@ -459,6 +781,7 @@ export class LocalCompanionServer {
               : "Android verisi yerel ağda zaten güncel.",
             approval_required: approvalRequired,
             not_modified: true,
+            ...businessIdentity,
             server_revision: this.sourceRevision,
             pulled_at: new Date().toISOString(),
             pending_action_count: 0,
@@ -471,6 +794,7 @@ export class LocalCompanionServer {
         writeJson(response, 200, {
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
           desktop_id: this.options.desktopId(),
+          ...businessIdentity,
           ...createLocalAndroidSummaryResponse(
             snapshot,
             this.options.businessInfo(),
@@ -486,8 +810,23 @@ export class LocalCompanionServer {
         writeJson(response, 422, { ok: false, code: "invalid_action", message: "Telefon işlemi eksik veya geçersiz." });
         return;
       }
-      const result = this.options.applyAction(action);
+      const context = this.httpsServer && (request.socket as TLSSocket).encrypted === true
+        ? Object.freeze({}) as LocalCompanionActionContext : undefined;
+      if (context) localActionCredentials.set(context, { action, deviceId, token });
+      let result: LocalCompanionActionResult;
+      try {
+        result = this.options.applyAction(action, context);
+      } finally {
+        if (context) localActionCredentials.delete(context);
+      }
       this.markSnapshotDirty();
+      // The action may already be committed, but access can change before its ACK.
+      if (this.options.enabled?.() === false || !this.options.authorize({ deviceId, token, remoteAddress })) {
+        writeJson(response, 403, { ok: false, code: "local_action_forbidden", message: "Yerel bağlantı kullanılamıyor." });
+        return;
+      }
+      const receipt = result.ok && action.action_type === "market_sale_complete"
+        ? this.options.readAuthorizedSaleReceipt?.(action, deviceId, token) : undefined;
       writeJson(response, 200, {
         ok: true,
         action_id: action.id,
@@ -495,7 +834,10 @@ export class LocalCompanionServer {
         message: result.message,
         error_message: result.ok ? "" : result.message,
         already_applied: result.ok ? Boolean(result.alreadyApplied) : false,
-        source_revision: this.sourceRevision
+        source_revision: this.sourceRevision,
+        ...(receipt ? { sale_receipt: { saleId: receipt.saleId, businessId: receipt.businessId, source: receipt.source,
+          customerId: receipt.customerId, cashPaidMinor: receipt.cashPaidMinor, pointsTenderMinor: receipt.pointsTenderMinor,
+          discountMinor: receipt.discountMinor ?? 0, currency: receipt.currency, paymentMethod: receipt.paymentMethod } } : {})
       });
     } catch (error) {
       const message = error instanceof Error && error.message === "request_body_too_large"
@@ -506,8 +848,8 @@ export class LocalCompanionServer {
         scope: "local-companion",
         event: "local-companion.request.failed",
         message,
-        meta: { status },
-        error
+        // JSON parse errors can contain request text, including credentials.
+        meta: { status }
       });
       if (!response.headersSent) {
         writeJson(response, status, { ok: false, code: "invalid_request", message });

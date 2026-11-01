@@ -19,6 +19,8 @@ import { Panel } from "../ui/Panel";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { RoomReceivablePaymentDialog } from "./RoomReceivablePaymentDialog";
+import { useMarketSaleRefund } from "./use-market-sale-refund";
+import { MarketSaleHistory } from "./MarketSaleHistory";
 
 type OutstandingRow = {
   id: string;
@@ -39,7 +41,9 @@ export function FinanceWorkspace({
   topPanel?: ReactNode;
 }) {
   const navigation = useWorkspaceNavigation();
+  const refund = useMarketSaleRefund(controller.data.recentEntries, controller.refreshFinanceData);
   const [selectedReceivable, setSelectedReceivable] = useState<DesktopRoomFolio | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const {
     data,
     roomData,
@@ -171,21 +175,26 @@ export function FinanceWorkspace({
               <p>Otomatik ve elle eklenen kasa kayıtları</p>
             </div>
             <div className="finance-section-actions action-row">
-              <ActionButton variant="primary" onClick={() => openEntry("income")} disabled={saving || loading}>
+              {window.yardimciDesktop?.commerce?.listMarketSaleHistory && <ActionButton variant="secondary" onClick={() => setHistoryOpen(open => !open)} disabled={saving || loading || refund.blocked || Boolean(draft.mode) || Boolean(pendingDelete) || Boolean(selectedReceivable)}>
+                Satış Geçmişi
+              </ActionButton>}
+              <ActionButton variant="primary" onClick={() => openEntry("income")} disabled={saving || loading || refund.blocked}>
                 <Plus size={16} aria-hidden="true" /> Gelir Ekle
               </ActionButton>
-              <ActionButton variant="secondary" onClick={() => openEntry("expense")} disabled={saving || loading}>
+              <ActionButton variant="secondary" onClick={() => openEntry("expense")} disabled={saving || loading || refund.blocked}>
                 <Minus size={16} aria-hidden="true" /> Gider Ekle
               </ActionButton>
             </div>
           </div>
+          {historyOpen && !refund.selected && <MarketSaleHistory onClose={() => setHistoryOpen(false)} onSelect={preview => { setHistoryOpen(false); refund.select(preview); }} />}
+          {refund.message && <p className="form-status" role="status">{refund.message}</p>}
           {data.recentEntries.length === 0 ? (
             !loading && <p className="empty-state">Henüz kasa hareketi yok.</p>
           ) : (
             <>
               <div className="finance-entry-list">
                 {data.recentEntries.map((entry) => (
-                  <article key={entry.id} className="finance-entry-item">
+                  <article key={entry.id} className="finance-entry-item" data-source-type={entry.sourceType} data-source-id={entry.sourceId}>
                     <span className={`finance-direction-icon is-${entry.direction}`} aria-hidden="true">
                       {entry.direction === "income" ? "+" : "−"}
                     </span>
@@ -196,14 +205,17 @@ export function FinanceWorkspace({
                     <b className={`finance-entry-item__amount ${entry.direction === "income" ? "is-income" : "is-expense"}`}>
                       {entry.direction === "income" ? "+" : "−"}{formatMinorCurrency(entry.amountMinor)}
                     </b>
-                    {entry.sourceType === "manual" ? (
+                    {entry.sourceType === "commerce_sale" && entry.direction === "income" && refund.previews[entry.sourceId] ? (
+                      <ActionButton variant="ghost" size="sm" className="finance-delete-entry" disabled={saving || refund.blocked || Boolean(draft.mode) || Boolean(pendingDelete) || Boolean(selectedReceivable)}
+                        onClick={() => refund.select(refund.previews[entry.sourceId]!)}>Tam İade</ActionButton>
+                    ) : entry.sourceType === "manual" ? (
                       <ActionButton
                         variant="ghost"
                         size="sm"
                         className="finance-delete-entry"
                         aria-label="Kasa hareketini kaldır"
                         onClick={() => setPendingDelete(entry)}
-                        disabled={saving}
+                        disabled={saving || refund.blocked}
                       >
                         <Trash2 size={15} aria-hidden="true" />
                       </ActionButton>
@@ -246,6 +258,7 @@ export function FinanceWorkspace({
                       {item.folioId && roomData.folios.find(folio => folio.id === item.folioId)?.status === "open" && <ActionButton
                         size="sm"
                         variant="secondary"
+                        disabled={refund.blocked}
                         onClick={() => setSelectedReceivable(roomData.folios.find(folio => folio.id === item.folioId) ?? null)}
                       >Tahsil Et</ActionButton>}
                     </div>
@@ -262,6 +275,22 @@ export function FinanceWorkspace({
           </Panel>
         )}
       </div>
+
+      {refund.selected && !draft.mode && !pendingDelete && !selectedReceivable && <ConfirmDialog
+        tone="warning" eyebrow="Market hızlı satış" title="Tam iade kaydedilsin mi?"
+        description="Kasa iadesi kaydı oluşturulur ve özgün stok hareketleri geri alınır. Harici kart veya banka transferi yapılmaz."
+        details={<div className="form-stack">
+          {refund.selected.customerName && <strong>{refund.selected.customerName}</strong>}
+          <span>Satış toplamı: {formatMinorCurrency(refund.selected.totalMinor, refund.selected.currency)}</span>
+          <strong>Kasa iadesi kaydı: {formatMinorCurrency(refund.selected.cashMinor, refund.selected.currency)}</strong>
+          <span>Geri yüklenecek Puan: {formatMinorCurrency(refund.selected.pointsMinor, refund.selected.currency)}</span>
+          {refund.selected.lines.map((line, index) => <span key={index}>{line.name} × {line.quantity}</span>)}
+          <p>Kazanılan Puan geri alınır; harcanmış veya ayrılmışsa iade uygulanmaz. Kupon kullanımı geri açılmaz.</p>
+          {refund.pending?.message && <p role="status">{refund.pending.message}</p>}
+        </div>}
+        busy={Boolean(refund.pending?.busy)} confirmLabel={refund.pending?.busy ? "Kaydediliyor…" : refund.pending?.uncertain ? "İade Sonucunu Doğrula" : "Tam İadeyi Kaydet"}
+        cancelLabel={refund.pending?.uncertain ? "Sonuç doğrulanmalı" : "Vazgeç"}
+        onConfirm={refund.submit} onCancel={refund.cancel} />}
 
       {selectedReceivable && <RoomReceivablePaymentDialog
         folio={selectedReceivable}

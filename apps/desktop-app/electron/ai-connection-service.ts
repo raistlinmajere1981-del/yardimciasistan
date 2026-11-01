@@ -5,11 +5,12 @@ import {
   generateConfiguredImage,
   CloudflareAiError,
   listGoogleAiStudioModels,
+  listCloudflareAiModels,
   rankGoogleAiStudioModels,
   verifyGoogleAiStudioVisionModel,
   type AICompletionFailureReason
 } from "@yardimci-asistan/ai-core";
-import { isCloudflareAiBaseUrl, supportsVisionModel, supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { CLOUDFLARE_AI_MODELS, isCloudflareAiBaseUrl, supportsVisionModel, supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import { normalizeGeneratedImagePng } from "./generated-image-normalization";
 import type { DesktopDatabase } from "./database";
 import { normalizeAiTimeoutSeconds } from "./ai-config";
@@ -86,13 +87,26 @@ export async function testAiConnection(
   const operationStartedAt = Date.now();
 
   if (service === "cloudflare") {
+    // Catalog lookup is read-only and proves no entitlement or free quota.
+    // Some API Tokens permit inference but lack Workers AI Read permission:
+    // keep the validated, documented fallback if discovery fails.
+    const discovery = await listCloudflareAiModels({ baseUrl, apiKey, timeoutMs: timeoutSeconds * 1000 });
+    const discoveredText = discovery.ok
+      ? discovery.models.filter(item => item.task === "text").map(item => ({ id: item.id, label: item.id }))
+      : [];
+    models = [...new Map([
+      { id: CLOUDFLARE_AI_MODELS.text, label: CLOUDFLARE_AI_MODELS.text },
+      ...discoveredText,
+      ...(model ? [{ id: model, label: model }] : [])
+    ].map(item => [item.id, item])).values()];
+    model ||= CLOUDFLARE_AI_MODELS.text;
     const config = { enabled: true, provider: "openai_compatible" as const, service, baseUrl, model, apiKey, timeoutMs: timeoutSeconds * 1000 };
     if (input.visionModel && !supportsVisionModel(service, input.visionModel)) return { ok: false, message: "Cloudflare görsel analiz modeli desteklenmiyor." };
     if (input.imageModel && !supportsImageGenerationModel(service, input.imageModel)) return { ok: false, message: "Cloudflare görsel üretim modeli desteklenmiyor." };
     logAiOperationStarted("connection-test", config, operationId);
     const text = await generateConfiguredChat({ ...config, messages: [{ role: "user", content: "Türkçe tek kısa cümleyle bağlantının çalıştığını belirt." }] });
     logAiOperationCompleted("connection-test", config, text, operationStartedAt, operationId);
-    if (!text.ok) return { ok: false, message: `Metin: ${text.message}` };
+    if (!text.ok) return { ok: false, message: `Metin: ${text.message}`, model, models };
     if (input.visionModel) {
       const visionConfig = { ...config, model: input.visionModel }, startedAt = Date.now();
       logAiOperationStarted("vision-test", visionConfig, operationId);
@@ -118,8 +132,8 @@ export async function testAiConnection(
     database.recordServiceSettingsVerification("ai", { provider, service, projectName, baseUrl, model,
       visionModel: input.visionModel ?? "", imageModel: input.imageModel ?? "", apiKey, timeoutSeconds });
     const verified = ["metin", ...(input.visionModel ? ["görsel analiz"] : []), ...(input.imageModel ? ["görsel üretim"] : [])];
-    return { ok: true, message: `Cloudflare ${verified.join(", ")} isteği başarılı. STT ayrı test edilmeli; bu sonuç kalan ücretsiz kotayı garanti etmez. Ayarları kaydedin.`, model,
-      models: [...new Set([model, input.visionModel, input.imageModel].filter((id): id is string => Boolean(id)))].map(id => ({ id, label: id })) };
+    return { ok: true, message: `Cloudflare ${verified.join(", ")} isteği başarılı. ${discovery.ok ? `${discoveredText.length} metin modeli listelendi.` : "Katalog alınamadı; belgelenmiş modelle çalışıyor."} Güncel kalan kota bu API'den doğrulanamaz. Ayarları kaydedin.`, model,
+      models };
   }
 
   if (service === "gemini") {
@@ -276,8 +290,9 @@ function isGoogleAiStudioUrl(value: string) {
 }
 
 function shouldTryNextGoogleModel(result: { status?: number; message: string }) {
+  // 429 can be minute-rate or daily quota exhaustion. Trying several models
+  // against the same project only spends more requests and obscures the limit.
   return result.status === 404
-    || result.status === 429
     || (result.status === 400 && /model|not found|support|image|vision|multimodal|mime/i.test(result.message));
 }
 

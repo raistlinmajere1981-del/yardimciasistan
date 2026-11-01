@@ -5,6 +5,10 @@ import { resolve } from 'node:path';
 import { cancelSettingsService, saveSettingsService } from './test-helpers/settings-ui.mjs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { verifyPhoneInput } from './test-helpers/phone-input.mjs';
+import { verifyWebAvailabilityContract } from './test-helpers/web-availability-contract.mjs';
+
+verifyWebAvailabilityContract();
+if (process.argv.includes('--web-availability-only')) process.exit(0);
 
 const server = await createServer({
   root: resolve('apps/desktop-app'),
@@ -354,8 +358,7 @@ try {
   await expect(structure).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByLabel('Sektör tipi')).toBeVisible();
   await expect(page.locator('.settings-service-row')).toHaveCount(0);
-  await page.getByLabel('Otomatik eşitle', { exact: true }).uncheck();
-  await page.getByLabel('Web güvenlik anahtarı', { exact: true }).fill('');
+  await expect(page.locator('#settings-web').getByLabel('Etkin', { exact: true })).not.toBeChecked();
   await businessSave();
   await expect.poll(() => page.evaluate(() => window.persistedSettings().setupRequired)).toBe(false);
   await expect(structure).toHaveAttribute('aria-expanded', 'false');

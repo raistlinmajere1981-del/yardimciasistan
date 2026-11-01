@@ -39,7 +39,8 @@ try {
     const saved = database.saveCustomer({ fullName: name, phone: "", email: "", notes: "", tags: [], ...(group ? { commercialProfile: { companyName: name, taxOffice: "", taxNumber: "", authorizedPerson: "", dealerStatus: "active", priceGroup: group, paymentTermDays: 0, notes: "" } } : {}) });
     assert.equal(saved.ok, true, saved.message);
   }
-  const initial = { snapshot: readBusinessCapabilitySnapshot(path), customers: database.getDashboardData().customers, dashboardData: database.getDashboardData() };
+  const initial = { snapshot: readBusinessCapabilitySnapshot(path), customers: database.getDashboardData().customers, dashboardData: database.getDashboardData(),
+    setup: { webModuleUrl: database.getSetupData().webModuleUrl, syncSecret: database.getSetupData().syncSecret } };
   const ids = Object.fromEntries(initial.customers.map(customer => [customer.fullName, customer.id]));
   server = await createServer({ root: resolve("apps/desktop-app"), configFile: resolve("apps/desktop-app/vite.renderer.config.ts"), logLevel: "error", server: { host: "127.0.0.1", port: 0, strictPort: false } });
   await server.listen(); browser = await launchChromiumForSmoke(chromium);
@@ -488,6 +489,14 @@ try {
   await expect(status.getByRole("checkbox", { name: "Stok takibi", exact: true })).toBeChecked();
   const published = status.getByRole("checkbox", { name: "Web satışında yayınla", exact: true });
   await expect(published).toBeEnabled();
+  const publicationBeforeWebOff = database.getCommerceProductPublication(kg.id);
+  await page.evaluate(() => window.__setSalesSetup({ webModuleUrl: "", syncSecret: "" }));
+  await expect(published).toHaveCount(0);
+  await expect(status.getByRole("checkbox", { name: "Stok takibi", exact: true })).toBeChecked();
+  await expect(workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeVisible();
+  assert.deepEqual(database.getCommerceProductPublication(kg.id), publicationBeforeWebOff, "Hiding Web controls preserves saved publication");
+  await page.evaluate(setup => window.__setSalesSetup(setup), initial.setup);
+  await expect(published).toBeEnabled();
   const initiallyPublished = await published.isChecked();
   await published.click(); await expect(published).toBeChecked({ checked: !initiallyPublished });
   assert.equal(database.getCommerceProductPublication(kg.id).isPublished, !initiallyPublished);
@@ -757,11 +766,13 @@ try {
     bulkBefore = bulkCalls.length; await expect(decision).toContainText("3 seçili ürüne"); assert.equal(bulkCalls.length, bulkBefore);
     if (action === "Webde yayınla") {
       await page.evaluate(() => window.__setSalesSnapshot({ ...window.__salesInitial.snapshot, enabledCapabilities: window.__salesInitial.snapshot.enabledCapabilities.filter(id => id !== "channel.online_sales") }));
-      await expect(bulkBar.getByRole("button", { name: action, exact: true })).toBeDisabled();
+      await expect(bulkBar.getByRole("button", { name: action, exact: true })).toHaveCount(0);
       await decision.getByRole("button", { name: action, exact: true }).click(); await expect(decision).toHaveCount(0);
       assert.equal(bulkCalls.length, bulkBefore);
       await expect(page.getByTestId("topbar-status")).toContainText("online satış etkin olmalı");
       await page.evaluate(() => window.__setSalesSnapshot(window.__salesInitial.snapshot));
+      await expect(bulkBar).toContainText("3 seçili");
+      await expect(bulkBar.getByRole("button", { name: action, exact: true })).toBeEnabled();
       await bulkBar.getByRole("button", { name: action, exact: true }).click();
     }
     await decision.getByRole("button", { name: action, exact: true }).click(); await expect(decision).toHaveCount(0);
@@ -774,8 +785,9 @@ try {
   assert.equal(database.getCommerceProductPublication(outsideBulk.id).isPublished, false);
   await bulkBar.getByRole("button", { name: "Tümünü seç", exact: true }).click();
   await page.evaluate(() => window.__setSalesSnapshot({ ...window.__salesInitial.snapshot, enabledCapabilities: window.__salesInitial.snapshot.enabledCapabilities.filter(id => id !== "channel.online_sales") }));
-  await expect(bulkBar.getByRole("button", { name: "Webde yayınla", exact: true })).toBeDisabled();
+  await expect(bulkBar.getByRole("button", { name: "Webde yayınla", exact: true })).toHaveCount(0);
   await page.evaluate(() => window.__setSalesSnapshot(window.__salesInitial.snapshot));
+  await expect(bulkBar).toContainText("3 seçili");
   await expect(bulkBar.getByRole("button", { name: "Webde yayınla", exact: true })).toBeEnabled();
   for (const width of [1120, 1440, 1650]) {
     await page.setViewportSize({ width, height: 680 });

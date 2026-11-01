@@ -62,6 +62,10 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
       || (action.payload.settlement === "credit" && !permissions.includes("customer_credit.view")))) {
     return { ok: false, message: "Bu cihazın ürün veya cari görüntüleme yetkisi yok." };
   }
+  if (action.action_type === "market_sale_complete" && action.payload.settlement === "paid"
+      && androidPayloadString(action.payload, "customer_id") && !permissions.includes("customer.view")) {
+    return { ok: false, message: "Bu cihazın müşteri görüntüleme yetkisi yok." };
+  }
   if (action.action_type === "customer_credit_payment_add" && !permissions.includes("customer_credit.view")) {
     return { ok: false, message: "Bu cihazın cari görüntüleme yetkisi yok." };
   }

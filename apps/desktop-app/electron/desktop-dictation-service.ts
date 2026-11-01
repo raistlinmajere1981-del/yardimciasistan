@@ -1,80 +1,18 @@
-import { createHash, randomBytes } from "node:crypto";
-import { Agent, request } from "node:https";
 import { BUSINESS_CAPABILITIES, isSupportedSttBaseUrl, supportsSttModel, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "./database";
 import { getEffectiveAiApiKey } from "./ai-secret-service";
 import { serviceConfigFingerprint } from "./service-settings-validation";
 import { readDesktopDictationPreference, saveDesktopDictationPreference } from "./desktop-dictation-preferences";
-import { getWebSyncConfig } from "./sync-config";
+import { transcribeDesktopStt, type DesktopSttTransport } from "./desktop-stt-direct";
 import { DICTATION_MAX_BYTES, DICTATION_MIME_TYPES, type DesktopDictationResult, type DesktopDictationStatus, type DesktopDictationSettingsResult } from "./desktop-dictation-contract";
 
 const CHANGED = "Ses ayarları veya oturum değişti. Yeniden kayıt başlatın.";
 const FAILED = "Ses metne çevrilemedi. Bağlantıyı ve kayıtlı konuşma modelini kontrol edin.";
-const RESPONSE_LIMIT = 128 * 1024;
 const TIMEOUT_MS = 70000;
-
-/** Accept only fixed Hosting codes; never display provider bodies or untrusted messages. */
-function hostedSttFailure(body: string, fallback: string): string {
-  const messages: Record<string, string> = {
-    provider_authentication_failed: "Cloudflare API Token veya hesap bilgisi kabul edilmedi.",
-    provider_permission_denied: "Cloudflare hesabının bu STT modeline erişim izni yok.",
-    provider_quota_exhausted: "Cloudflare günlük ücretsiz AI kotası doldu.",
-    provider_rate_limited: "Cloudflare istek sınırına ulaşıldı. Kısa süre sonra tekrar deneyin.",
-    provider_busy: "Cloudflare şu anda yoğun veya geçici olarak kullanılamıyor.",
-    provider_network: "Cloudflare bağlantısı kurulamadı.",
-    provider_model_unavailable: "Cloudflare STT modeli bulunamadı veya kullanılamıyor.",
-    provider_invalid_response: "Cloudflare STT yanıtı uygulamanın beklediği biçimde değil.",
-    provider_timeout: "Konuşma tanıma yanıtı zamanında alınamadı."
-  };
-  try {
-    if (Buffer.byteLength(body) > RESPONSE_LIMIT) return fallback;
-    const value = JSON.parse(body) as Record<string, unknown>;
-    return value?.ok === false && typeof value.code === "string" && Object.hasOwn(messages, value.code) ? messages[value.code]! : fallback;
-  } catch { return fallback; }
-}
-
-/** HTTPS only, no redirects/retries/proxy, bounded streaming response; no audio file or logging. */
-export function uploadDesktopDictation(url: URL, secret: string, mime: string, audio: Buffer, signal: AbortSignal, configuration?: string): Promise<{ status: number; body: string }> {
-  const boundary = `ya-${randomBytes(16).toString("hex")}`;
-  const prefix = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="source"\r\n\r\ndesktop\r\n--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="recording.${mime.split("/")[1]}"\r\nContent-Type: ${mime}\r\n\r\n`);
-  const suffix = Buffer.from(`\r\n--${boundary}--\r\n`);
-  return new Promise((resolve, reject) => {
-    const req = request(url, {
-      method: "POST", signal, rejectUnauthorized: true,
-      agent: new Agent({ keepAlive: false, proxyEnv: {} }),
-      headers: { "X-YA-Sync-Secret": secret, "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": prefix.length + audio.length + suffix.length, "Accept": "application/json",
-        ...(configuration ? { "X-YA-STT-Configuration": configuration } : {}) }
-    }, response => {
-      const chunks: Buffer[] = [];
-      let size = 0;
-      response.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > RESPONSE_LIMIT) { response.destroy(); req.destroy(new Error("response-limit")); return; }
-        chunks.push(chunk);
-      });
-      response.on("error", reject);
-      response.on("end", () => resolve({ status: response.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
-    });
-    req.on("error", reject);
-    req.write(prefix);
-    req.write(audio);
-    req.end(suffix);
-  });
-}
-
-function hostingEndpoint(baseUrl: string): URL | null {
-  try {
-    const url = new URL(baseUrl);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return null;
-    url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/audio-transcribe.php`;
-    return url;
-  } catch { return null; }
-}
 
 function validId(value: unknown): value is string { return typeof value === "string" && /^[a-zA-Z0-9_-]{16,80}$/.test(value); }
 
-// Hosting finfo remains authoritative. Reject obvious MIME spoofing before upload as well.
+// Reject obvious MIME spoofing before provider upload; decoding remains provider-owned.
 function matchesContainer(audio: Buffer, mime: string): boolean {
   const ascii = (start: number, length: number) => audio.subarray(start, start + length).toString("ascii");
   if (mime === "audio/webm") return audio.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
@@ -89,7 +27,7 @@ export function createDesktopDictationService(options: {
   getDatabase: () => DesktopDatabase;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
-  upload?: typeof uploadDesktopDictation;
+  transport?: DesktopSttTransport;
 }) {
   let revision = 1;
   let signature = "";
@@ -102,16 +40,11 @@ export function createDesktopDictationService(options: {
     testJob?.controller.abort();
   }
   function configuration() {
-    const database = options.getDatabase(), setup = database.getSetupData(), web = getWebSyncConfig(setup);
+    const database = options.getDatabase(), setup = database.getSetupData();
     const apiKey = getEffectiveAiApiKey(database, setup.aiService);
     const config = { provider: setup.aiProvider, service: setup.aiService, baseUrl: setup.aiBaseUrl.replace(/\/+$/, ""),
-      model: setup.aiSttModel ?? "", apiKey, timeoutSeconds: setup.aiTimeoutSeconds,
-      aiEnabled: setup.aiEnabled, chatModel: setup.aiModel, imageModel: setup.aiImageModel ?? "",
-      webBaseUrl: web.baseUrl, syncSecret: web.syncSecret, autoSyncEnabled: setup.autoSyncEnabled };
-    // Bound to the actual private provider configuration checked by Hosting, never renderer evidence.
-    const binding = createHash("sha256").update(JSON.stringify([config.provider, config.service, config.baseUrl,
-      config.model, apiKey, config.timeoutSeconds])).digest("hex");
-    return { database, setup, web, config, binding, fingerprint: serviceConfigFingerprint(config) };
+      model: setup.aiSttModel ?? "", apiKey, timeoutSeconds: setup.aiTimeoutSeconds, aiEnabled: setup.aiEnabled };
+    return { database, setup, config, fingerprint: serviceConfigFingerprint(config) };
   }
   function current(): DesktopDictationStatus {
     const denied = (message: string): DesktopDictationStatus => {
@@ -120,23 +53,20 @@ export function createDesktopDictationService(options: {
     };
     try { options.assertUnlocked(); } catch { return denied("Oturum kilitli"); }
     try { options.assertCapability(BUSINESS_CAPABILITIES.AI); } catch { return denied("AI özelliği kapalı"); }
-    const { setup, web, config, database, fingerprint } = configuration();
+    const { setup, config, database, fingerprint } = configuration();
     const preference = readDesktopDictationPreference(database.databasePath);
     const verification = database.getServiceSettingsVerification("desktop_stt");
     // Also fence effective environment/credential changes outside the Setup writer.
     if (verification && verification !== fingerprint) database.clearServiceSettingsVerification("desktop_stt");
     const activation = serviceConfigFingerprint({ fingerprint, testedAt: database.getServiceSettingsVerificationTime("desktop_stt") });
     // Identity never leaves main. A serial revision reveals no URL, key or secret digest.
-    const next = JSON.stringify([activation, preference, setup.aiLastPublishedAt]);
+    const next = JSON.stringify([activation, preference]);
     if (signature !== next) { invalidate(); signature = next; }
     const reason = !setup.aiEnabled ? "AI Yardımcı kapalı"
       : !supportsSttModel(setup.aiService, setup.aiSttModel ?? "") ? "AI modeli gerekli"
         : setup.aiProvider !== "openai_compatible" || !isSupportedSttBaseUrl(setup.aiService, setup.aiBaseUrl) ? "STT sağlayıcısı desteklenmiyor"
-          : !setup.aiApiKeyConfigured || !config.apiKey ? "AI anahtarı gerekli"
-            : setup.autoSyncEnabled === false ? "Web eşitlemesi kapalı"
-              : !hostingEndpoint(web.baseUrl) || web.syncSecret.trim().length < 12 || web.syncSecret.length > 4096
-                || web.syncSecret === "change-this-secret" || /[\r\n]/.test(web.syncSecret) ? "HTTPS web bağlantısı gerekli"
-                : !setup.aiLastPublishedAt ? "AI ayarlarının yayını bekleniyor" : "";
+          : !setup.aiApiKeyConfigured || !config.apiKey || config.apiKey.length > 4096 || /[\u0000-\u0020\u007f]/.test(config.apiKey) ? "AI anahtarı gerekli"
+            : !Number.isFinite(config.timeoutSeconds) || config.timeoutSeconds <= 0 ? "STT zaman aşımı geçersiz" : "";
     const canTest = !reason;
     const ready = canTest && verification === fingerprint;
     const enabled = ready && preference.enabled && preference.configuration === activation;
@@ -164,7 +94,7 @@ export function createDesktopDictationService(options: {
     try {
       const status = current();
       if (!status.canTest) return { ok: false, message: status.message };
-      const { database, web, config, fingerprint, binding } = configuration();
+      const { database, config, fingerprint } = configuration();
       database.clearServiceSettingsVerification("desktop_stt");
       const expectedRevision = current().revision, controller = new AbortController();
       testJob = { sender, controller };
@@ -177,13 +107,9 @@ export function createDesktopDictationService(options: {
       sample.writeUInt32LE(16000, 24); sample.writeUInt32LE(32000, 28); sample.writeUInt16LE(2, 32);
       sample.writeUInt16LE(16, 34); sample.write("data", 36); sample.writeUInt32LE(8000, 40);
       try {
-        const response = await (options.upload ?? uploadDesktopDictation)(hostingEndpoint(web.baseUrl)!, web.syncSecret, "audio/wav", sample, controller.signal, binding);
+        const result = await transcribeDesktopStt(config, "audio/wav", sample, controller.signal, options.transport);
         if (controller.signal.aborted || !current().canTest || revision !== expectedRevision) return { ok: false, message: CHANGED };
-        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: hostedSttFailure(response.body, "STT bağlantısı doğrulanamadı") };
-        const result = JSON.parse(response.body) as Record<string, unknown>;
-        if (result?.ok !== true || typeof result.text !== "string" || result.stt_configuration !== binding) {
-          return { ok: false, message: "STT modeli doğrulanamadı; web hizmetini kontrol edin" };
-        }
+        if (!result.ok) return result;
         if (configuration().fingerprint !== fingerprint) return { ok: false, message: CHANGED };
         database.recordServiceSettingsVerification("desktop_stt", config);
         invalidate();
@@ -225,7 +151,7 @@ export function createDesktopDictationService(options: {
       if (!audio.length || audio.length > DICTATION_MAX_BYTES || audio.toString("base64") !== encoded || !matchesContainer(audio, mime)) {
         return { ok: false, message: "Ses biçimi veya boyutu geçersiz (en fazla 5 MiB)." };
       }
-      const config = getWebSyncConfig(options.getDatabase().getSetupData());
+      const { config } = configuration();
       const controller = new AbortController();
       const job = { id: input.id, controller };
       const expectedRevision = revision;
@@ -234,17 +160,10 @@ export function createDesktopDictationService(options: {
       // Also catches persisted/environment changes outside the Settings IPC path.
       const gate = setInterval(() => { if (getStatus().revision !== expectedRevision) controller.abort(); }, 250);
       try {
-        const response = await (options.upload ?? uploadDesktopDictation)(hostingEndpoint(config.baseUrl)!, config.syncSecret, mime, audio, controller.signal);
+        const result = await transcribeDesktopStt(config, mime, audio, controller.signal, options.transport);
         const latest = current();
         if (controller.signal.aborted || !latest.available || latest.revision !== expectedRevision) return { ok: false, message: CHANGED };
-        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: hostedSttFailure(response.body, FAILED) };
-        const body: unknown = JSON.parse(response.body);
-        if (!body || typeof body !== "object") return { ok: false, message: FAILED };
-        const record = body as Record<string, unknown>;
-        if (record.ok !== true || typeof record.text !== "string" || [...record.text].length > 16000
-          || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f<>]/.test(record.text)
-          || record.text.includes(config.syncSecret)) return { ok: false, message: FAILED };
-        return { ok: true, text: record.text, revision: expectedRevision };
+        return result.ok ? { ok: true, text: result.text, revision: expectedRevision } : result;
       } finally {
         clearTimeout(timeout); clearInterval(gate);
         if (jobs.get(sender) === job) jobs.delete(sender);

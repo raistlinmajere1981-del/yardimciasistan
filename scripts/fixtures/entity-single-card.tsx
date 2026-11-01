@@ -4,6 +4,7 @@ import { BUSINESS_CAPABILITIES as C, type CatalogCategory, type CatalogProduct }
 import type { DesktopDashboardData, SaveCustomerInput } from "../../apps/desktop-app/electron/database";
 import type { DesktopPage } from "../../apps/desktop-app/src/app/navigation";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { isWebAvailable, WebAvailabilityProvider } from "../../apps/desktop-app/src/app/web-availability";
 import { customerWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { HospitalityWorkspaceHost, WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { MarketProductsWorkspace } from "../../apps/desktop-app/src/components/market/MarketProductsWorkspace";
@@ -12,7 +13,7 @@ import { reportAppStatus, subscribeAppStatus } from "../../apps/desktop-app/src/
 import "../../apps/desktop-app/src/styles/index.css";
 
 const control = window as typeof window & {
-  __cards: { data: DesktopDashboardData; products: CatalogProduct[]; categories: CatalogCategory[] };
+  __cards: { setup: { webModuleUrl: string; syncSecret: string }; data: DesktopDashboardData; products: CatalogProduct[]; categories: CatalogCategory[] };
 };
 function App() {
   const [page, setPage] = useState<DesktopPage>("market");
@@ -35,7 +36,7 @@ function Harness({ page, setPage }: { page: DesktopPage; setPage: (page: Desktop
   const onProductSaved = (saved: CatalogProduct) => { setProducts(current => [...current.filter(item => item.id !== saved.id), saved]); setCatalogRevision(current => current + 1); };
   const analyze = async () => ({ ok: false as const, message: "fixture" });
   const capabilities = [C.CUSTOMERS, C.WHOLESALE, C.INVENTORY, C.ONLINE_SALES];
-  return <BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: capabilities } }}>
+  return <WebAvailabilityProvider available={isWebAvailable(control.__cards.setup)}><BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: capabilities } }}>
     <main style={{ height: "100dvh", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <div role="status" data-testid="topbar-status">{statusMessage}</div>
       <nav><button onClick={() => setPage("market")}>Ürün listesi</button><button onClick={() => setPage("customerWork")}>Müşteri listesi</button>
@@ -49,6 +50,6 @@ function Harness({ page, setPage }: { page: DesktopPage; setPage: (page: Desktop
       <WorkspaceHost definition={productWorkspaceDefinition} context={{ products, categories: control.__cards.categories, inventoryEnabled: true, productDataEnabled: true, wholesaleEnabled: true, onlineSalesEnabled: true, busy: false, onReload: async () => {}, onProductSaved, onStateChange: reportAppStatus }} />
       <WorkspaceHost definition={customerWorkspaceDefinition} context={{ data, aiEnabled: false, whatsappEnabled: false, reservationsEnabled: false, staysEnabled: false, customerCreditEnabled: false, wholesaleEnabled: true, onWhatsApp: () => {}, onSave: saveCustomer, onAnalyzeIdentity: analyze, onDelete: async () => undefined }} />
     </main>
-  </BusinessCapabilityRuntimeProvider>;
+  </BusinessCapabilityRuntimeProvider></WebAvailabilityProvider>;
 }
 createRoot(document.getElementById("root")!).render(<App />);

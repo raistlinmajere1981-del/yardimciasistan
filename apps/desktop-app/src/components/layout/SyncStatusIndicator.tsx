@@ -1,40 +1,21 @@
-import { Cloud, CloudOff, RefreshCw, WifiOff } from "lucide-react";
-import type { AutomaticSyncStatus } from "../../../electron/sync-coordinator";
+import { Cloud, CloudOff, RefreshCw } from "lucide-react";
+import type { ConnectionStatus } from "../../app/connection-status";
 
 interface SyncStatusIndicatorProps {
-  automaticSyncStatus: AutomaticSyncStatus;
+  connection: ConnectionStatus;
   onSync: () => void;
 }
 
-type IndicatorState = "ready" | "pending" | "syncing" | "offline" | "error" | "disabled";
-
-function resolveIndicatorState(status: AutomaticSyncStatus): IndicatorState {
-  if (status.phase === "syncing") return "syncing";
-  if (status.phase === "error") return "error";
-  if (status.phase === "offline") return "offline";
-  if (status.phase === "disabled" || !status.enabled) return "disabled";
-  if (status.pendingJobs > 0) return "pending";
-  return "ready";
-}
-
-function indicatorText(state: IndicatorState) {
-  if (state === "syncing") return "Eşitleme sürüyor";
-  if (state === "error") return "Eşitleme hatası";
-  if (state === "offline") return "Çevrimdışı";
-  if (state === "disabled") return "Otomatik eşitleme kapalı";
-  if (state === "pending") return "Arka planda eşitleme bekliyor";
-  return "Eşitleme hazır";
-}
-
 export function SyncStatusIndicator({
-  automaticSyncStatus,
+  connection,
   onSync
 }: SyncStatusIndicatorProps) {
-  const state = resolveIndicatorState(automaticSyncStatus);
-  const label = indicatorText(state);
-  const Icon = state === "offline"
-    ? WifiOff
-    : state === "error"
+  if (!connection.webConfigured) return null;
+  const state = connection.webSyncStatus === "unreachable" ? "offline"
+    : connection.webSyncStatus === "waiting" ? "pending" : connection.webSyncStatus;
+  const { label, detail } = connection.web;
+  const action = connection.manualWebSyncAllowed ? " Elle eşitlemek için tıklayın." : "";
+  const Icon = state === "offline" || state === "error"
       ? CloudOff
       : state === "syncing"
         ? RefreshCw
@@ -44,10 +25,10 @@ export function SyncStatusIndicator({
     <button
       className={`sync-status-indicator topbar-control is-${state}`}
       type="button"
-      aria-label={`Eşitleme durumu: ${label}. Elle eşitlemek için tıklayın.`}
-      title={`${label}. İsterseniz elle eşitleyebilirsiniz.`}
+      aria-label={`Web eşitleme durumu: ${label}.${action}`}
+      title={`${label}. ${detail}${action}`}
       onClick={onSync}
-      disabled={state === "syncing"}
+      disabled={!connection.manualWebSyncAllowed}
     >
       <Icon size={18} aria-hidden="true" />
       <span className="sync-status-indicator__dot" aria-hidden="true" />

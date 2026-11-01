@@ -237,6 +237,7 @@ export function buildLocalCompanionMdnsResponse(input: {
       DEFAULT_TTL_SECONDS,
       txtData([
         `protocol=${input.protocolVersion}`,
+        "scheme=https",
         `desktop_id=${input.desktopId}`
       ])
     )

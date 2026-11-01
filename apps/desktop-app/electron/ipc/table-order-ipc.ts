@@ -1,4 +1,7 @@
-import { ipcMain } from "electron";
+import { app, ipcMain, safeStorage } from "electron";
+import { CommerceBenefitsKey } from "../commerce-benefits-key";
+import { assertBenefitsManagementSender, benefitsManagementFailure } from "./commerce-benefits-ipc";
+import type { TableOrderBenefitsCloseInput, TableOrderBenefitsPreviewInput } from "@yardimci-asistan/shared";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
   AddTableOrderItemInput,
@@ -13,6 +16,7 @@ import type {
 
 export function registerTableOrderIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  isTrustedRendererUrl: (url: string) => boolean;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   hasCapability?: (capability: BusinessCapability) => boolean;
@@ -25,6 +29,25 @@ export function registerTableOrderIpcHandlers(options: {
   const canReadFoodOrders = () => hasCapability
     ? hasCapability(BUSINESS_CAPABILITIES.FOOD_ORDERS)
     : true;
+
+  const authority = (event: Electron.IpcMainInvokeEvent) => {
+    const assertAuthorized = () => assertBenefitsManagementSender(event, options);
+    assertAuthorized();
+    return { actor: { id: "local-desktop-owner", role: "desktop_owner" as const, assertAuthorized },
+      keys: new CommerceBenefitsKey(app.getPath("userData"), safeStorage) };
+  };
+  ipcMain.handle("tableOrder:benefitsState", event => {
+    try {
+      authority(event);
+      return { ok: true, value: getDatabase().getTableOrderBenefitsState() };
+    } catch (error) { return benefitsManagementFailure(error); }
+  });
+  ipcMain.handle("tableOrder:previewBenefits", (event, input: TableOrderBenefitsPreviewInput) => {
+    try {
+      const owner = authority(event);
+      return { ok: true, value: getDatabase().previewTableOrderBenefits(input, owner) };
+    } catch (error) { return benefitsManagementFailure(error); }
+  });
 
   ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
     options.assertUnlocked();
@@ -102,7 +125,13 @@ export function registerTableOrderIpcHandlers(options: {
       : invalidTableOrderPayload("Adisyon durumu bilgisi geçersiz.");
   });
 
-  ipcMain.handle("tableOrder:close", (_event, input: unknown): DesktopTableOrderResult => {
+  ipcMain.handle("tableOrder:close", (event, input: unknown) => {
+    if (toUnknownRecord(input)?.benefits !== undefined) {
+      try {
+        const owner = authority(event);
+        return { ok: true, value: getDatabase().settleTableOrderBenefits(input as TableOrderBenefitsCloseInput, owner) };
+      } catch (error) { return benefitsManagementFailure(error); }
+    }
     options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderStatusInput(input);

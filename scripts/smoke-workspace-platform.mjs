@@ -210,6 +210,11 @@ try {
   const appearances = [];
   for (const [scheme, density, scale] of [['light', 'comfortable', 1], ['dark', 'compact', 1.2]]) {
     await page.evaluate(({ scheme, density, scale }) => window.appearance({ version: 2, scheme, density, scale, accent: 'green', font: 'system', motion: 'reduced' }), { scheme, density, scale });
+    await expect.poll(async () => dialog.evaluate(el => {
+      const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
+      const top = document.querySelector('.page-header').getBoundingClientRect().bottom;
+      return Math.abs(parseFloat(el.style.getPropertyValue('--workspace-canvas-top')) * zoom - top) < 1;
+    })).toBe(true);
     const button = dialog.getByRole('button', { name: 'Çalışma alanını genişlet' });
     if (appearances.length) await expect.poll(() => dialog.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(appearances[0].background);
     appearances.push(await button.evaluate(el => ({ height: getComputedStyle(el).height, background: getComputedStyle(el.closest('dialog')).backgroundColor })));

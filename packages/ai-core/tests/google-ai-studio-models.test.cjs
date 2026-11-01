@@ -15,9 +15,10 @@ test("Gemini discovery accepts stable Flash families without a hard-coded minor-
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-flash")), true);
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-flash-lite")), true);
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-4.0-flash")), true);
+  assert.equal(isGoogleAiStudioVisionModel(model("gemini-4.0-pro")), true);
 
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-2.5-flash")), false);
-  assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-pro")), false);
+  assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-pro")), true);
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-flash-preview")), false);
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-flash-image")), false);
   assert.equal(isGoogleAiStudioVisionModel(model("gemini-3.8-flash", "Deprecated model")), false);

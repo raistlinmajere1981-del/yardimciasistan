@@ -18,6 +18,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
 import { DealerWebAccessPanel } from "./DealerWebAccessPanel";
 import { CustomerCreditPanel } from "./CustomerCreditPanel";
+import { CustomerPointsPanel } from "./CustomerPointsPanel";
 import { CustomerRoomReceivablesPanel } from "./CustomerRoomReceivablesPanel";
 import { CustomerFormFields } from "./CustomerFormFields";
 import { CustomerHistoryView } from "./CustomerHistoryView";
@@ -33,6 +34,7 @@ export interface CustomerWorkspaceProps {
   staysEnabled: boolean;
   accommodationFolioEnabled?: boolean;
   customerCreditEnabled: boolean;
+  benefitsEnabled?: boolean;
   wholesaleEnabled?: boolean;
   dealerPortalEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
@@ -262,6 +264,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {<DealerWebAccessPanel key={customer.id} customerId={customerId} active={customer.commercialProfile?.dealerStatus === "active"} disabled={dirty || saveState === "loading"} />}
+        {props.benefitsEnabled && <CustomerPointsPanel key={`points-${customer.id}`} customerId={customerId} />}
         {staysEnabled && <DetailSectionCard className="customer-operation-card form-stack" title="Konaklama"
           actions={activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}>
           {activeStay ? <>

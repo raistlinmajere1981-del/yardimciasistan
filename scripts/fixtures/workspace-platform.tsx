@@ -16,7 +16,6 @@ import "../../apps/desktop-app/src/styles/index.css";
 
 const test = window as unknown as { lock: () => void; mounts: number; returned: unknown; appearance: typeof applyUiPreferences; openOther: () => boolean; changePresentation: () => void; openSame: () => boolean; openTable: () => boolean; openUnknown: () => boolean; presentation?: string; beginGeneration: () => () => boolean; wrongMode: () => void };
 test.mounts = 0;
-test.appearance = applyUiPreferences;
 function FixtureWorkspace() {
   const nav = useWorkspaceNavigation();
   test.beginGeneration = useRequestGeneration();
@@ -48,6 +47,8 @@ function FixtureWorkspace() {
 }
 function Unlocked() {
   const nav = useWorkspaceNavigation();
+  const [uiScale, setUiScale] = useState(1);
+  test.appearance = preferences => { applyUiPreferences(preferences); setUiScale(preferences.scale); };
   const contentRef = useRef<HTMLElement>(null);
   const [surface, setSurface] = useState<"form" | "diagnostics" | null>(null);
   const [filter, setFilter] = useState("original filter");
@@ -59,7 +60,7 @@ function Unlocked() {
   test.presentation = nav.current?.presentation;
   test.wrongMode = () => nav.updateWorkspaceMode({ entityType: "table", mode: "order" });
   test.changePresentation = () => nav.updateWorkspacePresentation(nav.current?.presentation === "centered" ? "full-canvas" : "centered");
-  return <AppShell contentRef={contentRef} sidebar={<aside className="sidebar">Sidebar</aside>}
+  return <AppShell uiScale={uiScale} contentRef={contentRef} sidebar={<aside className="sidebar">Sidebar</aside>}
     header={<PageHeader title="Feature page" />} overlay={<>
       <WorkspaceHost definition={{ ...roomWorkspaceDefinition, sessionPage: undefined, render: () => <FixtureWorkspace /> }} context={{}} />
       <WorkspaceHost definition={{ ...tableWorkspaceDefinition, sessionPage: undefined, render: () => <FixtureWorkspace /> }} context={{}} />

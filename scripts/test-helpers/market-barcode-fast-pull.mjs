@@ -17,7 +17,6 @@ export function verifyMarketBarcodeFastPullLifecycle() {
     require: (name) => {
       if (name === "electron") return { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } };
       if (name === "@yardimci-asistan/shared") return shared;
-      if (name === "./android-installation-service") return { AndroidInstallationService: class {} };
       if (name === "./desktop-dictation-service") return {
         createDesktopDictationService: () => ({ invalidate() {}, canCaptureAudio: () => false })
       };

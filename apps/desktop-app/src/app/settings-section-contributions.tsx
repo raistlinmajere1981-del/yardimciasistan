@@ -18,6 +18,7 @@ import {
   type StagedSettingsCategoryId
 } from "./settings-registry";
 import type { SetupFormState } from "./setup-model";
+import { isWebAvailable, useWebAvailability } from "./web-availability";
 
 type CategoryField<C extends StagedSettingsCategoryId> = (typeof settingsFieldOwners)[C][number];
 export type CategoryDraft<C extends StagedSettingsCategoryId> = Pick<SetupFormState, CategoryField<C>>;
@@ -101,7 +102,7 @@ function DealerApplicationLinkButton({ disabled }: { disabled: boolean }) {
     setCopying(true);
     try {
       const saved = await window.yardimciDesktop?.getSetupData();
-      if (!saved?.dealerPortalEnabled || !saved.dealerApplicationEnabled) {
+      if (!saved?.dealerPortalEnabled || !saved.dealerApplicationEnabled || !isWebAvailable(saved)) {
         reportAppStatus("error", "Önce Bayi Web Erişimi ve Online Bayi Başvurusu ayarlarını kaydedin.");
         return;
       }
@@ -146,6 +147,7 @@ export function StagedSettingsContributionSlot<C extends StagedSettingsCategoryI
 }: StagedSettingsContributionSlotProps<C>) {
   const activeContributions = contributions
     ?? (stagedSettingsContributions[category] as readonly SettingsSectionContribution<C>[]);
+  const webAvailable = useWebAvailability();
   const draft = pickCategoryDraft(form, category);
 
   return <>
@@ -154,7 +156,8 @@ export function StagedSettingsContributionSlot<C extends StagedSettingsCategoryI
         contribution.definition,
         configurationCapabilities,
         initialized,
-        runtimeSnapshot
+        runtimeSnapshot,
+        webAvailable
       ))
       .map((contribution) => (
         <fieldset className="settings-resource-fields" disabled={busy} key={contribution.definition.id}>

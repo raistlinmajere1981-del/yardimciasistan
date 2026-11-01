@@ -167,7 +167,7 @@ try {
     db.recordServiceSettingsVerification("web", { baseUrl: transport.webModuleUrl.replace(/\/+$/, ""), syncSecret: transport.syncSecret });
     db.recordServiceSettingsVerification("desktop_stt", { audio: "fixture verified configuration" });
     assert.equal(save(patch).ok, true);
-    assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "Web/activation changes withdraw audio evidence");
+    assert.notEqual(db.getServiceSettingsVerification("desktop_stt"), "", "Web changes preserve Desktop audio evidence");
   }
   assert.equal(save({ aiSttModel: "" }).ok, true);
   assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
@@ -235,6 +235,38 @@ try {
   assert.deepEqual([db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")], storedKeys, "Cloudflare never overwrites other keys");
   const cfProfile = db.getSetupData().aiProfiles.find(profile => profile.service === "cloudflare");
   assert.equal(cfProfile.visionModel, cfModels.vision); assert.equal(cfProfile.sttModel, cfModels.stt);
+  // Real Setup transaction: STT evidence ignores chat/image/Web edits for every provider.
+  for (const [service, baseUrl, sttModel, chatModel] of [
+    ["openai", "https://api.openai.com/v1", "whisper-1", "gpt-4.1"],
+    ["gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-3.6-flash", "gemini-3.6-flash"],
+    ["cloudflare", shared.cloudflareAiBaseUrl("a".repeat(32)), cfModels.stt, cfModels.text]
+  ]) {
+    const switchedForm = model.selectAiService(model.toSetupForm(db.getSetupData()), service);
+    const selected = model.createSetupInput({ ...switchedForm, aiBaseUrl: baseUrl, aiModel: chatModel, aiSttModel: sttModel, aiEnabled: true });
+    db.recordServiceSettingsVerification("desktop_stt", { fixture: "before provider switch" });
+    assert.equal(db.saveInitialSetup(selected).ok, true);
+    assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "Provider/model switch withdraws evidence");
+    for (const patch of [{ aiModel: `${chatModel}-fixture` }, { aiModel: chatModel },
+      { aiImageModel: "" }, { aiProjectName: "Unrelated project label" },
+      { webModuleUrl: "", syncSecret: "", autoSyncEnabled: false }, { autoSyncEnabled: true }]) {
+      db.recordServiceSettingsVerification("desktop_stt", { fixture: "preserve audio" });
+      const evidence = db.getServiceSettingsVerification("desktop_stt");
+      assert.equal(save(patch).ok, true, `${service} unrelated ${JSON.stringify(patch)}`);
+      assert.equal(db.getServiceSettingsVerification("desktop_stt"), evidence, `${service}: unrelated settings preserve evidence`);
+    }
+    for (const patch of [{ aiTimeoutSeconds: 31 }, { aiEnabled: false }, { aiEnabled: true }, { aiSttModel: "" }, { aiSttModel: sttModel }]) {
+      db.recordServiceSettingsVerification("desktop_stt", { fixture: "invalidate audio" });
+      assert.equal(save(patch).ok, true);
+      assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", `${service}: STT relevant settings invalidate evidence`);
+    }
+    db.recordServiceSettingsVerification("desktop_stt", { fixture: "old key" });
+    const rotated = createAiApiKeyUpdate({ aiApiKey: `rotated-${service}-fixture`, clearAiApiKey: false });
+    assert.equal(rotated.ok, true);
+    const rotatedInput = { ...model.createSetupInput(model.toSetupForm(db.getSetupData())), aiApiKey: `rotated-${service}-fixture` };
+    const rotationResult = db.saveInitialSetup(rotatedInput, rotated.update);
+    assert.equal(rotationResult.ok, true, rotationResult.message);
+    assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "Encrypted key rotation withdraws evidence");
+  }
   console.log("voice-stt-settings-smoke-ok: drafts, persistence, provider policy, durable exact ack/retry, OFF and secret privacy");
 } finally {
   Module._load = originalLoad; globalThis.fetch = nativeFetch; raw?.close(); db.close();

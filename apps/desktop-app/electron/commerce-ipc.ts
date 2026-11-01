@@ -1,9 +1,16 @@
-import { ipcMain } from "electron";
+import { app, ipcMain, safeStorage } from "electron";
+import { CommerceBenefitsKey } from "./commerce-benefits-key";
+import { CommerceBenefitsError } from "./commerce-benefits-engine";
+import { benefitsManagementFailure, assertBenefitsManagementSender } from "./ipc/commerce-benefits-ipc";
+import { createTrustedDesktopRendererUrlPredicate } from "./desktop-runtime";
 import { registerProductPhotoIpcHandlers } from "./ipc/product-photo-ipc";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
+import { getMarketSaleBenefitsState, previewMarketSaleBenefits } from "./market-sale-benefits";
 import { completeMarketSale } from "./market-sale-operation";
+import { fullRefundMarketSale, getFullRefundMarketSalePreview, listMarketSaleHistory, MarketSaleRefundError } from "./market-sale-full-refund";
+import { previewCommerceOrderBenefits } from "./commerce-order-benefits";
 import { activateCatalogProduct, deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } from "./commerce-catalog-presentation-store";
 import {
   previewExternalProductImage
@@ -61,6 +68,8 @@ const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
 ];
 
 export function classifyExpectedCommerceRejection(error: unknown): { code: string; message: string } | null {
+  if (error instanceof MarketSaleRefundError) return { code: error.code, message: error.message };
+  if (error instanceof CommerceBenefitsError) return { code: error.code, message: benefitsManagementFailure(error).message };
   if (!(error instanceof Error)) return null;
   const message = String(error.message ?? "").trim();
   if (!message) return null;
@@ -79,15 +88,11 @@ export function registerCommerceIpcHandlers(options: {
     options.assertUnlocked();
     return operation();
   };
-  const mutate = <T>(operation: () => T): T => {
-    options.assertUnlocked();
-    const result = operation();
-    options.onMutation?.();
-    return result;
-  };
   const mutateForIpc = <T>(channel: string, operation: () => T): CommerceIpcMutationResult<T> => {
+    let value: T;
     try {
-      return { ok: true, value: mutate(operation) };
+      options.assertUnlocked();
+      value = operation();
     } catch (error) {
       const rejection = classifyExpectedCommerceRejection(error);
       if (!rejection) throw error;
@@ -107,6 +112,10 @@ export function registerCommerceIpcHandlers(options: {
         message: rejection.message
       };
     }
+    // The domain operation has committed. Projection/notification failures are
+    // uncertain responses, never an expected rejection proving rollback.
+    options.onMutation?.();
+    return { ok: true, value };
   };
   const ephemeralMutate = <T>(operation: () => T): T => {
     options.assertUnlocked();
@@ -191,8 +200,51 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutateForIpc("commerce:sale:createPaid", () => createRuntimePaidSale(databasePath(), input))
   );
-  ipcMain.handle("commerce:sale:completeMarket", (_event, input: Parameters<DesktopCommerceBridge["completeMarketSale"]>[0]) =>
-    mutateForIpc("commerce:sale:completeMarket", () => completeMarketSale(databasePath(), input))
+  const marketBenefitsAuthority = (event: Electron.IpcMainInvokeEvent) => {
+    const assertAuthorized = () => assertBenefitsManagementSender(event, { assertUnlocked: options.assertUnlocked,
+      isTrustedRendererUrl: createTrustedDesktopRendererUrlPredicate(Boolean(process.env.VITE_DEV_SERVER_URL), process.env.VITE_DEV_SERVER_URL) });
+    assertAuthorized();
+    return { actor: { id: "local-desktop-owner", role: "desktop_owner" as const, assertAuthorized },
+      keys: new CommerceBenefitsKey(app.getPath("userData"), safeStorage) };
+  };
+  ipcMain.handle("commerce:sale:benefitsState", event => {
+    try {
+      marketBenefitsAuthority(event);
+      return { ok: true, value: getMarketSaleBenefitsState(databasePath()) };
+    } catch (error) { return benefitsManagementFailure(error); }
+  });
+  ipcMain.handle("commerce:sale:previewBenefits", (event, input: Parameters<DesktopCommerceBridge["previewMarketSaleBenefits"]>[0]) => {
+    try {
+      const authority = marketBenefitsAuthority(event);
+      return { ok: true, value: previewMarketSaleBenefits(databasePath(), input, authority) };
+    }
+    catch (error) { return benefitsManagementFailure(error); }
+  });
+  ipcMain.handle("commerce:sale:completeMarket", (event, input: Parameters<DesktopCommerceBridge["completeMarketSale"]>[0]) =>
+    mutateForIpc("commerce:sale:completeMarket", () => {
+      if (input?.benefits === undefined) return completeMarketSale(databasePath(), input);
+      try {
+        const authority = marketBenefitsAuthority(event);
+        return completeMarketSale(databasePath(), input, authority);
+      } catch (error) {
+        if (classifyExpectedCommerceRejection(error)) throw error;
+        throw new CommerceBenefitsError("BENEFITS_FAST_SALE_FAILED");
+      }
+    })
+  );
+  ipcMain.handle("commerce:sale:fullRefundMarketPreview", (event, saleId: string) => {
+    const authority = marketBenefitsAuthority(event);
+    return getFullRefundMarketSalePreview(databasePath(), saleId, authority);
+  });
+  ipcMain.handle("commerce:sale:marketHistory", (event, input: Parameters<DesktopCommerceBridge["listMarketSaleHistory"]>[0]) => {
+    const authority = marketBenefitsAuthority(event);
+    return listMarketSaleHistory(databasePath(), input, authority);
+  });
+  ipcMain.handle("commerce:sale:fullRefundMarket", (event, input: Parameters<DesktopCommerceBridge["fullRefundMarketSale"]>[0]) =>
+    mutateForIpc("commerce:sale:fullRefundMarket", () => {
+      const authority = marketBenefitsAuthority(event);
+      return fullRefundMarketSale(databasePath(), input, authority);
+    })
   );
 
   ipcMain.handle("commerce:price:resolve", (_event, input: Parameters<DesktopCommerceBridge["resolveProductPrice"]>[0]) =>
@@ -211,8 +263,23 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:order:updateStatus", (_event, input: Parameters<DesktopCommerceBridge["updateOrderStatus"]>[0]) =>
     mutateForIpc("commerce:order:updateStatus", () => updateRuntimeOrderStatus(databasePath(), input))
   );
-  ipcMain.handle("commerce:order:fulfill", (_event, input: Parameters<DesktopCommerceBridge["fulfillOrder"]>[0]) =>
-    mutateForIpc("commerce:order:fulfill", () => fulfillRuntimeOrder(databasePath(), input))
+  ipcMain.handle("commerce:order:previewBenefits", (event, input: Parameters<DesktopCommerceBridge["previewOrderBenefits"]>[0]) => {
+    try {
+      const authority = marketBenefitsAuthority(event);
+      return { ok: true, value: previewCommerceOrderBenefits(databasePath(), input, authority) };
+    } catch (error) { return benefitsManagementFailure(error); }
+  });
+  ipcMain.handle("commerce:order:fulfill", (event, input: Parameters<DesktopCommerceBridge["fulfillOrder"]>[0]) =>
+    mutateForIpc("commerce:order:fulfill", () => {
+      if (input?.benefits === undefined) return fulfillRuntimeOrder(databasePath(), input);
+      try {
+        const authority = marketBenefitsAuthority(event);
+        return fulfillRuntimeOrder(databasePath(), input, authority);
+      } catch (error) {
+        if (classifyExpectedCommerceRejection(error)) throw error;
+        throw new CommerceBenefitsError("BENEFITS_ORDER_FULFILLMENT_FAILED");
+      }
+    })
   );
 
   ipcMain.handle("commerce:customerCredit:list", (_event, input: Parameters<DesktopCommerceBridge["listCustomerCreditAccounts"]>[0]) =>

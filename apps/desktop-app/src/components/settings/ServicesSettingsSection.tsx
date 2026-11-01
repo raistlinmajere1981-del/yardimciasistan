@@ -1,8 +1,8 @@
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import { isBusinessServiceAvailable, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
-import type { DesktopAndroidInstallationSnapshot } from "../../../electron/android-installation-service";
 import type { SetupFormState } from "../../app/setup-model";
+import { LocalCompanionPairingPanel } from "./LocalCompanionPairingPanel";
 import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
@@ -13,12 +13,8 @@ export interface ServicesSettingsProps {
   disabled?: boolean;
   dashboardData?: DesktopDashboardData;
   androidDeviceState?: SyncState;
-  androidInstallState?: SyncState;
-  androidInstallSnapshot?: DesktopAndroidInstallationSnapshot | null;
   onFormChange: (form: SetupFormState) => void;
-  onRefreshAndroidInstallDevices?: () => void;
-  onInstallAndroidApp?: (serial: string) => void;
-  onProvisionAndroidApp?: (serial: string) => void;
+  onRefreshAndroidDevices?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   androidPermissionGroups?: Record<string, AndroidPermissionGroups>;
   onAndroidPermissionGroupsChange?: (deviceId: string, groups: AndroidPermissionGroups) => void;
@@ -34,12 +30,8 @@ export function ServicesSettingsSection({
   disabled = false,
   dashboardData,
   androidDeviceState = "idle",
-  androidInstallState = "idle",
-  androidInstallSnapshot = null,
   onFormChange,
-  onRefreshAndroidInstallDevices,
-  onInstallAndroidApp,
-  onProvisionAndroidApp,
+  onRefreshAndroidDevices,
   onSetAndroidDeviceRole,
   androidPermissionGroups,
   onAndroidPermissionGroupsChange,
@@ -113,16 +105,14 @@ export function ServicesSettingsSection({
                   {!androidReady && <p className="settings-service-empty" role="status">
                     Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.
                   </p>}
+                  {androidReady && setupData.localNetworkEnabled !== false && form.localNetworkEnabled
+                    && <LocalCompanionPairingPanel disabled={disabled} />}
                   <AndroidDevicesSection
                     operationsEnabled={androidReady && !disabled}
                     devices={dashboardData?.androidDevices ?? []}
                     enabledCapabilities={enabledCapabilities}
                     state={androidDeviceState}
-                    installState={androidInstallState}
-                    installSnapshot={androidInstallSnapshot}
-                    {...(onRefreshAndroidInstallDevices === undefined ? {} : { onRefreshInstallDevices: onRefreshAndroidInstallDevices })}
-                    {...(onInstallAndroidApp === undefined ? {} : { onInstallApp: onInstallAndroidApp })}
-                    {...(onProvisionAndroidApp === undefined ? {} : { onProvisionApp: onProvisionAndroidApp })}
+                    {...(onRefreshAndroidDevices === undefined ? {} : { onRefresh: onRefreshAndroidDevices })}
                     {...(onSetAndroidDeviceRole === undefined ? {} : { onSetRole: onSetAndroidDeviceRole })}
                     {...(androidPermissionGroups === undefined ? {} : { permissionGroupsByDevice: androidPermissionGroups })}
                     {...(onAndroidPermissionGroupsChange === undefined ? {} : { onPermissionGroupsChange: onAndroidPermissionGroupsChange })}

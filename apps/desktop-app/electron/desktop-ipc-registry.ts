@@ -1,4 +1,5 @@
 import { registerDealerAccessIpcHandlers } from "./ipc/dealer-access-ipc";
+import { registerCommerceBenefitsIpcHandlers } from "./ipc/commerce-benefits-ipc";
 import { registerCommerceProductPublicationIpcHandlers } from "./ipc/commerce-product-publication-ipc";
 import { app, ipcMain, type WebContents } from "electron";
 import {
@@ -9,11 +10,9 @@ import {
 import type { DesktopDatabase } from "./database";
 import type { SyncCoordinator } from "./sync-coordinator";
 import type { DesktopAppLockService } from "./app-lock-service";
-import { AndroidInstallationService } from "./android-installation-service";
 import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver";
 import type { EgmKbsBackgroundSession } from "./egm-kbs-background-session";
 import { getKbsSettings } from "./kbs-settings";
-import { getWebSyncConfig } from "./sync-config";
 import { registerAppLockIpcHandlers } from "./ipc/app-lock-ipc";
 import { registerAppIpcHandlers } from "./ipc/app-ipc";
 import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
@@ -58,6 +57,10 @@ export type DesktopIpcRegistryDependencies = {
   getDatabase: () => DesktopDatabase;
   getSyncCoordinator: () => SyncCoordinator;
   getAppLockService: () => DesktopAppLockService;
+  getLocalPairingService: AndroidDeviceIpcOptions["getLocalPairingService"];
+  prepareLocalPairing: AndroidDeviceIpcOptions["prepareLocalPairing"];
+  getLocalPairingEndpoint: AndroidDeviceIpcOptions["getLocalPairingEndpoint"];
+  getLocalPairingSpkiSha256: AndroidDeviceIpcOptions["getLocalPairingSpkiSha256"];
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   enabledBusinessCapabilities: () => BusinessCapability[];
@@ -136,6 +139,7 @@ export function registerDesktopIpcHandlers(
     assertTaskScope
   } = dependencies;
   registerWebConnectionIpcHandlers({ getDatabase, assertUnlocked });
+  registerCommerceBenefitsIpcHandlers({ getDatabase, assertUnlocked, isTrustedRendererUrl });
   const dictation = createDesktopDictationService({ getDatabase, assertUnlocked, assertCapability });
   registerDesktopDictationIpcHandlers(dictation);
 
@@ -258,43 +262,16 @@ export function registerDesktopIpcHandlers(
     assertUnlocked
   });
 
-  const androidInstallationService = new AndroidInstallationService({
-    getConnection: () => getWebSyncConfig(getDatabase().getSetupData()),
-    getDesktopId: () => getDatabase().getSyncRuntimeStatus().clientId
-  });
-
   registerAndroidDeviceIpcHandlers({
+    getLocalPairingService: dependencies.getLocalPairingService,
+    prepareLocalPairing: dependencies.prepareLocalPairing,
+    getLocalPairingEndpoint: dependencies.getLocalPairingEndpoint,
+    getLocalPairingSpkiSha256: dependencies.getLocalPairingSpkiSha256,
+    isTrustedRendererUrl,
     assertUnlocked,
     getDatabase,
     assertCapability,
-    finalizeDeviceMutation,
-    listInstallDevices: () => androidInstallationService.listDevices(),
-    installOnDevice: async (serial) => {
-      const publication = await publishAndroidSnapshot();
-      if (!publication.ok) {
-        return {
-          ok: false,
-          message:
-            `Android kurulumu için web bağlantısı hazırlanamadı. ${publication.message}`
-        };
-      }
-      const result = await androidInstallationService.install(serial);
-      if (result.ok) getSyncCoordinator().scheduleSoon(2_500);
-      return result;
-    },
-    provisionOnDevice: async (serial) => {
-      const publication = await publishAndroidSnapshot();
-      if (!publication.ok) {
-        return {
-          ok: false,
-          message:
-            `Android bağlantısı için web yayını hazırlanamadı. ${publication.message}`
-        };
-      }
-      const result = await androidInstallationService.provision(serial);
-      if (result.ok) getSyncCoordinator().scheduleSoon(2_500);
-      return result;
-    }
+    finalizeDeviceMutation
   });
 
   registerAiConnectionIpcHandlers({ getDatabase, assertUnlocked });
@@ -356,6 +333,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerTableOrderIpcHandlers({
+    isTrustedRendererUrl,
     assertUnlocked,
     getDatabase,
     assertCapability,

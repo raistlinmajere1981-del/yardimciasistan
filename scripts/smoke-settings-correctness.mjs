@@ -54,6 +54,7 @@ const setup = { businessName: "Settings fixture", profileId: "market", profileOp
 let raw;
 try {
   db.initialize();
+  db.recordServiceSettingsVerification("web", { baseUrl: setup.webModuleUrl, syncSecret: setup.syncSecret });
   // Each service merge carries only its fields, preserving every other owner and draft.
   const fieldCode = ts.transpileModule(readFileSync(resolve("apps/desktop-app/src/app/settings-service-fields.ts"), "utf8"),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -219,7 +220,8 @@ try {
     assert.equal(reopened.getSetupData().arasShipping.enabled, true);
   } finally { reopened.close(); }
   const autoSync = { ...setup, autoSyncEnabled: true };
-  assert.match(validate(autoSync), /test edin/);
+  db.clearServiceSettingsVerification("web");
+  assert.equal(validate(autoSync), null, "passive sync preference needs no new connection test");
   db.recordServiceSettingsVerification("web", { baseUrl: setup.webModuleUrl, syncSecret: setup.syncSecret });
   assert.equal(validate(autoSync), null);
   assert.match(validate({ ...autoSync, webModuleUrl: "https://another.test/module" }), /test edin/);
@@ -233,9 +235,10 @@ try {
   assert.equal(validate({ ...autoSync, webModuleUrl: setup.webModuleUrl + "/" }), null, "trailing slash is the same effective transport");
   assert.match(validate({ ...autoSync, syncSecret: "new-untested-secret" }), /test edin/);
   assert.match(validate({ ...autoSync, webModuleUrl: "https://new.test" }), /test edin/);
-  assert.equal(validate({ ...setup, syncSecret: "new-offline-secret" }), null, "disabled sync needs no live test");
+  assert.match(validate({ ...setup, syncSecret: "new-offline-secret" }), /test edin/, "transport changes still require evidence with passive sync OFF");
   assert.equal(db.saveInitialSetup(setup).ok, true);
-  assert.match(validate(autoSync), /test edin/, "reenabling unchanged transport still requires verification");
+  assert.equal(validate(autoSync), null, "reenabling unchanged transport saves locally without a new test");
+  assert.equal(validate({ ...setup, webModuleUrl: "", syncSecret: "", autoSyncEnabled: false }), null, "disconnecting is a local choice without test evidence");
   assert.match(validate({ ...setup, arasShipping: { ...shipping, username: null } }), /geçersiz/);
 
   assert.equal(db.saveInitialSetup({ ...setup, profileId: "pension" }).ok, true);

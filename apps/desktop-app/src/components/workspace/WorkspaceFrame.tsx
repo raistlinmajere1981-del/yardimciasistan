@@ -1,4 +1,4 @@
-import { createContext, useContext, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { ModalSurface, type ModalSurfaceProps } from "../ui/ModalSurface";
@@ -7,6 +7,7 @@ import type { WorkspacePresentation } from "./workspace-intent";
 
 /** Shell content bounds; measured only while a modal frame is open. */
 export const WorkspaceCanvasContext = createContext<RefObject<HTMLElement | null> | null>(null);
+export const WorkspaceScaleContext = createContext(1);
 
 interface WorkspaceChromeProps {
   className?: string;
@@ -86,31 +87,39 @@ export function WorkspaceFrame({ title, context, actions, headerSummary, navigat
   const id = useId();
   const marker = useRef<HTMLDivElement>(null);
   const canvas = useContext(WorkspaceCanvasContext);
+  const scale = useContext(WorkspaceScaleContext);
+  const [canvasStyle, setCanvasStyle] = useState<Record<string, string>>({});
   useLayoutEffect(() => {
     const dialog = marker.current?.closest("dialog");
     const content = canvas?.current;
-    if (!dialog || !content) return;
-    const header = content.querySelector<HTMLElement>(":scope > .page-header");
+    if (!dialog) return;
+    const header = content?.querySelector<HTMLElement>(":scope > .page-header");
     const update = () => {
-      const bounds = content.getBoundingClientRect();
+      // Standalone workspaces use the viewport; both paths need CSS zoom compensation.
+      const bounds = content?.getBoundingClientRect() ?? { left: 0, top: 0, width: innerWidth, bottom: innerHeight };
       const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
       const top = Math.min(innerHeight, Math.max(bounds.top, header?.getBoundingClientRect().bottom ?? bounds.top));
-      dialog.style.setProperty("--workspace-canvas-left", `${bounds.left / zoom}px`);
-      dialog.style.setProperty("--workspace-canvas-top", `${top / zoom}px`);
-      dialog.style.setProperty("--workspace-canvas-width", `${Math.min(bounds.width, innerWidth - bounds.left) / zoom}px`);
-      dialog.style.setProperty("--workspace-canvas-height", `${Math.max(0, Math.min(innerHeight, bounds.bottom) - top) / zoom}px`);
+      const next = {
+        "--workspace-canvas-left": `${bounds.left / zoom}px`,
+        "--workspace-canvas-top": `${top / zoom}px`,
+        "--workspace-canvas-width": `${Math.min(bounds.width, innerWidth - bounds.left) / zoom}px`,
+        "--workspace-canvas-height": `${Math.max(0, Math.min(innerHeight, bounds.bottom) - top) / zoom}px`
+      };
+      setCanvasStyle(previous => Object.keys(next).every(key => previous[key] === next[key as keyof typeof next]) ? previous : next);
     };
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(content);
+    if (content) observer.observe(content);
     if (header) observer.observe(header);
+    // Preference application occurs in the parent effect after this layout effect.
+    const frame = requestAnimationFrame(update);
     window.addEventListener("resize", update);
-    content.addEventListener("scroll", update);
-    return () => { observer.disconnect(); window.removeEventListener("resize", update); content.removeEventListener("scroll", update); };
-  }, [canvas]);
+    content?.addEventListener("scroll", update);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); window.removeEventListener("resize", update); content?.removeEventListener("scroll", update); };
+  }, [canvas, scale]);
 
   return (
-    <ModalSurface {...modal} labelledBy={`${id}-title`} className={`workspace-frame workspace-frame--${presentation} ${className}`}>
+    <ModalSurface {...modal} style={canvasStyle} labelledBy={`${id}-title`} className={`workspace-frame workspace-frame--${presentation} ${className}`}>
       <div ref={marker} hidden aria-hidden="true" />
       <WorkspaceChrome
         title={title}

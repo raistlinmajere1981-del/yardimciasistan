@@ -110,7 +110,7 @@ export type AndroidPermissionGroups = Record<AndroidPermissionGroupId, boolean>;
 
 export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermissionGroupId, readonly AndroidPermission[]>> = {
   voice_dictation: ["voice.dictation"],
-  market_sales: ["market.product.view", "market.sale.complete"],
+  market_sales: ["market.product.view", "market.sale.complete", "customer.view"],
   customer_credit_view: ["customer_credit.view"],
   customer_credit_payment: ["customer_credit.view", "customer_credit.payment"],
   commerce_orders_view: ["commerce_order.view"],

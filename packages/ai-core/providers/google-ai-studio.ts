@@ -346,13 +346,11 @@ export function isGoogleAiStudioVisionModel(model: Pick<GoogleAiStudioModel, "id
     return false;
   }
 
-  const generalFlashFamily = id.match(/^gemini-(\d+)(?:\.(\d+))?-(?:flash-lite|flash)(?:-|$)/);
-  if (!generalFlashFamily) {
-    return false;
-  }
-
-  const majorVersion = Number(generalFlashFamily[1]);
-  return Number.isFinite(majorVersion) && majorVersion >= 3;
+  // Discover current general-purpose text + vision families from the live API.
+  // Avoid a minor-version allowlist: the provider controls what is actually available.
+  // Specialized (image, audio, embedding, preview, etc.) models were filtered above.
+  const generalFamily = id.match(/^gemini-(\d+)(?:\.(\d+))?-(?:flash-lite|flash|pro)$/);
+  return Boolean(generalFamily) && Number(generalFamily?.[1]) >= 3;
 }
 
 export async function listGoogleAiStudioModels(

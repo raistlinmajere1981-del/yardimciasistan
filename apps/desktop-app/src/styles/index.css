@@ -69,6 +69,7 @@
 /* Keep the page's responsive field bounds after feature layouts, as in the original cascade. */
 @import "./pages/settings.css" layer(pages);
 @import "./pages/translations.css" layer(pages);
+@import "./pages/print-management.css" layer(pages);
 @import "../components/settings/business-location-map-picker.css" layer(pages);
 @import "./pages/menu-preview.css" layer(pages);
 @import "./pages/marketing.css" layer(pages);

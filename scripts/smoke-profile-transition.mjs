@@ -24,7 +24,7 @@ function scenario(run) {
     const save = (patch = {}) => {
       const current = fixture.database.getSetupData();
       const input = createSmokeSetupInput({ ...current, businessName: current.businessName || "Profile matrix",
-        phone: "", whatsapp: "", syncSecret: "profile-matrix-secret",
+        phone: "", whatsapp: "",
         servicePreferences: current.servicePreferences, ...patch });
       const result = fixture.database.saveInitialSetup(input);
       assert.equal(result.ok, true, result.message);
@@ -67,7 +67,9 @@ for (const target of profiles) {
   for (const origin of profiles.filter(profile => profile.id !== target.id)) {
     for (const path of ["setup", "apply"]) {
       await test(`${path}: ${origin.id} -> ${target.id} -> ${origin.id}, no remembered overrides`, () => scenario(({ database, raw, save }) => {
-        save({ profileId: origin.id, profileOptions: origin.defaultOptionalCapabilities });
+        // This matrix also proves that configured Web transport survives profile changes.
+        save({ profileId: origin.id, profileOptions: origin.defaultOptionalCapabilities,
+          webModuleUrl: "https://example.test/yardimci-asistan", syncSecret: "profile-matrix-secret", autoSyncEnabled: true });
         // Invert ALL optional choices: no hard-coded profile/capability allowlist in this matrix.
         save({ profileOptions: origin.optionalCapabilities.filter(capability => !origin.defaultOptionalCapabilities.includes(capability)) });
         setBusinessCapability(database.databasePath, { capability: C.ANDROID, enabled: true });
@@ -111,6 +113,25 @@ const stateTables = ["business", "business_capabilities", "settings", "ai_servic
   "business_messaging_provider_config", "marketing_provider_config", "kbs_service_settings", "sync_outbox", "sync_outbox_revisions",
   "sync_publication_payloads", "customer_web_access"];
 const snapshotRows = raw => Object.fromEntries(stateTables.map(table => [table, raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
+
+await test("Web-less setup stays local-only and rejects incomplete Web credentials atomically", () => scenario(({ database, raw, save }) => {
+  save({ profileId: "market", autoSyncEnabled: true });
+  const setup = database.getSetupData();
+  assert.equal(setup.setupRequired, false);
+  assert.equal(setup.webModuleUrl, "");
+  assert.equal(setup.syncSecret, "");
+  assert.equal(setup.autoSyncEnabled, false, "Web-less setup must disable passive sync");
+  const before = snapshotRows(raw);
+  for (const [patch, message] of [
+    [{ syncSecret: "profile-matrix-secret" }, "Web modül adresi http veya https ile başlamalı."],
+    [{ webModuleUrl: "https://example.test/yardimci-asistan" }, "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı."]
+  ]) {
+    const result = database.saveInitialSetup(createSmokeSetupInput({ ...setup, ...patch }));
+    assert.equal(result.ok, false);
+    assert.equal(result.message, message);
+    assert.deepEqual(snapshotRows(raw), before, "invalid Web transport must not persist setup or publication intent");
+  }
+}));
 
 for (const [stage, table, when] of [
   ["profile", "business", "NEW.profile_id != OLD.profile_id"],

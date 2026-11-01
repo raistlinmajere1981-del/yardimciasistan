@@ -2,6 +2,8 @@ import { Bot, DatabaseBackup, LockKeyhole, Smartphone, Wifi } from "lucide-react
 import { useMemo } from "react";
 import type { DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import type { AutomaticSyncStatus } from "../../../electron/sync-coordinator";
+import { projectConnectionStatus } from "../../app/connection-status";
+import { useNetworkSignal } from "../../app/network-signal";
 import { Panel } from "../ui/Panel";
 
 interface SystemHealthPanelProps {
@@ -32,22 +34,25 @@ export function SystemHealthPanel({
   features,
   aiEnabled
 }: SystemHealthPanelProps) {
+  const networkSignal = useNetworkSignal();
   const items = useMemo<HealthItem[]>(() => {
-    const activeDevices = data.androidDevices.filter((device) => device.isActive && !device.revokedAt).length;
-    const pendingDevices = data.androidDevices.filter((device) => !device.isActive && !device.revokedAt).length;
-    const webUrl = setup.webModuleUrl || data.webModuleUrl;
-    const webItem = buildWebHealth(webUrl, setup.autoSyncEnabled ?? syncStatus.enabled, syncStatus);
+    const connection = projectConnectionStatus({
+      setup, syncStatus, networkSignal, androidEnabled: features.android, devices: data.androidDevices
+    });
+    const activeDevices = connection.approvedAndroidDevices;
+    const pendingDevices = connection.pendingAndroidDevices;
 
-    const items: HealthItem[] = [webItem];
+    const items: HealthItem[] = [
+      { key: "web", label: "Web bağlantısı", value: connection.web.label, detail: connection.web.detail, tone: connection.web.tone, icon: Wifi },
+      { key: "network", label: "Ağ sinyali", value: connection.network.label, detail: connection.network.detail, tone: connection.network.tone, icon: Wifi }
+    ];
     if (features.android) {
       items.push({
         key: "android",
-        label: "Android",
-        value: pendingDevices > 0 ? `${pendingDevices} onay bekliyor` : `${activeDevices} aktif cihaz`,
-        detail: pendingDevices > 0
-          ? "Yeni telefon masaüstünden onaylanmadan işletme verisini göremez."
-          : activeDevices > 0 ? "Telefon yetkileri masaüstünden yönetiliyor." : "Henüz onaylanmış telefon yok.",
-        tone: pendingDevices > 0 ? "warning" : activeDevices > 0 ? "success" : "muted",
+        label: "Yerel ağ Companion",
+        value: connection.companion.label,
+        detail: `${connection.companion.detail} ${activeDevices} onaylı cihaz${pendingDevices > 0 ? ` · ${pendingDevices} onay bekliyor` : ""}. Cihaz kayıtları anlık bağlantı kanıtı değildir.`,
+        tone: pendingDevices > 0 ? "warning" : connection.companion.tone,
         icon: Smartphone
       });
     }
@@ -55,11 +60,11 @@ export function SystemHealthPanel({
       items.push({
         key: "ai",
         label: "AI",
-        value: setup.aiApiKeyConfigured ? "Hazır" : "Anahtar gerekli",
+        value: setup.aiApiKeyConfigured ? "Yapılandırıldı" : "Anahtar gerekli",
         detail: setup.aiApiKeyConfigured
-          ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}`
+          ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}. Servis erişimi burada doğrulanmadı.`
           : "AI açık ancak servis anahtarı henüz tamamlanmamış.",
-        tone: setup?.aiApiKeyConfigured ? "success" : "warning",
+        tone: setup?.aiApiKeyConfigured ? "info" : "warning",
         icon: Bot
       });
     }
@@ -84,7 +89,7 @@ export function SystemHealthPanel({
       }
     );
     return items;
-  }, [aiEnabled, data.androidDevices, data.backupPath, data.webModuleUrl, features.android, setup, syncStatus]);
+  }, [aiEnabled, data.androidDevices, data.backupPath, features.android, networkSignal, setup, syncStatus]);
 
   return (
     <Panel className="system-health-panel" padding="compact" aria-labelledby="system-health-title">
@@ -113,57 +118,7 @@ export function SystemHealthPanel({
   );
 }
 
-function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncStatus | null): HealthItem {
-  if (!webUrl) {
-    return {
-      key: "web",
-      label: "Web bağlantısı",
-      value: "Bağlantı yok",
-      detail: "Web modülü adresi Ayarlar bölümünden tamamlanmalı.",
-      tone: "warning",
-      icon: Wifi
-    };
-  }
-  if (!enabled) {
-    return {
-      key: "web",
-      label: "Web bağlantısı",
-      value: "Otomatik eşitleme kapalı",
-      detail: compactUrl(webUrl),
-      tone: "warning",
-      icon: Wifi
-    };
-  }
-  if (status?.phase === "offline" || status?.phase === "error") {
-    return {
-      key: "web",
-      label: "Web bağlantısı",
-      value: status.phase === "offline" ? "Çevrimdışı" : "Hata",
-      detail: status.message || compactUrl(webUrl),
-      tone: status.phase === "offline" ? "warning" : "danger",
-      icon: Wifi
-    };
-  }
-  return {
-    key: "web",
-    label: "Web bağlantısı",
-    value: "Hazır",
-    detail: "Otomatik eşitleme etkin.",
-    tone: "success",
-    icon: Wifi
-  };
-}
-
 function compactPath(value: string) {
   if (value.length <= 54) return value;
   return `…${value.slice(-52)}`;
-}
-
-function compactUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
-  } catch {
-    return value;
-  }
 }

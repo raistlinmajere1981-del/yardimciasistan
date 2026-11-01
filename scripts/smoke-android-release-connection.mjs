@@ -5,6 +5,7 @@ import { join } from "node:path";
 import process from "node:process";
 
 const secret = "release-apk-must-not-contain-this-secret-987654321";
+const webModuleUrl = "https://pilot.example.test/yardimci-asistan";
 const generator = join(process.cwd(), "scripts", "generate-android-connection-defaults.mjs");
 const result = spawnSync(process.execPath, [generator], {
   cwd: process.cwd(),
@@ -12,7 +13,7 @@ const result = spawnSync(process.execPath, [generator], {
   env: {
     ...process.env,
     YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD: "1",
-    YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL: "https://pilot.example.test/yardimci-asistan",
+    YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL: webModuleUrl,
     YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET: secret
   }
 });
@@ -33,7 +34,8 @@ const generatedPath = join(
 );
 const generated = readFileSync(generatedPath, "utf8");
 assert.equal(generated.includes(secret), false, "Release ConnectionDefaults ortak sync anahtarını içermemeli.");
+assert.equal(generated.includes(webModuleUrl), false, "Release ConnectionDefaults işletmeye ait Web adresini içermemeli.");
+assert.match(generated, /static final String WEB_MODULE_URL = "";/);
 assert.match(generated, /static final String SYNC_SECRET = "";/);
 assert.match(generated, /static final boolean LOCK_EMBEDDED_CONNECTION = false;/);
-assert.match(generated, /https:\/\/pilot\.example\.test\/yardimci-asistan/);
-console.log("android-release-connection-smoke-ok: shared secret omitted");
+console.log("android-release-connection-smoke-ok: injected Web URL and shared secret omitted");

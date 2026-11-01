@@ -26,6 +26,7 @@ import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateRe
 import { MenuProductEntryFields } from "../menu/MenuProductEntryFields";
 import { toItemForm, type ItemFormState } from "../menu/menu-model";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { useWebAvailability } from "../../app/web-availability";
 
 type WorkspaceState = "idle" | "loading" | "success" | "error";
 
@@ -36,11 +37,11 @@ export function ProductWorkspace({
   inventoryEnabled,
   productDataEnabled,
   wholesaleEnabled = false,
-  onlineSalesEnabled = false,
+  onlineSalesEnabled: onlineSalesCapability = false,
   retailFieldsEnabled = true,
   purchasingEnabled = true,
   menuData,
-  qrMenuEnabled = false,
+  qrMenuEnabled: qrMenuCapability = false,
   onSaveMenuEntry,
   onRemoveMenuEntry,
   busy,
@@ -66,6 +67,9 @@ export function ProductWorkspace({
   onProductSaved: (product: CatalogProduct) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
+  const webAvailable = useWebAvailability();
+  const onlineSalesEnabled = webAvailable && onlineSalesCapability;
+  const qrMenuEnabled = webAvailable && qrMenuCapability;
   const navigation = useWorkspaceNavigation();
   const bridge = window.yardimciDesktop?.commerce;
   const [productReadAttempt, setProductReadAttempt] = useState(0);
@@ -114,8 +118,8 @@ export function ProductWorkspace({
   const [removeMenuConfirm, setRemoveMenuConfirm] = useState(false);
   const menuDirty = JSON.stringify(menuForm) !== JSON.stringify(menuBaseline);
   const [createPublished, setCreatePublished] = useState(onlineSalesEnabled);
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || (creating && createPublished !== onlineSalesEnabled);
-  const showPhotoGallery = onlineSalesEnabled && Boolean(productId) && imageDraftMode === "keep" && resourceState === "success";
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || (creating && onlineSalesEnabled && createPublished !== onlineSalesEnabled);
+  const showPhotoGallery = onlineSalesCapability && Boolean(productId) && imageDraftMode === "keep" && resourceState === "success";
   const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockConfirm);
   const mutationBusy = busy || fieldsBusy || photosBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"

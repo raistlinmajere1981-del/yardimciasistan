@@ -292,6 +292,29 @@ export interface FulfillCommerceOrderInput {
   operationKey: string;
   settlement: CommerceOrderFulfillmentSettlement;
   locationId?: string;
+  /** Explicit local checkout opt-in. Codes are ephemeral and must never be persisted. */
+  benefits?: CommerceOrderBenefitsCommand;
+}
+
+export interface CommerceOrderBenefitsCommand {
+  requestedPointsMinor: number;
+  expectedQuote: import("./pricing-benefits").BenefitsQuote;
+  paymentAmountMinor: number;
+  couponCode?: string;
+}
+
+export interface CommerceOrderBenefitsPreviewInput {
+  orderId: string;
+  operationKey: string;
+  paymentMethod: "cash" | "card" | "bank" | "other";
+  requestedPointsMinor: number;
+  couponCode?: string;
+}
+
+export interface CommerceOrderBenefitsPreview {
+  quote: import("./pricing-benefits").BenefitsQuote;
+  availablePointsMinor: number;
+  authority: { state: "preview_only"; canConfirmPoints: false };
 }
 
 export interface CommerceOrderFulfillment {
@@ -310,6 +333,7 @@ export interface CommerceOrderFulfillmentResult {
   fulfillment: CommerceOrderFulfillment;
   order: CommerceOrderDetail;
   sale: CommerceSale;
+  benefits?: import("./pricing-benefits").BenefitsSettlementReceipt;
 }
 
 export interface CommerceSupplier {
@@ -481,3 +505,13 @@ export interface CommerceOnlineCatalog {
   updatedAt: string;
   products: PublishedCommerceProduct[];
 }
+
+export type {
+  BenefitsChannel, BenefitsFamily, BenefitsFamilies, BenefitsScope, BenefitsRule,
+  BenefitsResolvedLine, BenefitsPricingContext, BenefitsAdjustment, BenefitsQuote,
+  BenefitsSource, BenefitsCheckoutIntent, BenefitsReservationReceipt,
+  BenefitsSettlementReceipt, BenefitsCheckoutCommand, BenefitsCheckoutAcknowledgement,
+  BenefitsAuthority, BenefitsManagementResult, BenefitsManagementSnapshot,
+  BenefitsPointAccount, BenefitsPointAdjustmentInput, BenefitsCouponIssueInput, BenefitsManagementBridge,
+  TableOrderBenefitsPreviewInput, TableOrderBenefitsCloseInput, TableOrderBenefitsState, TableOrderBenefitsPreview, TableOrderBenefitsPaidReceipt, TableOrderBenefitsBridge
+} from "./pricing-benefits";

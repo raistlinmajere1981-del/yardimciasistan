@@ -1,5 +1,4 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { useEffect, useRef } from "react";
 import { RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import {
   androidAvailablePermissionGroupIds,
@@ -12,10 +11,6 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice } from "../../../electron/database";
-import type {
-  DesktopAndroidInstallDevice,
-  DesktopAndroidInstallationSnapshot
-} from "../../../electron/android-installation-service";
 import { formatDateTime } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 
@@ -38,7 +33,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   { id: "cashier", label: "Kasa / Hesap", shortLabel: "Kasa", description: "Ödendi / Kapat işlemi" },
   { id: "rooms_tasks", label: "Oda / Günlük İşler", shortLabel: "Oda işleri", description: "Oda durumu ve günlük işler" },
   { id: "customer_reservation", label: "Müşteri / Rezervasyon", shortLabel: "Müşteri / Rezervasyon", description: "Talep yanıtı ve rezervasyon onayı" },
-  { id: "market_sales", label: "Market / Mobil Satış", shortLabel: "Mobil satış", description: "Sepeti son satış kaydına dönüştürme; kart ödemesi harici POS'ta alınır" },
+  { id: "market_sales", label: "Market / Mobil Satış", shortLabel: "Mobil satış", description: "Müşteri seçimi ve sepeti son satış kaydına dönüştürme; kart ödemesi harici POS'ta alınır" },
   { id: "customer_credit_view", label: "Cari / Görüntüleme", shortLabel: "Cari görüntüleme", description: "Müşteri adı, para birimine göre borç ve son hareketler" },
   { id: "customer_credit_payment", label: "Cari / Tahsilat", shortLabel: "Cari tahsilat", description: "Müşteri borcuna nakit, harici kart, havale veya diğer tahsilatı kaydetme" },
   {
@@ -54,11 +49,7 @@ interface AndroidDevicesSectionProps {
   devices: DesktopAndroidDevice[];
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
-  installState: SyncState;
-  installSnapshot: DesktopAndroidInstallationSnapshot | null;
-  onRefreshInstallDevices?: () => void;
-  onInstallApp?: (serial: string) => void;
-  onProvisionApp?: (serial: string) => void;
+  onRefresh?: () => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   permissionGroupsByDevice?: Record<string, AndroidPermissionGroups>;
   onPermissionGroupsChange?: (deviceId: string, groups: AndroidPermissionGroups) => void;
@@ -72,11 +63,7 @@ export function AndroidDevicesSection({
   devices,
   enabledCapabilities,
   state,
-  installState,
-  installSnapshot,
-  onRefreshInstallDevices,
-  onInstallApp,
-  onProvisionApp,
+  onRefresh,
   onSetRole,
   permissionGroupsByDevice,
   onPermissionGroupsChange,
@@ -85,42 +72,13 @@ export function AndroidDevicesSection({
   onRevoke
 }: AndroidDevicesSectionProps) {
   const busy = !operationsEnabled || state === "loading";
-  const installBusy = installState === "loading";
   const { confirm, confirmDialog } = useConfirmDialog();
   const availableDevices = devices.filter((device) => !device.revokedAt);
   const removedDevices = devices.filter((device) => Boolean(device.revokedAt));
-  const usbDevices = installSnapshot?.devices ?? [];
   const availableGroupIds = new Set(androidAvailablePermissionGroupIds(enabledCapabilities));
   const permissionGroupOptions = ANDROID_PERMISSION_GROUP_OPTIONS
     .filter((group) => availableGroupIds.has(group.id))
     .map((group) => capabilityAwareAndroidGroupCopy(group, enabledCapabilities));
-
-  const matchedDeviceIds = new Set<string>();
-  const usbRows = usbDevices.map((usbDevice) => {
-    const registeredDevice = findRegisteredDeviceForUsb(usbDevice, availableDevices);
-    if (registeredDevice) matchedDeviceIds.add(registeredDevice.deviceId);
-    return { usbDevice, registeredDevice };
-  });
-  const autoRepairAttempted = useRef(new Set<string>());
-  // Only exact registered identities can silently restore a missing debug
-  // credential. No model-name guesses, no rekey of connected healthy phones.
-  useEffect(() => {
-    if (!operationsEnabled || !onProvisionApp || installBusy || busy) return;
-    for (const { usbDevice, registeredDevice } of usbRows) {
-      const exact = Boolean(usbDevice.deviceId && usbDevice.deviceId === registeredDevice?.deviceId);
-      if (!exact || !registeredDevice?.isActive || usbDevice.state !== "device"
-          || !usbDevice.appInstalled) continue;
-      if (usbDevice.credentialState === "present") {
-        autoRepairAttempted.current.delete(usbDevice.serial);
-      } else if (usbDevice.credentialState === "missing"
-          && !autoRepairAttempted.current.has(usbDevice.serial)) {
-        autoRepairAttempted.current.add(usbDevice.serial);
-        onProvisionApp(usbDevice.serial);
-        break;
-      }
-    }
-  }, [operationsEnabled, installBusy, busy, onProvisionApp, usbRows]);
-  const offlineRegisteredDevices = availableDevices.filter((device) => !matchedDeviceIds.has(device.deviceId));
 
   const restoreDevice = async (device: DesktopAndroidDevice) => {
     if (!operationsEnabled || !onSetActive) return;
@@ -246,142 +204,33 @@ export function AndroidDevicesSection({
             variant="secondary"
             size="sm"
             type="button"
-            onClick={onRefreshInstallDevices}
-            disabled={!operationsEnabled || !onRefreshInstallDevices || installBusy}
+            onClick={onRefresh}
+            disabled={busy || !onRefresh}
           >
             <RefreshCw size={15} aria-hidden="true" />
-            {installBusy ? "Taranıyor" : "Yenile"}
+            Yenile
           </ActionButton>
         </div>
       </div>
 
-      {usbRows.length === 0 && offlineRegisteredDevices.length === 0 ? (
+      <p className="form-status">
+        Companion APK’sını resmî Yardımcı Asistan demo sitesinin indirme bölümünden telefona indirip açın.
+        Android isterse indirdiğiniz tarayıcı veya dosya yöneticisi için “Bilinmeyen uygulamaları yükle” iznini onaylayın.
+        Güncelleme için aynı bölümdeki yeni APK’yı açın; mevcut uygulama ve verileriniz korunur.
+      </p>
+      <p className="form-status">Aynı Wi-Fi ağına veya USB internet paylaşımına bağlanıp Companion ile HTTPS QR kodunu okutun. Web bağlantısı isteğe bağlıdır.</p>
+
+      {availableDevices.length === 0 ? (
         <div className="android-devices-empty">
           <Smartphone size={22} aria-hidden="true" />
           <div>
             <strong>Henüz telefon yok.</strong>
-            <span>{installSnapshot?.message || "Kurulum için telefonu USB ile bağlayıp USB hata ayıklamasını açın."}</span>
+            <span>Telefonu bağlamak için QR gösterin.</span>
           </div>
         </div>
       ) : (
         <div className="android-device-list">
-          {usbRows.map(({ usbDevice, registeredDevice }) => {
-            const installAction = usbDevice.action === "install" || usbDevice.action === "update";
-            const canInstall = Boolean(installSnapshot?.apkAvailable && installAction);
-            const canCompleteSetup = usbDevice.appInstalled
-              && usbDevice.state === "device"
-              && !registeredDevice;
-            const sameRegisteredPhone = Boolean(registeredDevice
-              && usbDevice.deviceId && usbDevice.deviceId === registeredDevice.deviceId);
-            const canRepair = sameRegisteredPhone && registeredDevice?.isActive
-              && usbDevice.appInstalled && usbDevice.state === "device"
-              && usbDevice.credentialState !== "pending";
-            const primaryLabel = installAction && !installSnapshot?.apkAvailable
-              ? "APK Hazır Değil"
-              : usbDevice.action === "install"
-                ? "Uygulamayı Kur"
-                : usbDevice.action === "update"
-                  ? "Güncelle"
-                  : canCompleteSetup
-                    ? "Kurulumu Tamamla"
-                    : "";
-            const primaryDisabled = !operationsEnabled || installBusy
-              || (installAction
-                ? !canInstall || !onInstallApp
-                : canCompleteSetup
-                  ? !onProvisionApp
-                  : true);
-            return (
-              <article
-                className={`android-device-card${registeredDevice && !registeredDevice.isActive ? " is-inactive" : ""}`}
-                key={usbDevice.serial}
-              >
-                <div className="android-device-identity">
-                  <span className="android-device-icon"><Smartphone size={18} aria-hidden="true" /></span>
-                  <div>
-                    <strong>{registeredDevice?.deviceName || usbDevice.model || "Android Telefon"}</strong>
-                    <code title={registeredDevice?.deviceId || usbDevice.serial}>
-                      {registeredDevice
-                        ? compactAndroidDeviceId(registeredDevice.deviceId)
-                        : usbDevice.deviceId
-                          ? compactAndroidDeviceId(usbDevice.deviceId)
-                          : usbDevice.serial}
-                    </code>
-                  </div>
-                  <div className="android-device-badges">
-                    <span className={`device-state${usbDevice.state === "device" ? " is-active" : " is-inactive"}`}>
-                      USB · {usbDevice.state === "device" ? "Hazır" : usbDevice.state}
-                    </span>
-                    {registeredDevice && (
-                      <>
-                        <span className={`device-role role-${registeredDevice.role}`}>
-                          {registeredDevice.role === "admin" ? "Yönetici" : "Personel"}
-                        </span>
-                        <span className={`device-state${registeredDevice.isActive ? " is-active" : " is-inactive"}`}>
-                          {registeredDevice.isActive ? "Bağlı" : "Pasif"}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <dl className="android-device-details">
-                  <div>
-                    <dt>Uygulama</dt>
-                    <dd>{usbDevice.appInstalled ? usbDevice.installedVersionName || "Kurulu" : "Kurulu değil"}</dd>
-                  </div>
-                  <div>
-                    <dt>Bağlantı</dt>
-                    <dd>{usbDevice.credentialState === "missing" && sameRegisteredPhone
-                      ? "Yeniden eşleştirme gerekli"
-                      : usbDevice.credentialState === "pending"
-                        ? "Eşleştiriliyor"
-                        : registeredDevice
-                          ? registeredDevice.lastSeenAt ? formatDateTime(registeredDevice.lastSeenAt) : "Hazır"
-                          : usbDevice.appInstalled ? "Kurulum tamamlanmadı" : "Uygulama bekleniyor"}</dd>
-                  </div>
-                  <div>
-                    <dt>Durum</dt>
-                    <dd>{registeredDevice
-                      ? androidDevicePermissionSummary(registeredDevice, permissionGroupOptions)
-                      : usbDevice.message}</dd>
-                  </div>
-                </dl>
-
-                {primaryLabel && (
-                  <div className="android-device-actions">
-                    <ActionButton
-                      size="sm"
-                      type="button"
-                      onClick={() => {
-                        if (canInstall) {
-                          onInstallApp?.(usbDevice.serial);
-                        } else if (canCompleteSetup) {
-                          onProvisionApp?.(usbDevice.serial);
-                        }
-                      }}
-                      disabled={primaryDisabled}
-                    >
-                      {primaryLabel}
-                    </ActionButton>
-                  </div>
-                )}
-
-                {canRepair && (
-                  <div className="android-device-actions">
-                    <ActionButton variant="secondary" size="sm" type="button"
-                      onClick={() => onProvisionApp?.(usbDevice.serial)}
-                      disabled={!operationsEnabled || installBusy || !onProvisionApp}>
-                      Yeniden Eşleştir
-                    </ActionButton>
-                  </div>
-                )}
-                {registeredDevice && renderManagement(registeredDevice)}
-              </article>
-            );
-          })}
-
-          {offlineRegisteredDevices.map((device) => {
+          {availableDevices.map((device) => {
             const permissionGroups = permissionGroupsByDevice?.[device.deviceId] ?? device.permissionGroups;
             return (
               <article className={`android-device-card${device.isActive ? "" : " is-inactive"}`} key={device.deviceId}>
@@ -392,7 +241,7 @@ export function AndroidDevicesSection({
                     <code title={device.deviceId}>{compactAndroidDeviceId(device.deviceId)}</code>
                   </div>
                   <div className="android-device-badges">
-                    <span className="device-state is-inactive">USB · Bağlı değil</span>
+                    <span className="device-state">Yerel cihaz</span>
                     <span className={`device-role role-${device.role}`}>{device.role === "admin" ? "Yönetici" : "Personel"}</span>
                     <span className={`device-state${device.isActive ? " is-active" : " is-inactive"}`}>
                       {device.isActive ? "Aktif" : "Pasif"}
@@ -446,25 +295,6 @@ export function AndroidDevicesSection({
       )}
     </section>
   );
-}
-
-function findRegisteredDeviceForUsb(
-  usbDevice: DesktopAndroidInstallDevice,
-  devices: DesktopAndroidDevice[]
-): DesktopAndroidDevice | undefined {
-  if (usbDevice.deviceId) {
-    const exact = devices.find((device) => device.deviceId === usbDevice.deviceId);
-    if (exact) return exact;
-  }
-
-  const model = normalizeDeviceName(usbDevice.model);
-  if (!model) return undefined;
-  const matches = devices.filter((device) => normalizeDeviceName(device.deviceName) === model);
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
-function normalizeDeviceName(value: string): string {
-  return String(value ?? "").trim().toLocaleLowerCase("tr-TR");
 }
 
 function compactAndroidDeviceId(deviceId: string): string {

@@ -1,0 +1,95 @@
+.print-management__layout {
+  display: grid; grid-template-columns: 11rem minmax(0, 1fr) 16rem;
+  min-width: 0; min-height: 0;
+}
+.print-management__documents, .print-management__configuration {
+  min-width: 0; overflow: auto; padding: var(--space-3);
+  overscroll-behavior: contain; scrollbar-gutter: stable;
+}
+.print-management__documents { border-right: 1px solid var(--color-border); }
+.print-management__configuration { border-left: 1px solid var(--color-border); }
+.print-management h3 { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--color-shell-ink); }
+.print-management__documents .action-button {
+  width: 100%; justify-content: flex-start; text-align: left;
+  margin-bottom: var(--space-1); white-space: normal;
+}
+.print-management__documents svg { flex: none; }
+.print-management__documents small { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
+.print-management__preview {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  padding: var(--space-4); background: var(--color-bg-surface); gap: var(--space-2);
+}
+.print-management__preview-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.print-management__preview-heading h3 { margin: 0; }
+.print-management__hint { margin: 0; font-size: var(--text-xs); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.print-management__canvas {
+  flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
+  display: grid; justify-items: center; align-items: start; padding: var(--space-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-bg-app); scrollbar-gutter: stable;
+}
+.print-management__paper {
+  width: min(100%, 19rem); aspect-ratio: 1 / 2; box-sizing: border-box;
+  padding: var(--space-4); color: var(--color-text); background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-strong); box-shadow: var(--shadow-panel);
+  font-size: var(--text-sm); overflow-wrap: anywhere;
+}
+.print-management__paper--sheet { width: min(100%, 30rem); aspect-ratio: 210 / 297; }
+.print-management__paper--shipping { width: min(100%, 24rem); aspect-ratio: 2 / 3; }
+.print-management__paper--label { width: min(100%, 22rem); aspect-ratio: 3 / 2; }
+.print-management__paper header { display: grid; text-align: center; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px dashed var(--color-border-strong); }
+.print-management__paper header strong { font-size: var(--text-lg); }
+.print-management__sample { font-size: var(--text-xs); letter-spacing: .2em; color: var(--color-text-muted); }
+.print-management__paper-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); font-size: var(--text-xs); }
+.print-management__paper dl { margin: var(--space-4) 0; display: grid; gap: var(--space-3); }
+.print-management__paper dl > div, .print-management__total { display: flex; justify-content: space-between; gap: var(--space-3); }
+.print-management__paper dd { margin: 0; text-align: right; }
+.print-management__total { padding-top: var(--space-3); border-top: 1px dashed var(--color-border-strong); }
+.print-management__paper footer { margin-top: var(--space-4); text-align: center; font-size: var(--text-xs); color: var(--color-text-muted); }
+.print-management__details { margin: var(--space-4) 0; display: grid; gap: var(--space-3); }
+.print-management__details dt { font-size: var(--text-xs); color: var(--color-text-muted); }
+.print-management__details dd { margin: var(--space-1) 0 0; font-size: var(--text-sm); }
+.print-management__details small { display: block; color: var(--color-text-muted); }
+.print-management__channel { display: flex; gap: var(--space-2); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.print-management__channel svg { flex: none; color: var(--color-text-muted); }
+.print-management__channel p { margin: var(--space-1) 0; }
+.print-management__channel small { color: var(--color-text-muted); }
+.print-management__empty { padding: var(--space-4); }
+@media (max-width: 1000px) {
+  .print-management__layout { grid-template-columns: 10rem minmax(0, 1fr); overflow: auto; align-content: start; }
+  .print-management__configuration { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--color-border); overflow: visible; }
+  .print-management__preview { min-height: 32rem; }
+  .print-management__canvas { flex: none; max-height: 32rem; }
+}
+@media (max-width: 600px) {
+  .print-management__layout { display: block; }
+  .print-management__documents { border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .print-management__preview { padding: var(--space-2); }
+  .print-management__canvas { padding: var(--space-2); }
+}
+
+.print-management__configuration label { display: grid; gap: .35rem; margin-block: .7rem; }
+.print-management__configuration select { width: 100%; min-width: 0; }
+.print-management__channel > div { min-width: 0; flex: 1; }
+
+.print-management__inspector { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.print-management__inspector label { display: grid; min-width: 0; gap: var(--space-1); font-size: var(--text-xs); }
+.print-management__inspector input, .print-management__inspector select { min-width: 0; width: 100%; }
+.print-management__move { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.print-management__paper--layout { position: relative; padding: 0; flex: none; overflow: hidden; }
+.print-management__field.action-button { position: absolute; min-height: 0; min-width: 0; padding: 0; overflow: hidden; white-space: nowrap; font-size: var(--text-xs); touch-action: none; cursor: grab; }
+.print-management__row-field { position: absolute; overflow: hidden; white-space: nowrap; font-size: var(--text-xs); border-bottom: 1px dashed var(--color-border-strong); pointer-events: none; }
+.print-management__watermark { position: absolute; bottom: 0; left: 0; width: 100%; text-align: center; font-size: var(--text-xs); color: var(--color-text-muted); pointer-events: none; }
+@media (max-width: 600px) { .print-management__inspector { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.print-management__form-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+
+.print-management__preparation { display: flex; flex-direction: column; min-height: 0; gap: var(--space-2); overflow: auto; }
+.print-management__preparation .print-management__canvas { flex: none; }
+.print-management__preparation input[type="checkbox"] { width: auto; justify-self: start; }
+.print-management__corners { position: relative; width: min(100%, 32rem); margin: var(--space-4); touch-action: none; }
+.print-management__corners > img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+.print-management__quad { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.print-management__quad polygon { fill: none; stroke: var(--color-accent); stroke-width: .5; }
+.print-management__corner.action-button { position: absolute; transform: translate(-50%, -50%); touch-action: none; padding: 0; min-width: var(--interaction-target-min); }
+.print-management__prepared-preview { width: min(100%, 32rem); height: auto; margin-top: var(--space-4); }

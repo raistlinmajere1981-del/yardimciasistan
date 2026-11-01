@@ -16,6 +16,7 @@ export function TableRelationsPanel({
   customersEnabled,
   reservationsEnabled,
   roomFolioTransferEnabled,
+  transferDisabled = false,
   quickCustomerId,
   onCreateCustomer,
   onCreateReservation,
@@ -28,6 +29,7 @@ export function TableRelationsPanel({
   customersEnabled: boolean;
   reservationsEnabled: boolean;
   roomFolioTransferEnabled: boolean;
+  transferDisabled?: boolean;
   quickCustomerId?: string;
   onCreateCustomer: () => void;
   onCreateReservation: () => void;
@@ -155,7 +157,7 @@ export function TableRelationsPanel({
     {roomFolioTransferEnabled && order && order.total > 0 && <TableRoomTransfer
       key={order.id}
       order={order}
-      busy={disabled}
+      busy={disabled || transferDisabled}
       onTransfer={onTransfer}
       revision={data.revision}
       customerId={table.currentCustomerId}

@@ -1008,7 +1008,11 @@ export const LOCAL_COMPANION_ENDPOINTS = {
   status: `${LOCAL_COMPANION_API_PREFIX}/status`,
   summary: `${LOCAL_COMPANION_API_PREFIX}/summary`,
   action: `${LOCAL_COMPANION_API_PREFIX}/action`,
-  pair: `${LOCAL_COMPANION_API_PREFIX}/pair`
+  pair: `${LOCAL_COMPANION_API_PREFIX}/pair`,
+  benefitsBalance: `${LOCAL_COMPANION_API_PREFIX}/benefits-balance`,
+  customerSalePreview: `${LOCAL_COMPANION_API_PREFIX}/customer-sale-preview`,
+  pointSpendQuote: `${LOCAL_COMPANION_API_PREFIX}/point-spend-quote`,
+  couponAttempt: `${LOCAL_COMPANION_API_PREFIX}/coupon-attempt`
 } as const;
 export const LOCAL_COMPANION_DEVICE_ID_HEADER = "X-YA-Device-Id";
 export const LOCAL_COMPANION_TOKEN_HEADER = "X-YA-Local-Token";

@@ -32,6 +32,9 @@ try {
     aiBaseUrl: "https://api.openai.com/v1", aiTimeoutSeconds: 30, aiApiKey: "", clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: []
   }).ok, true);
+  const connectedSetup = database.getSetupData();
+  assert.equal(connectedSetup.webModuleUrl, "https://catalog.example.test");
+  assert.equal(connectedSetup.syncSecret, "online-catalog-ui-secret");
   const product = saveRuntimeCatalogProduct(database.databasePath, { name: "Publication UI product", salePrice: 25, currency: "TRY", unit: "piece", trackInventory: false, isActive: true });
   server = await createServer({ root: appPath, configFile: join(appPath, "vite.renderer.config.ts"), logLevel: "error",
     server: { host: "127.0.0.1", port: 0 }, plugins: [{ name: "online-catalog-ui-smoke", configureServer(instance) {
@@ -46,12 +49,13 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let saves = 0;
+  let publicationReads = 0;
   const createdProducts = [];
   let failSave = false;
   await page.exposeFunction("__publicationCall", (method, input) => {
     if (method === "create") { const saved = saveRuntimeCatalogProduct(database.databasePath, input); createdProducts.push(saved); return saved; }
     if (method === "list") return listRuntimeCatalogProducts(database.databasePath, input);
-    if (method === "get") return database.getCommerceProductPublication(input);
+    if (method === "get") { publicationReads++; return database.getCommerceProductPublication(input); }
     if (method === "save") {
       saves++;
       if (failSave) throw new Error("Fixture publication failure");
@@ -59,6 +63,7 @@ try {
     }
     throw new Error("Unexpected fixture bridge call");
   });
+  await page.addInitScript(setup => { window.__setup = setup; }, connectedSetup);
   await page.addInitScript((product) => {
     window.__product = product;
     window.yardimciDesktop = { commerce: {
@@ -69,6 +74,8 @@ try {
     } };
   }, product);
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/online-catalog-ui-smoke`);
+  const bulkPublish = page.locator(".market-product-bulk-actions").getByRole("button", { name: "Webde yayınla", exact: true, includeHidden: true });
+  await expect(bulkPublish).toHaveCount(1);
   await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   const checkbox = page.getByRole("checkbox", { name: "Web satışında yayınla", exact: true });
   await expect(checkbox).toBeEnabled();
@@ -89,6 +96,26 @@ try {
   await checkbox.click();
   await expect(checkbox).not.toBeChecked();
   await expect.poll(() => database.getCommerceProductPublication(product.id).isPublished).toBe(false);
+  // Persisted online-sales selection alone must not expose publication controls.
+  const beforeWebOff = { saves, publicationReads };
+  const disconnected = database.saveInitialSetup(createSmokeSetupInput({ ...database.getSetupData(), webModuleUrl: "", syncSecret: "", autoSyncEnabled: false }));
+  assert.equal(disconnected.ok, true, disconnected.message);
+  await page.evaluate(setup => window.__webSetupChanged(setup), database.getSetupData());
+  await expect(checkbox).toHaveCount(0);
+  await expect(bulkPublish).toHaveCount(0);
+  assert.deepEqual({ saves, publicationReads }, beforeWebOff, "Web off must not read or rewrite publication preferences");
+  assert.equal(database.getCommerceProductPublication(product.id).isPublished, false);
+  await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
+  await expect(checkbox).toHaveCount(0);
+  await expect(page.getByText("İlk kayıttan sonra en fazla 12 fotoğrafı sıralayıp kapak seçebilirsiniz.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  const reconnected = database.saveInitialSetup(createSmokeSetupInput(connectedSetup));
+  assert.equal(reconnected.ok, true, reconnected.message);
+  await page.evaluate(setup => window.__webSetupChanged(setup), database.getSetupData());
+  await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
+  await expect(checkbox).toBeEnabled();
+  await expect(checkbox).not.toBeChecked();
   const beforeToggleSaves = saves;
   selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
@@ -144,6 +171,7 @@ try {
   setRuntimeInventoryCount(database.databasePath, { productId: stockProduct.id, countedQuantity: 10 });
   const detailCalls = [];
   const detailPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await detailPage.addInitScript(setup => { window.__setup = setup; }, database.getSetupData());
   detailPage.on("pageerror", error => errors.push(error.message));
   await detailPage.exposeFunction("__detailCall", (method, input) => {
     detailCalls.push(method);

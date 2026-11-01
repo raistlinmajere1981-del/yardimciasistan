@@ -57,6 +57,41 @@ try {
   } finally {pauseRaw.close();}
   assert.equal((await ingress.pullWebOrderPages(transport)).error,'');
   assert.ok(listRuntimeOrders(database.databasePath).some(x=>x.sourceReference===paused.body.order_id));
+  // C33: catalog revisions are invalidation hints, never quote authority; price groups stay private.
+  const sha256=/^[a-f0-9]{64}$/;
+  const privateDealerCatalog=(body,price,otherPrice)=>{
+    assert.equal(body.catalog.products[0].price,price);
+    const text=JSON.stringify(body);
+    for(const field of ['customerId','customer_id','dealer_price','dealerPrice','purchase_price','purchasePrice'])assert.equal(text.includes(field),false,`dealer catalog leaks ${field}`);
+    assert.equal(text.includes(`"price":${otherPrice}`),false,'dealer catalog leaks the other price group');
+    assert.match(body.catalog.catalog_revision,sha256);
+  };
+  const staleCatalog=await call('dealer/catalog',undefined,renewed);assert.equal(staleCatalog.status,200,JSON.stringify(staleCatalog.body));
+  const staleRevision=staleCatalog.body.catalog.catalog_revision;privateDealerCatalog(staleCatalog.body,80,60);
+  const bCatalogBefore=await call('dealer/catalog',undefined,bc);assert.equal(bCatalogBefore.status,200,JSON.stringify(bCatalogBefore.body));privateDealerCatalog(bCatalogBefore.body,60,80);
+  saveRuntimeCatalogProduct(database.databasePath,{...product,dealerPriceA:65});
+  assert.equal(database.createCommerceOnlineCatalog().products.find(x=>x.productId===product.id)?.price,100,'retail price remains public');
+  await f.publish();
+  const renewedCatalog=await call('dealer/catalog',undefined,renewed);assert.equal(renewedCatalog.status,200,JSON.stringify(renewedCatalog.body));
+  privateDealerCatalog(renewedCatalog.body,65,60);
+  const currentRevision=renewedCatalog.body.catalog.catalog_revision;assert.notEqual(currentRevision,staleRevision,'dealer price change renews the catalog revision');
+  const bCatalogAfter=await call('dealer/catalog',undefined,bc);assert.equal(bCatalogAfter.status,200,JSON.stringify(bCatalogAfter.body));privateDealerCatalog(bCatalogAfter.body,60,65);
+  // Isolate retry semantics from the fixture's 8/10min public-order abuse limit.
+  f.storage("if (ya_storage_open()->query(\"SELECT 1 FROM sqlite_master WHERE name = 'public_request_guard_events'\")->fetchColumn()) ya_storage_open()->exec('DELETE FROM public_request_guard_events');");
+  const staleKey=randomUUID(),stalePayload={idempotencyKey:staleKey,items:[{productId:product.id,quantity:2,price:1}],delivery:{method:'pickup',address:null},note:'Stale revision fixture',total:2,catalogRevision:staleRevision};
+  const stale=await call('dealer/order',stalePayload,renewed);assert.equal(stale.status,201,JSON.stringify(stale.body));assert.equal(stale.body.quoted_total,130,'stale revision and client price never set the quote');
+  assert.equal((await call('dealer/order',stalePayload,renewed)).body.order_id,stale.body.order_id,'retry returns the same receipt');
+  assert.equal((await call('dealer/receipt',{idempotencyKey:staleKey},renewed)).body.receipt.quoted_total,130);
+  assert.equal((await ingress.pullWebOrderPages(transport)).count,1);
+  const staleOrders=()=>listRuntimeOrders(database.databasePath).filter(x=>x.sourceReference===stale.body.order_id);
+  assert.equal(staleOrders().length,1);assert.equal(staleOrders()[0].total,130);assert.equal(staleOrders()[0].customerId,a.id);
+  const currentKey=randomUUID(),currentPayload={...stalePayload,idempotencyKey:currentKey,note:'Current revision fixture',catalogRevision:currentRevision};
+  const current=await call('dealer/order',currentPayload,renewed);assert.equal(current.status,201,JSON.stringify(current.body));assert.equal(current.body.quoted_total,130);assert.notEqual(current.body.order_id,stale.body.order_id);
+  assert.equal((await call('dealer/order',currentPayload,renewed)).body.order_id,current.body.order_id,'current revision retry returns the same receipt');
+  assert.equal((await ingress.pullWebOrderPages(transport)).count,1);
+  assert.equal((await ingress.pullWebOrderPages(transport)).count,0,'a retried submission is never imported twice');
+  const currentOrders=()=>listRuntimeOrders(database.databasePath).filter(x=>x.sourceReference===current.body.order_id);
+  assert.equal(currentOrders().length,1);assert.equal(currentOrders()[0].total,130);assert.equal(currentOrders()[0].customerId,a.id);
   // Desktop gates a queued order again when dealer status changes before import.
   const queued=await call('dealer/order',{...payload,idempotencyKey:randomUUID()},bc);assert.equal(queued.status,201);
   const queuedPage=await transport.pullWebOrders({afterSeq:database.getSyncRuntimeStatus().webOrderCursor});

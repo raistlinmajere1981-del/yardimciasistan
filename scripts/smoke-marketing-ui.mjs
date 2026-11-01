@@ -103,6 +103,15 @@ try {
   await page.screenshot({path:'artifacts/marketing/drafts-management.png'});
   await page.keyboard.press('Escape');await expect(page.getByLabel('Taslaklar',{exact:true}).getByRole('button',{name:'Tümünü gör',exact:true})).toBeFocused();
   await page.getByLabel('Son paylaşımlar',{exact:true}).getByRole('button',{name:'Tümünü gör',exact:true}).click();await assertMarketingDialog(page,page.getByRole('dialog',{name:'Tüm paylaşımlar',exact:true}));await page.keyboard.press('Escape');
+  // Web publication visibility is presentation-only; local Marketing drafts remain usable.
+  await page.evaluate(() => window.__setMarketingWebAvailable(false));
+  await expect(page.getByLabel('Aktif web içerikleri', {exact:true})).toHaveCount(0);
+  await expect(page.getByLabel('Taslaklar', {exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'Yeni paylaşım', exact:true}).click();
+  await expect(page.getByLabel('Web sitesi', {exact:true})).toHaveCount(0);
+  await page.getByRole('button', {name:'Çalışma alanını kapat', exact:true}).click();
+  await page.evaluate(() => window.__setMarketingWebAvailable(true));
+  await expect(page.getByLabel('Aktif web içerikleri', {exact:true})).toBeVisible();
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length),0);
-  console.log('Marketing UI: stable composer, draft preservation, explicit AI acceptance, media selection/upload/generation, audience, variants, preview, publish/live update/unpublish and schedule creation passed.');
+  console.log('Marketing UI: stable composer, draft preservation, explicit AI acceptance, media selection/upload/generation, audience, variants, preview, publish/live update/unpublish, schedule creation and Web visibility passed.');
 } finally {await ui?.close();f.dispose();}

@@ -33,7 +33,8 @@ export interface DesktopWorkspaceFeatures {
 }
 
 export function projectDesktopWorkspaceFeatures(
-  snapshot: BusinessCapabilitySnapshot | null | undefined
+  snapshot: BusinessCapabilitySnapshot | null | undefined,
+  webAvailable: boolean
 ): DesktopWorkspaceFeatures {
   const customers = runtimeHasCapability(snapshot, C.CUSTOMERS);
   const whatsapp = runtimeHasCapability(snapshot, C.WHATSAPP);
@@ -48,7 +49,7 @@ export function projectDesktopWorkspaceFeatures(
 
   return {
     customers,
-    requests: runtimeHasCapability(snapshot, C.REQUESTS),
+    requests: webAvailable && runtimeHasCapability(snapshot, C.REQUESTS),
     tasks: runtimeHasCapability(snapshot, C.TASKS),
     ai: runtimeHasCapability(snapshot, C.AI),
     whatsapp,
@@ -56,7 +57,7 @@ export function projectDesktopWorkspaceFeatures(
     calendar: runtimeHasCapability(snapshot, C.CALENDAR),
     finance: runtimeHasCapability(snapshot, C.FINANCE),
     reports: runtimeHasCapability(snapshot, C.REPORTS),
-    qrMenu: runtimeHasCapability(snapshot, C.QR_MENU),
+    qrMenu: webAvailable && runtimeHasCapability(snapshot, C.QR_MENU),
     inventory: runtimeHasCapability(snapshot, C.INVENTORY),
     wholesale: runtimeHasCapability(snapshot, C.WHOLESALE),
     customerMessaging: customers && whatsapp,

@@ -1,12 +1,13 @@
 import { startTableOrder, setTableOrderStatus } from "./table-order-operations";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { DesktopDashboardData, DesktopTableOrder, DesktopTableOrderResult } from "../../../electron/database";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { reportAppStatus } from "../../app/runtime-state";
 
 /** Entity lifetime only. The page owns the order projection; SQLite owns persisted orders. */
 export function useTableOrderController(tableId: string, enabled: boolean,
-  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void, revision: number, expectedOrderId?: string, customersEnabled = false) {
+  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void, revision: number, expectedOrderId?: string, customersEnabled = false,
+  checkoutLock?: RefObject<boolean>) {
   const [order, setOrder] = useState<DesktopTableOrder | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -26,6 +27,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   customerCapability.current = customersEnabled;
   const callbacks = useRef({ onOrder, onDashboard });
   callbacks.current = { onOrder, onDashboard };
+  const checkoutBusy = checkoutLock?.current === true;
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   function feedback(text: string, failed = false) {
@@ -46,7 +48,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     return true;
   }
   useEffect(() => {
-    if (!enabled || running.current || notePromise.current) return;
+    if (!enabled || running.current || notePromise.current || checkoutLock?.current) return;
     const current = beginRead();
     setLoading(true); setLoaded(false);
     void (async () => {
@@ -54,7 +56,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
         const bridge = window.yardimciDesktop;
         if (!bridge) throw new Error("bridge unavailable");
         const next = await bridge.getActiveTableOrder(tableId);
-        if (!current()) return;
+        if (!current() || checkoutLock?.current) return;
         if (expectedOrderId && next?.id !== expectedOrderId) {
           feedback("Seçilen adisyon artık açık değil veya değişti. Masayı yeniden açın.", true); return;
         }
@@ -68,15 +70,17 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     return () => { beginRead(); };
     // Identity is keyed by WorkspaceHost; callbacks are kept fresh without restarting reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, enabled, beginRead, revision, expectedOrderId, busy]);
+  }, [tableId, enabled, beginRead, revision, expectedOrderId, busy, checkoutLock, checkoutBusy]);
 
   function editNote(id: string, text: string) {
+    if (checkoutLock?.current) return;
     drafts.current = { ...drafts.current, [id]: text };
     dirtyIds.current.add(id); setNotes(drafts.current); setDirty(true);
   }
 
   /** Serialize full-order note responses, including edits made while a save is pending. */
   async function flushNotes(): Promise<boolean> {
+    if (checkoutLock?.current) return false;
     if (notePromise.current) return notePromise.current;
     const save = (async () => {
       while (dirtyIds.current.size > 0 && alive.current) {
@@ -104,7 +108,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
 
   /** Every mutation and close/return shares the same flush and synchronous busy gate. */
   async function run(operation: (isCurrent: () => boolean) => Promise<boolean>): Promise<boolean> {
-    if (running.current || loading || !loaded || !alive.current) return false;
+    if (checkoutLock?.current || running.current || loading || !loaded || !alive.current) return false;
     running.current = true; setBusy(true);
     try {
       if (!await flushNotes() || !alive.current) return false;

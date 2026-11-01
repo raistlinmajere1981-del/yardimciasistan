@@ -1,9 +1,17 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { BUSINESS_CAPABILITIES: C } = require("../../shared/dist");
-const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: defaults, androidEffectivePermissionsForGroups,
-  androidEffectivePermissionsForRole, androidActionAllowedByCapabilities, resolveAndroidActionPermission } = require("../dist");
+const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: defaults, ANDROID_PERMISSION_GROUP_PERMISSIONS: groups,
+  androidEffectivePermissionsForGroups, androidEffectivePermissionsForRole, androidActionAllowedByCapabilities,
+  resolveAndroidActionPermission } = require("../dist");
 const caps = [C.ANDROID, C.CATALOG, C.SALES, C.INVENTORY, C.RETAIL_BARCODE, C.CUSTOMERS, C.FINANCE, C.CUSTOMER_CREDIT];
+
+test("market sales grants the customer lookup required by the paid-sale server gate only", () => {
+  assert.deepEqual(groups.market_sales, ["market.product.view", "market.sale.complete", "customer.view"]);
+  const sale = androidEffectivePermissionsForGroups({ ...defaults, market_sales: true }, caps);
+  for (const permission of ["market.product.view", "market.sale.complete", "customer.view"]) assert.equal(sale.includes(permission), true, permission);
+  for (const permission of ["customer.manage", "customer.delete", "customer_credit.view", "customer_credit.payment"]) assert.equal(sale.includes(permission), false, permission);
+});
 
 test("sales, credit read and payment are explicit independent staff grants", () => {
   assert.equal(defaults.market_sales, false);

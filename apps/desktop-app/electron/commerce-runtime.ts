@@ -401,7 +401,8 @@ export function resolveRuntimeProductPrice(
 
 export function fulfillRuntimeOrder(
   databasePath: string,
-  input: FulfillCommerceOrderInput
+  input: FulfillCommerceOrderInput,
+  benefitsAuthority?: import("./commerce-order-benefits").OrderBenefitsAuthority
 ): CommerceOrderFulfillmentResult {
   requireCapability(
     databasePath,
@@ -420,7 +421,7 @@ export function fulfillRuntimeOrder(
       "Veresiye / Müşteri Hesabı bu işletmede etkin değil."
     );
   }
-  return fulfillCommerceOrder(databasePath, input);
+  return fulfillCommerceOrder(databasePath, input, benefitsAuthority);
 }
 
 export function updateRuntimeOrderStatus(

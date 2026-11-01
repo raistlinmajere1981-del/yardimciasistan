@@ -208,8 +208,9 @@ try {
   assert.deepEqual(oversizedDetails.available_actions, []);
   assert.equal(snapshot.commerce.orders.find(order => order.id === manualDealer.id).details.items_complete, true);
 
-  // Real LAN replies share the projection, identity binding and canonical action receipt.
-  local = new LocalCompanionServer({ desktopId: () => "desktop-companion", businessInfo: () => ({ displayName: "Test", phone: "", whatsapp: "" }),
+  // Legacy loopback HTTP fixture tests projections/receipts; product uses pinned HTTPS.
+  process.env.NODE_ENV = "test";
+  local = new LocalCompanionServer({ testOnlyHttp: true, desktopId: () => "desktop-companion", businessInfo: () => ({ displayName: "Test", phone: "", whatsapp: "" }),
     createSummary: id => projectLocalAndroidSnapshotForDevice(sourceSnapshot(), id), applyAction: a => database.applyAndroidAction(a),
     authorize: ({ deviceId: id, token: supplied }) => [deviceId, adminId].includes(id) && supplied === "local-test-token" });
   const address = await local.start("127.0.0.1", 0);

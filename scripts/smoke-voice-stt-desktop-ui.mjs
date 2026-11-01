@@ -76,20 +76,22 @@ try {
   await overlay.getByLabel('Model adı', { exact: true }).fill('gpt-4.1');
   await overlay.getByLabel('AI güvenlik anahtarı', { exact: true }).fill('fixture-only-provider-key');
   await stt.selectOption('whisper-1'); await save();
-  const web = page.locator('#settings-web');
-  await web.getByLabel('Web eşitleme adresi', { exact: true }).fill('https://hosting.example/module');
-  await web.getByRole('button', { name: 'Bağlan', exact: true }).click();
+  // Saved Desktop STT remains testable with Web completely unconfigured and unpublished.
+  await page.evaluate(() => window.refreshSettings({ webModuleUrl: "", syncSecret: "", autoSyncEnabled: false, aiLastPublishedAt: "" }));
   await openSettingsService(page, 'settings-dictation');
   await expect(dictationToggle).not.toBeChecked();
   await expect(dictationToggle).toBeDisabled();
   await expect(configuration).toHaveJSProperty("disabled", true);
   await expect(overlay.getByRole('group', { name: 'Ön koşul doğrulaması', exact: true }).getByRole('button')).toBeEnabled();
+  const testCalls = () => page.evaluate(() => window.settingsCalls.filter(call => call.kind === 'dictation-test').length);
+  const testsBeforeFailure = await testCalls();
   await page.evaluate(() => { window.failDictationTest = true; });
   await sttTest.click();
   await expect(dictationToggle).toBeDisabled();
   await expect(dictationToggle).not.toBeChecked();
   await expect(configuration).toHaveJSProperty("disabled", true);
   await expect(overlay.getByLabel('Canlı kontrol durumu')).toHaveText('Hata');
+  assert.equal(await testCalls(), testsBeforeFailure + 1, 'Failed STT test reaches its bridge owner');
   await expect(page.locator('.global-message-bar')).toContainText('Fixture STT bağlantı hatası');
   await expect.poll(() => overlay.evaluate(dialog => getComputedStyle(dialog, "::backdrop").clipPath)).toContain("inset(");
   await expect(page.locator(".page-header .global-message-bar")).toBeVisible();
@@ -103,6 +105,7 @@ try {
   await expect(dictationToggle).not.toBeChecked();
   await expect(configuration).toHaveJSProperty("disabled", true);
   await expect(overlay.getByLabel('Canlı kontrol durumu')).toHaveText('Hazır');
+  assert.equal(await testCalls(), testsBeforeFailure + 2, 'Retry performs a fresh STT test');
   await dictationToggle.check();
   await expect(configuration).toHaveJSProperty("disabled", false);
   await cancelSettingsService(page);
@@ -149,7 +152,7 @@ try {
   environment = { ...environment, locked: true, revision: 10 };
   await expect(page.getByRole("button", { name: "Durdur ve Metne Çevir" })).toHaveCount(0);
   await expect.poll(() => allTracksStopped(), { timeout: 8000 }).toBe(true);
-  environment = { locked: false, hosting: false, revision: 20 }; await expect(mic()).toHaveCount(0);
+  environment = { locked: false, hosting: false, revision: 20 }; await expect(mic()).toBeVisible();
   environment = { locked: false, hosting: true, revision: 30 }; await expect(mic()).toBeVisible();
   await page.getByRole("button", { name: "Metin Asistanını Aç", exact: true }).click(); await expect(mic()).toBeVisible();
   await start(); const count = uploads.length; await editor(); assert.ok(await allTracksStopped()); assert.equal(uploads.length, count);

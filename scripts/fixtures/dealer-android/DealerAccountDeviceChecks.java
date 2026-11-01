@@ -37,7 +37,42 @@ final class DealerAccountDeviceChecks {
     JSONObject order=new JSONObject().put("idempotencyKey",UUID.randomUUID().toString()).put("items",new org.json.JSONArray().put(new JSONObject().put("productId",product.getString("product_id")).put("quantity",1))).put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
     String receipt=api.submit(order,cookie).getString("order_id");check(api.submit(order,cookie).getString("order_id").equals(receipt),"Retry duplicated order");
     control(base,"import",connections);check(api.call("orders",null,cookie).body.getJSONArray("orders").getJSONObject(0).getString("order_id").equals(receipt),"Canonical order belongs to another customer");
+    JSONObject before=api.call("catalog",null,cookie).body.getJSONObject("catalog");
+    String oldRevision=before.getString("catalog_revision"),accessId=before.getString("access_id");
+    check(oldRevision.matches("[a-f0-9]{64}"),"Catalog revision must be a SHA-256 hex digest");
+    check(before.getJSONArray("products").length()==1,"Catalog must expose only this dealer's product");
+    check(before.getJSONArray("products").getJSONObject(0).getDouble("price")==80,"Catalog price changed before the fixture reprice");
+    control(base,"reprice",connections);
+    JSONObject repriced=api.call("catalog",null,cookie).body.getJSONObject("catalog");
+    String newRevision=repriced.getString("catalog_revision");
+    check(newRevision.matches("[a-f0-9]{64}")&&!newRevision.equals(oldRevision),"Repricing must publish a new catalog revision");
+    check(repriced.getString("access_id").equals(accessId),"Repricing changed the dealer access identity");
+    check(repriced.getJSONArray("products").length()==1,"Repricing exposed another product or dealer");
+    check(!repriced.has("dealers")&&!repriced.has("order_history"),"Catalog response must not embed other dealer data");
+    JSONObject repricedProduct=repriced.getJSONArray("products").getJSONObject(0);
+    check(repricedProduct.getString("product_id").equals(product.getString("product_id")),"Repricing replaced the canonical product id");
+    check(repricedProduct.getDouble("price")==65,"Repriced catalog must expose the new dealer A price");
+    check(repricedProduct.getString("currency").equals("TRY"),"Repricing changed the dealer currency");
+    privateFields(repricedProduct);
+    JSONObject replayed=api.submit(order,cookie);
+    check(replayed.getString("order_id").equals(receipt),"Catalog change replaced the accepted order");
+    check(replayed.getDouble("quoted_total")==80,"Retried acceptance must keep its original quote");
+    check(api.call("orders",null,cookie).body.getJSONArray("orders").length()==1,"Retried submission created another order");
+    JSONObject repricedOrder=new JSONObject().put("idempotencyKey",UUID.randomUUID().toString()).put("catalogRevision",oldRevision)
+      .put("items",new org.json.JSONArray().put(new JSONObject().put("productId",repricedProduct.getString("product_id")).put("quantity",1).put("price",0).put("unitPrice",0)))
+      .put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
+    JSONObject quote=api.submit(repricedOrder,cookie);
+    check(!quote.getString("order_id").equals(receipt),"New attempt reused the previous order identity");
+    check(quote.getDouble("quoted_total")==65,"New order must be quoted from the repriced catalog");
+    check(quote.getString("currency").equals("TRY"),"New order currency changed");
+    check(api.call("orders",null,cookie).body.getJSONArray("orders").length()==2,"New order must be recorded exactly once");
+    String relogin=api.call("account/login",credentials,"").cookie;
+    check(api.call("account/session",null,relogin).body.getJSONObject("account").getString("id").equals(account),"Re-login changed the ordinary account identity");
+    JSONObject afterLogin=api.call("catalog",null,relogin).body.getJSONObject("catalog");
+    check(afterLogin.getString("catalog_revision").equals(newRevision),"Re-login must see the published catalog revision");
+    check(afterLogin.getJSONArray("products").getJSONObject(0).getDouble("price")==65,"Re-login must see the repriced dealer catalog");
     control(base,"demote",connections);denied(api,"catalog",null,cookie,403,"dealer_access_required");
+    denied(api,"catalog",null,relogin,403,"dealer_access_required");
     check(api.call("account/session",null,cookie).body.getJSONObject("account").getString("id").equals(account),"Dealer demotion destroyed normal account");
     control(base,"disable",connections);denied(api,"account/session",null,cookie,403,"online_sales_disabled");denied(api,"account/login",credentials,"",403,"online_sales_disabled");
     api.call("account/logout",new JSONObject(),cookie);
@@ -53,6 +88,11 @@ final class DealerAccountDeviceChecks {
   private static void denied(DealerApi api,String endpoint,JSONObject body,String cookie,int status,String code) throws Exception {
     try {api.call(endpoint,body,cookie);throw new AssertionError("Private endpoint allowed: "+endpoint);}
     catch(DealerApi.Failure error){check(error.status==status,"Unexpected denial: "+endpoint+" "+error.status);if(!code.isEmpty())check(code.equals(error.code),"Unexpected denial reason");}
+  }
+  private static void privateFields(JSONObject product) {
+    for (String field : new String[]{"dealer_price_a","dealer_price_b","dealerPriceA","dealerPriceB","purchase_price","purchasePrice","sale_price","salePrice","cost_price","costPrice","customer_id","customerId","dealerAccessId","access_revision"})
+      check(!product.has(field),"Private catalog field leaked: "+field);
+    check(product.has("product_id")&&product.has("price")&&product.has("currency")&&product.has("name"),"Catalog product lost its public fields");
   }
   private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
 }

@@ -9,3 +9,4 @@ export * from "./providers/generate-chat";
 export * from "./providers/failure-classification";
 export * from "./providers/image-generation";
 export * from "./providers/cloudflare";
+export * from "./providers/cloudflare-models";

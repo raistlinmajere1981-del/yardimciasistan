@@ -25,6 +25,7 @@ import { MarketProductToolbar } from "./MarketProductToolbar";
 import { readMarketProductViewPreference, saveMarketProductViewPreference, type MarketProductViewPreference } from "../../ui-preferences";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { runtimeHasCapability } from "../../app/capabilities";
+import { useWebAvailability } from "../../app/web-availability";
 
 type BulkProductAction = "activate" | "quickAccess" | "delete" | "publish";
 const bulkActionLabels: Record<BulkProductAction, string> = {
@@ -95,7 +96,8 @@ export function MarketProductsWorkspace({
   const bridge = window.yardimciDesktop?.commerce;
   const navigation = useWorkspaceNavigation();
   const { snapshot } = useBusinessCapabilityRuntime();
-  const onlineSalesEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.ONLINE_SALES);
+  const webAvailable = useWebAvailability();
+  const onlineSalesEnabled = webAvailable && runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.ONLINE_SALES);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [pendingBulk, setPendingBulk] = useState<{ action: BulkProductAction; products: Array<{ id: string; name: string }> } | null>(null);
   const bulkLock = useRef(false);
@@ -288,7 +290,7 @@ export function MarketProductsWorkspace({
             <span aria-live="polite">{selectedProducts.length} seçili</span>
             <ActionButton variant="secondary" size="sm" type="button" title="Listelenen ürünlerin tümünü seç" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error) || !filteredProducts.length || selectedProducts.length === filteredProducts.length} onClick={() => setSelectedIds(new Set(filteredProducts.map(product => product.id)))}>Tümünü seç</ActionButton>
             <ActionButton variant="ghost" size="sm" type="button" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error) || !selectedProducts.length} onClick={() => setSelectedIds(new Set())}>Temizle</ActionButton>
-            {(["activate", "quickAccess", "delete", "publish"] as const).map(action => <ActionButton key={action} variant={action === "delete" ? "danger" : "secondary"} size="sm" type="button"
+            {(["activate", "quickAccess", "delete", "publish"] as const).filter(action => action !== "publish" || onlineSalesEnabled).map(action => <ActionButton key={action} variant={action === "delete" ? "danger" : "secondary"} size="sm" type="button"
               disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error) || !selectedProducts.length || (action === "publish" && !onlineSalesEnabled)}
               title={action === "publish" && !onlineSalesEnabled ? "Webde yayınlamak için online satış etkin olmalı." : undefined}
               onClick={() => requestBulk(action)}>{bulkActionLabels[action]}</ActionButton>)}

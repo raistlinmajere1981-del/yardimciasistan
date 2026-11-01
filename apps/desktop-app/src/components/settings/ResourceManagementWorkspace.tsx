@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useWebAvailability } from "../../app/web-availability";
 
 interface ResourceManagementWorkspaceProps {
   id: string;
@@ -27,13 +28,14 @@ export function ResourceManagementWorkspace({
   actions,
   media
 }: ResourceManagementWorkspaceProps) {
+  const webAvailable = useWebAvailability();
   return (
     <section
       id={id}
       tabIndex={-1}
       className={`resource-management-workspace${className ? ` ${className}` : ""}`}
     >
-      <div className="settings-panel resource-management-shell">
+      <div className={`settings-panel resource-management-shell${webAvailable ? "" : " is-local-only"}`}>
         <div className="resource-management-main-pane">
           <div className="settings-panel-header resource-management-pane-header">
             <div>
@@ -41,7 +43,7 @@ export function ResourceManagementWorkspace({
               <p>{subtitle}</p>
             </div>
             <div className="resource-management-header-actions">
-              <label className="resource-management-publication-toggle">
+              {webAvailable && <label className="resource-management-publication-toggle">
                 <input
                   type="checkbox"
                   aria-label={publishAriaLabel}
@@ -50,7 +52,7 @@ export function ResourceManagementWorkspace({
                   onChange={(event) => onPublishChange(event.target.checked)}
                 />
                 <span>Webde yayınla</span>
-              </label>
+              </label>}
               {actions}
             </div>
           </div>
@@ -62,9 +64,9 @@ export function ResourceManagementWorkspace({
           </div>
         </div>
 
-        <div className="resource-management-media-pane">
+        {webAvailable && <div className="resource-management-media-pane">
           {media}
-        </div>
+        </div>}
       </div>
     </section>
   );

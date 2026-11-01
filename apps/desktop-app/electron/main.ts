@@ -1,3 +1,5 @@
+import { getDocumentPrinterInstallationId } from "./document-printer-installation";
+import { registerDocumentOutputIpcHandlers } from "./ipc/document-output-ipc";
 import { registerDataTransferIpc } from "./ipc/data-transfer-ipc";
 import { PublicTranslationService } from "./public-translation-service";
 import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
@@ -32,12 +34,15 @@ import { registerShippingProviderIpcHandlers } from "./ipc/shipping-provider-ipc
 import { createShippingSecretWrite } from "./shipping-secret-service";
 import { registerCommerceShipmentIpcHandlers } from "./ipc/commerce-shipment-ipc";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
-import { app, BrowserWindow, powerMonitor } from "electron";
+import { CommerceBenefitsKey } from "./commerce-benefits-key";
+import { app, BrowserWindow, powerMonitor, safeStorage } from "electron";
 import path from "node:path";
+import { networkInterfaces } from "node:os";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { desktopLog } from "./desktop-logger";
 import { resolveProjectBackupPath } from "./data-maintenance";
-import { LocalCompanionServer } from "./local-companion-server";
+import { getLocalPairingEndpoint, LocalCompanionServer } from "./local-companion-server";
+import { LocalCompanionTlsIdentity, LocalCompanionTlsIdentityError } from "./local-companion-tls-identity";
 import { LocalCompanionPairingService } from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
 import { LocalCompanionMdnsAdvertiser } from "./local-companion-mdns";
@@ -84,6 +89,7 @@ import {
 } from "./ai-secret-service";
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
+import { isUsableSyncConfig } from "./sync-network-policy";
 import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { createPublicRoomCatalog } from "./public-room-catalog-publication";
 import { createPublicTableCatalog } from "./public-table-catalog-publication";
@@ -125,6 +131,9 @@ let maintenanceSyncSuspended = false;
 let appLockService: DesktopAppLockService | null = null;
 let desktopIpcRegistryHandle: DesktopIpcRegistryHandle | null = null;
 let localCompanionServer: LocalCompanionServer | null = null;
+let localCompanionTlsIdentity: LocalCompanionTlsIdentity | null = null;
+let localCompanionTlsFailure = "";
+let localCompanionInterfaceTimer: ReturnType<typeof setInterval> | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
 const egmKbsInteractiveDriver = new EgmKbsWebviewDriver();
@@ -304,6 +313,7 @@ if (!hasSingleInstanceLock) {
       backupPath: resolveProjectBackupPath(runtimeDataRoot)
     });
     desktopDatabase.initialize();
+    localCompanionTlsIdentity = new LocalCompanionTlsIdentity({ userDataPath: app.getPath("userData"), safeStorage });
     cleanupOrphanProductImages(desktopDatabase.databasePath);
     androidActionSyncService = new AndroidActionSyncService({
       database: desktopDatabase,
@@ -320,10 +330,13 @@ if (!hasSingleInstanceLock) {
       database: desktopDatabase,
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
+        void reconcileLocalCompanionRuntime();
         reconcileEgmKbsBackgroundSession();
         void reconcileOptionalBackgroundServices();
       },
       onLocked: () => {
+        localCompanionPairingService?.cancel();
+        void reconcileLocalCompanionRuntime();
         desktopIpcRegistryHandle?.invalidateDictation();
         egmKbsBackgroundSession.destroy();
         void reconcileOptionalBackgroundServices();
@@ -371,11 +384,15 @@ if (!hasSingleInstanceLock) {
     });
     localCompanionPairingService = new LocalCompanionPairingService(getDatabase(), {
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
-      syncSecret: () => getWebSyncConfig(getDatabase().getSetupData()).syncSecret,
-      localNetworkEnabled: () => localCompanionEnabled()
+      isLocked: () => campaignShutdownStarted || getAppLockService().isLocked(),
+      androidEnabled: () => hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID),
+      localNetworkEnabled: () => getDatabase().getSetupData().localNetworkEnabled !== false
     });
     localCompanionServer = new LocalCompanionServer({
+      httpsExperiment: { enabled: true, identity: localCompanionTlsIdentity },
+      onStopped: () => localCompanionPairingService?.cancel(),
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+      activeBusinessId: () => getDatabase().getActiveBusinessId(),
       businessInfo: () => {
         const setup = getDatabase().getSetupData();
         return {
@@ -390,6 +407,24 @@ if (!hasSingleInstanceLock) {
       ),
       authorize: ({ deviceId, token }) =>
         getDatabase().authorizeAndroidLocalCredential(deviceId, token),
+      readAuthorizedSaleReceipt: (action, deviceId, token) =>
+        getDatabase().readAuthorizedLocalSaleReceipt(action, deviceId, token),
+      readBenefitsBalance: ({ deviceId, token, customerId, currency }) =>
+        getDatabase().readAndroidPointBalance(deviceId, token, customerId, currency),
+      readCustomerSalePreview: ({ deviceId, token, customerId, lines }) =>
+        getDatabase().readAndroidCustomerSalePreview(deviceId, token, { customerId: customerId ?? "", lines }),
+      readPointSpendQuote: ({ deviceId, token, customerId, lines }) =>
+        getDatabase().readAndroidPointSpendQuote(deviceId, token, { customerId, lines }),
+      readCouponAttempt: (input) => {
+        // The protected benefits key is loaded before any coupon transaction;
+        // missing/unavailable secure storage fails closed with a generic denial.
+        try {
+          return getDatabase().readAndroidCouponAttempt(input.deviceId, input.token, {
+            actionId: input.actionId, customerId: input.customerId, lines: input.lines,
+            couponCode: input.couponCode, paymentMethod: input.paymentMethod
+          }, new CommerceBenefitsKey(app.getPath("userData"), safeStorage).load(false));
+        } catch { return null; }
+      },
       enabled: () => localCompanionEnabled(),
       pair: ({ pairingTicket, deviceId, deviceName, appVersion }) => {
         if (!hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)) {
@@ -414,8 +449,11 @@ if (!hasSingleInstanceLock) {
         }
         return result;
       },
-      applyAction: (action) => {
-        const result = getDatabase().applyAndroidAction(action);
+      applyAction: (action, localContext) => {
+        // Positive Puan uses the established protected benefits key; load(false)
+        // never creates or rotates it, and all key I/O happens pre-BEGIN.
+        const result = getDatabase().applyAndroidAction(action, localContext,
+          new CommerceBenefitsKey(app.getPath("userData"), safeStorage));
         if (result.ok) kbsDeliveryRequestProcessor.wake();
         getDatabase().recordAndroidActionResult(action, result);
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
@@ -431,13 +469,26 @@ if (!hasSingleInstanceLock) {
     kbsDeliveryRequestProcessor.start();
     void reconcileOptionalBackgroundServices();
     powerMonitor.on("resume", () => marketingSchedulerService.wake());
-    if (!desktopDatabase.getSetupData().setupRequired) {
+    if (!desktopDatabase.getSetupData().setupRequired && isUsableSyncConfig(getWebSyncConfig(desktopDatabase.getSetupData()))) {
       void publishBusinessAiContextFromMain();
       if (getGoogleReviewsSettings(desktopDatabase.databasePath).publicationPending) {
         void publishGoogleReviewsSettingsFromMain();
       }
     }
     void reconcileLocalCompanionRuntime();
+
+    // USB tether/DHCP can change without an online Hosting connection.
+    let interfaces = JSON.stringify(networkInterfaces());
+    localCompanionInterfaceTimer = setInterval(() => {
+      const next = JSON.stringify(networkInterfaces());
+      if (next === interfaces) return;
+      interfaces = next;
+      localCompanionMdnsAdvertiser?.stop();
+      localCompanionMdnsAdvertiser = null;
+      void reconcileLocalCompanionRuntime();
+    }, 5000);
+    localCompanionInterfaceTimer.unref();
+    powerMonitor.on("resume", () => { void reconcileLocalCompanionRuntime(); });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -453,6 +504,8 @@ app.on("window-all-closed", () => {
 let campaignShutdownDrained = false;
 let campaignShutdownStarted = false;
 app.on("before-quit", (event) => {
+  if (localCompanionInterfaceTimer) clearInterval(localCompanionInterfaceTimer);
+  localCompanionPairingService?.cancel();
   syncCoordinator?.stop();
   localCompanionMdnsAdvertiser?.stop();
   void localCompanionServer?.stop();
@@ -558,6 +611,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerDocumentOutputIpcHandlers({ installationId: () => getDocumentPrinterInstallationId(app.getPath("userData")), databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, isTrustedRendererUrl: isTrustedDesktopRendererUrl });
   registerDataTransferIpc({ databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, onMutation: () => { syncCoordinator?.scheduleSoon(); } });
   registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => getSyncCoordinator().scheduleSoon(0, true)});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
@@ -578,6 +632,13 @@ function registerIpcHandlers() {
     onChanged: notifyShipmentsChanged
   });
   desktopIpcRegistryHandle = registerDesktopIpcHandlers({
+    getLocalPairingService: getLocalCompanionPairingService,
+    prepareLocalPairing: async () => {
+      await reconcileLocalCompanionRuntime();
+      if (localCompanionTlsFailure) throw new Error(localCompanionTlsFailure);
+    },
+    getLocalPairingSpkiSha256: () => localCompanionServer?.tlsIdentity?.spkiSha256 ?? "",
+    getLocalPairingEndpoint: () => getLocalPairingEndpoint(localCompanionServer?.address ?? null, localCompanionServer?.tlsIdentity ?? null),
     getDatabase,
     getSyncCoordinator,
     getAppLockService,
@@ -660,36 +721,17 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   markLocalCompanionSnapshotDirty();
   void reconcileLocalCompanionRuntime();
   void reconcileOptionalBackgroundServices();
-  scheduleAutomaticSyncSoon(true);
-
-  const [aiWebSync, businessContextWebSync] = await Promise.all([
-    publishSavedAiSettingsFromMain(),
-    publishBusinessAiContextFromMain()
-  ]);
+  // The Setup transaction owns durable publication intent. The local response
+  // never waits for hosting; the existing coordinator retries the committed jobs.
   getSyncCoordinator().restart();
   const setupData = getDatabase().getSetupData();
+  if (isUsableSyncConfig(getWebSyncConfig(setupData))) getSyncCoordinator().scheduleSoon(0, true);
   const dashboardData = getDatabase().getDashboardData();
-
-  if (!aiWebSync.ok) {
-    return {
-      ...localResult,
-      message: `Ayarlar bu bilgisayarda kaydedildi. Web sitesine uygulanamadı: ${aiWebSync.message}`,
-      setupData,
-      dashboardData,
-      aiWebSync,
-      businessContextWebSync
-    };
-  }
-
   return {
     ...localResult,
-    message: businessContextWebSync.ok
-      ? "Ayarlar kaydedildi; AI bağlantısı ve işletme bağlamı web sitesinde güncellendi."
-      : `Ayarlar bu bilgisayarda kaydedildi. İşletme AI bağlamı web sitesine uygulanamadı: ${businessContextWebSync.message}`,
+    message: "Ayarlar bu bilgisayarda kaydedildi.",
     setupData,
-    dashboardData,
-    aiWebSync,
-    businessContextWebSync
+    dashboardData
   };
 }
 
@@ -893,13 +935,15 @@ function getLocalCompanionPairingService(): LocalCompanionPairingService {
 
 function localCompanionEnabled(): boolean {
   const setup = getDatabase().getSetupData();
+  // Locking the desktop closes pairing, but must not interrupt authorized Companion operations.
   return setup.localNetworkEnabled !== false
     && hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID);
 }
 
-// The local HTTP listener is not opened for businesses without Android/local LAN.
+// One HTTPS listener; startup failure leaves the desktop usable and LAN closed.
 let localCompanionReconcile: Promise<void> = Promise.resolve();
 export function reconcileLocalCompanionRuntime(): Promise<void> {
+  if (!localCompanionEnabled()) localCompanionPairingService?.cancel();
   const operation = localCompanionReconcile.then(async () => {
     if (!localCompanionServer || campaignShutdownStarted) return;
     if (!localCompanionEnabled()) {
@@ -908,18 +952,30 @@ export function reconcileLocalCompanionRuntime(): Promise<void> {
       await localCompanionServer.stop();
       return;
     }
-    await localCompanionServer.start();
+    if (localCompanionServer.address) await localCompanionServer.refreshTlsIdentity();
+    else await localCompanionServer.start();
+    localCompanionTlsFailure = "";
     reconcileLocalCompanionAdvertisement();
   });
-  localCompanionReconcile = operation.catch(error => {
-    desktopLog.error({scope:"local-companion",event:"local-companion.reconcile.failed",message:"Yerel Companion servis durumu güncellenemedi.",error});
+  localCompanionReconcile = operation.catch(async error => {
+    localCompanionTlsFailure = error instanceof LocalCompanionTlsIdentityError ? error.code : "local_secure_pairing_unavailable";
+    localCompanionMdnsAdvertiser?.stop();
+    localCompanionMdnsAdvertiser = null;
+    await localCompanionServer?.stop();
+    desktopLog.error({
+      scope: "local-companion", event: "local-companion.reconcile.failed",
+      message: localCompanionTlsFailure === "tls_storage_unavailable"
+        ? "Güvenli telefon bağlantısı kapalı. Sistem anahtar kasasını (GNOME Keyring / KWallet) açıp uygulamayı yeniden başlatın; basic_text desteklenmez."
+        : "Güvenli telefon bağlantısı başlatılamadı. Telefon eşleştirme panelinden yeniden deneyin.",
+      meta: { code: localCompanionTlsFailure }
+    });
   });
   return localCompanionReconcile;
 }
 
 function reconcileLocalCompanionAdvertisement() {
   const serverAddress = localCompanionServer?.address;
-  if (!serverAddress || !localCompanionEnabled()) {
+  if (serverAddress?.protocol !== "https" || !localCompanionServer?.tlsIdentity || !localCompanionEnabled()) {
     localCompanionMdnsAdvertiser?.stop();
     localCompanionMdnsAdvertiser = null;
     return;
@@ -987,9 +1043,13 @@ async function publishGoogleReviewsSettingsFromMain() {
 
 async function publishBusinessAiContextFromMain(): Promise<PushBusinessContextResult> {
   const database = getDatabase();
+  const config = getWebSyncConfig(database.getSetupData());
+  if (!config.baseUrl.trim() && !config.syncSecret.trim()) {
+    return { ok: false, message: "Web kullanılmıyor." };
+  }
   return await publishBusinessAiContext(
     database,
-    getWebSyncConfig(database.getSetupData())
+    config
   ) ?? { ok: false, message: "İşletme bağlam yayın niyeti hazırlanamadı." };
 }
 import { validateSetupServiceActivation } from "./setup-service-activation";

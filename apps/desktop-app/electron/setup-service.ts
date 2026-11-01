@@ -84,9 +84,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     WHERE business_id = ? AND is_selected = 1`).all(String(business?.id ?? "")) as Array<{ capability_id: string }>)
     .map(row => row.capability_id));
   const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
-  const setupRequired =
-    !setupCompleted ||
-    (Number(settings?.auto_sync_enabled ?? 1) === 1 && (syncSecret.length < 12 || syncSecret === "change-this-secret"));
+  const setupRequired = !setupCompleted;
 
   return {
     setupRequired,
@@ -100,9 +98,9 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     whatsapp: String(business?.whatsapp ?? ""),
     email: String(business?.email ?? ""),
     address: String(business?.address ?? ""),
-    webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
+    webModuleUrl: String(settings?.web_module_url ?? ""),
     syncSecret,
-    autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
+    autoSyncEnabled: Boolean(settings?.web_module_url || syncSecret) && Number(settings?.auto_sync_enabled ?? 1) === 1,
     localNetworkEnabled: Number(settings?.local_network_enabled ?? 1) === 1,
     aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
     aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
@@ -159,6 +157,10 @@ export function saveSetupData(
   const businessName = input.businessName.trim();
   const syncSecret = input.syncSecret.trim();
   const webModuleUrl = normalizeUrl(input.webModuleUrl);
+  // No transport means local-only. Passive sync OFF with a retained transport
+  // still permits explicit publication through the existing outbox.
+  const usesWeb = Boolean(input.webModuleUrl.trim() || syncSecret);
+  const autoSyncEnabled = usesWeb && input.autoSyncEnabled !== false;
   const aiProvider = input.aiProvider.trim() || "openai_compatible";
   const aiService = normalizeAiService(input.aiService);
   const aiProjectName = String(input.aiProjectName ?? "").trim();
@@ -272,10 +274,10 @@ export function saveSetupData(
   if (input.servicePreferences.whatsapp && !input.whatsapp.trim()) {
     return { ok: false, message: "WhatsApp servisi açıkken WhatsApp numarası gerekli." };
   }
-  if (input.autoSyncEnabled !== false && !webModuleUrl) {
+  if (usesWeb && !webModuleUrl) {
     return { ok: false, message: "Web modül adresi http veya https ile başlamalı." };
   }
-  if (input.autoSyncEnabled !== false && (syncSecret.length < 12 || syncSecret === "change-this-secret")) {
+  if (usesWeb && (syncSecret.length < 12 || syncSecret === "change-this-secret")) {
     return { ok: false, message: "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı." };
   }
   if (!aiApiKeyResolution.ok) return aiApiKeyResolution;
@@ -426,9 +428,14 @@ export function saveSetupData(
     existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
   const webTransportChanged = String(existingSettings?.web_module_url ?? "") !== webModuleUrl
     || String(existingSettings?.sync_secret ?? "") !== syncSecret;
-  const dictationSettingsChanged = aiSettingsChanged || webTransportChanged
-    || String(existingAiProfile?.image_model ?? "") !== aiImageModel
-    || Number(existingSettings?.auto_sync_enabled ?? 1) !== Number(input.autoSyncEnabled !== false);
+  // Desktop audio evidence depends only on the saved private STT configuration.
+  const dictationSettingsChanged = !existingSettings || !existingAiProfile || aiWasEnabled !== input.aiEnabled
+    || String(existingSettings.ai_provider ?? "") !== storedAiProvider
+    || String(existingSettings.ai_service ?? "") !== storedAiService
+    || String(existingAiProfile.stt_model ?? "") !== aiSttModel
+    || (normalizeAiBaseUrl(existingAiProfile.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[storedAiService]) !== storedAiBaseUrl
+    || normalizeStoredAiTimeout(existingAiProfile.timeout_seconds) !== storedAiTimeoutSeconds
+    || existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
   const aiLastPublishedAt = aiSettingsChanged || webTransportChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
 
   db.exec("BEGIN IMMEDIATE");
@@ -500,7 +507,7 @@ export function saveSetupData(
         businessId,
         webModuleUrl,
         syncSecret,
-        input.autoSyncEnabled === false ? 0 : 1,
+        autoSyncEnabled ? 1 : 0,
         storedAiProvider,
         storedAiService,
         aiLastPublishedAt,
@@ -587,6 +594,7 @@ export function saveSetupData(
         || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
       queueSyncJob(db, "online_catalog_publish", now);
     }
+    queueSyncJob(db, "business_context_publish", now);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

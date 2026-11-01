@@ -6,6 +6,7 @@ import {
   normalizeBarcodeIdentity,
   type CatalogProduct,
   type CommerceSale,
+  type BenefitsQuote,
   type CommerceSupplier,
   type CommerceUnit,
   type InventoryBalance,
@@ -17,6 +18,7 @@ import { saveCommerceProductPublication } from "./commerce-product-publication-s
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service.js";
 import { synchronizeFinanceSourceInTransaction } from "./finance.js";
+import { withCommerceBenefitsParentFailureBoundary } from "./commerce-benefits-rules.js";
 
 const COMMERCE_UNITS = new Set<CommerceUnit>([
   "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
@@ -882,19 +884,62 @@ export function createPaidCommerceSale(databasePath: string, input: CreateCommer
   }
 }
 
+/** Server-only paid checkout adapter, never part of CreateCommerceSaleInput. */
+export interface CommerceSaleBenefitsSettlement {
+  saleId: string;
+  reserve(sale: { businessId: string; currency: string; subtotalMinor: number }): BenefitsQuote;
+}
+
+/** Internal one-attempt identity, allocated by the sale owner before BEGIN.
+ * Copies/JSON cannot choose a sale ID. Never part of a sale input or wire type.
+ */
+export interface CommerceSaleSourceAllocation { readonly id: string }
+const saleSourceAllocations = new WeakMap<CommerceSaleSourceAllocation, { database: DatabaseSync; businessId: string; used: boolean }>();
+export function prepareCommerceSaleSource(database: DatabaseSync): CommerceSaleSourceAllocation {
+  if (database.isTransaction) throw new Error("Sale source preparation must precede BEGIN.");
+  const source = Object.freeze({ id: createId("sale_") });
+  saleSourceAllocations.set(source, { database, businessId: activeBusinessId(database), used: false });
+  return source;
+}
+
 /** Caller owns BEGIN IMMEDIATE / COMMIT, including current-price resolution. */
 export function createCommerceSaleInTransaction(
   database: DatabaseSync,
   input: CreateCommerceSaleInput,
   status: "paid" | "credit" | ((total: number, currency: string) => "paid" | "credit"),
-  now: string
+  now: string,
+  benefits?: CommerceSaleBenefitsSettlement,
+  allocatedSource?: CommerceSaleSourceAllocation
+): CommerceSale {
+  return allocatedSource
+    ? withCommerceBenefitsParentFailureBoundary(database, () => writeCommerceSaleInTransaction(database, input, status, now, benefits, allocatedSource))
+    : writeCommerceSaleInTransaction(database, input, status, now, benefits);
+}
+
+function writeCommerceSaleInTransaction(
+  database: DatabaseSync,
+  input: CreateCommerceSaleInput,
+  status: "paid" | "credit" | ((total: number, currency: string) => "paid" | "credit"),
+  now: string,
+  benefits?: CommerceSaleBenefitsSettlement,
+  allocatedSource?: CommerceSaleSourceAllocation
 ): CommerceSale {
   const businessId = activeBusinessId(database);
   if (!Array.isArray(input.items) || input.items.length === 0) {
     throw new Error("Satış için en az bir ürün gerekli.");
   }
 
-  const saleId = createId("sale_");
+  const customerId = String(input.customerId ?? "").trim();
+  if (customerId && !database.prepare("SELECT 1 FROM customers WHERE id = ? AND business_id = ? AND deleted_at = ''")
+    .get(customerId, businessId)) throw new Error("Satış müşterisi aktif işletmede bulunamadı.");
+
+  if (allocatedSource) {
+    const allocation = saleSourceAllocations.get(allocatedSource);
+    if (!database.isTransaction || benefits || !allocation || allocation.database !== database
+        || allocation.businessId !== businessId || allocation.used) throw new Error("Invalid canonical sale source allocation.");
+    allocation.used = true;
+  }
+  const saleId = benefits?.saleId ?? allocatedSource?.id ?? createId("sale_");
   const inventoryEnabled = isInventoryTrackingEnabled(database);
   const wholesaleEnabled = readEnabledBusinessCapabilities(database).includes(BUSINESS_CAPABILITIES.WHOLESALE);
   const locationId = inventoryEnabled
@@ -934,20 +979,28 @@ export function createCommerceSaleInTransaction(
 
   const requestedDiscount = Number(input.discountTotal ?? 0);
   moneyToMinor(requestedDiscount);
-  const discountTotal = Math.min(subtotal, roundMoney(requestedDiscount));
+  const quote = benefits?.reserve({ businessId, currency: currency || "TRY", subtotalMinor: moneyToMinor(subtotal) });
+  if (quote && (!database.isTransaction || quote.currency !== currency || quote.currencyExponent !== 2
+      || quote.subtotalMinor !== moneyToMinor(subtotal) || quote.accountingMinor !== 0
+      || ![quote.discountMinor, quote.pointsTenderMinor, quote.payableMinor].every(value => Number.isSafeInteger(value) && value >= 0)
+      || quote.subtotalMinor !== quote.discountMinor + quote.pointsTenderMinor + quote.payableMinor)) {
+    throw new Error("Satış toplamı Puan ödeme planıyla uyuşmuyor.");
+  }
+  const discountTotal = quote ? quote.discountMinor / 100 : Math.min(subtotal, roundMoney(requestedDiscount));
   const total = roundMoney(subtotal - discountTotal);
   // Settlement policy sees the authoritative total without duplicating price/stock preparation.
   const saleStatus = typeof status === "function" ? status(total, currency || "TRY") : status;
+  if (quote && saleStatus !== "paid") throw new Error("Puan için tam ödenmiş satış gerekli.");
   const paymentMethod = saleStatus === "credit" ? "" : String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
   const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
 
   database.prepare(`
     INSERT INTO commerce_sales (
-      id, business_id, status, subtotal, discount_total, total, currency,
+      id, business_id, customer_id, status, subtotal, discount_total, total, currency,
       payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
   `).run(
-    saleId, businessId, saleStatus, subtotal, discountTotal, total, currency || "TRY",
+    saleId, businessId, customerId || null, saleStatus, subtotal, discountTotal, total, currency || "TRY",
     paymentMethod, source, now, now, now, now
   );
 
@@ -984,6 +1037,9 @@ export function createCommerceSaleInTransaction(
       }, now);
     }
   }
+  if (quote) database.prepare(`INSERT INTO commerce_sale_settlements
+    (sale_id,business_id,customer_id,payment_method,cash_received_minor,points_tender_minor,created_at) VALUES (?,?,?,?,?,?,?)`)
+    .run(saleId, businessId, input.customerId || null, paymentMethod, quote.payableMinor, quote.pointsTenderMinor, now);
   if (saleStatus === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
   return {
     id: saleId,
@@ -1012,7 +1068,8 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
   database: DatabaseSync,
   input: CreateCommerceSaleFromOrderSnapshotInput,
   status: "paid" | "credit",
-  now: string
+  now: string,
+  benefits?: { saleId: string; customerId: string | null; quote: BenefitsQuote }
 ): CommerceSaleFromOrderSnapshotResult {
   const businessId = activeBusinessId(database);
   if (!Array.isArray(input.items) || input.items.length === 0) {
@@ -1035,7 +1092,14 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
     throw new Error("Sipariş toplamı snapshot ile uyuşmuyor.");
   }
 
-  const saleId = createId("sale_");
+  const quote = benefits?.quote;
+  if (quote && (!database.isTransaction || status !== "paid" || quote.currency !== currency || quote.currencyExponent !== 2
+    || quote.subtotalMinor !== moneyToMinor(subtotal) || quote.discountMinor !== moneyToMinor(discountTotal) || quote.accountingMinor !== 0
+    || ![quote.payableMinor, quote.pointsTenderMinor].every(value => Number.isSafeInteger(value) && value >= 0)
+    || quote.payableMinor + quote.pointsTenderMinor !== moneyToMinor(total))) {
+    throw new Error("Sipariş toplamı Puan ödeme planıyla uyuşmuyor.");
+  }
+  const saleId = benefits?.saleId ?? createId("sale_");
   const inventoryEnabled = isInventoryTrackingEnabled(database);
   const inventoryLocationId = inventoryEnabled
     ? resolveInventoryLocation(database, businessId, input.locationId, now)
@@ -1124,6 +1188,9 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
     }
   }
 
+  if (benefits) database.prepare(`INSERT INTO commerce_sale_settlements
+    (sale_id,business_id,customer_id,payment_method,cash_received_minor,points_tender_minor,created_at) VALUES (?,?,?,?,?,?,?)`)
+    .run(saleId, businessId, benefits.customerId, paymentMethod, benefits.quote.payableMinor, benefits.quote.pointsTenderMinor, now);
   if (status === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
   return {
     sale: {

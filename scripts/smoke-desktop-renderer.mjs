@@ -70,7 +70,7 @@ try {
     window.__stockProductLookups = [];
     window.__reportRanges = [];
     window.__reportAiCalls = [];
-    window.__androidProvisionCalls = [];
+    window.__androidLegacyCalls = [];
     window.__qrMenuWebPublicationChanges = [];
     window.__menuReorderCalls = [];
     let qrMenuWebEnabled = true;
@@ -430,48 +430,10 @@ try {
         permissionGroups: { service_orders: true, cashier: false, rooms_tasks: true, customer_reservation: false }
       }), "Telefon görev alanları varsayılana döndürüldü."),
       revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
-      listAndroidInstallDevices: async () => ({
-        ok: true,
-        adbAvailable: true,
-        apkAvailable: true,
-        bundledVersionName: "0.1.1-debug",
-        bundledVersionCode: 2,
-        devices: [{
-          serial: "SMOKE-USB-1",
-          state: "device",
-          model: "Smoke USB Telefonu",
-          deviceId: "",
-          appInstalled: true,
-          installedVersionName: "0.1.1-debug",
-          installedVersionCode: 2,
-          bundledVersionName: "0.1.1-debug",
-          bundledVersionCode: 2,
-          action: "current",
-          message: "Yardımcı Asistan 0.1.1-debug güncel."
-        }],
-        message: "1 USB Android cihazı bulundu."
-      }),
-      installAndroidApp: async () => ({ ok: true, message: "Android uygulaması güncellendi." }),
-      provisionAndroidApp: async (serial) => {
-        window.__androidProvisionCalls.push(serial);
-        return {
-          ok: true,
-          message: "Telefon kurulumu tamamlanıyor.",
-          device: {
-            serial,
-            state: "device",
-            model: "Smoke USB Telefonu",
-            deviceId: "",
-            appInstalled: true,
-            installedVersionName: "0.1.1-debug",
-            installedVersionCode: 2,
-            bundledVersionName: "0.1.1-debug",
-            bundledVersionCode: 2,
-            action: "current",
-            message: "Yardımcı Asistan 0.1.1-debug güncel."
-          }
-        };
-      },
+      // Fail if a retired bridge is read, including an automatic inventory scan.
+      get listAndroidInstallDevices() { window.__androidLegacyCalls.push("scan"); throw new Error("Retired consumer ADB bridge"); },
+      get installAndroidApp() { window.__androidLegacyCalls.push("install"); throw new Error("Retired consumer ADB bridge"); },
+      get provisionAndroidApp() { window.__androidLegacyCalls.push("provision"); throw new Error("Retired consumer ADB bridge"); },
       markWhatsAppMessageSent: async () => ({ ok: true, message: "Mesaj gönderildi olarak işaretlendi." }),
       openExternal: async (url) => {
         window.__openedExternalUrls.push(url);
@@ -547,10 +509,13 @@ try {
   const androidDeviceSection = page.locator(".settings-android-devices-section");
   await expect(androidDeviceSection.getByRole("heading", { name: "Telefonlar" })).toBeVisible();
   await expect(androidDeviceSection.getByRole("button", { name: "Yenile", exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText("Smoke USB Telefonu", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true })).toBeEnabled();
-  await androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__androidProvisionCalls)).toEqual(["SMOKE-USB-1"]);
+  await expect(androidDeviceSection.locator(".android-device-card")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Telefon eşleştir · QR göster", exact: true })).toBeVisible();
+  await expect(androidDeviceSection).toContainText("Web bağlantısı isteğe bağlıdır");
+  await expect(androidDeviceSection.getByText("USB hata ayıklaması", { exact: false })).toHaveCount(0);
+  await expect(androidDeviceSection.getByRole("button", { name: "Uygulamayı Kur", exact: true })).toHaveCount(0);
+  await expect(androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__androidLegacyCalls)).toEqual([]);
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();
@@ -583,7 +548,7 @@ try {
   await page.locator(".confirm-dialog").getByRole("button", { name: "Sil", exact: true }).click();
   await openSettingsService(page, "settings-android");
   const androidDeviceList = androidDeviceSection.locator(".android-device-list");
-  await expect(androidDeviceList.locator(".android-device-card")).toHaveCount(1);
+  await expect(androidDeviceList.locator(".android-device-card")).toHaveCount(0);
   await expect(androidDeviceList.getByText("Smoke Personel Telefonu", { exact: true })).toHaveCount(0);
   await expect(androidDeviceSection.getByText("0 kayıtlı", { exact: true })).toBeVisible();
   const removedDevices = androidDeviceSection.locator(".android-removed-devices");
@@ -2110,12 +2075,14 @@ try {
     setupData: {
       ...createSetupFixture(),
       setupRequired: false,
+      syncSecret: "ai-only-smoke-secret",
       servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }
     },
     dashboardData: createCompactUiFixture(),
     capabilitySnapshot: createBusinessCapabilitySnapshotFixture({
       ...createSetupFixture(),
       setupRequired: false,
+      syncSecret: "ai-only-smoke-secret",
       servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }
     })
   });
@@ -2542,8 +2509,8 @@ try {
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(pullPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
-  const shellSync = pullPage.getByRole("button", { name: /Eşitleme durumu:/ });
-  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
+  const shellSync = pullPage.getByRole("button", { name: /^Web eşitleme durumu:/ });
+  await expect(shellSync).toHaveAttribute("aria-label", /Web eşitlemeye hazır/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2558,7 +2525,7 @@ try {
     phase: "syncing",
     message: "Web, masaüstü ve Android verileri eşitleniyor..."
   }));
-  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme sürüyor/);
+  await expect(shellSync).toHaveAttribute("aria-label", /Web eşitleniyor/);
   await expect(shellSync).toBeDisabled();
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
@@ -2574,7 +2541,7 @@ try {
     phase: "success",
     message: "0 talep, 0 telefon işlemi ve 1 yayın eşitlendi."
   }));
-  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
+  await expect(shellSync).toHaveAttribute("aria-label", /Web eşitlemeye hazır/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2589,7 +2556,7 @@ try {
     phase: "error",
     message: "Web modülüne ulaşılamadı."
   }));
-  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hatası/);
+  await expect(shellSync).toHaveAttribute("aria-label", /Web eşitleme hatası/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2604,12 +2571,15 @@ try {
     phase: "success",
     message: "Tüm veriler güncel."
   }));
-  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
+  await expect(shellSync).toHaveAttribute("aria-label", /Web eşitlemeye hazır/);
   await shellSync.click();
   await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
   await expect(pullPage.getByText("Bahçe masa için canlı web talebi.")).toBeVisible();
   await pullPage.screenshot({ path: "artifacts/screenshots/desktop-web-pull-flow.png", fullPage: true });
 
+  // First-run local setup must not inherit the shared fixture's partial Web connection.
+  // Connecting Web during setup requires its own successful connection test.
+  const initialSetup = { ...createSetupFixture(), webModuleUrl: "", syncSecret: "", autoSyncEnabled: false };
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await setupPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
@@ -2630,7 +2600,7 @@ try {
         platform: "linux",
         syncSettings: {
           webModuleUrl: setupData.webModuleUrl,
-          hasSyncSecret: true
+          hasSyncSecret: Boolean(setupData.syncSecret)
         },
         databasePath: "/tmp/yardimci-asistan.sqlite",
         userDataPath: "/tmp/yardimci-asistan",
@@ -2650,7 +2620,7 @@ try {
       }),
       testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
       getSyncStatus: async () => ({
-        enabled: true,
+        enabled: setupData.autoSyncEnabled,
         clientId: "renderer-smoke",
         requestCursor: 0,
         acknowledgedCursor: 0,
@@ -2782,9 +2752,9 @@ try {
       openExternal: async () => true
     };
   }, {
-    setupData: createSetupFixture(),
-    dashboardData: createDashboardFixture(),
-    capabilitySnapshot: createBusinessCapabilitySnapshotFixture(createSetupFixture())
+    setupData: initialSetup,
+    dashboardData: { ...createDashboardFixture(), webModuleUrl: "" },
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture(initialSetup)
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.locator("html")).toHaveAttribute("data-density", "compact");
@@ -2796,6 +2766,16 @@ try {
   await setupPage.getByRole("textbox", { name: "WhatsApp", exact: true }).fill("+905550000000");
   await setupPage.getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect(setupPage.locator(".settings-page-actions")).not.toContainText("Kaydedilmemiş");
+  expect(await setupPage.evaluate(() => window.yardimciDesktop.getSetupData())).toMatchObject({
+    setupRequired: false,
+    businessName: "Smoke Pansiyon",
+    whatsapp: "+905550000000",
+    webModuleUrl: "",
+    syncSecret: "",
+    autoSyncEnabled: false
+  });
+  await expect(setupPage.locator(".settings-page-actions").getByRole("button", { name: "Kaydet", exact: true })).toBeDisabled();
+  await expect(setupPage.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true })).toBeDisabled();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Smoke Pansiyon");
   await setupPage.locator("#settings-rooms-button").click();
   await expect(setupPage.getByRole("heading", { name: "Oda Yönetimi", exact: true }).first()).toBeVisible();

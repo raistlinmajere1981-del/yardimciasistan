@@ -31,6 +31,14 @@ CREATE TABLE android_action_receipts (
   applied_at TEXT NOT NULL
 );
 
+CREATE TABLE android_market_sale_result_receipts (
+  action_id TEXT PRIMARY KEY REFERENCES android_action_receipts(id),
+  sale_id TEXT NOT NULL UNIQUE REFERENCES commerce_sales(id),
+  result_json TEXT NOT NULL CHECK (json_valid(result_json))
+);
+CREATE TRIGGER android_market_sale_result_no_update BEFORE UPDATE ON android_market_sale_result_receipts BEGIN SELECT RAISE(ABORT, 'receipt immutable'); END;
+CREATE TRIGGER android_market_sale_result_no_delete BEFORE DELETE ON android_market_sale_result_receipts BEGIN SELECT RAISE(ABORT, 'receipt immutable'); END;
+
 CREATE TABLE android_devices (
   id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL UNIQUE,
@@ -38,6 +46,7 @@ CREATE TABLE android_devices (
   app_version TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('admin', 'staff')),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  authorization_epoch INTEGER NOT NULL DEFAULT 1 CHECK (typeof(authorization_epoch) = 'integer' AND authorization_epoch BETWEEN 1 AND 9007199254740991),
   permissions_json TEXT NOT NULL DEFAULT '[]',
   first_seen_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL,
@@ -54,6 +63,25 @@ CREATE TABLE android_local_credentials (
   updated_at TEXT NOT NULL,
   revoked_at TEXT NOT NULL DEFAULT '',
   FOREIGN KEY (device_id) REFERENCES android_devices(device_id) ON DELETE CASCADE
+);
+
+-- Internal-only explicit customer scope; never derived from Android device roles.
+CREATE TABLE android_benefits_balance_grants (
+  business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+  device_record_id TEXT NOT NULL REFERENCES android_devices(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  authorization_epoch INTEGER NOT NULL CHECK (authorization_epoch > 0),
+  PRIMARY KEY (business_id, device_record_id, customer_id)
+);
+
+-- Internal-only spend authority; never inferred from balance access or device role.
+CREATE TABLE android_benefits_spend_grants (
+  business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+  device_record_id TEXT NOT NULL REFERENCES android_devices(id) ON DELETE CASCADE,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  authorization_epoch INTEGER NOT NULL CHECK (authorization_epoch > 0),
+  grant_generation TEXT NOT NULL CHECK (length(grant_generation) = 64 AND grant_generation NOT GLOB '*[^0-9a-f]*'),
+  PRIMARY KEY (business_id, device_record_id, customer_id)
 );
 
 CREATE TABLE business (
@@ -238,6 +266,7 @@ CREATE TABLE commerce_sale_items (
 CREATE TABLE commerce_sales (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
+  customer_id TEXT NULL,
   status TEXT NOT NULL DEFAULT 'open',
   subtotal REAL NOT NULL DEFAULT 0,
   discount_total REAL NOT NULL DEFAULT 0,
@@ -249,8 +278,75 @@ CREATE TABLE commerce_sales (
   closed_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  deleted_at TEXT NOT NULL DEFAULT ''
+  deleted_at TEXT NOT NULL DEFAULT '',
+  FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id)
 );
+
+-- Sale provenance is chosen by the transaction owner and cannot be relabeled.
+CREATE TRIGGER trg_sale_source_immutable BEFORE UPDATE OF source ON commerce_sales
+WHEN NEW.source IS NOT OLD.source
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_source_immutable'); END;
+
+-- Parent-owned paid tender evidence. Sale total remains after discounts, BEFORE
+-- Puan tender; Finance projects only cash_received_minor for these sales.
+CREATE TABLE commerce_sale_settlements (
+  sale_id TEXT PRIMARY KEY REFERENCES commerce_sales(id),
+  business_id TEXT NOT NULL REFERENCES business(id),
+  customer_id TEXT NULL,
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'card', 'bank', 'other')),
+  cash_received_minor INTEGER NOT NULL CHECK (typeof(cash_received_minor) = 'integer' AND cash_received_minor BETWEEN 0 AND 9007199254740991),
+  points_tender_minor INTEGER NOT NULL CHECK (typeof(points_tender_minor) = 'integer' AND points_tender_minor BETWEEN 0 AND 9007199254740991),
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (business_id, sale_id) REFERENCES commerce_sales(business_id, id),
+  FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id)
+);
+CREATE TRIGGER trg_commerce_sale_settlement_immutable_update BEFORE UPDATE ON commerce_sale_settlements
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_settlement_immutable'); END;
+CREATE TRIGGER trg_commerce_sale_settlement_immutable_delete BEFORE DELETE ON commerce_sale_settlements
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_settlement_immutable'); END;
+
+-- B2c-1: full Desktop Quick Sale refund, never a mutation of the original sale.
+-- The parent and exact operation receipt commit with stock/Finance/points.
+CREATE TABLE commerce_sale_full_refunds (
+  id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  sale_id TEXT NOT NULL UNIQUE REFERENCES commerce_sales(id),
+  customer_id TEXT NULL,
+  snapshot_id TEXT NULL,
+  operation_id TEXT NOT NULL,
+  command_json TEXT NOT NULL CHECK (json_valid(command_json)),
+  actor_id TEXT NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('desktop-market-quick-sale', 'android-market-sale')),
+  currency TEXT NOT NULL,
+  cash_minor INTEGER NOT NULL CHECK (typeof(cash_minor) = 'integer' AND cash_minor >= 0),
+  points_minor INTEGER NOT NULL CHECK (typeof(points_minor) = 'integer' AND points_minor >= 0),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('cash','card','bank','other')),
+  items_json TEXT NOT NULL CHECK (json_valid(items_json)),
+  stock_movements_json TEXT NOT NULL CHECK (json_valid(stock_movements_json)),
+  created_at TEXT NOT NULL,
+  UNIQUE (business_id, operation_id),
+  FOREIGN KEY (business_id, sale_id) REFERENCES commerce_sales(business_id, id),
+  FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id),
+  FOREIGN KEY (business_id, snapshot_id) REFERENCES commerce_benefit_snapshots(business_id, id)
+);
+CREATE TABLE commerce_sale_full_refund_receipts (
+  refund_id TEXT PRIMARY KEY REFERENCES commerce_sale_full_refunds(id),
+  receipt_json TEXT NOT NULL CHECK (json_valid(receipt_json))
+);
+CREATE TRIGGER trg_sale_full_refund_no_update BEFORE UPDATE ON commerce_sale_full_refunds
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_full_refund_immutable'); END;
+CREATE TRIGGER trg_sale_full_refund_no_delete BEFORE DELETE ON commerce_sale_full_refunds
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_full_refund_immutable'); END;
+CREATE TRIGGER trg_sale_full_refund_receipt_no_update BEFORE UPDATE ON commerce_sale_full_refund_receipts
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_full_refund_receipt_immutable'); END;
+CREATE TRIGGER trg_sale_full_refund_receipt_no_delete BEFORE DELETE ON commerce_sale_full_refund_receipts
+BEGIN SELECT RAISE(ABORT, 'commerce_sale_full_refund_receipt_immutable'); END;
+CREATE TRIGGER trg_refunded_sale_no_update BEFORE UPDATE ON commerce_sales
+WHEN EXISTS (SELECT 1 FROM commerce_sale_full_refunds WHERE sale_id = OLD.id)
+BEGIN SELECT RAISE(ABORT, 'commerce_refunded_sale_immutable'); END;
+CREATE TRIGGER trg_refunded_sale_no_delete BEFORE DELETE ON commerce_sales
+WHEN EXISTS (SELECT 1 FROM commerce_sale_full_refunds WHERE sale_id = OLD.id)
+BEGIN SELECT RAISE(ABORT, 'commerce_refunded_sale_immutable'); END;
 
 CREATE TABLE commerce_orders (
   id TEXT PRIMARY KEY,
@@ -1019,6 +1115,33 @@ CREATE TABLE table_orders (
   updated_at TEXT NOT NULL,
   FOREIGN KEY (table_id) REFERENCES tables(id)
 );
+
+-- Actual Desktop paid table tender, before assignment is cleared. No room-folio collection.
+CREATE TABLE table_order_settlements (
+  order_id TEXT PRIMARY KEY REFERENCES table_orders(id),
+  business_id TEXT NOT NULL REFERENCES business(id),
+  table_id TEXT NOT NULL REFERENCES tables(id),
+  customer_id TEXT NULL,
+  source_kind TEXT NOT NULL CHECK (source_kind = 'table_order'),
+  channel TEXT NOT NULL CHECK (channel = 'desktop_desk'),
+  operation_key TEXT NOT NULL UNIQUE,
+  request_hmac TEXT NOT NULL,
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('cash','card','bank','other')),
+  currency TEXT NOT NULL,
+  subtotal_minor INTEGER NOT NULL CHECK (typeof(subtotal_minor) = 'integer' AND subtotal_minor BETWEEN 1 AND 9007199254740991),
+  discount_minor INTEGER NOT NULL CHECK (typeof(discount_minor) = 'integer' AND discount_minor BETWEEN 0 AND subtotal_minor),
+  order_total_minor INTEGER NOT NULL CHECK (typeof(order_total_minor) = 'integer' AND order_total_minor = subtotal_minor - discount_minor AND order_total_minor > 0),
+  cash_received_minor INTEGER NOT NULL CHECK (typeof(cash_received_minor) = 'integer' AND cash_received_minor BETWEEN 0 AND order_total_minor),
+  points_tender_minor INTEGER NOT NULL CHECK (typeof(points_tender_minor) = 'integer' AND points_tender_minor BETWEEN 0 AND order_total_minor
+    AND cash_received_minor + points_tender_minor = order_total_minor AND (points_tender_minor = 0 OR customer_id IS NOT NULL)),
+  items_json TEXT NOT NULL CHECK (json_valid(items_json)),
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id)
+);
+CREATE TRIGGER table_order_settlement_immutable_update BEFORE UPDATE ON table_order_settlements
+BEGIN SELECT RAISE(ABORT, 'table_order_settlement_immutable'); END;
+CREATE TRIGGER table_order_settlement_immutable_delete BEFORE DELETE ON table_order_settlements
+BEGIN SELECT RAISE(ABORT, 'table_order_settlement_immutable'); END;
 
 CREATE TABLE tables (
   id TEXT PRIMARY KEY,
@@ -3256,3 +3379,526 @@ BEGIN
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
+
+-- Commerce benefits Phase A: canonical local authority; no migration/backfill.
+CREATE TABLE commerce_benefit_settings (
+  business_id TEXT PRIMARY KEY REFERENCES business(id),
+  coupons_enabled INTEGER NOT NULL DEFAULT 0 CHECK (coupons_enabled IN (0,1)),
+  points_enabled INTEGER NOT NULL DEFAULT 0 CHECK (points_enabled IN (0,1)),
+  payment_modifiers_enabled INTEGER NOT NULL DEFAULT 0 CHECK (payment_modifiers_enabled IN (0,1)),
+  revision INTEGER NOT NULL CHECK (revision > 0),
+  updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
+);
+
+-- Versioned canonical JSON owns channel/customer/group/product/category scopes,
+-- exclusions, thresholds, caps, stacking and monetary policy. Indexed fields are
+-- generated from that same JSON, never a second independently writable policy.
+CREATE TABLE commerce_benefit_rules (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version > 0),
+  canonical_json TEXT NOT NULL CHECK (json_valid(canonical_json)),
+  family TEXT GENERATED ALWAYS AS (json_extract(canonical_json,'$.family')) STORED NOT NULL
+    CHECK (family IN ('coupon','points','payment_modifier')),
+  status TEXT GENERATED ALWAYS AS (json_extract(canonical_json,'$.status')) STORED NOT NULL
+    CHECK (status IN ('draft','active','disabled')),
+  currency TEXT GENERATED ALWAYS AS (json_extract(canonical_json,'$.currency')) STORED NOT NULL,
+  starts_at_ms INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.startsAt')) STORED NOT NULL,
+  ends_at_ms INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.endsAt')) STORED,
+  min_spend_minor INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.minSpendMinor')) STORED NOT NULL CHECK (min_spend_minor >= 0),
+  max_benefit_minor INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.maxBenefitMinor')) STORED CHECK (max_benefit_minor >= 0),
+  percent_bps INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.percentBps')) STORED NOT NULL CHECK (percent_bps BETWEEN 0 AND 10000),
+  fixed_minor INTEGER GENERATED ALWAYS AS (json_extract(canonical_json,'$.fixedMinor')) STORED NOT NULL CHECK (fixed_minor >= 0),
+  PRIMARY KEY (business_id,id,version),
+  CHECK (id = json_extract(canonical_json,'$.id') AND version = json_extract(canonical_json,'$.version')),
+  CHECK (json_extract(canonical_json,'$.schemaVersion') = 1),
+  CHECK (ends_at_ms IS NULL OR ends_at_ms > starts_at_ms)
+);
+CREATE TABLE commerce_benefit_rule_heads (
+  business_id TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  PRIMARY KEY (business_id,rule_id),
+  FOREIGN KEY (business_id,rule_id,version) REFERENCES commerce_benefit_rules(business_id,id,version)
+);
+CREATE INDEX idx_benefit_rules_scope ON commerce_benefit_rules(business_id,family,status,currency,starts_at_ms,ends_at_ms);
+
+CREATE TABLE commerce_benefit_payment_methods (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  channel TEXT NOT NULL CHECK (channel IN ('desktop_cart','desktop_desk','web','web_dealer','companion')),
+  external_method TEXT NOT NULL,
+  canonical_method TEXT NOT NULL,
+  enabled INTEGER NOT NULL CHECK (enabled IN (0,1)),
+  PRIMARY KEY (business_id,channel,external_method)
+);
+CREATE TABLE commerce_benefit_coupon_codes (
+  business_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
+  key_id TEXT NOT NULL,
+  secret_hmac TEXT NOT NULL CHECK (length(secret_hmac) = 64),
+  status TEXT NOT NULL CHECK (status IN ('active','disabled')),
+  max_uses INTEGER NOT NULL CHECK (max_uses > 0),
+  max_uses_per_customer INTEGER NULL CHECK (max_uses_per_customer > 0),
+  expires_at_ms INTEGER NOT NULL CHECK (expires_at_ms > 0),
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,id),
+  UNIQUE (business_id,key_id,secret_hmac),
+  FOREIGN KEY (business_id,rule_id) REFERENCES commerce_benefit_rule_heads(business_id,rule_id)
+);
+CREATE INDEX idx_benefit_codes_rule ON commerce_benefit_coupon_codes(business_id,rule_id,status);
+CREATE TABLE commerce_benefit_coupon_rate_limits (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  bucket_hmac TEXT NOT NULL,
+  window_ms INTEGER NOT NULL,
+  attempts INTEGER NOT NULL CHECK (attempts > 0),
+  PRIMARY KEY (business_id,bucket_hmac,window_ms)
+);
+-- A successful online secret check yields a short-lived, intent-bound permit.
+-- Rate attempts commit before the parent sale transaction, including failures.
+CREATE TABLE commerce_benefit_coupon_authorizations (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL,
+  intent_hmac TEXT NOT NULL,
+  code_ids_json TEXT NOT NULL CHECK (json_valid(code_ids_json)),
+  expires_at_ms INTEGER NOT NULL,
+  reservation_id TEXT NULL,
+  PRIMARY KEY (business_id,id)
+);
+CREATE INDEX idx_benefit_authorizations_expiry ON commerce_benefit_coupon_authorizations(business_id,expires_at_ms);
+
+CREATE TABLE commerce_benefit_receipts (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  operation_key TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  intent_hmac TEXT NOT NULL,
+  receipt_json TEXT NOT NULL CHECK (json_valid(receipt_json)),
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,operation_key)
+);
+CREATE TABLE commerce_benefit_reservations (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL,
+  customer_id TEXT NULL REFERENCES customers(id),
+  source_kind TEXT NOT NULL CHECK (source_kind IN ('sale','commerce_order','table_order')),
+  source_id TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active','settled','released','expired')),
+  intent_json TEXT NOT NULL CHECK (json_valid(intent_json)),
+  context_json TEXT NOT NULL CHECK (json_valid(context_json)),
+  quote_json TEXT NOT NULL CHECK (json_valid(quote_json)),
+  rules_json TEXT NOT NULL CHECK (json_valid(rules_json)),
+  points_minor INTEGER NOT NULL CHECK (points_minor >= 0),
+  created_at_ms INTEGER NOT NULL,
+  expires_at_ms INTEGER NOT NULL CHECK (expires_at_ms > created_at_ms),
+  PRIMARY KEY (business_id,id)
+);
+CREATE UNIQUE INDEX idx_benefit_active_source ON commerce_benefit_reservations(business_id,source_kind,source_id) WHERE status = 'active';
+CREATE INDEX idx_benefit_reservations_customer ON commerce_benefit_reservations(business_id,customer_id,currency,status,expires_at_ms);
+CREATE TRIGGER benefit_reservation_customer_insert BEFORE INSERT ON commerce_benefit_reservations
+WHEN NEW.customer_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM customers WHERE id = NEW.customer_id AND business_id = NEW.business_id AND deleted_at = '')
+BEGIN SELECT RAISE(ABORT,'BENEFITS_CUSTOMER_SCOPE'); END;
+
+CREATE TABLE commerce_benefit_coupon_holds (
+  business_id TEXT NOT NULL,
+  reservation_id TEXT NOT NULL,
+  code_id TEXT NOT NULL,
+  PRIMARY KEY (business_id,reservation_id,code_id),
+  FOREIGN KEY (business_id,reservation_id) REFERENCES commerce_benefit_reservations(business_id,id),
+  FOREIGN KEY (business_id,code_id) REFERENCES commerce_benefit_coupon_codes(business_id,id)
+);
+CREATE INDEX idx_benefit_coupon_holds_code ON commerce_benefit_coupon_holds(business_id,code_id);
+
+CREATE TABLE commerce_benefit_point_ledger (
+  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  currency TEXT NOT NULL CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+  kind TEXT NOT NULL CHECK (kind IN ('grant','spend','reversal','expiry','manual_adjustment')),
+  amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND abs(amount_minor) <= 9007199254740991 AND amount_minor != 0),
+  source_kind TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  operation_key TEXT NOT NULL,
+  linked_entry_id TEXT NULL,
+  expires_at_ms INTEGER NULL,
+  created_at_ms INTEGER NOT NULL,
+  UNIQUE (business_id,id),
+  UNIQUE (business_id,source_kind,source_id,kind),
+  FOREIGN KEY (business_id,linked_entry_id) REFERENCES commerce_benefit_point_ledger(business_id,id),
+  CHECK ((kind = 'grant' AND amount_minor > 0) OR (kind IN ('spend','expiry') AND amount_minor < 0) OR kind IN ('reversal','manual_adjustment')),
+  CHECK (expires_at_ms IS NULL OR (amount_minor > 0 AND expires_at_ms > 0))
+);
+CREATE INDEX idx_benefit_points_account ON commerce_benefit_point_ledger(business_id,customer_id,currency,created_at_ms,id);
+CREATE INDEX idx_benefit_points_expiry ON commerce_benefit_point_ledger(business_id,expires_at_ms) WHERE amount_minor > 0;
+CREATE TRIGGER benefit_point_customer_insert BEFORE INSERT ON commerce_benefit_point_ledger
+WHEN NOT EXISTS (SELECT 1 FROM customers WHERE id = NEW.customer_id AND business_id = NEW.business_id AND deleted_at = '')
+BEGIN SELECT RAISE(ABORT,'BENEFITS_CUSTOMER_SCOPE'); END;
+
+-- Immutable FIFO lot allocations make expiry/refund independent of later rules.
+CREATE TABLE commerce_benefit_point_allocations (
+  business_id TEXT NOT NULL,
+  credit_entry_id TEXT NOT NULL,
+  debit_entry_id TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor > 0),
+  PRIMARY KEY (business_id,credit_entry_id,debit_entry_id),
+  FOREIGN KEY (business_id,credit_entry_id) REFERENCES commerce_benefit_point_ledger(business_id,id),
+  FOREIGN KEY (business_id,debit_entry_id) REFERENCES commerce_benefit_point_ledger(business_id,id)
+);
+CREATE TABLE commerce_benefit_point_holds (
+  business_id TEXT NOT NULL,
+  reservation_id TEXT NOT NULL,
+  credit_entry_id TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor > 0),
+  PRIMARY KEY (business_id,reservation_id,credit_entry_id),
+  FOREIGN KEY (business_id,reservation_id) REFERENCES commerce_benefit_reservations(business_id,id),
+  FOREIGN KEY (business_id,credit_entry_id) REFERENCES commerce_benefit_point_ledger(business_id,id)
+);
+CREATE TRIGGER benefit_point_hold_scope BEFORE INSERT ON commerce_benefit_point_holds
+WHEN NOT EXISTS (
+  SELECT 1 FROM commerce_benefit_reservations r JOIN commerce_benefit_point_ledger l
+  ON l.business_id = r.business_id AND l.customer_id = r.customer_id AND l.currency = r.currency
+  WHERE r.business_id = NEW.business_id AND r.id = NEW.reservation_id AND l.id = NEW.credit_entry_id
+    AND l.amount_minor > 0 AND (l.expires_at_ms IS NULL OR l.expires_at_ms >= r.expires_at_ms)
+) BEGIN SELECT RAISE(ABORT,'BENEFITS_POINT_HOLD_SCOPE'); END;
+CREATE TRIGGER benefit_point_allocation_scope BEFORE INSERT ON commerce_benefit_point_allocations
+WHEN NOT EXISTS (
+  SELECT 1 FROM commerce_benefit_point_ledger c JOIN commerce_benefit_point_ledger d
+  ON d.business_id = c.business_id AND d.customer_id = c.customer_id AND d.currency = c.currency
+  WHERE c.business_id = NEW.business_id AND c.id = NEW.credit_entry_id AND d.id = NEW.debit_entry_id
+    AND c.amount_minor > 0 AND d.amount_minor < 0
+    AND NEW.amount_minor <= c.amount_minor - COALESCE((SELECT SUM(a.amount_minor) FROM commerce_benefit_point_allocations a
+      WHERE a.business_id = c.business_id AND a.credit_entry_id = c.id),0)
+) BEGIN SELECT RAISE(ABORT,'BENEFITS_POINT_ALLOCATION_SCOPE'); END;
+
+CREATE TABLE commerce_benefit_snapshots (
+  business_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version = 1),
+  reservation_id TEXT NOT NULL,
+  source_kind TEXT NOT NULL CHECK (source_kind IN ('sale','commerce_order','table_order')),
+  source_id TEXT NOT NULL,
+  context_json TEXT NOT NULL CHECK (json_valid(context_json)),
+  rules_json TEXT NOT NULL CHECK (json_valid(rules_json)),
+  receipt_json TEXT NOT NULL CHECK (json_valid(receipt_json)),
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,id),
+  UNIQUE (business_id,source_kind,source_id),
+  UNIQUE (business_id,reservation_id),
+  FOREIGN KEY (business_id,reservation_id) REFERENCES commerce_benefit_reservations(business_id,id)
+);
+CREATE TABLE commerce_benefit_coupon_redemptions (
+  business_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  code_id TEXT NOT NULL,
+  customer_id TEXT NULL REFERENCES customers(id),
+  reservation_id TEXT NOT NULL,
+  snapshot_id TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,id),
+  UNIQUE (business_id,code_id,reservation_id),
+  FOREIGN KEY (business_id,code_id) REFERENCES commerce_benefit_coupon_codes(business_id,id),
+  FOREIGN KEY (business_id,reservation_id) REFERENCES commerce_benefit_reservations(business_id,id),
+  FOREIGN KEY (business_id,snapshot_id) REFERENCES commerce_benefit_snapshots(business_id,id)
+);
+CREATE INDEX idx_benefit_coupon_usage ON commerce_benefit_coupon_redemptions(business_id,code_id,customer_id);
+CREATE TABLE commerce_benefit_reversals (
+  business_id TEXT NOT NULL,
+  snapshot_id TEXT NOT NULL,
+  receipt_json TEXT NOT NULL CHECK (json_valid(receipt_json)),
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,snapshot_id),
+  FOREIGN KEY (business_id,snapshot_id) REFERENCES commerce_benefit_snapshots(business_id,id)
+);
+
+CREATE TRIGGER benefit_rules_no_update BEFORE UPDATE ON commerce_benefit_rules BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_rules_no_delete BEFORE DELETE ON commerce_benefit_rules BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_ledger_no_update BEFORE UPDATE ON commerce_benefit_point_ledger BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_ledger_no_delete BEFORE DELETE ON commerce_benefit_point_ledger BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_allocations_no_update BEFORE UPDATE ON commerce_benefit_point_allocations BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_allocations_no_delete BEFORE DELETE ON commerce_benefit_point_allocations BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_snapshots_no_update BEFORE UPDATE ON commerce_benefit_snapshots BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_snapshots_no_delete BEFORE DELETE ON commerce_benefit_snapshots BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_receipts_no_update BEFORE UPDATE ON commerce_benefit_receipts BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_receipts_no_delete BEFORE DELETE ON commerce_benefit_receipts BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_redemptions_no_update BEFORE UPDATE ON commerce_benefit_coupon_redemptions BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_redemptions_no_delete BEFORE DELETE ON commerce_benefit_coupon_redemptions BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_reversals_no_update BEFORE UPDATE ON commerce_benefit_reversals BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_reversals_no_delete BEFORE DELETE ON commerce_benefit_reversals BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_reservation_immutable BEFORE UPDATE ON commerce_benefit_reservations
+WHEN NEW.business_id != OLD.business_id OR NEW.id != OLD.id OR NEW.customer_id IS NOT OLD.customer_id
+ OR NEW.source_kind != OLD.source_kind OR NEW.source_id != OLD.source_id OR NEW.currency != OLD.currency
+ OR NEW.intent_json != OLD.intent_json OR NEW.context_json != OLD.context_json OR NEW.quote_json != OLD.quote_json
+ OR NEW.rules_json != OLD.rules_json OR NEW.points_minor != OLD.points_minor
+ OR NEW.created_at_ms != OLD.created_at_ms OR NEW.expires_at_ms != OLD.expires_at_ms
+ OR (OLD.status != 'active' AND NOT (OLD.status = 'expired' AND NEW.status = 'released') AND NEW.status != OLD.status)
+BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_reservation_no_delete BEFORE DELETE ON commerce_benefit_reservations BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_coupon_holds_no_update BEFORE UPDATE ON commerce_benefit_coupon_holds BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_coupon_holds_no_delete BEFORE DELETE ON commerce_benefit_coupon_holds BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_point_holds_no_update BEFORE UPDATE ON commerce_benefit_point_holds BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_point_holds_no_delete BEFORE DELETE ON commerce_benefit_point_holds BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_point_link_scope BEFORE INSERT ON commerce_benefit_point_ledger
+WHEN NEW.linked_entry_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM commerce_benefit_point_ledger l WHERE l.business_id = NEW.business_id
+ AND l.id = NEW.linked_entry_id AND l.customer_id = NEW.customer_id AND l.currency = NEW.currency)
+BEGIN SELECT RAISE(ABORT,'BENEFITS_POINT_LINK_SCOPE'); END;
+CREATE TRIGGER benefit_point_hold_capacity BEFORE INSERT ON commerce_benefit_point_holds
+WHEN NEW.amount_minor > (SELECT l.amount_minor
+ - COALESCE((SELECT SUM(a.amount_minor) FROM commerce_benefit_point_allocations a WHERE a.business_id = l.business_id AND a.credit_entry_id = l.id),0)
+ - COALESCE((SELECT SUM(h.amount_minor) FROM commerce_benefit_point_holds h JOIN commerce_benefit_reservations r ON r.business_id = h.business_id AND r.id = h.reservation_id
+   WHERE h.business_id = l.business_id AND h.credit_entry_id = l.id AND r.status = 'active' AND r.expires_at_ms >
+     (SELECT created_at_ms FROM commerce_benefit_reservations WHERE business_id = NEW.business_id AND id = NEW.reservation_id)),0)
+ FROM commerce_benefit_point_ledger l WHERE l.business_id = NEW.business_id AND l.id = NEW.credit_entry_id)
+ OR NEW.amount_minor + COALESCE((SELECT SUM(h.amount_minor) FROM commerce_benefit_point_holds h
+ WHERE h.business_id = NEW.business_id AND h.reservation_id = NEW.reservation_id),0) >
+ (SELECT points_minor FROM commerce_benefit_reservations WHERE business_id = NEW.business_id AND id = NEW.reservation_id)
+BEGIN SELECT RAISE(ABORT,'BENEFITS_POINTS_INSUFFICIENT'); END;
+CREATE TRIGGER benefit_point_debit_capacity BEFORE INSERT ON commerce_benefit_point_allocations
+WHEN NEW.amount_minor + COALESCE((SELECT SUM(a.amount_minor) FROM commerce_benefit_point_allocations a
+ WHERE a.business_id = NEW.business_id AND a.debit_entry_id = NEW.debit_entry_id),0) >
+ (SELECT -amount_minor FROM commerce_benefit_point_ledger WHERE business_id = NEW.business_id AND id = NEW.debit_entry_id)
+BEGIN SELECT RAISE(ABORT,'BENEFITS_POINT_ALLOCATION_SCOPE'); END;
+CREATE TRIGGER benefit_coupon_redemption_scope BEFORE INSERT ON commerce_benefit_coupon_redemptions
+WHEN NOT EXISTS (SELECT 1 FROM commerce_benefit_reservations r JOIN commerce_benefit_coupon_holds h
+ ON h.business_id = r.business_id AND h.reservation_id = r.id JOIN commerce_benefit_snapshots s
+ ON s.business_id = r.business_id AND s.reservation_id = r.id
+ WHERE r.business_id = NEW.business_id AND r.id = NEW.reservation_id AND r.customer_id IS NEW.customer_id
+ AND h.code_id = NEW.code_id AND s.id = NEW.snapshot_id)
+BEGIN SELECT RAISE(ABORT,'BENEFITS_COUPON_SCOPE'); END;
+
+-- Future Web/Dealer opaque authorization envelope. Phase A exposes no issuer or
+-- HTTP consumer. Only the canonical reservation/snapshot can authorize spending.
+CREATE TABLE commerce_benefit_checkout_authorizations (
+  business_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version = 1),
+  reservation_id TEXT NOT NULL,
+  channel TEXT NOT NULL CHECK (channel IN ('web','web_dealer')),
+  customer_id TEXT NULL REFERENCES customers(id),
+  principal_hmac TEXT NOT NULL CHECK (length(principal_hmac) = 64),
+  token_hmac TEXT NOT NULL CHECK (length(token_hmac) = 64),
+  authority_id TEXT NOT NULL,
+  authority_revision INTEGER NOT NULL CHECK (authority_revision > 0),
+  access_revision INTEGER NOT NULL CHECK (access_revision >= 0),
+  quote_hmac TEXT NOT NULL CHECK (length(quote_hmac) = 64),
+  created_at_ms INTEGER NOT NULL,
+  expires_at_ms INTEGER NOT NULL CHECK (expires_at_ms > created_at_ms),
+  revoked_at_ms INTEGER NULL,
+  consumed_snapshot_id TEXT NULL,
+  PRIMARY KEY (business_id,id),
+  UNIQUE (business_id,token_hmac),
+  FOREIGN KEY (business_id,reservation_id) REFERENCES commerce_benefit_reservations(business_id,id),
+  FOREIGN KEY (business_id,consumed_snapshot_id) REFERENCES commerce_benefit_snapshots(business_id,id)
+);
+CREATE INDEX idx_benefit_checkout_authorizations_scope ON commerce_benefit_checkout_authorizations(business_id,customer_id,channel,expires_at_ms);
+CREATE TRIGGER benefit_checkout_authorization_scope BEFORE INSERT ON commerce_benefit_checkout_authorizations
+WHEN NOT EXISTS (SELECT 1 FROM commerce_benefit_reservations r WHERE r.business_id = NEW.business_id AND r.id = NEW.reservation_id
+ AND r.customer_id IS NEW.customer_id AND json_extract(r.intent_json,'$.channel') = NEW.channel
+ AND NEW.expires_at_ms <= r.expires_at_ms AND r.status = 'active')
+BEGIN SELECT RAISE(ABORT,'BENEFITS_AUTHORIZATION_SCOPE'); END;
+
+-- B1 staff attribution/reason for explicit point maintenance. No customer messages or coupon secrets.
+CREATE TABLE commerce_benefit_management_audit (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  operation_key TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  intent_json TEXT NOT NULL CHECK (json_valid(intent_json)),
+  note TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (business_id,operation_key)
+);
+CREATE TRIGGER benefit_management_audit_update BEFORE UPDATE ON commerce_benefit_management_audit
+BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+CREATE TRIGGER benefit_management_audit_delete BEFORE DELETE ON commerce_benefit_management_audit
+BEGIN SELECT RAISE(ABORT,'BENEFITS_IMMUTABLE'); END;
+
+-- Common document output P0. Local-only; deliberately absent from public publication.
+-- Template revisions are append-only; the domain owner validates the declarative layout.
+CREATE TABLE document_print_templates (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL CHECK (length(id) BETWEEN 1 AND 128),
+  revision INTEGER NOT NULL CHECK (typeof(revision) = 'integer' AND revision > 0),
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
+  layout_json TEXT NOT NULL CHECK (length(CAST(layout_json AS BLOB)) <= 32768 AND json_valid(layout_json)),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (business_id, id, revision),
+  CHECK (json_extract(layout_json, '$.unit') IS 'mm10'),
+  CHECK (json_type(layout_json, '$.pageWidth') IS 'integer' AND json_extract(layout_json, '$.pageWidth') BETWEEN 200 AND 5000),
+  CHECK (json_type(layout_json, '$.pageHeight') IS 'integer' AND json_extract(layout_json, '$.pageHeight') BETWEEN 200 AND 10000),
+  CHECK (json_type(layout_json, '$.fields') IS 'array' AND json_array_length(layout_json, '$.fields') <= 100)
+);
+CREATE TRIGGER document_template_immutable BEFORE UPDATE ON document_print_templates
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_TEMPLATE_IMMUTABLE'); END;
+
+CREATE TRIGGER document_template_layout_guard BEFORE INSERT ON document_print_templates
+BEGIN
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM json_each(NEW.layout_json) WHERE key NOT IN ('unit','pageWidth','pageHeight','fields','lineBlock','scan'))
+    OR json_type(NEW.layout_json, '$.lineBlock') IS NULL OR json_type(NEW.layout_json, '$.scan') IS NULL
+    THEN RAISE(ABORT, 'DOCUMENT_TEMPLATE_INVALID') END;
+  SELECT CASE WHEN json_type(NEW.layout_json, '$.lineBlock') <> 'null' AND (
+    json_type(NEW.layout_json, '$.lineBlock') <> 'object'
+    OR json_type(NEW.layout_json, '$.lineBlock.y') IS NOT 'integer'
+    OR json_type(NEW.layout_json, '$.lineBlock.rowHeight') IS NOT 'integer'
+    OR json_type(NEW.layout_json, '$.lineBlock.maxRows') IS NOT 'integer'
+    OR json_extract(NEW.layout_json, '$.lineBlock.y') < 0
+    OR json_extract(NEW.layout_json, '$.lineBlock.rowHeight') < 1
+    OR json_extract(NEW.layout_json, '$.lineBlock.maxRows') NOT BETWEEN 1 AND 200
+    OR json_extract(NEW.layout_json, '$.lineBlock.y') + json_extract(NEW.layout_json, '$.lineBlock.rowHeight') * json_extract(NEW.layout_json, '$.lineBlock.maxRows') > json_extract(NEW.layout_json, '$.pageHeight')
+    OR json_type(NEW.layout_json, '$.lineBlock.fields') IS NOT 'array'
+    OR json_array_length(NEW.layout_json, '$.lineBlock.fields') > 100
+    OR EXISTS (SELECT 1 FROM json_each(NEW.layout_json, '$.lineBlock') WHERE key NOT IN ('y','rowHeight','maxRows','fields')))
+    THEN RAISE(ABORT, 'DOCUMENT_TEMPLATE_INVALID') END;
+  SELECT CASE WHEN json_type(NEW.layout_json, '$.scan') <> 'null' AND (
+    json_type(NEW.layout_json, '$.scan') <> 'object'
+    OR json_type(NEW.layout_json, '$.scan.originalImageRef') IS NOT 'text'
+    OR length(json_extract(NEW.layout_json, '$.scan.originalImageRef')) NOT BETWEEN 1 AND 128
+    OR json_extract(NEW.layout_json, '$.scan.originalImageRef') GLOB '*[^a-zA-Z0-9_-]*'
+    OR json_type(NEW.layout_json, '$.scan.processedImageRef') IS NULL
+    OR (json_type(NEW.layout_json, '$.scan.processedImageRef') <> 'null' AND (
+      json_type(NEW.layout_json, '$.scan.processedImageRef') <> 'text'
+      OR length(json_extract(NEW.layout_json, '$.scan.processedImageRef')) NOT BETWEEN 1 AND 128
+      OR json_extract(NEW.layout_json, '$.scan.processedImageRef') GLOB '*[^a-zA-Z0-9_-]*'))
+    OR json_type(NEW.layout_json, '$.scan.foreground') NOT IN ('true','false')
+    OR json_type(NEW.layout_json, '$.scan.foreground') IS NULL
+    OR EXISTS (SELECT 1 FROM json_each(NEW.layout_json, '$.scan') WHERE key NOT IN ('originalImageRef','processedImageRef','foreground')))
+    THEN RAISE(ABORT, 'DOCUMENT_TEMPLATE_INVALID') END;
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM json_each(NEW.layout_json, '$.fields') f WHERE
+    json_type(f.value) <> 'object' OR json_type(f.value, '$.binding') IS NOT 'text' OR json_extract(f.value, '$.binding') NOT IN ('business.name','business.address','business.phone','document.number','document.date','customer.name','totals.total','totals.currency','product.barcode')
+    OR json_type(f.value, '$.x') IS NOT 'integer' OR json_extract(f.value, '$.x') < 0
+    OR json_type(f.value, '$.y') IS NOT 'integer' OR json_extract(f.value, '$.y') < 0
+    OR json_type(f.value, '$.width') IS NOT 'integer' OR json_extract(f.value, '$.width') < 1
+    OR json_type(f.value, '$.height') IS NOT 'integer' OR json_extract(f.value, '$.height') < 1
+    OR json_extract(f.value, '$.x') + json_extract(f.value, '$.width') > json_extract(NEW.layout_json, '$.pageWidth')
+    OR json_extract(f.value, '$.y') + json_extract(f.value, '$.height') > json_extract(NEW.layout_json, '$.pageHeight')
+    OR EXISTS (SELECT 1 FROM json_each(f.value) WHERE key NOT IN ('binding','x','y','width','height')))
+    THEN RAISE(ABORT, 'DOCUMENT_TEMPLATE_INVALID') END;
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM json_each(NEW.layout_json, '$.lineBlock.fields') f WHERE
+    json_type(f.value) <> 'object' OR json_type(f.value, '$.binding') IS NOT 'text' OR json_extract(f.value, '$.binding') NOT IN ('business.name','business.address','business.phone','document.number','document.date','customer.name','totals.total','totals.currency','product.barcode', 'line.description','line.quantity','line.price','line.total')
+    OR json_type(f.value, '$.x') IS NOT 'integer' OR json_extract(f.value, '$.x') < 0
+    OR json_type(f.value, '$.y') IS NOT 'integer' OR json_extract(f.value, '$.y') < 0
+    OR json_type(f.value, '$.width') IS NOT 'integer' OR json_extract(f.value, '$.width') < 1
+    OR json_type(f.value, '$.height') IS NOT 'integer' OR json_extract(f.value, '$.height') < 1
+    OR json_extract(f.value, '$.x') + json_extract(f.value, '$.width') > json_extract(NEW.layout_json, '$.pageWidth')
+    OR json_extract(f.value, '$.y') + json_extract(f.value, '$.height') > json_extract(NEW.layout_json, '$.lineBlock.rowHeight')
+    OR EXISTS (SELECT 1 FROM json_each(f.value) WHERE key NOT IN ('binding','x','y','width','height')))
+    THEN RAISE(ABORT, 'DOCUMENT_TEMPLATE_INVALID') END;
+END;
+
+CREATE TABLE document_output_rules (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
+  trigger_kind TEXT NOT NULL CHECK (trigger_kind IN ('sale_completed','table_closed','stay_checked_out','order_dispatched','shipment_created','customer_statement_requested','order_created','manual')),
+  channel TEXT NOT NULL CHECK (channel IN ('print','email','whatsapp')),
+  mode TEXT NOT NULL CHECK (mode IN ('OFF','ASK_CONFIRMATION','AUTOMATIC')),
+  adapter TEXT NOT NULL CHECK (adapter IN ('native_print','smtp','whatsapp_webview','whatsapp_business_api')),
+  PRIMARY KEY (business_id, document_kind, trigger_kind, channel),
+  CHECK ((channel = 'print' AND adapter = 'native_print') OR (channel = 'email' AND adapter = 'smtp') OR (channel = 'whatsapp' AND adapter IN ('whatsapp_webview','whatsapp_business_api'))),
+  CHECK (mode <> 'AUTOMATIC' OR adapter <> 'whatsapp_webview'),
+  CHECK (trigger_kind = 'manual' OR (document_kind = 'sale_receipt' AND trigger_kind = 'sale_completed') OR (document_kind = 'table_bill' AND trigger_kind = 'table_closed') OR (document_kind = 'stay_statement' AND trigger_kind = 'stay_checked_out') OR (document_kind = 'credit_statement' AND trigger_kind = 'customer_statement_requested') OR (document_kind = 'shipping_label' AND trigger_kind IN ('order_dispatched','shipment_created')) OR (document_kind = 'kitchen_ticket' AND trigger_kind = 'order_created'))
+);
+CREATE TABLE document_printer_bindings (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  installation_id TEXT NOT NULL CHECK (length(installation_id) BETWEEN 1 AND 128),
+  id TEXT NOT NULL CHECK (length(id) BETWEEN 1 AND 128),
+  printer_ref TEXT NOT NULL CHECK (length(printer_ref) BETWEEN 1 AND 256),
+  PRIMARY KEY (business_id, installation_id, id)
+);
+CREATE TABLE document_output_jobs (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  id TEXT NOT NULL CHECK (length(id) BETWEEN 1 AND 128),
+  installation_id TEXT NOT NULL CHECK (length(installation_id) BETWEEN 1 AND 128),
+  source_id TEXT NOT NULL CHECK (length(source_id) BETWEEN 1 AND 128),
+  operation_id TEXT NOT NULL CHECK (length(operation_id) BETWEEN 1 AND 128),
+  command_kind TEXT NOT NULL CHECK (command_kind IN ('event','manual')),
+  reprint_of TEXT,
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
+  trigger_kind TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('ASK_CONFIRMATION','AUTOMATIC')),
+  adapter TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  template_revision INTEGER NOT NULL,
+  layout_snapshot_json TEXT NOT NULL CHECK (json_valid(layout_snapshot_json) AND length(CAST(layout_snapshot_json AS BLOB)) <= 32768),
+  copies INTEGER NOT NULL CHECK (typeof(copies) = 'integer' AND copies BETWEEN 1 AND 100),
+  printer_binding_id TEXT,
+  legal_meaning TEXT NOT NULL DEFAULT 'non_fiscal_copy' CHECK (legal_meaning = 'non_fiscal_copy'),
+  state TEXT NOT NULL CHECK (state IN ('queued','awaiting-confirmation','sending','accepted','failed','unknown')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (business_id, id),
+  UNIQUE (business_id, operation_id, source_id, trigger_kind, channel, document_kind),
+  FOREIGN KEY (business_id, template_id, template_revision) REFERENCES document_print_templates(business_id, id, revision),
+  FOREIGN KEY (business_id, installation_id, printer_binding_id) REFERENCES document_printer_bindings(business_id, installation_id, id),
+  FOREIGN KEY (business_id, reprint_of) REFERENCES document_output_jobs(business_id, id),
+  CHECK (command_kind = 'manual' OR (reprint_of IS NULL AND trigger_kind <> 'manual')),
+  CHECK (channel = 'print' OR printer_binding_id IS NULL),
+  CHECK (channel <> 'print' OR printer_binding_id IS NOT NULL),
+  CHECK (reprint_of IS NULL OR reprint_of <> id)
+);
+-- One event per source/trigger/channel, including replays with a changed operation ID.
+-- Manual commands deliberately do not participate; new command IDs permit reprints.
+CREATE UNIQUE INDEX document_output_event_once ON document_output_jobs(business_id, source_id, document_kind, trigger_kind, channel) WHERE command_kind = 'event';
+CREATE INDEX document_output_pending ON document_output_jobs(business_id, installation_id, state);
+CREATE TRIGGER document_job_create_guard BEFORE INSERT ON document_output_jobs
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM document_output_rules r WHERE r.business_id = NEW.business_id AND r.document_kind = NEW.document_kind AND r.trigger_kind = NEW.trigger_kind AND r.channel = NEW.channel AND r.mode = NEW.mode AND r.adapter = NEW.adapter AND r.mode <> 'OFF') THEN RAISE(ABORT, 'DOCUMENT_RULE_DISABLED') END;
+  SELECT CASE WHEN NEW.state <> CASE NEW.mode WHEN 'AUTOMATIC' THEN 'queued' ELSE 'awaiting-confirmation' END THEN RAISE(ABORT, 'DOCUMENT_INITIAL_STATE') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM document_print_templates t WHERE t.business_id = NEW.business_id AND t.id = NEW.template_id AND t.revision = NEW.template_revision AND t.document_kind = NEW.document_kind AND t.layout_json = NEW.layout_snapshot_json) THEN RAISE(ABORT, 'DOCUMENT_SNAPSHOT_INVALID') END;
+  SELECT CASE WHEN NEW.reprint_of IS NOT NULL AND NOT EXISTS (SELECT 1 FROM document_output_jobs j WHERE j.business_id = NEW.business_id AND j.id = NEW.reprint_of AND j.source_id = NEW.source_id AND j.document_kind = NEW.document_kind AND j.channel = NEW.channel) THEN RAISE(ABORT, 'DOCUMENT_REPRINT_LINEAGE') END;
+END;
+CREATE TRIGGER document_job_capability_insert BEFORE INSERT ON document_output_jobs
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'document.printing' AND is_enabled = 1) OR
+    (NEW.document_kind <> 'invoice_copy' AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = CASE NEW.document_kind WHEN 'sale_receipt' THEN 'commerce.sales' WHEN 'table_bill' THEN 'food_service.orders' WHEN 'stay_statement' THEN 'accommodation.stays' WHEN 'product_label' THEN 'retail.labels' WHEN 'credit_statement' THEN 'commerce.customer_credit' WHEN 'shipping_label' THEN 'commerce.orders' WHEN 'kitchen_ticket' THEN 'food_service.orders' END AND is_enabled = 1)) OR
+    (NEW.channel = 'whatsapp' AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'service.whatsapp' AND is_enabled = 1))
+    THEN RAISE(ABORT, 'DOCUMENT_CAPABILITY_DISABLED') END;
+END;
+CREATE TRIGGER document_job_state_guard BEFORE UPDATE ON document_output_jobs
+BEGIN
+  SELECT CASE WHEN NEW.business_id IS NOT OLD.business_id OR NEW.id IS NOT OLD.id OR NEW.installation_id IS NOT OLD.installation_id OR NEW.source_id IS NOT OLD.source_id OR NEW.operation_id IS NOT OLD.operation_id OR NEW.command_kind IS NOT OLD.command_kind OR NEW.reprint_of IS NOT OLD.reprint_of OR NEW.document_kind IS NOT OLD.document_kind OR NEW.trigger_kind IS NOT OLD.trigger_kind OR NEW.channel IS NOT OLD.channel OR NEW.mode IS NOT OLD.mode OR NEW.adapter IS NOT OLD.adapter OR NEW.template_id IS NOT OLD.template_id OR NEW.template_revision IS NOT OLD.template_revision OR NEW.layout_snapshot_json IS NOT OLD.layout_snapshot_json OR NEW.copies IS NOT OLD.copies OR NEW.printer_binding_id IS NOT OLD.printer_binding_id OR NEW.legal_meaning IS NOT OLD.legal_meaning OR NEW.created_at IS NOT OLD.created_at THEN RAISE(ABORT, 'DOCUMENT_JOB_IMMUTABLE') END;
+  SELECT CASE WHEN NOT ((OLD.state = 'awaiting-confirmation' AND NEW.state = 'queued') OR (OLD.state = 'queued' AND NEW.state = 'sending') OR (OLD.state = 'sending' AND NEW.state IN ('accepted','failed','unknown'))) THEN RAISE(ABORT, 'DOCUMENT_STATE_TRANSITION') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'document.printing' AND is_enabled = 1) AND NEW.state IN ('queued','sending') THEN RAISE(ABORT, 'DOCUMENT_CAPABILITY_DISABLED') END;
+  SELECT CASE WHEN NEW.state IN ('queued','sending') AND (NOT EXISTS (SELECT 1 FROM document_output_rules r WHERE r.business_id = NEW.business_id AND r.document_kind = NEW.document_kind AND r.trigger_kind = NEW.trigger_kind AND r.channel = NEW.channel AND r.mode = NEW.mode AND r.adapter = NEW.adapter) OR
+    (NEW.document_kind <> 'invoice_copy' AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = CASE NEW.document_kind WHEN 'sale_receipt' THEN 'commerce.sales' WHEN 'table_bill' THEN 'food_service.orders' WHEN 'stay_statement' THEN 'accommodation.stays' WHEN 'product_label' THEN 'retail.labels' WHEN 'credit_statement' THEN 'commerce.customer_credit' WHEN 'shipping_label' THEN 'commerce.orders' WHEN 'kitchen_ticket' THEN 'food_service.orders' END AND is_enabled = 1)) OR
+    (NEW.channel = 'whatsapp' AND NOT EXISTS (SELECT 1 FROM business_capabilities WHERE business_id = NEW.business_id AND capability_id = 'service.whatsapp' AND is_enabled = 1))) THEN RAISE(ABORT, 'DOCUMENT_EXECUTION_DISABLED') END;
+END;
+CREATE TRIGGER document_job_no_delete BEFORE DELETE ON document_output_jobs
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_JOB_IMMUTABLE'); END;
+CREATE TABLE document_output_render_snapshots (
+  business_id TEXT NOT NULL,
+  installation_id TEXT NOT NULL,
+  job_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json) AND length(CAST(payload_json AS BLOB)) <= 262144),
+  PRIMARY KEY (business_id, job_id),
+  FOREIGN KEY (business_id, job_id) REFERENCES document_output_jobs(business_id, id)
+);
+CREATE TRIGGER document_render_snapshot_parent BEFORE INSERT ON document_output_render_snapshots
+BEGIN
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM document_output_render_snapshots s WHERE s.business_id = NEW.business_id AND s.job_id = NEW.job_id) THEN RAISE(ABORT, 'DOCUMENT_SNAPSHOT_IMMUTABLE') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM document_output_jobs j WHERE j.business_id = NEW.business_id AND j.installation_id = NEW.installation_id AND j.id = NEW.job_id AND j.legal_meaning = 'non_fiscal_copy') THEN RAISE(ABORT, 'DOCUMENT_SNAPSHOT_JOB_MISSING') END;
+END;
+CREATE TRIGGER document_render_snapshot_no_update BEFORE UPDATE ON document_output_render_snapshots
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_SNAPSHOT_IMMUTABLE'); END;
+CREATE TRIGGER document_render_snapshot_no_delete BEFORE DELETE ON document_output_render_snapshots
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_SNAPSHOT_IMMUTABLE'); END;
+CREATE TABLE document_output_snapshot_images (
+  business_id TEXT NOT NULL, installation_id TEXT NOT NULL, job_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('original','processed')),
+  image_ref TEXT NOT NULL,
+  sha256 TEXT NOT NULL CHECK (length(sha256) = 64 AND sha256 NOT GLOB '*[^0-9a-f]*'),
+  bytes BLOB NOT NULL CHECK (typeof(bytes) = 'blob' AND length(bytes) BETWEEN 1 AND 12582912),
+  PRIMARY KEY (business_id, job_id, role),
+  FOREIGN KEY (business_id, job_id) REFERENCES document_output_render_snapshots(business_id, job_id)
+);
+CREATE TRIGGER document_snapshot_image_parent BEFORE INSERT ON document_output_snapshot_images
+BEGIN
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM document_output_snapshot_images WHERE business_id=NEW.business_id AND job_id=NEW.job_id AND role=NEW.role) THEN RAISE(ABORT, 'DOCUMENT_IMAGE_IMMUTABLE') END;
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM document_output_render_snapshots WHERE business_id=NEW.business_id AND installation_id=NEW.installation_id AND job_id=NEW.job_id) THEN RAISE(ABORT, 'DOCUMENT_SNAPSHOT_JOB_MISSING') END;
+END;
+CREATE TRIGGER document_snapshot_image_no_update BEFORE UPDATE ON document_output_snapshot_images
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_IMAGE_IMMUTABLE'); END;
+CREATE TRIGGER document_snapshot_image_no_delete BEFORE DELETE ON document_output_snapshot_images
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_IMAGE_IMMUTABLE'); END;
+CREATE TRIGGER document_template_no_delete BEFORE DELETE ON document_print_templates
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_TEMPLATE_IMMUTABLE'); END;
+CREATE TRIGGER document_binding_immutable BEFORE UPDATE ON document_printer_bindings
+BEGIN SELECT RAISE(ABORT, 'DOCUMENT_BINDING_IMMUTABLE'); END;

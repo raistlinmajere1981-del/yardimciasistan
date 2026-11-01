@@ -11,7 +11,8 @@ import type {
   CommerceUnit,
   ProductLookupCandidate
 } from "@yardimci-asistan/shared";
-import { parseMoneyToMajor, parseMoneyInput } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, parseMoneyToMajor, parseMoneyInput } from "@yardimci-asistan/shared";
+import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import {
   createKeyboardBarcodeInputAdapter,
   type BarcodeScan
@@ -140,6 +141,20 @@ export function MarketQuickSaleWorkspace({
   onExternalProductFound
 }: MarketQuickSaleWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
+  const { snapshot } = useBusinessCapabilityRuntime();
+  const receiptBridge = window.yardimciDesktop?.prepareSaleReceipt;
+  const receiptAuthority = snapshot?.businessId && snapshot.enabledCapabilities.includes(C.PRINTING) && snapshot.enabledCapabilities.includes(C.SALES)
+    ? snapshot.businessId : "";
+  const receiptScope = useRef({ authority: receiptAuthority, generation: 0 });
+  if (receiptScope.current.authority !== receiptAuthority) {
+    receiptScope.current = { authority: receiptAuthority, generation: receiptScope.current.generation + 1 };
+  }
+  const [receiptSale, setReceiptSale] = useState<{ id: string; generation: number } | null>(null);
+  const [receiptJob, setReceiptJob] = useState<{ jobId: string; saleId: string; generation: number; terminal: boolean } | null>(null);
+  const [receiptMessage, setReceiptMessage] = useState("");
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const receiptInFlight = useRef(false);
+  const beginReceiptRequest = useRequestGeneration();
   const [search, setSearch] = usePageViewState("market.sale.search", "");
   const [categoryId, setCategoryId] = usePageViewState("market.sale.category", "");
   const [discountDraft, setDiscountDraft] = useState<string | null>(null);
@@ -175,9 +190,27 @@ export function MarketQuickSaleWorkspace({
     recordSale,
     applyLoadedDraft
   } = session;
-  const { pricesReady, priceError, prepareSaleOperation, refreshPrices } = session;
+  const { pricesReady, priceError, prepareSaleOperation, refreshPrices, benefits } = session;
   const { transactionMode, setTransactionMode, orderNote, setOrderNote, orderUncertain } = session;
   const isOrder = transactionMode === "order" && ordersEnabled;
+  useEffect(() => {
+    if (!receiptAuthority || cart.length || isOrder || cartDraftRequest) {
+      setReceiptSale(null);
+      setReceiptJob(null);
+      setReceiptMessage("");
+      beginReceiptRequest();
+      receiptInFlight.current = false;
+      setReceiptBusy(false);
+    }
+  }, [receiptAuthority, cart.length, isOrder, cartDraftRequest, beginReceiptRequest]);
+  useEffect(() => {
+    setReceiptSale(null);
+    setReceiptJob(null);
+    setReceiptMessage("");
+    beginReceiptRequest();
+    receiptInFlight.current = false;
+    setReceiptBusy(false);
+  }, [receiptAuthority, beginReceiptRequest]);
   const isCredit = !isOrder && paymentMethod === "credit";
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
   const customerPricingContext = JSON.stringify([selectedCustomer?.id, selectedCustomer?.commercialProfile?.dealerStatus, selectedCustomer?.commercialProfile?.priceGroup]);
@@ -207,20 +240,20 @@ export function MarketQuickSaleWorkspace({
   const discountMajor = discountTotal.trim() === "" ? 0 : parseMoneyToMajor(discountTotal);
   const discountValid = discountMajor !== null && discountMajor >= 0;
   const discount = discountValid ? Math.max(0, Math.min(subtotal, roundMoney(discountMajor))) : 0;
-  const previewTotal = roundMoney(subtotal - discount);
-  const currency = cartLines[0]?.product.currency ?? "TRY";
+  const previewTotal = benefits.active ? (benefits.current?.quote.payableMinor ?? 0) / 100 : roundMoney(subtotal - discount);
+  const currency = benefits.active && benefits.current ? benefits.current.quote.currency : cartLines[0]?.product.currency ?? "TRY";
   const existingDebtMinor = customerDebtEnabled && customerDebtReady
     ? customerAccount.account?.balances.find(balance => balance.currency === currency)?.amountMinor ?? 0 : 0;
   const totalDebt = roundMoney(previewTotal + existingDebtMinor / 100);
-  const checkoutReady = pricesReady && customerDebtReady;
-  const explicitTender = !isCredit && (paymentAmount !== null || existingDebtMinor > 0);
-  const paymentText = isCredit ? "0" : paymentAmount ?? (checkoutReady ? totalDebt.toFixed(2).replace(".", ",") : "");
+  const checkoutReady = pricesReady && (benefits.active || customerDebtReady) && (!benefits.active || Boolean(benefits.current));
+  const explicitTender = !benefits.active && !isCredit && (paymentAmount !== null || existingDebtMinor > 0);
+  const paymentText = benefits.active ? (benefits.current ? (benefits.current.quote.payableMinor / 100).toFixed(2).replace(".", ",") : "") : isCredit ? "0" : paymentAmount ?? (checkoutReady ? totalDebt.toFixed(2).replace(".", ",") : "");
   const parsedPayment = parseMoneyInput(paymentText);
   const paymentMinor = parsedPayment.status === "valid" ? parsedPayment.minor : null;
   const paymentValid = paymentMinor !== null && paymentMinor >= 0 && paymentMinor <= 999_999_999_999;
   const paymentDifference = paymentValid ? roundMoney(paymentMinor / 100 - previewTotal) : 0;
-  const customerPaymentRequired = isCredit || paymentDifference !== 0;
-  const paymentAllowed = checkoutReady && paymentValid && (!customerPaymentRequired || (customerCreditEnabled && Boolean(selectedCustomer)));
+  const customerPaymentRequired = !benefits.active && (isCredit || paymentDifference !== 0);
+  const paymentAllowed = benefits.uncertain || checkoutReady && paymentValid && (!customerPaymentRequired || (customerCreditEnabled && Boolean(selectedCustomer)));
 
   const addProduct = useCallback((product: CatalogProduct) => {
     const result = addSessionProduct(product);
@@ -268,14 +301,14 @@ export function MarketQuickSaleWorkspace({
   }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange, orderUncertain, saleInFlight, setSearch]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
-    if (!barcodeEnabled || busy || submitting || orderUncertain || saleInFlight.current || draftLoading || localScanInFlight.current) return;
+    if (!barcodeEnabled || busy || submitting || orderUncertain || benefits.uncertain || saleInFlight.current || draftLoading || localScanInFlight.current) return;
     localScanInFlight.current = true;
     try {
       await resolveBarcode(scan.value);
     } finally {
       localScanInFlight.current = false;
     }
-  }, [barcodeEnabled, busy, draftLoading, orderUncertain, resolveBarcode, saleInFlight, submitting]);
+  }, [barcodeEnabled, benefits.uncertain, busy, draftLoading, orderUncertain, resolveBarcode, saleInFlight, submitting]);
 
   useEffect(() => {
     if (!barcodeEnabled) {
@@ -317,7 +350,7 @@ export function MarketQuickSaleWorkspace({
     };
   }, [applyLoadedDraft, beginBarcodeRequest, bridge, cartDraftRequest, loadedDraftRequestId, onCartDraftLoaded, onStateChange]);
 
-  interactionBlocked.current = busy || submitting || orderUncertain || saleInFlight.current || draftLoading;
+  interactionBlocked.current = busy || submitting || orderUncertain || benefits.uncertain || saleInFlight.current || draftLoading;
 
   useEffect(() => {
     if (!barcodeEnabled || !bridge) {
@@ -369,7 +402,7 @@ export function MarketQuickSaleWorkspace({
   }, [barcodeEnabled, beginBarcodeRequest, bridge, onStateChange, resolveBarcode]);
 
   function clearCart() {
-    if (orderUncertain || submitting) return;
+    if (orderUncertain || benefits.uncertain || submitting) return;
     setDiscountDraft(null);
     clearSale();
   }
@@ -384,7 +417,7 @@ export function MarketQuickSaleWorkspace({
   }
 
   async function completeSale() {
-    if (isOrder || orderUncertain || busy || !pricesReady || discountDraft !== null || !paymentAllowed) return;
+    if (isOrder || orderUncertain || busy || (!benefits.uncertain && (!pricesReady || discountDraft !== null || !paymentAllowed))) return;
     if (!bridge) {
       onStateChange("error", "Satış kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
       return;
@@ -404,6 +437,13 @@ export function MarketQuickSaleWorkspace({
 
     beginBarcodeRequest();
     if (!startSale()) return;
+    setReceiptSale(null);
+    setReceiptJob(null);
+    setReceiptMessage("");
+    beginReceiptRequest();
+    receiptInFlight.current = false;
+    setReceiptBusy(false);
+    const saleAuthorityGeneration = receiptScope.current.generation;
 
     const draftToReview = sourceDraft;
     const creditCustomerId = selectedCustomer?.id ?? "";
@@ -411,20 +451,25 @@ export function MarketQuickSaleWorkspace({
     const salePaymentMethod = paymentMethod;
     let operation: CompleteMarketSaleResult;
     try {
-      const saleInput = {
-        items: cartLines.map((line) => ({
-          productId: line.product.id,
-          quantity: line.quantity,
-          ...(!explicitTender ? {} : { expectedUnitPrice: line.price!.unitPrice, expectedCurrency: line.price!.currency })
-        })),
-        ...(!explicitTender ? {} : { paymentAmountMinor: paymentMinor }),
-        discountTotal: discount,
-        source: "desktop-market-quick-sale"
-      };
-      operation = await bridge.completeMarketSale({ ...saleInput,
-        settlement: isCredit ? "credit" : "paid", customerId,
-        paymentMethod: salePaymentMethod, ...(draftToReview?.id ? { sourceDraftId: draftToReview.id } : {}),
-        operationId: prepareSaleOperation({ ...saleInput, settlement: isCredit ? "credit" : "paid", customerId, paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id }) });
+      if (benefits.active || benefits.uncertain) {
+        operation = await benefits.submit();
+      } else {
+        if (paymentMinor === null) throw new Error("Geçerli bir ödeme tutarı girin.");
+        const saleInput = {
+          items: cartLines.map((line) => ({
+            productId: line.product.id,
+            quantity: line.quantity,
+            ...(!explicitTender ? {} : { expectedUnitPrice: line.price!.unitPrice, expectedCurrency: line.price!.currency })
+          })),
+          ...(!explicitTender ? {} : { paymentAmountMinor: paymentMinor }),
+          discountTotal: discount,
+          source: "desktop-market-quick-sale"
+        };
+        operation = await bridge.completeMarketSale({ ...saleInput,
+          settlement: isCredit ? "credit" : "paid", customerId,
+          paymentMethod: salePaymentMethod, ...(draftToReview?.id ? { sourceDraftId: draftToReview.id } : {}),
+          operationId: prepareSaleOperation({ ...saleInput, settlement: isCredit ? "credit" : "paid", customerId, paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id }) });
+      }
     } catch (error) {
       onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));
       finishSale();
@@ -432,11 +477,16 @@ export function MarketQuickSaleWorkspace({
     }
 
     const sale = operation.sale;
+    if (receiptScope.current.authority && receiptScope.current.generation === saleAuthorityGeneration) {
+      setReceiptSale({ id: sale.id, generation: saleAuthorityGeneration });
+    }
     recordSale(sale);
     if (sale.status === "credit" || (operation.payment?.appliedToDebtMinor ?? 0) > 0) notifyCustomerCreditChanged(creditCustomerId);
     clearSale();
 
-    const saleMessage = operation.payment && !isCredit
+    const saleMessage = operation.benefits
+      ? `Satış tamamlandı: ${money(operation.benefits.quote.payableMinor / 100, sale.currency)} tahsilat${operation.benefits.quote.pointsTenderMinor ? ` · ${money(operation.benefits.quote.pointsTenderMinor / 100, sale.currency)} Puan ile ödeme` : ""}.${operation.benefits.quote.pointsEarnPreviewMinor ? ` ${money(operation.benefits.quote.pointsEarnPreviewMinor / 100, sale.currency)} Puan kazanıldı.` : ""}`
+      : operation.payment && !isCredit
       ? `Satış kaydedildi. ${money(operation.payment.receivedMinor / 100, sale.currency)} tahsil edildi. ${operation.payment.newDebtMinor > 0 ? `${creditCustomerName}: ${money(operation.payment.newDebtMinor / 100, sale.currency)} veresiye eklendi.` : operation.payment.appliedToDebtMinor > 0 ? `Eski borçtan ${money(operation.payment.appliedToDebtMinor / 100, sale.currency)} düşüldü.` : ""}`.trim()
       : sale.status === "credit"
       ? `Veresiye satış kaydedildi. ${creditCustomerName}: müşteri hesabına ${money(sale.total, sale.currency)} borç işlendi.`
@@ -464,6 +514,68 @@ export function MarketQuickSaleWorkspace({
       onStateChange("success", completionMessage);
     } finally {
       finishSale();
+    }
+  }
+
+  async function prepareReceipt() {
+    if (!receiptSale || receiptJob || !receiptAuthority || !receiptBridge || receiptInFlight.current || receiptSale.generation !== receiptScope.current.generation || cart.length || isOrder || submitting || benefits.uncertain || orderUncertain || draftLoading) return;
+    const current = beginReceiptRequest();
+    const generation = receiptScope.current.generation;
+    receiptInFlight.current = true;
+    setReceiptBusy(true);
+    setReceiptMessage("");
+    try {
+      const result = await receiptBridge({ saleId: receiptSale.id });
+      if (!current() || generation !== receiptScope.current.generation) return;
+      if (result.ok) setReceiptJob({ jobId: result.value.jobId, saleId: receiptSale.id, generation, terminal: false });
+      setReceiptMessage(result.ok ? "Fiş hazır."
+        : result.code === "DOCUMENT_SALE_JOB_LINES_MISSING"
+          ? "Fiş şablonunda ürün satırları eksik veya kapasitesi yetersiz. Baskı Yönetimi > Satış fişi > Düzenle > Ürün satırlarını ekle > Şablonları kaydet. Satır kapasitesini aşan satışlar hazırlanamaz."
+        : result.code === "DOCUMENT_SALE_JOB_CONFIGURATION_MISSING"
+          ? "Fiş hazırlanamadı. Baskı Yönetimi'nde fiş şablonunu, yazıcıyı ve yazdırma onayı kuralını kontrol edin."
+          : "Fiş hazırlanamadı. Baskı Yönetimi ayarlarını kontrol edip yeniden deneyin.");
+    } catch {
+      if (current() && generation === receiptScope.current.generation) setReceiptMessage("Fiş hazırlanamadı. Yeniden deneyin.");
+    } finally {
+      if (current() && generation === receiptScope.current.generation) {
+        receiptInFlight.current = false;
+        setReceiptBusy(false);
+      }
+    }
+  }
+
+  async function outputReceipt(action: "preview" | "print") {
+    const desktop = window.yardimciDesktop;
+    if (!receiptJob || receiptJob.terminal || !receiptSale || receiptJob.saleId !== receiptSale.id || receiptJob.generation !== receiptScope.current.generation || !receiptAuthority || cart.length || isOrder || submitting || benefits.uncertain || orderUncertain || draftLoading || cartDraftRequest || receiptInFlight.current) return;
+    const operation = action === "preview" ? desktop?.previewReadyDocument : desktop?.printReadyDocument;
+    if (!operation) return;
+    const current = beginReceiptRequest();
+    const generation = receiptScope.current.generation;
+    receiptInFlight.current = true;
+    setReceiptBusy(true);
+    try {
+      const result = await operation({ documentKind: "sale_receipt", jobId: receiptJob.jobId });
+      if (!current() || generation !== receiptScope.current.generation) return;
+      if (action === "preview") {
+        setReceiptMessage(result.ok ? "Önizleme açıldı." : "Önizleme açılamadı. Baskı Yönetimi'ni kontrol edin.");
+      } else if (!result.ok && result.code === "DOCUMENT_PRINT_CANCELLED") {
+        setReceiptMessage("Yazdırmadan vazgeçildi. Fiş hâlâ hazır.");
+      } else {
+        setReceiptJob({ ...receiptJob, terminal: true });
+        setReceiptMessage(result.ok && result.value === "accepted" ? "Yazdırma işletim sistemine iletildi; kâğıt çıktısı doğrulanmadı."
+          : result.ok && result.value === "failed" ? "Yazdırma başarısız. Baskı Yönetimi'ni kontrol edin."
+            : result.ok && result.value === null ? "Bu fiş daha önce işlendi; tekrar gönderilmedi. Baskı Yönetimi'ni kontrol edin."
+            : "Yazdırma sonucu belirsiz. Tekrar göndermeden önce Baskı Yönetimi'ni ve yazıcıyı kontrol edin.");
+      }
+    } catch {
+      if (!current() || generation !== receiptScope.current.generation) return;
+      if (action === "print") setReceiptJob({ ...receiptJob, terminal: true });
+      setReceiptMessage(action === "print" ? "Yazdırma sonucu belirsiz. Tekrar göndermeden önce Baskı Yönetimi'ni ve yazıcıyı kontrol edin." : "Önizleme açılamadı. Baskı Yönetimi'ni kontrol edin.");
+    } finally {
+      if (current() && generation === receiptScope.current.generation) {
+        receiptInFlight.current = false;
+        setReceiptBusy(false);
+      }
     }
   }
 
@@ -495,7 +607,7 @@ export function MarketQuickSaleWorkspace({
     }
   }
 
-  const disabled = busy || submitting || draftLoading || orderUncertain;
+  const disabled = busy || submitting || draftLoading || orderUncertain || benefits.uncertain;
 
   return (
     <div className="market-quick-sale-layout">
@@ -527,7 +639,7 @@ export function MarketQuickSaleWorkspace({
         <CatalogPageControls catalog={catalog} />
       </section>
 
-      <div className="market-sale-sidebar">
+      <div className={`market-sale-sidebar${benefits.active ? " market-sale-sidebar--benefits" : ""}`}>
       <section className="market-panel market-sale-checkout" aria-label="Ödeme">
         <div className="market-sale-checkout-fields">
           {customerSelectionEnabled && (
@@ -537,21 +649,58 @@ export function MarketQuickSaleWorkspace({
             <ChoiceChips ariaLabel="İşlem ve ödeme seçimi" value={isOrder ? "order" : paymentMethod} onChange={value => {
               if (value === "order") { if (sourceDraft || reviewRecoveryDraft) return; setTransactionMode("order"); }
               else { setTransactionMode("sale"); if (value !== "sale") setPaymentMethod(value); }
-            }} disabled={disabled} options={[...(isOrder ? [{ id: "sale", label: "Satış" }] : [...Object.entries(paymentMethodLabels).map(([id, label]) => ({ id, label })), ...(customerCreditEnabled ? [{ id: "credit", label: "Veresiye" }] : [])]), ...(ordersEnabled ? [{ id: "order", label: "Sipariş", disabled: Boolean(sourceDraft || reviewRecoveryDraft) }] : [])]} />
+            }} disabled={disabled} options={[...(isOrder ? [{ id: "sale", label: "Satış" }] : [...Object.entries(paymentMethodLabels).map(([id, label]) => ({ id, label })), ...(customerCreditEnabled ? [{ id: "credit", label: "Veresiye", disabled: benefits.active }] : [])]), ...(ordersEnabled ? [{ id: "order", label: "Sipariş", disabled: benefits.active || Boolean(sourceDraft || reviewRecoveryDraft) }] : [])]} />
           </div>
           {ordersEnabled && (sourceDraft || reviewRecoveryDraft) && <p className="market-muted">Telefon sepeti yalnız satış olarak tamamlanabilir. Sipariş için bağımsız bir sepet hazırlayın.</p>}
           {isOrder && !selectedCustomer && <p role="status" className="market-muted">Sipariş için kayıtlı müşteri seçin.</p>}
           {orderUncertain && <p role="alert" className="market-muted">Sipariş sonucu belirsiz. Sepet korundu; aynı siparişi doğrulamak için yeniden kaydedin.</p>}
           {priceError && <p role="alert">{priceError}</p>}
 
+          {benefits.availabilityError && <p role="alert">{benefits.availabilityError}
+            <ActionButton variant="secondary" disabled={disabled} onClick={benefits.reloadAvailability}>Yeniden dene</ActionButton></p>}
+          {benefits.available && <section className="form-stack" aria-label="İndirim ve Puan">
+            <label><input type="checkbox" checked={benefits.selected} disabled={disabled || (!benefits.selected && (!benefits.compatible || discountDraft !== null))}
+              onChange={event => { if (event.target.checked) benefits.setSelected(true); else benefits.clear(); }} /> İndirim ve Puan</label>
+            {!benefits.compatible && <p className="market-muted">Tam ödenen satışta kullanılabilir. Manuel indirimi kaldırın ve ödeme tutarını otomatik bırakın.</p>}
+            {paymentAmount !== null && <ActionButton variant="ghost" disabled={disabled} onClick={() => setPaymentAmount(null)}>Ödemeyi otomatik hesapla</ActionButton>}
+            {benefits.active && <>
+              {benefits.families?.coupon && <label className="form-field">Kupon<input aria-label="Kupon kodu" type="password" autoComplete="off" maxLength={128}
+                defaultValue={benefits.coupon.current} disabled={disabled} onChange={event => benefits.setCoupon(event.target.value)} /></label>}
+              {benefits.families?.points && <>
+                <span>Kullanılabilir Puan: {benefits.current ? money(benefits.current.availablePointsMinor / 100, currency) : "—"}</span>
+                <label className="form-field">Kullanılacak Puan<MoneyInput aria-label="Kullanılacak Puan" value={benefits.points} onChange={benefits.setPoints} disabled={disabled || !customerId}
+                  aria-invalid={benefits.requestedPointsMinor === null || benefits.requestedPointsMinor < 0} /></label>
+                {!customerId && <p className="market-muted">Puan için müşteri seçin.</p>}
+              </>}
+              <ActionButton variant="secondary" type="button" busy={benefits.loading} disabled={disabled || !benefits.compatible || !pricesReady || !cartLines.length || benefits.requestedPointsMinor === null || benefits.requestedPointsMinor < 0}
+                onClick={() => void benefits.refresh().catch(error => onStateChange("error", customerCreditError(error, "Tutar hesaplanamadı.")))}>Tutarı Hesapla</ActionButton>
+              {!benefits.current && <p role="status" className="market-muted">Onaylamadan önce güncel tutarı hesaplayın.</p>}
+              {benefits.current && <details>
+                <summary>İndirim ve Puan detayı</summary>
+                <div className="market-sale-totals">
+                  <span><small>Güncel ara toplam</small><strong>{money(benefits.current.quote.subtotalMinor / 100, currency)}</strong></span>
+                  <span><small>Fayda indirimi</small><strong>-{money(benefits.current.quote.discountMinor / 100, currency)}</strong></span>
+                  {benefits.current.quote.adjustments.filter(adjustment => adjustment.operation === "discount").map(adjustment =>
+                    <span key={adjustment.ruleId}><small>{adjustment.family === "coupon" ? "Kupon indirimi" : "Ödeme yöntemi indirimi"}</small><strong>-{money(adjustment.amountMinor / 100, currency)}</strong></span>)}
+                  <span><small>Puan ile ödeme</small><strong>{money(benefits.current.quote.pointsTenderMinor / 100, currency)}</strong></span>
+                  <span><small>Ödeme sonrası kazanılacak Puan</small><strong>{money(benefits.current.quote.pointsEarnPreviewMinor / 100, currency)}</strong></span>
+                </div>
+                <p className="market-muted">Önizleme. Puan, satış kaydedildiğinde kesinleşir.</p>
+              </details>}
+              {existingDebtMinor > 0 && <p className="market-muted">Mevcut borç bu satışta tahsil edilmez.</p>}
+            </>}
+          </section>}
+          {benefits.active && !benefits.available && <p role="alert">İndirim ve Puan kullanılamıyor. Önizlemeyi yenileyin veya seçimi kaldırın.
+            <ActionButton variant="secondary" disabled={disabled} onClick={() => benefits.clear()}>Seçimi kaldır</ActionButton></p>}
+          {benefits.uncertain && <p role="alert">Satış sonucu belirsiz. Sepet korundu; aynı işlemin sonucunu doğrulayın.</p>}
           <div className="market-sale-totals">
-            <span><small>Ara toplam</small><strong>{pricesReady ? money(subtotal, currency) : "Fiyatlar güncelleniyor…"}</strong></span>
-            <form className="market-sale-discount" aria-label="İndirim" onSubmit={event => { event.preventDefault(); if (!disabled) saveDiscount(); }}>
+            <span><small>Ara toplam</small><strong>{benefits.active ? (benefits.current ? money(benefits.current.quote.subtotalMinor / 100, currency) : "—") : pricesReady ? money(subtotal, currency) : "Fiyatlar güncelleniyor…"}</strong></span>
+            {!benefits.active && <form className="market-sale-discount" aria-label="İndirim" onSubmit={event => { event.preventDefault(); if (!disabled) saveDiscount(); }}>
               <small>İndirim</small>
               <div className="market-sale-discount-controls">
                 {discountDraft === null ? <>
                   <strong>-{money(discount, currency)}</strong>
-                  <ActionButton variant="ghost" size="sm" type="button" disabled={disabled} onClick={event => { event.preventDefault(); setDiscountDraft(discountTotal); }}>
+                  <ActionButton variant="ghost" size="sm" type="button" disabled={disabled || benefits.active} onClick={event => { event.preventDefault(); setDiscountDraft(discountTotal); }}>
                     Düzenle
                   </ActionButton>
                 </> : <>
@@ -561,11 +710,11 @@ export function MarketQuickSaleWorkspace({
                   <ActionButton variant="ghost" size="sm" type="button" disabled={disabled} onClick={() => setDiscountDraft(null)}>Vazgeç</ActionButton>
                 </>}
               </div>
-            </form>
+            </form>}
             {(!discountValid || (discountDraft !== null && !draftDiscountValid)) && <p role="alert" className="market-muted">İndirim için geçerli bir tutar girin (örn. 125,50).</p>}
-            <span className="market-sale-grand-total"><small>{isOrder ? "Sipariş toplamı" : isCredit ? "Yeni veresiye tutarı" : "Ödenecek"}</small><strong>{pricesReady ? money(previewTotal, currency) : "—"}</strong></span>
+            <span className="market-sale-grand-total"><small>{isOrder ? "Sipariş toplamı" : isCredit ? "Yeni veresiye tutarı" : "Ödenecek"}</small><strong>{(benefits.active ? Boolean(benefits.current) : pricesReady) ? money(previewTotal, currency) : "—"}</strong></span>
             {!isOrder && customerCreditEnabled && selectedCustomer && <CustomerCreditDebt state={customerAccount} compact currency={currency} />}
-            {existingDebtMinor > 0 && <span className="market-sale-total-debt"><small>Toplam borç</small><strong>{checkoutReady ? money(totalDebt, currency) : "—"}</strong></span>}
+            {!benefits.active && existingDebtMinor > 0 && <span className="market-sale-total-debt"><small>Toplam borç</small><strong>{checkoutReady ? money(totalDebt, currency) : "—"}</strong></span>}
             {!isOrder && !isCredit && paymentAmount !== null && paymentValid && paymentDifference !== 0 && <span className="market-sale-payment-difference">
               <small>{paymentDifference < 0 ? "Kalan veresiye" : "Eski borca uygulanacak"}</small><strong>{money(Math.abs(paymentDifference), currency)}</strong>
             </span>}
@@ -575,7 +724,7 @@ export function MarketQuickSaleWorkspace({
 
         <div className={`market-sale-checkout-action${isCredit ? " market-sale-checkout-action--credit" : ""}`}>
           {isOrder && <input aria-label="Sipariş notu" placeholder="sipariş notu" value={orderNote} onChange={event => setOrderNote(event.target.value)} maxLength={500} disabled={disabled} />}
-          {!isOrder && !isCredit && <MoneyInput aria-label="Ödeme tutarı" value={paymentText} onChange={setPaymentAmount} disabled={disabled || !checkoutReady} aria-invalid={!isOrder && checkoutReady && !paymentValid} />}
+          {!isOrder && !isCredit && <MoneyInput aria-label="Ödeme tutarı" value={paymentText} onChange={setPaymentAmount} disabled={disabled || benefits.active || !checkoutReady} aria-invalid={!isOrder && checkoutReady && !paymentValid} />}
           <ActionButton
             size="lg"
             fullWidth
@@ -583,12 +732,26 @@ export function MarketQuickSaleWorkspace({
             busyLabel={isOrder ? "Sipariş kaydediliyor…" : "Satış işleniyor…"}
             type="button"
             onClick={() => void (isOrder ? saveOrder() : completeSale())}
-            disabled={busy || submitting || draftLoading || (isOrder ? Boolean(sourceDraft || reviewRecoveryDraft) || (!orderUncertain && (discountDraft !== null || !pricesReady || !discountValid || !selectedCustomer || cartLines.length === 0)) : orderUncertain || discountDraft !== null || !pricesReady || !discountValid || cartLines.length === 0 || !paymentAllowed || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0)))}
+            disabled={busy || submitting || draftLoading || (!benefits.uncertain && (isOrder ? Boolean(sourceDraft || reviewRecoveryDraft) || (!orderUncertain && (discountDraft !== null || !pricesReady || !discountValid || !selectedCustomer || cartLines.length === 0)) : orderUncertain || discountDraft !== null || !pricesReady || !discountValid || cartLines.length === 0 || !paymentAllowed || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))))}
           >
             <WalletCards size={18} aria-hidden="true" />
-            {isOrder ? "Siparişi Kaydet" : isCredit ? "Satışı Veresiye Kaydet" : "Ödeme Al"}
+            {benefits.uncertain ? "Satış Sonucunu Doğrula" : isOrder ? "Siparişi Kaydet" : isCredit ? "Satışı Veresiye Kaydet" : "Ödeme Al"}
           </ActionButton>
         </div>
+
+        {receiptSale && receiptSale.generation === receiptScope.current.generation && receiptAuthority && receiptBridge && !cart.length && !isOrder && !draftLoading && !cartDraftRequest && !benefits.uncertain && !orderUncertain && (
+          <div>
+            {!receiptJob && <ActionButton variant="secondary" type="button" busy={receiptBusy} busyLabel="Fiş hazırlanıyor…" disabled={busy || submitting} onClick={() => void prepareReceipt()}>Fişi hazırla</ActionButton>}
+            {receiptJob && receiptJob.saleId === receiptSale.id && receiptJob.generation === receiptScope.current.generation && <>
+              <p>MALİ BELGE DEĞİLDİR</p>
+              {!receiptJob.terminal && <>
+                <ActionButton variant="secondary" type="button" disabled={busy || submitting || receiptBusy || !window.yardimciDesktop?.previewReadyDocument} onClick={() => void outputReceipt("preview")}>Önizle</ActionButton>{" "}
+                <ActionButton variant="secondary" type="button" disabled={busy || submitting || receiptBusy || !window.yardimciDesktop?.printReadyDocument} onClick={() => void outputReceipt("print")}>Yazdır</ActionButton>
+              </>}
+            </>}
+            {receiptMessage && <p role="status">{receiptMessage}</p>}
+          </div>
+        )}
 
       </section>
 

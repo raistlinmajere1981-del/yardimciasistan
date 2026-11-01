@@ -1,6 +1,9 @@
+import type { DocumentOutputManagementBridge } from "@yardimci-asistan/shared";
 import type { TranslationBridge } from "@yardimci-asistan/shared";
+import type { BenefitsManagementBridge, TableOrderBenefitsBridge } from "@yardimci-asistan/shared";
 import type { BusinessMessagingBridge, MarketingShareBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
+import type { LocalCompanionPairingSession } from "./local-companion-pairing-service";
 import type {
   KbsConnectionTestResult,
   KbsSettings,
@@ -107,10 +110,6 @@ import type {
   GenerateDesktopReportAiResult
 } from "./database";
 import type {
-  DesktopAndroidInstallationSnapshot,
-  DesktopAndroidInstallResult
-} from "./android-installation-service";
-import type {
   DesktopBackupActionResult,
   DesktopBackupCreateResult,
   DesktopBackupListResult,
@@ -201,7 +200,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends TranslationBridge, MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
+export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsManagementBridge, TableOrderBenefitsBridge, TranslationBridge, MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
@@ -316,9 +315,9 @@ export interface DesktopBridge extends TranslationBridge, MarketingShareBridge, 
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
   resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
-  listAndroidInstallDevices: () => Promise<DesktopAndroidInstallationSnapshot>;
-  installAndroidApp: (serial: string) => Promise<DesktopAndroidInstallResult>;
-  provisionAndroidApp: (serial: string) => Promise<DesktopAndroidInstallResult>;
+  beginLocalPairing: (deviceId?: string) => Promise<LocalCompanionPairingSession>;
+  readLocalPairing: () => Promise<LocalCompanionPairingSession | null>;
+  cancelLocalPairing: () => Promise<void>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
   getCustomerRequests: (customerId: string) => Promise<import("@yardimci-asistan/sync-core").SyncedCustomerRequest[]>;
   approveDealerApplication: (requestId: string, priceGroup: string) => Promise<ReturnType<import("./database").DesktopDatabase["approveDealerApplication"]>>;
@@ -424,6 +423,34 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  pickFormImage: input => invokeWhenUnlocked("documentOutput:pickFormImage", input),
+  listReadyDocuments: input => invokeWhenUnlocked("documentOutput:listReady", input),
+  previewReadyDocument: input => invokeWhenUnlocked("documentOutput:previewReady", input),
+  prepareSaleReceipt: input => invokeWhenUnlocked("documentOutput:prepareSaleReceipt", input),
+  printReadyDocument: input => invokeWhenUnlocked("documentOutput:printReady", input),
+  saveProcessedFormImage: input => invokeWhenUnlocked("documentOutput:saveProcessedFormImage", input),
+  readFormImage: input => invokeWhenUnlocked("documentOutput:readFormImage", input),
+  getDocumentPrinters: input => invokeWhenUnlocked("documentOutput:getPrinters", input),
+  readPrinterBinding: input => invokeWhenUnlocked("documentOutput:readPrinterBinding", input),
+  savePrinterBinding: input => invokeWhenUnlocked("documentOutput:savePrinterBinding", input),
+  readDocumentOutputTemplate: input => invokeWhenUnlocked("documentOutput:readTemplate", input),
+  saveDocumentOutputTemplate: input => invokeWhenUnlocked("documentOutput:saveTemplate", input),
+  getDocumentOutputSettings: input => invokeWhenUnlocked("documentOutput:read", input),
+  saveDocumentOutputRule: input => invokeWhenUnlocked("documentOutput:saveRule", input),
+  getCommerceBenefits: () => invokeWhenUnlocked("benefits:get"),
+  configureCommerceBenefits: input => invokeWhenUnlocked("benefits:configure", input),
+  saveCommerceBenefitsRule: rule => invokeWhenUnlocked("benefits:saveRule", rule),
+  issueCommerceBenefitsCoupon: input => invokeWhenUnlocked("benefits:issueCoupon", input),
+  getCommercePointAccount: (customerId, currency) => invokeWhenUnlocked("benefits:pointAccount", customerId, currency),
+  adjustCommercePoints: input => invokeWhenUnlocked("benefits:adjustPoints", input),
+  expireCommercePoints: input => invokeWhenUnlocked("benefits:expirePoints", input),
+  getCompanionPointGrantStatus: input => invokeWhenUnlocked("benefits:companionGrantStatus", input),
+  getCompanionPointSpendStatus: input => invokeWhenUnlocked("benefits:companionSpendStatus", input),
+  grantCompanionPointSpend: input => invokeWhenUnlocked("benefits:companionSpendGrant", input),
+  revokeCompanionPointSpend: input => invokeWhenUnlocked("benefits:companionSpendRevoke", input),
+  listCompanionPointDevices: () => invokeWhenUnlocked("benefits:companionDevices"),
+  grantCompanionPointAccess: input => invokeWhenUnlocked("benefits:companionGrant", input),
+  revokeCompanionPointAccess: input => invokeWhenUnlocked("benefits:companionRevoke", input),
   getTranslationSettings: () => invokeWhenUnlocked("translation:settings"),
   saveTranslationSettings: input => invokeWhenUnlocked("translation:saveSettings", input),
   getTranslation: (identity, language) => invokeWhenUnlocked("translation:get", identity, language),
@@ -602,7 +629,14 @@ const bridge: DesktopBridge = {
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),
   commerce: {
+    getMarketSaleBenefitsState: () => invokeWhenUnlocked("commerce:sale:benefitsState"),
+    previewMarketSaleBenefits: input => invokeWhenUnlocked("commerce:sale:previewBenefits", input),
+    tryCompleteMarketSale: input => invokeWhenUnlocked("commerce:sale:completeMarket", input),
     completeMarketSale: (input) => invokeCommerceMutation<CompleteMarketSaleResult>("commerce:sale:completeMarket", input),
+    getFullRefundMarketSalePreview: saleId => invokeWhenUnlocked("commerce:sale:fullRefundMarketPreview", saleId),
+    listMarketSaleHistory: input => invokeWhenUnlocked("commerce:sale:marketHistory", input),
+    fullRefundMarketSale: input => invokeCommerceMutation<import("./market-sale-full-refund").FullRefundMarketSaleResult>("commerce:sale:fullRefundMarket", input),
+    tryFullRefundMarketSale: input => invokeWhenUnlocked("commerce:sale:fullRefundMarket", input),
     listCategories: (options) => invokeWhenUnlocked<CatalogCategory[]>("commerce:category:list", options),
     saveCategory: (input) => invokeCommerceMutation<CatalogCategory>("commerce:category:save", input),
     deleteCategory: (categoryId) => invokeCommerceMutation<DeleteCatalogCategoryResult>("commerce:category:delete", categoryId),
@@ -657,6 +691,8 @@ const bridge: DesktopBridge = {
     createOrder: (input) => invokeWhenUnlocked<CommerceIpcMutationResult<CommerceOrderDetail>>("commerce:order:create", input),
     updateOrderStatus: (input) => invokeCommerceMutation<CommerceOrderDetail>("commerce:order:updateStatus", input),
     fulfillOrder: (input) => invokeCommerceMutation<CommerceOrderFulfillmentResult>("commerce:order:fulfill", input),
+    previewOrderBenefits: input => invokeWhenUnlocked("commerce:order:previewBenefits", input),
+    tryFulfillOrder: input => invokeWhenUnlocked("commerce:order:fulfill", input),
     listCustomerCreditAccounts: (input) => invokeWhenUnlocked("commerce:customerCredit:list", input),
     getCustomerCreditAccount: (customerId) => invokeWhenUnlocked("commerce:customerCredit:get", customerId),
     prepareCustomerCreditWhatsApp: (input) => invokeWhenUnlocked("commerce:customerCredit:prepareWhatsApp", input),
@@ -679,9 +715,9 @@ const bridge: DesktopBridge = {
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
   resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),
   revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),
-  listAndroidInstallDevices: () => ipcRenderer.invoke("androidDevice:listInstallDevices"),
-  installAndroidApp: (serial: string) => ipcRenderer.invoke("androidDevice:install", serial),
-  provisionAndroidApp: (serial: string) => ipcRenderer.invoke("androidDevice:provision", serial),
+  beginLocalPairing: (deviceId?: string) => ipcRenderer.invoke("androidDevice:beginLocalPairing", deviceId),
+  readLocalPairing: () => ipcRenderer.invoke("androidDevice:readLocalPairing"),
+  cancelLocalPairing: () => ipcRenderer.invoke("androidDevice:cancelLocalPairing"),
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),
   getCustomerRequests: (customerId: string) => ipcRenderer.invoke("request:customerHistory", customerId),
   approveDealerApplication: (requestId: string, priceGroup: string) => ipcRenderer.invoke("request:approveDealer", requestId, priceGroup),
@@ -728,6 +764,9 @@ const bridge: DesktopBridge = {
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),
   updateTableStatus: (input: UpdateTableStatusInput) => ipcRenderer.invoke("table:updateStatus", input),
   assignTableCustomer: (input: AssignTableCustomerInput) => invokeWhenUnlocked<DesktopStatusUpdateResult>("table:assignCustomer", input),
+  getTableOrderBenefitsState: () => invokeWhenUnlocked("tableOrder:benefitsState"),
+  previewTableOrderBenefits: input => invokeWhenUnlocked("tableOrder:previewBenefits", input),
+  settleTableOrderBenefits: input => invokeWhenUnlocked("tableOrder:close", input),
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
   getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
   openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),

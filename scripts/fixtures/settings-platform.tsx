@@ -37,11 +37,13 @@ function FixtureStatusHost() {
 }
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
-let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", webModuleUrl: "https://example.test/module", syncSecret: "settings-platform-secret", autoSyncEnabled: true };
 const firstRun = new URLSearchParams(window.location.search).get("firstRun") === "on";
-if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "", syncSecret: "" };
+if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "", webModuleUrl: "", syncSecret: "", autoSyncEnabled: false };
+if (new URLSearchParams(window.location.search).get("web") === "off") canonical = { ...canonical, webModuleUrl: "", syncSecret: "", autoSyncEnabled: false };
 canonical.profileOptions = [...getBusinessProfile(canonical.profileId).defaultOptionalCapabilities];
 if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
+if (new URLSearchParams(window.location.search).has("webVisibility")) canonical.profileOptions = [...getBusinessProfile(canonical.profileId).optionalCapabilities];
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
 let layout = {
   capabilities: { rooms: true, tables: true },
@@ -126,17 +128,16 @@ const shippingSignature = (input: typeof canonical.arasShipping & { password?: s
   JSON.stringify([input.environment, input.customerCode, input.username, input.clearPassword ? "" : input.password || shippingPassword]);
 let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
-const dictationSignature = () => JSON.stringify([canonical.aiEnabled, canonical.aiService, canonical.aiBaseUrl, canonical.aiModel,
-  canonical.aiSttModel, canonical.aiTimeoutSeconds, canonical.webModuleUrl, canonical.syncSecret, canonical.autoSyncEnabled]);
+const dictationSignature = () => JSON.stringify([canonical.aiEnabled, canonical.aiProvider, canonical.aiService, canonical.aiBaseUrl,
+  canonical.aiSttModel, canonical.aiTimeoutSeconds]);
 async function dictationStatus() {
   const environment = voiceDesktop ? await (await fetch("/fixture-dictation-state")).json() : { locked: false, hosting: true, revision: 0 };
-  const canTest = !environment.locked && environment.hosting && canonical.aiEnabled && canonical.aiApiKeyConfigured
-    && supportsSttModel(canonical.aiService, canonical.aiSttModel ?? "") && isSupportedSttBaseUrl(canonical.aiService, canonical.aiBaseUrl)
-    && canonical.autoSyncEnabled && canonical.webModuleUrl.startsWith("https://");
+  const canTest = !environment.locked && canonical.aiEnabled && canonical.aiApiKeyConfigured
+    && supportsSttModel(canonical.aiService, canonical.aiSttModel ?? "") && isSupportedSttBaseUrl(canonical.aiService, canonical.aiBaseUrl);
   const ready = canTest && dictationVerification === dictationSignature();
   const enabled = ready && dictationEnabled && dictationActivation === dictationSignature() && dictationActivationRevision === dictationVerificationRevision;
   return { available: enabled, enabled, ready, canTest, revision: dictationRevision + environment.revision,
-    message: !canTest ? "AI modeli veya HTTPS web bağlantısı gerekli" : !ready ? "STT bağlantısı doğrulanmadı"
+    message: !canTest ? "Kayıtlı AI konuşma ayarları gerekli" : !ready ? "STT bağlantısı doğrulanmadı"
       : enabled ? "Etkin · Masaüstü dikte hazır" : "Kapalı · STT bağlantısı doğrulandı" };
 }
 const translationFixture = async (method: string, input?: unknown) => {
@@ -218,8 +219,8 @@ window.yardimciDesktop = {
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
     const transport = web => JSON.stringify([web.webModuleUrl.trim().replace(/\/+$/, ""), web.syncSecret.trim()]);
-    if (input.autoSyncEnabled
-      && (canonical.setupRequired || !canonical.autoSyncEnabled || transport(input) !== transport(canonical))
+    if ((input.webModuleUrl || input.syncSecret)
+      && (canonical.setupRequired || transport(input) !== transport(canonical))
       && window.webVerification !== transport(input)) return { ok: false, message: "Web bağlantısını test edin." };
     input = normalizeProfileTransitionInput(input, canonical);
     const arasShipping = input.arasShipping ? {
@@ -235,7 +236,7 @@ window.yardimciDesktop = {
     if (dictationSignature() !== previousDictation || input.aiApiKey || input.clearAiApiKey) dictationVerification = "";
     return { ok: true, message: window.webSaveWarning ? "Yerel ayarlar kaydedildi; web yayını başarısız." : "Kaydedildi", ...(window.webSaveWarning ? { aiWebSync: { ok: false } } : {}), setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
-  getBusinessPublicProfile: async () => profile,
+  getBusinessPublicProfile: async () => { window.settingsCalls.push({ kind: "profile-read" }); return structuredClone(profile); },
   geocodeBusinessAddress: async address => {
     window.settingsCalls.push({ kind: "geocode", address });
     return { ok: true, results: [{ id: "fixture-point", label: address, latitude: 39, longitude: 32 }] };
@@ -361,7 +362,7 @@ window.yardimciDesktop = {
       })
     };
   },
-  listRoomMedia: async (roomId) => mediaVisible(String(roomId ?? "")),
+  listRoomMedia: async (roomId) => { window.settingsCalls.push({ kind: "room-media-read" }); return mediaVisible(String(roomId ?? "")); },
   addRoomMedia: async (input) => {
     const roomId = String(input?.roomId ?? "");
     if (!mediaDraft) mediaDraft = structuredClone(mediaCanonical);
@@ -396,7 +397,7 @@ window.yardimciDesktop = {
     mediaDraft = null;
     return { ok: true, message: changed ? "Oda medyası değişiklikleri geri alındı." : "Oda medyalarında bekleyen değişiklik yok.", dirty: false, changed };
   },
-  listTableMedia: async (tableId) => tableMediaVisible(String(tableId ?? "")),
+  listTableMedia: async (tableId) => { window.settingsCalls.push({ kind: "table-media-read" }); return tableMediaVisible(String(tableId ?? "")); },
   addTableMedia: async (input) => {
     const tableId = String(input?.tableId ?? "");
     if (!tableMediaDraft) tableMediaDraft = structuredClone(tableMediaCanonical);

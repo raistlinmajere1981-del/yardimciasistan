@@ -14,6 +14,52 @@ const {createCurrentBusinessWebContext} = require('../../apps/desktop-app/dist-e
 const {SyncCoordinator} = require('../../apps/desktop-app/dist-electron/sync-coordinator.js');
 const {PUBLIC_LANGUAGES} = require('../../packages/shared/dist/index.js');
 
+export async function exerciseTemplateSyncPreferences(desktop) {
+  const target = 'http://127.0.0.1:1/yardimci-asistan';
+  const targetOrigin = new URL(target).origin;
+  const fetchBefore = globalThis.fetch, requests = [], statuses = [];
+  let configReads = 0, webEnabled = true;
+  const coordinator = new SyncCoordinator({database:desktop,
+    getSyncConfig:()=>{configReads++;return webEnabled ? {baseUrl:target,syncSecret:'isolated-language-secret'} : {baseUrl:'',syncSecret:''};},
+    createAndroidSnapshot:()=>{throw Error('Android is disabled in this fixture');},
+    onDashboardChanged:()=>{},onStatusChanged:status=>statuses.push(status)});
+  // Count transport calls to this coordinator's target, not configuration reads
+  // for status display or the template/catalog/provider traffic elsewhere.
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.origin !== targetOrigin) return fetchBefore(input, init);
+    requests.push({method:init?.method ?? 'GET',path:url.pathname,action:JSON.parse(init?.body ?? '{}').action});
+    throw Error('Fixture publication target is offline');
+  };
+  try {
+    assert.equal(desktop.getSyncRuntimeStatus().enabled,false);
+    const attemptBefore = desktop.getSyncRuntimeStatus().lastAttemptAt;
+    coordinator.scheduleSoon(0);
+    await expect.poll(()=>statuses.length).toBeGreaterThan(0);
+    await new Promise(done=>setTimeout(done,50));
+    assert.ok(configReads>0,'Status may inspect the configured Web target while passive sync is OFF');
+    assert.deepEqual(requests,[],'Passive sync OFF makes no transport calls');
+    assert.equal(desktop.getSyncRuntimeStatus().lastAttemptAt,attemptBefore,'Passive sync OFF records no sync attempt');
+    coordinator.scheduleSoon(0,true);
+    await expect.poll(()=>statuses.at(-1)?.phase).toBe('offline');
+    assert.deepEqual(requests,[{method:'POST',path:'/yardimci-asistan/api/sync.php',action:'activate_publication_source'}],
+      'Explicit publication reaches the transport even with passive sync OFF');
+    assert.equal(desktop.getSyncRuntimeStatus().enabled,false,'Explicit language publication does not change passive-sync preference');
+    assert.ok(desktop.getPendingSyncJobs().length>0,'Offline publication remains in the durable outbox');
+
+    const explicitAttempt = desktop.getSyncRuntimeStatus().lastAttemptAt;
+    webEnabled=false; statuses.length=0;
+    coordinator.scheduleSoon(0,true);
+    await expect.poll(()=>statuses.at(-1)?.message).toBe('Web kullanılmıyor.');
+    assert.equal(requests.length,1,'Web disabled blocks transport even for explicit publication');
+    assert.equal(desktop.getSyncRuntimeStatus().lastAttemptAt,explicitAttempt,'Web disabled records no additional sync attempt');
+    console.log('template-sync-preferences-ok: passive OFF=0 transport calls; explicit publication=POST api/sync.php activate_publication_source (offline); Web disabled=0 additional calls');
+  } finally {
+    try { await coordinator.suspendAndDrain(); }
+    finally { globalThis.fetch=fetchBefore; }
+  }
+}
+
 export async function exerciseTemplateTranslations({page, base, api, publish, site, root, publishedContext}) {
   const desktop = new DesktopDatabase({appPath:resolve('apps/desktop-app'), userDataPath:join(root, 'translations-desktop')});
   desktop.initialize();
@@ -46,6 +92,9 @@ export async function exerciseTemplateTranslations({page, base, api, publish, si
     assert.equal(raw.prepare('SELECT count(*) AS n FROM public_translations').get().n,0);
     raw.prepare("INSERT INTO business_public_profile(business_id,about_text,created_at,updated_at) VALUES (?,'İşletme kaynak açıklaması','t','t') ON CONFLICT(business_id) DO UPDATE SET about_text=excluded.about_text").run(store.businessId());
     raw.exec("INSERT INTO customers(id,full_name,phone,notes,created_at,updated_at) VALUES ('secret','PRIVATE_NAME','PRIVATE_PHONE','PRIVATE_NOTE','t','t')");
+    service.reconcile();
+    await new Promise(done=>setTimeout(done,50));
+    assert.deepEqual(calls,[],'Disabled translations do not start AI preparation');
     const catalog = await readPublicSiteCatalog(api);
     assert.ok(catalog?.entries['page.home']);
     assert.throws(()=>validateSiteCatalog({...catalog,revision:'0'.repeat(64)}),/revision/);
@@ -130,9 +179,11 @@ export async function exerciseTemplateTranslations({page, base, api, publish, si
     settings(['de']);await project();
     await page.goto(base+'/?lang=fr');await expect(page.locator('html')).toHaveAttribute('lang','tr');
     assert.deepEqual(await page.locator('#site-language option').evaluateAll(options=>options.map(o=>o.value)),['tr','de']);
-    store.saveSettings({...store.settings(),enabled:false});service.reconcile();await project();
+    const callsBeforeDisable=calls.length;
+    store.saveSettings({...store.settings(),enabled:false});service.reconcile();await service.stopAndDrain();await project();
     await page.goto(base+'/?lang=de');await expect(page.locator('html')).toHaveAttribute('lang','tr');
     await expect(page.locator('.language-picker')).toHaveCount(0);
+    assert.equal(calls.length,callsBeforeDisable,'Reading the site after language withdrawal starts no AI calls');
     assert.ok(raw.prepare('SELECT count(*) AS n FROM public_translations').get().n>0);
     assert.equal(raw.prepare("SELECT full_name FROM customers WHERE id='secret'").get().full_name,'PRIVATE_NAME');
     assert.ok(!JSON.stringify(calls).includes('PRIVATE_'));
@@ -142,19 +193,7 @@ export async function exerciseTemplateTranslations({page, base, api, publish, si
     await until(()=>unavailable.status()?.state==='unavailable');
     assert.match(unavailable.status().message,/AI yapılandırılmamış/);
     await unavailable.stopAndDrain();
-    let attempts=0;
-    const coordinator=new SyncCoordinator({database:desktop,
-      getSyncConfig:()=>{attempts++;return {baseUrl:'http://127.0.0.1:1/yardimci-asistan',syncSecret:'isolated-language-secret'};},
-      createAndroidSnapshot:()=>{throw Error('Android is disabled in this fixture');},onDashboardChanged:()=>{},onStatusChanged:()=>{}});
-    assert.equal(desktop.getSyncRuntimeStatus().enabled,false);
-    coordinator.scheduleSoon(0);
-    await new Promise(done=>setTimeout(done,30));
-    assert.equal(attempts,0,'Passive sync stays OFF');
-    coordinator.scheduleSoon(0,true);
-    await until(()=>attempts>0);
-    await coordinator.suspendAndDrain();
-    assert.equal(desktop.getSyncRuntimeStatus().enabled,false,'Explicit language publication does not change passive-sync preference');
-    assert.ok(desktop.getPendingSyncJobs().length>0,'Offline publication remains in the durable outbox');
+    await exerciseTemplateSyncPreferences(desktop);
     const beforeTargetChange = store.siteCatalog(); assert.ok(beforeTargetChange);
     raw.prepare("UPDATE settings SET web_module_url='https://other.invalid/yardimci-asistan'").run();
     assert.equal(desktop.translations().siteCatalog(),undefined,'Catalog is scoped to the configured publication target');

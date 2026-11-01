@@ -27,6 +27,7 @@ export function useMarketController({
   const catalogEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CATALOG);
   const customerCreditEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT);
   const quickSaleSession = useMarketQuickSaleSession({ customerCreditEnabled,
+    benefitsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.COMMERCE_BENEFITS),
     customerSelectionEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     pricingContext: businessCapabilities?.enabledCapabilities.join("|") ?? "" });
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -45,6 +46,7 @@ export function useMarketController({
 
   const ordersSession = useMarketOrdersSession({
     enabled: enabled && runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ORDERS),
+    benefitsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.COMMERCE_BENEFITS),
     onStateChange: handleStateChange
   });
 

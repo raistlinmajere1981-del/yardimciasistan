@@ -4,6 +4,7 @@ import {
   getTableSmokingPolicyLabel,
 } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
+import { useWebAvailability } from "../../app/web-availability";
 import { ActionButton } from "../ui/ActionButton";
 import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
 import { TableMediaPanel } from "./TableMediaPanel";
@@ -11,6 +12,7 @@ import { TableMediaPanel } from "./TableMediaPanel";
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 
 export function LayoutSettingsSection({ controller, onEditTable }: { controller: BusinessLayoutController; onEditTable: (id: string) => void }) {
+  const webAvailable = useWebAvailability();
   const [mediaTableKey, setMediaTableKey] = useState("");
   const {
     draft,
@@ -133,12 +135,12 @@ export function LayoutSettingsSection({ controller, onEditTable }: { controller:
                   <span aria-hidden="true" />
                 </div>
                 {draft.tables.map((table) => {
-                  const selected = mediaTable?.key === table.key;
+                  const selected = webAvailable && mediaTable?.key === table.key;
                   return (
                     <div
-                      className={`table-public-resource-row interactive-surface interactive-surface--record${selected ? " is-media-selected is-selected" : ""}`}
+                      className={`table-public-resource-row${webAvailable ? " interactive-surface interactive-surface--record" : ""}${selected ? " is-media-selected is-selected" : ""}`}
                       key={table.key}
-                      onClick={() => setMediaTableKey(table.key)}
+                      onClick={() => { if (webAvailable) setMediaTableKey(table.key); }}
                     >
                       <strong>{table.name}</strong>
                       <span>{table.area || "—"}</span>

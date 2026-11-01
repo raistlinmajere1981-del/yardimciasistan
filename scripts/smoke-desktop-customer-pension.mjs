@@ -27,6 +27,11 @@ try {
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
   await page.addInitScript({ content: `window.__catalogPageFixture = ${catalogPageFixture.toString()};` });
   await page.addInitScript(({ setup, dashboard, report, allCapabilities }) => {
+    if (localStorage.getItem('stage2a.web-off')) {
+      setup.webModuleUrl = '';
+      setup.syncSecret = '';
+      setup.autoSyncEnabled = false;
+    }
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
     const enabledCapabilities = allCapabilities;
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'], socialLinks: [] };
@@ -186,8 +191,20 @@ try {
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true
     };
-  }, { setup: { ...createSetupFixture(), setupRequired: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
+  }, { setup: { ...createSetupFixture(), setupRequired: false, syncSecret: 'stage2a-fixture-web-secret', autoSyncEnabled: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
   await page.goto(baseUrl);
+  const customerViewButtons = () => page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button');
+  await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
+  await expect(customerViewButtons()).toHaveText(['Müşteriler', 'Talepler', 'Hazır Mesajlar']);
+  await page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button', { name: 'Talepler', exact: true }).click();
+  await page.evaluate(() => localStorage.setItem('stage2a.web-off', 'true'));
+  await page.reload();
+  await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
+  await expect(customerViewButtons()).toHaveText(['Müşteriler', 'Hazır Mesajlar']);
+  await expect(page.getByRole('region', { name: 'Müşteri yönetimi görünümü', exact: true })).toBeVisible();
+  await expect(page.locator('.request-filter-tabs')).toHaveCount(0);
+  await page.evaluate(() => localStorage.removeItem('stage2a.web-off'));
+  await page.reload();
   const observations = [];
   const capture = async (name) => {
     await page.evaluate(() => document.fonts.ready);
@@ -228,7 +245,7 @@ try {
     await page.setViewportSize({ width, height });
     await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
     const customerViews = page.getByRole('navigation', { name: 'Müşteri işleri görünümü' });
-    await expect(customerViews.getByRole('button')).toHaveCount(3);
+    await expect(customerViews.getByRole('button')).toHaveText(['Müşteriler', 'Talepler', 'Hazır Mesajlar']);
     await customerViews.getByRole('button', { name: 'Talepler', exact: true }).click();
     await expect(page.locator('.request-filter-tabs').getByRole('tab')).toHaveCount(2);
     await capture('requests');

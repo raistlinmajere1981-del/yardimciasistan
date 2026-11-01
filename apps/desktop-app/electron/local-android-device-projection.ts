@@ -118,6 +118,10 @@ export function projectLocalAndroidSnapshotForDevice(
   const companion = projectAndroidCompanion(source.commerce, source.marketing, source.business_capabilities, profile.permissions);
   const permissions = new Set(profile.permissions);
   const customerManagementAllowed = profile.role === "admin" && permissions.has("customer.manage");
+  // Sales staff need a picker identity, not the full private customer record.
+  // The server still rechecks real customer ownership and permission on write.
+  const paidSaleCustomerPickerAllowed = permissions.has("market.product.view")
+    && permissions.has("market.sale.complete") && permissions.has("customer.view");
   const roomFolioAllowed = permissions.has("room_folio.view");
   const financeAllowed = permissions.has("finance.view");
   const menuAllowed = permissions.has("menu.view");
@@ -158,7 +162,19 @@ export function projectLocalAndroidSnapshotForDevice(
     summary: { ...source.summary, ...androidCompanionCounters(companion.commerce, companion.marketing),
       active_menu_categories: menuAllowed ? source.summary.active_menu_categories : 0,
       available_menu_items: menuAllowed ? source.summary.available_menu_items : 0 },
-    customers: customerManagementAllowed ? source.customers.map(customer => ({ ...customer, identity_number: "", document_serial_number: "" })) : [],
+    customers: customerManagementAllowed
+      ? source.customers.map(customer => ({ ...customer, identity_number: "", document_serial_number: "" }))
+      : paidSaleCustomerPickerAllowed
+        ? source.customers.map(customer => ({
+            id: customer.id,
+            full_name: customer.full_name,
+            phone: "", email: "", notes: "", identity_type: "", identity_number: "",
+            nationality: "", birth_date: "", gender: "", document_serial_number: "",
+            document_expiry_date: "", birth_place: "", mother_name: "", father_name: "",
+            issuing_authority: "", address: "", request_count: 0, reservation_count: 0,
+            stay_count: 0, updated_at: ""
+          }))
+        : [],
     menu_product_candidates: permissions.has("menu.edit") ? source.menu_product_candidates ?? [] : [],
     customer_room_stays: customerManagementAllowed ? source.customer_room_stays : [],
     room_folios: roomFolioAllowed ? source.room_folios : [],

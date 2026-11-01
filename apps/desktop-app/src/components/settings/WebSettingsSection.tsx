@@ -2,41 +2,44 @@ import { IconButton } from "../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import type { WebConnectionSettings } from "../../app/settings-draft-model";
-import type { SettingsOperationResult } from "../../app/settings-save";
 import { reportAppStatus } from "../../app/runtime-state";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ActionButton } from "../ui/ActionButton";
 
 type TestState = "unchecked" | "testing" | "verified" | "failed";
 
-export function WebSettingsSection({ canonical, onSave, disabled, initialized, onSetupChange }: {
+export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb, onEnabledChange, onVerified, onBusyChange, resetVersion, disabled, initialized }: {
   canonical: WebConnectionSettings;
-  onSetupChange?: (web: WebConnectionSettings) => void;
-  onSave: (web: WebConnectionSettings) => Promise<SettingsOperationResult>;
+  web: WebConnectionSettings;
+  onChange: (web: WebConnectionSettings) => void;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onVerified: (web: WebConnectionSettings | null) => void;
+  onBusyChange: (busy: boolean) => void;
+  resetVersion: number;
   disabled: boolean;
   initialized: boolean;
 }) {
-  const [web, setWeb] = useState<WebConnectionSettings>(() => ({
-    webModuleUrl: canonical.webModuleUrl, syncSecret: canonical.syncSecret, autoSyncEnabled: canonical.autoSyncEnabled
-  }));
-  function updateWeb(next: WebConnectionSettings) {
-    setWeb(next);
-    if (!initialized) onSetupChange?.(next);
-  }
   const [reveal, setReveal] = useState(false);
-  const [evidence, setEvidence] = useState<{ url: string; secret: string; state: TestState }>(() => ({
+  const [savedEvidence, setSavedEvidence] = useState<{ url: string; secret: string; state: TestState }>(() => ({
     url: canonical.webModuleUrl, secret: canonical.syncSecret,
     state: (initialized && canonical.webModuleUrl.trim() && canonical.syncSecret.trim() ? "testing" : "unchecked")
   }));
+  const [evidence, setEvidence] = useState<{ url: string; secret: string; state: TestState } | null>(null);
+  useEffect(() => { setEvidence(null); }, [resetVersion]);
+  function updateWeb(next: WebConnectionSettings) {
+    if (next.webModuleUrl !== web.webModuleUrl || next.syncSecret !== web.syncSecret) setEvidence(null);
+    onChange(next);
+  }
   const [connecting, setConnecting] = useState(false);
   const requestGeneration = useRef(0);
   // Reuse only this mounted form's current probe (including StrictMode effect replay).
   const probe = useRef<{ url: string; secret: string; result: Promise<{ ok: boolean }> } | null>(null);
 
   useEffect(() => {
-    const generation = ++requestGeneration.current;
     let active = true;
-    const setState = (state: TestState) => setEvidence({ url: canonical.webModuleUrl, secret: canonical.syncSecret, state });
+    setEvidence(null);
+    const setState = (state: TestState) => setSavedEvidence({ url: canonical.webModuleUrl, secret: canonical.syncSecret, state });
     setState("unchecked");
     if (!initialized || !canonical.webModuleUrl.trim() || !canonical.syncSecret.trim()) return;
     setState("testing");
@@ -48,20 +51,17 @@ export function WebSettingsSection({ canonical, onSave, disabled, initialized, o
     }
     // The main-process probe already bounds network work to 10 seconds; also bound UI waiting.
     const timeout = window.setTimeout(() => {
-      if (active && generation === requestGeneration.current) { active = false; setState("failed"); }
+      if (active) { active = false; setState("failed"); }
     }, 12_000);
     void probe.current.result.then(result => {
-      if (active && generation === requestGeneration.current) setState(result.ok ? "verified" : "failed");
+      if (active) setState(result.ok ? "verified" : "failed");
       window.clearTimeout(timeout);
     });
     return () => { active = false; window.clearTimeout(timeout); };
   }, [initialized, canonical.webModuleUrl, canonical.syncSecret]);
 
-  useEffect(() => {
-    setWeb({ webModuleUrl: canonical.webModuleUrl, syncSecret: canonical.syncSecret, autoSyncEnabled: canonical.autoSyncEnabled });
-  }, [canonical.webModuleUrl, canonical.syncSecret, canonical.autoSyncEnabled]);
-
   async function connect() {
+    onVerified(null);
     const generation = ++requestGeneration.current;
     const setState = (state: TestState) => setEvidence({ url: web.webModuleUrl, secret: web.syncSecret, state });
     const input = {
@@ -75,6 +75,7 @@ export function WebSettingsSection({ canonical, onSave, disabled, initialized, o
       return;
     }
     setConnecting(true);
+    onBusyChange(true);
     setState("testing");
     reportAppStatus("loading", "Web bağlantısı ve yayın kaynağı doğrulanıyor…");
     try {
@@ -92,45 +93,40 @@ export function WebSettingsSection({ canonical, onSave, disabled, initialized, o
         reportAppStatus("error", source.message || "Web yayın kaynağı bağlanamadı.");
         return;
       }
-      const saved = await onSave(web);
-      if (!saved.ok) {
-        setState("failed");
-        reportAppStatus("error", saved.message || "Web bağlantısı kaydedilemedi.");
-        return;
-      }
+      onVerified(web);
       setState("verified");
-      const warning = saved.message && /başarısız|uygulanamadı|hata|uyarı/i.test(saved.message);
-      reportAppStatus(warning ? "error" : "success", warning ? saved.message! : "Web bağlantısı ve yayın kaynağı hazır.");
+      reportAppStatus("success", "Web bağlantısı doğrulandı. Tercihleri uygulamak için Kaydet düğmesini kullanın.");
     } catch {
       setState("failed");
       reportAppStatus("error", "Web bağlantısı tamamlanamadı. Tekrar deneyin.");
     } finally {
       setConnecting(false);
+      onBusyChange(false);
     }
   }
 
-  const state = evidence.url === canonical.webModuleUrl && evidence.secret === canonical.syncSecret ? evidence.state : "testing";
+  const matchingEvidence = [evidence, savedEvidence].find(value => value?.url === web.webModuleUrl && value?.secret === web.syncSecret);
+  const state = matchingEvidence?.state ?? "unchecked";
   const busy = disabled || connecting;
   const canConnect = Boolean(web.webModuleUrl.trim() && web.syncSecret.trim());
   const draftConnection = web.webModuleUrl !== canonical.webModuleUrl || web.syncSecret !== canonical.syncSecret;
-  const displayState = connecting ? "testing" : draftConnection ? "draft" : !canConnect ? "unconfigured" : state;
-  const status = displayState === "draft" ? "Bağlantı değişikliği bekliyor" : displayState === "unconfigured" ? "Bağlantı yapılandırılmadı" : connecting ? "Bağlanıyor" : displayState === "verified" ? "Bağlantı doğrulandı"
+  const displayState = !usesWeb ? "unused" : connecting ? "testing" : draftConnection && state === "unchecked" ? "draft" : !canConnect ? "unconfigured" : state;
+  const status = displayState === "unused" ? "Web kullanılmıyor" : displayState === "draft" ? "Bağlantı değişikliği bekliyor" : displayState === "unconfigured" ? "Bağlantı yapılandırılmadı" : connecting ? "Bağlanıyor" : displayState === "verified" ? "Bağlantı doğrulandı"
     : displayState === "failed" ? "Bağlantı doğrulanamadı" : displayState === "testing" ? "Bağlantı kontrol ediliyor…" : "Bağlantı henüz kontrol edilmedi";
 
   return (
     <section id="settings-web" tabIndex={-1} className="settings-web-bar" aria-label="Web bağlantısı">
       <div className="settings-web-heading">
         <strong>Web bağlantısı</strong>
-        <StatusBadge className="settings-web-indicator" role="status"
-          tone={displayState === "verified" ? "success" : displayState === "failed" ? "danger" : displayState === "testing" ? "info" : displayState === "draft" ? "warning" : "neutral"}>{status}</StatusBadge>
-        <label className="settings-web-choice">
-          <input type="checkbox" checked={web.autoSyncEnabled}
-            disabled={busy}
-            onChange={event => updateWeb({ ...web, autoSyncEnabled: event.target.checked })} />
-          Otomatik eşitle
+        {usesWeb && <StatusBadge className="settings-web-indicator" role="status"
+          tone={displayState === "verified" ? "success" : displayState === "failed" ? "danger" : displayState === "testing" ? "info" : displayState === "draft" ? "warning" : "neutral"}>{status}</StatusBadge>}
+        <label className="settings-web-choice settings-web-enable">
+          <input type="checkbox" checked={usesWeb} disabled={busy}
+            onChange={event => onEnabledChange(event.target.checked)} />
+          Etkin
         </label>
       </div>
-      <div className="settings-web-fields">
+      {usesWeb && <div className="settings-web-fields">
         <label className="form-field settings-web-url">
           Web eşitleme adresi
           <input value={web.webModuleUrl} disabled={busy} spellCheck={false}
@@ -151,10 +147,15 @@ export function WebSettingsSection({ canonical, onSave, disabled, initialized, o
           </span>
         </label>
         <div className="settings-web-actions">
+          <label className="settings-web-choice">
+            <input type="checkbox" checked={web.autoSyncEnabled} disabled={busy}
+              onChange={event => updateWeb({ ...web, autoSyncEnabled: event.target.checked })} />
+            Otomatik eşitle
+          </label>
           <ActionButton type="button" disabled={busy || !canConnect}
             onClick={() => void connect()}>{connecting ? "Bağlanıyor…" : "Bağlan"}</ActionButton>
         </div>
-      </div>
+      </div>}
     </section>
   );
 }

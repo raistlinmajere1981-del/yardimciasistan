@@ -23,7 +23,7 @@ const fakeHttps = { Agent: class { constructor(options) { this.options = options
       const response = new EventEmitter(); response.statusCode = spec.status;
       response.destroy = () => response.emit("error", new Error("limit-secret"));
       onResponse(response);
-      response.emit("data", Buffer.from(spec.body)); response.emit("end");
+      response.emit("data", (Buffer.isBuffer(spec.body) ? spec.body : Buffer.from(spec.body))); response.emit("end");
     });
   };
   req.destroy = error => req.emit("error", error);
@@ -62,8 +62,9 @@ function load(file) {
   return exports;
 }
 const plain = value => JSON.parse(JSON.stringify(value));
-const { createDesktopDictationService: createService, uploadDesktopDictation } = load("apps/desktop-app/electron/desktop-dictation-service.ts");
+const { createDesktopDictationService: createService } = load("apps/desktop-app/electron/desktop-dictation-service.ts");
 const { registerDesktopDictationIpcHandlers } = load("apps/desktop-app/electron/ipc/desktop-dictation-ipc.ts");
+const { transcribeDesktopStt } = load("apps/desktop-app/electron/desktop-stt-direct.ts");
 const preferenceRoot = mkdtempSync(resolve(tmpdir(), "desktop-dictation-"));
 process.on("exit", () => rmSync(preferenceRoot, { recursive: true, force: true }));
 let setup = { aiEnabled: true, aiProvider: "openai_compatible", aiModel: "gpt-4.1", aiTimeoutSeconds: 30,
@@ -85,27 +86,32 @@ const service = createService({
   getDatabase: () => database,
   assertUnlocked: () => { gates.push("unlocked"); if (locked) throw new Error("locked-raw-secret"); },
   assertCapability: capability => { gates.push(capability); assert.equal(capability, "service.ai"); if (!ai) throw new Error("capability-raw-secret"); },
-  upload: async (url, secret, mime, audio, signal, configuration) => {
+  transport: async (url, headers, body, signal) => {
     uploadCount++;
-    assert.equal(url.href, "https://hosting.example/module/api/audio-transcribe.php");
-    assert.equal(secret, setup.syncSecret); assert.equal(mime, configuration ? "audio/wav" : "audio/webm"); assert.ok(audio.length <= 5 * 1024 * 1024);
-    if (configuration) {
-      assert.equal(audio.subarray(0, 4).toString(), "RIFF");
-      assert.equal(audio.readUInt32LE(28), 32000); assert.equal(audio.length, 8044);
-      if (behavior === "success") return { status: 200, body: JSON.stringify({ ok: true, text: "", stt_configuration: configuration }) };
-      if (behavior === "wrong-binding") return { status: 200, body: JSON.stringify({ ok: true, text: "", stt_configuration: "a".repeat(64) }) };
-      if (behavior === "legacy") return { status: 200, body: '{"ok":true,"text":""}' };
+    assert.notEqual(url.hostname, "hosting.example", "Desktop never contacts Hosting");
+    assert.equal(url.origin, setup.aiService === "openai" ? "https://api.openai.com" : setup.aiService === "gemini" ? "https://generativelanguage.googleapis.com" : "https://api.cloudflare.com");
+    assert.equal(headers[setup.aiService === "gemini" ? "x-goog-api-key" : "Authorization"], setup.aiService === "gemini" ? credential : `Bearer ${credential}`);
+    const multipart = headers["Content-Type"].startsWith("multipart/");
+    const json = multipart ? null : JSON.parse(body);
+    const sentAudio = multipart ? body.subarray(body.indexOf('Content-Type: audio/') + body.subarray(body.indexOf('Content-Type: audio/')).indexOf('\r\n\r\n') + 4, body.lastIndexOf('\r\n--'))
+      : Buffer.from(setup.aiService === "gemini" ? json.contents[0].parts[0].inline_data.data : json.audio, "base64");
+    assert.ok(sentAudio.length <= 5 * 1024 * 1024);
+    if (sentAudio.subarray(0, 4).toString() === "RIFF") {
+      assert.equal(sentAudio.readUInt32LE(28), 32000); assert.equal(sentAudio.length, 8044, "Explicit test is one 250ms PCM WAV");
     }
-    if (behavior.startsWith("cf:")) return { status: 502, body: JSON.stringify({ ok: false, code: behavior.slice(3), message: "raw-provider-token-secret" }) };
     if (behavior === "throw") throw new Error("raw-provider-auth-secret");
     if (behavior === "wait") return new Promise(resolve => { pending = { resolve, signal }; });
     if (behavior === "oversize") return { status: 200, body: "x".repeat(128 * 1024 + 1) };
-    if (behavior === "error") return { status: 502, body: '{"ok":false,"message":"raw-provider-auth-secret"}' };
-    if (behavior === "invalid") return { status: 200, body: '{"ok":true,"text":"<script>secret</script>"}' };
+    if (behavior === "error") return { status: 502, body: '{"error":"raw-provider-auth-secret"}' };
+    if (behavior.startsWith("status:")) return { status: Number(behavior.slice(7)), body: '{"error":"raw-provider-auth-secret"}' };
     if (behavior === "bad-json") return { status: 200, body: "not-json-raw-secret" };
-    if (behavior === "long") return { status: 200, body: JSON.stringify({ ok: true, text: "a".repeat(16001) }) };
-    if (behavior === "secret") return { status: 200, body: JSON.stringify({ ok: true, text: secret }) };
-    return { status: 200, body: '{"ok":true,"text":"Düzenlenebilir metin"}' };
+    if (behavior === "legacy") return { status: 200, body: '{"ok":true}' };
+    if (behavior === "wrong-shape") return { status: 200, body: '{"text":42,"success":false}' };
+    const text = behavior === "long" ? "a".repeat(16001) : behavior === "secret" ? credential
+      : behavior === "invalid" ? "<b>Temiz</b>\u0000" : "Düzenlenebilir metin";
+    return { status: 200, body: JSON.stringify(setup.aiService === "gemini"
+      ? { candidates: [{ finishReason: "STOP", content: { parts: [{ text }] } }] }
+      : setup.aiService === "cloudflare" ? { success: true, errors: [], result: { text } } : { text }) };
   }
 });
 registerDesktopDictationIpcHandlers(service);
@@ -124,7 +130,7 @@ const tested = await invoke("dictation:testConnection");
 assert.equal(tested.ok, true); assert.equal(tested.status.ready, true); assert.equal(tested.status.enabled, false);
 assert.equal(invoke("dictation:saveEnabled", true).ok, true); assert.equal(getStatus().available, true);
 assert.deepEqual(Object.keys(getStatus()).sort(), ["available", "canTest", "enabled", "message", "ready", "revision"]);
-for (const mode of ["error", "throw", "bad-json", "legacy", "wrong-binding"]) {
+for (const mode of ["error", "throw", "bad-json", "legacy", "wrong-shape"]) {
   behavior = mode; const result = await invoke("dictation:testConnection");
   assert.equal(result.ok, false, mode); assert.equal(getStatus().available, false, mode);
   assert.equal(verifications.has("desktop_stt"), false, mode);
@@ -158,7 +164,7 @@ assert.ok(!JSON.stringify(getStatus()).includes(setup.syncSecret));
 const valid = input(); gates.length = 0;
 assert.equal((await invoke("dictation:transcribe", valid)).text, "Düzenlenebilir metin");
 assert.deepEqual(gates.slice(0, 3), ["unlocked", "service.ai", "setup"]);
-for (const deny of ["lock", "capability", "model", "disabled", "key", "http", "userinfo", "query", "no-secret", "provider", "provider-url", "web-off", "unpublished"]) {
+for (const deny of ["lock", "capability", "model", "disabled", "key", "provider", "provider-url"]) {
   const previous = { ...setup }, count = uploadCount;
   if (deny === "lock") locked = true;
   if (deny === "capability") ai = false;
@@ -190,7 +196,7 @@ const boundary = Buffer.alloc(5 * 1024 * 1024); audio.copy(boundary);
 assert.equal((await invoke("dictation:transcribe", input({ audioBase64: boundary.toString("base64") }))).ok, true);
 const tooBig = Buffer.concat([boundary, Buffer.from([1])]);
 assert.equal((await invoke("dictation:transcribe", input({ audioBase64: tooBig.toString("base64") }))).ok, false);
-for (const mode of ["throw", "error", "invalid", "bad-json", "oversize", "long", "secret"]) {
+for (const mode of ["throw", "error", "bad-json", "oversize", "long", "wrong-shape"]) {
   behavior = mode;
   const result = await invoke("dictation:transcribe", input());
   assert.equal(result.ok, false, mode); assert.ok(!JSON.stringify(result).includes("raw-provider")); assert.ok(!JSON.stringify(result).includes(setup.syncSecret));
@@ -226,42 +232,127 @@ sender.emit("destroyed"); assert.equal(pending.signal.aborted, true);
 pending.resolve({ status: 200, body: '{"ok":true,"text":"late"}' });
 assert.equal((await waiting).ok, false);
 
-// Cloudflare uses the same saved gates and separate real audio evidence; fixed diagnostics only.
+// All supported providers use saved private STT, independently of every Web setting.
 const previousProvider = { ...setup };
-setup = { ...setup, aiService: "cloudflare", aiBaseUrl: `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/ai`,
-  aiModel: "@cf/zai-org/glm-4.7-flash", aiSttModel: "@cf/openai/whisper-large-v3-turbo" };
-behavior = "success";
-assert.equal(getStatus().canTest, true); assert.equal(getStatus().ready, false);
-assert.equal((await invoke("dictation:testConnection")).ok, true);
-assert.equal(invoke("dictation:saveEnabled", true).ok, true);
-assert.equal((await invoke("dictation:transcribe", input())).ok, true);
-for (const [code, text] of [["provider_authentication_failed", /Token/], ["provider_permission_denied", /erişim izni/],
-  ["provider_quota_exhausted", /kota/], ["provider_busy", /yoğun/], ["provider_network", /bağlantısı/],
-  ["provider_invalid_response", /beklediği biçimde/], ["__proto__", /Ses metne çevrilemedi/]]) {
-  behavior = `cf:${code}`;
-  const failed = await invoke("dictation:transcribe", input());
-  assert.equal(failed.ok, false); assert.match(failed.message, text);
-  assert.equal(JSON.stringify(failed).includes("raw-provider"), false);
-  assert.equal(getStatus().enabled, true, "runtime failures preserve saved activation");
+for (const [provider, baseUrl, model] of [
+  ["openai", "https://api.openai.com/v1", "gpt-4o-mini-transcribe"],
+  ["gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-3.6-flash"],
+  ["cloudflare", `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/ai`, "@cf/openai/whisper-large-v3-turbo"]
+]) {
+  setup = { ...setup, aiService: provider, aiBaseUrl: baseUrl, aiSttModel: model,
+    webModuleUrl: "", syncSecret: "", autoSyncEnabled: false, aiLastPublishedAt: "" };
+  behavior = "success";
+  assert.equal(getStatus().canTest, true); assert.equal(getStatus().ready, false);
+  assert.equal((await invoke("dictation:testConnection")).ok, true);
+  assert.equal(invoke("dictation:saveEnabled", true).ok, true);
+  assert.equal((await invoke("dictation:transcribe", input())).ok, true);
+  const stableRevision = getStatus().revision, stableEvidence = verifications.get("desktop_stt");
+  for (const patch of [{ aiModel: "unrelated-chat" }, { aiImageModel: "unrelated-image" }, { autoSyncEnabled: true },
+    { webModuleUrl: "http://unused.example", syncSecret: "unused" }, { aiLastPublishedAt: "unrelated" }]) {
+    setup = { ...setup, ...patch };
+    assert.equal(getStatus().ready, true); assert.equal(getStatus().revision, stableRevision);
+    assert.equal(verifications.get("desktop_stt"), stableEvidence);
+    assert.equal((await invoke("dictation:transcribe", input())).ok, true);
+  }
+  for (const mode of ["status:302", "status:401", "status:403", "status:404", "status:429", "status:503", "error", "bad-json", "wrong-shape", "oversize", "long"]) {
+    behavior = mode;
+    const failed = await invoke("dictation:transcribe", input());
+    assert.equal(failed.ok, false, `${provider} ${mode}`);
+    assert.equal(JSON.stringify(failed).includes("raw-provider"), false);
+    assert.equal(getStatus().enabled, true, "Runtime failure preserves saved activation");
+  }
+  for (const mode of ["secret", "invalid"]) {
+    behavior = mode;
+    const cleaned = await invoke("dictation:transcribe", input());
+    assert.equal(cleaned.ok, true); assert.equal(cleaned.text.includes(credential), false);
+    assert.doesNotMatch(cleaned.text, /[<>\u0000]/);
+  }
+  behavior = "error";
+  assert.equal((await invoke("dictation:testConnection")).ok, false);
+  assert.equal(getStatus().ready, false, "Failed explicit audio test withdraws evidence");
 }
-behavior = "cf:provider_quota_exhausted";
-const failedAudioTest = await invoke("dictation:testConnection");
-assert.equal(failedAudioTest.ok, false); assert.match(failedAudioTest.message, /kota/);
-assert.equal(getStatus().ready, false, "failed Cloudflare audio test withdraws evidence");
 setup = previousProvider; behavior = "success";
 
-// Real Node transport implementation, fake HTTPS stream: multipart identity/size/path, response cap.
+// Actual native HTTPS transport with fake streams: request format, allowlist, response bounds.
 const signal = new AbortController().signal;
-await uploadDesktopDictation(new URL("https://hosting.example/module/api/audio-transcribe.php"), setup.syncSecret, "audio/webm", audio, signal);
-const sent = transport.calls.at(-1);
-assert.equal(sent.options.method, "POST"); assert.equal(sent.options.rejectUnauthorized, true);
-assert.deepEqual(plain(sent.options.agent.options.proxyEnv), {}, "Transport does not inherit a proxy environment");
-assert.equal(sent.options.headers["Content-Length"], sent.body.length);
-assert.equal(sent.options.headers["X-YA-Sync-Secret"], setup.syncSecret);
-assert.match(sent.body.toString("latin1"), /name="source"\r\n\r\ndesktop/);
-assert.match(sent.body.toString("latin1"), /name="audio"; filename="recording.webm"/);
-transport.responses.push({ status: 200, body: "a".repeat(128 * 1024 + 1) });
-await assert.rejects(uploadDesktopDictation(sent.url, setup.syncSecret, "audio/webm", audio, signal));
+const config = { provider: "openai_compatible", service: "openai", model: "whisper-1", baseUrl: "https://api.openai.com/v1", apiKey: credential, timeoutSeconds: 30 };
+const successResponse = service => JSON.stringify(service === "gemini"
+  ? { candidates: [{ finishReason: "STOP", content: { parts: [{ thought: true, text: "private-thought" }, { text: "Test metni" }] } }] }
+  : service === "cloudflare" ? { success: true, errors: [], result: { text: "Test metni" } } : { text: "Test metni" });
+for (const [provider, root, model] of [["openai", config.baseUrl, "whisper-1"], ["gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-3.6-flash"],
+  ["cloudflare", `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/ai`, "@cf/openai/whisper-large-v3-turbo"]]) {
+  const providerConfig = { ...config, service: provider, baseUrl: root, model };
+  transport.responses.push({ status: 200, body: successResponse(provider) });
+  assert.equal((await transcribeDesktopStt(providerConfig, "audio/webm", audio, signal)).text, "Test metni");
+  const sent = transport.calls.at(-1);
+  assert.equal(sent.options.method, "POST"); assert.equal(sent.options.rejectUnauthorized, true);
+  assert.deepEqual(plain(sent.options.agent.options.proxyEnv), {});
+  assert.equal(sent.options.headers["Content-Length"], sent.body.length);
+  assert.equal(sent.url.search, ""); assert.equal(sent.url.username, "");
+  assert.equal(sent.options.headers["X-YA-Sync-Secret"], undefined);
+  if (provider === "openai") {
+    assert.equal(sent.url.href, "https://api.openai.com/v1/audio/transcriptions");
+    assert.match(sent.body.toString("latin1"), /name="file"; filename="audio-[a-f0-9]+\.webm"/);
+    assert.match(sent.body.toString("latin1"), /name="model"\r\n\r\nwhisper-1/);
+    assert.match(sent.body.toString("latin1"), /name="response_format"\r\n\r\njson/);
+  } else {
+    const json = JSON.parse(sent.body);
+    if (provider === "gemini") {
+      assert.equal(sent.url.href, `${root}/models/${model}:generateContent`);
+      assert.equal(json.generationConfig.temperature, 0); assert.equal(json.generationConfig.thinkingConfig.thinkingBudget, 0);
+      assert.match(json.systemInstruction.parts[0].text, /Transcribe only/);
+      assert.equal(json.contents[0].parts[0].inline_data.data, audio.toString("base64"));
+    } else {
+      assert.equal(sent.url.href, `${root}/run/${model}`);
+      assert.equal(json.audio, audio.toString("base64")); assert.equal(json.task, "transcribe"); assert.equal(json.language, "tr");
+    }
+  }
+  for (const body of [Buffer.from([0xff, 0xfe]), JSON.stringify({ text: "\ud800", success: true, result: { text: "\ud800" } }),
+    JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "truncated" }] } }] }),
+    JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ functionCall: { name: "unsafe" }, text: "tool" }] } }] }),
+    "a".repeat(128 * 1024 + 1), '{"text":null}', '{"success":false,"errors":[{"message":"raw-secret"}]}']) {
+    transport.responses.push({ status: 200, body });
+    assert.equal((await transcribeDesktopStt(providerConfig, "audio/webm", audio, signal)).ok, false);
+  }
+  for (const baseUrl of [root.replace("https:", "http:"), root + "?key=secret", root + "#fragment", root.replace("https://", "https://user:pass@"), root.replace(".com/", ".com:443/"), "https://proxy.example/v1"]) {
+    const count = transport.calls.length;
+    assert.equal((await transcribeDesktopStt({ ...providerConfig, baseUrl }, "audio/webm", audio, signal)).ok, false);
+    assert.equal(transport.calls.length, count, "Rejected URL sends no credentials");
+  }
+  const controller = new AbortController(); controller.abort(); const count = transport.calls.length;
+  assert.equal((await transcribeDesktopStt(providerConfig, "audio/webm", audio, controller.signal)).ok, false);
+  assert.equal(transport.calls.length, count);
+  const timed = transcribeDesktopStt({ ...providerConfig, timeoutSeconds: 120 }, "audio/webm", audio, signal, async () => new Promise(() => {}));
+  triggerDeadline(60000); assert.equal((await timed).ok, false, "60s hard cap bounds even an uncooperative transport");
+}
+
+// Actual Settings presentation without a browser listener: only STT-relevant drafts block tests.
+const presentation = {};
+const presentationCode = ts.transpileModule(readFileSync("apps/desktop-app/src/components/settings/DesktopDictationSetup.tsx", "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }
+}).outputText;
+runInContext(`(function(exports, require) { ${presentationCode}\n})`, context)(presentation, name => {
+  if (name === "react/jsx-runtime") return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
+  if (name.endsWith("/ActionButton")) return { ActionButton: "button" };
+  if (name.endsWith("/ServiceSettingsCard")) return { ServiceSettingsCard: "card" };
+  throw new Error(`Unexpected presentation dependency: ${name}`);
+});
+for (const service of ["openai", "gemini", "cloudflare"]) {
+  const canonical = { aiEnabled: true, aiProvider: "openai_compatible", aiService: service, aiBaseUrl: "official-root",
+    aiSttModel: "saved-stt", aiTimeoutSeconds: "30", aiApiKey: "", aiGoogleCurl: "", clearAiApiKey: false };
+  const controller = { status: { ready: true, canTest: true, enabled: false, message: "ready" }, enabled: false, busy: false };
+  for (const patch of [{}, { aiModel: "chat-draft" }, { aiImageModel: "image-draft" }, { webModuleUrl: "" }, { syncSecret: "" }, { autoSyncEnabled: false }]) {
+    const view = presentation.DesktopDictationSetup({ controller, canonical, form: { ...canonical, ...patch }, aiCapability: true });
+    assert.equal(view.props.toggleDisabled, false, `${service}: unrelated draft preserves STT readiness`);
+    assert.ok(view.props.prerequisiteActions, "Explicit test remains available");
+  }
+  for (const patch of [{ aiSttModel: "other-stt" }, { aiService: "custom" }, { aiProvider: "other" }, { aiBaseUrl: "draft-root" },
+    { aiTimeoutSeconds: "40" }, { aiApiKey: "draft-secret" }, { clearAiApiKey: true }, { aiEnabled: false }]) {
+    const view = presentation.DesktopDictationSetup({ controller, canonical, form: { ...canonical, ...patch }, aiCapability: true });
+    assert.equal(view.props.toggleDisabled, true, `${service}: STT draft cannot enable capture`);
+    assert.equal(view.props.prerequisiteActions, false);
+  }
+}
 
 // Actual capture coordinator, fake media device/runtime; no real microphone/network.
 context.window = context; context.isSecureContext = true; context.navigator = {};
@@ -351,4 +442,4 @@ assert.equal(checkPermission(trusted, "media", "", { mediaType: "video" }), true
 assert.equal(requestMedia(trusted, ["video"]), true);
 assert.equal(requestMedia(trusted, []), true, "Existing omitted camera mediaTypes behavior is preserved");
 captureAllowed = false; assert.equal(requestMedia(trusted, ["audio"]), false);
-console.log("voice-stt-desktop-smoke-ok: saved gates/IPC/sender cancellation, HTTPS multipart/bounds/sanitization, capture/stop/cancel/permission/MIME/preview/stale insertion");
+console.log("voice-stt-desktop-smoke-ok: direct OpenAI/Gemini/Cloudflare, Web OFF, saved STT gates/evidence, draft UI, HTTPS/bounds/sanitization/abort/timeout, capture/preview/stale insertion");

@@ -19,6 +19,12 @@ export function createAndroidOperationsSnapshot(
 ): AndroidOperationsSnapshot {
   const updatedAt = new Date().toISOString();
   const setup = database.getSetupData();
+  // Dashboard customer lists are not tenant-scoped. Android recipients must
+  // only see customers belonging to the currently active business.
+  const firstCustomers = database.listCustomers({ limit: 200, offset: 0 }).items;
+  const scopedCustomers = firstCustomers.length < 200
+    ? firstCustomers
+    : [...firstCustomers, ...database.listCustomers({ limit: 100, offset: 200 }).items];
   const today = formatLocalDateKey(new Date());
   const activeTableOrders = database
     .listTableOrders()
@@ -81,7 +87,7 @@ export function createAndroidOperationsSnapshot(
       ).length,
       active_menu_categories: dashboardData.summary.activeMenuCategories,
       available_menu_items: dashboardData.summary.availableMenuItems,
-      customer_count: dashboardData.customers.length
+      customer_count: scopedCustomers.length
     },
     daily_tasks: dashboardData.dailyTasks
       .filter((task) => task.status !== "archived")
@@ -124,7 +130,7 @@ export function createAndroidOperationsSnapshot(
       created_at: request.created_at,
       updated_at: request.updated_at
     })),
-    customers: dashboardData.customers.slice(0, 300).map((customer) => ({
+    customers: scopedCustomers.map((customer) => ({
       id: customer.id,
       full_name: customer.fullName,
       phone: customer.phone,

@@ -63,6 +63,14 @@ export function getAndroidPermissionSnapshot(db: DatabaseSync, enabledCapabiliti
   ]));
 }
 
+/** Internal generation for binding future device-scoped grants; never projected to clients. */
+export function readAndroidDeviceAuthorizationEpoch(db: DatabaseSync, deviceIdInput: string): number | null {
+  const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+  if (!deviceId) return null;
+  const row = db.prepare("SELECT authorization_epoch FROM android_devices WHERE device_id = ?").get(deviceId) as { authorization_epoch: number } | undefined;
+  return row?.authorization_epoch ?? null;
+}
+
 export function upsertAndroidDeviceSightings(db: DatabaseSync, sightings: AndroidDeviceSighting[]): number {
   if (!Array.isArray(sightings) || sightings.length === 0) {
     return 0;
@@ -275,10 +283,11 @@ export function setAndroidDeviceActive(db: DatabaseSync, deviceIdInput: string, 
   const result = db
     .prepare(`
         UPDATE android_devices
-        SET is_active = ?, revoked_at = CASE WHEN ? = 1 THEN NULL ELSE revoked_at END, updated_at = ?
+        SET is_active = ?, revoked_at = CASE WHEN ? = 1 THEN NULL ELSE revoked_at END,
+            authorization_epoch = authorization_epoch + CASE WHEN ? = 0 THEN 1 ELSE 0 END, updated_at = ?
         WHERE device_id = ?
       `)
-    .run(active ? 1 : 0, active ? 1 : 0, now, deviceId);
+    .run(active ? 1 : 0, active ? 1 : 0, active ? 1 : 0, now, deviceId);
   return Number(result.changes) === 1
     ? { ok: true, message: active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi.", devices: getAndroidDevices(db, enabledCapabilities) }
     : { ok: false, message: "Telefon kaydı bulunamadı.", devices: getAndroidDevices(db, enabledCapabilities) };
@@ -315,7 +324,7 @@ export function revokeAndroidDevice(db: DatabaseSync, deviceIdInput: string, ena
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = db
-      .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, updated_at = ? WHERE device_id = ?")
+      .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, authorization_epoch = authorization_epoch + 1, updated_at = ? WHERE device_id = ?")
       .run(now, now, deviceId);
     if (Number(result.changes) !== 1) {
       db.exec("ROLLBACK");

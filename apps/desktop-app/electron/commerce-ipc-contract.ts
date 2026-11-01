@@ -78,7 +78,15 @@ export interface MarketBarcodeFastPullState {
  * guarded commerce runtime rather than repository/store functions.
  */
 export interface DesktopCommerceBridge {
+  getMarketSaleBenefitsState: () => Promise<import("@yardimci-asistan/shared").BenefitsManagementResult<import("./market-sale-benefits").MarketSaleBenefitsState>>;
+  previewMarketSaleBenefits: (input: import("./market-sale-benefits").MarketSalePreviewInput) => Promise<import("@yardimci-asistan/shared").BenefitsManagementResult<import("./market-sale-benefits").MarketSalePreview>>;
+  /** Same canonical IPC operation; explicit rejection distinguishes rollback from a lost response. */
+  tryCompleteMarketSale: (input: import("./market-sale-operation").CompleteMarketSaleInput) => Promise<CommerceIpcMutationResult<import("./market-sale-operation").CompleteMarketSaleResult>>;
   completeMarketSale: (input: import("./market-sale-operation").CompleteMarketSaleInput) => Promise<import("./market-sale-operation").CompleteMarketSaleResult>;
+  getFullRefundMarketSalePreview: (saleId: string) => Promise<import("./market-sale-full-refund").FullRefundMarketSalePreview>;
+  listMarketSaleHistory: (input: { limit: number; cursor?: import("./market-sale-full-refund").MarketSaleHistoryCursor }) => Promise<import("./market-sale-full-refund").MarketSaleHistoryPage>;
+  fullRefundMarketSale: (input: import("./market-sale-full-refund").FullRefundMarketSaleInput) => Promise<import("./market-sale-full-refund").FullRefundMarketSaleResult>;
+  tryFullRefundMarketSale: (input: import("./market-sale-full-refund").FullRefundMarketSaleInput) => Promise<CommerceIpcMutationResult<import("./market-sale-full-refund").FullRefundMarketSaleResult>>;
 
   listCategories: (options?: ListCatalogCategoriesOptions) => Promise<CatalogCategory[]>;
   saveCategory: (input: SaveCatalogCategoryInput) => Promise<CatalogCategory>;
@@ -127,6 +135,8 @@ export interface DesktopCommerceBridge {
   createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceIpcMutationResult<CommerceOrderDetail>>;
   updateOrderStatus: (input: UpdateCommerceOrderStatusInput) => Promise<CommerceOrderDetail>;
   fulfillOrder: (input: FulfillCommerceOrderInput) => Promise<CommerceOrderFulfillmentResult>;
+  previewOrderBenefits: (input: import("@yardimci-asistan/shared").CommerceOrderBenefitsPreviewInput) => Promise<import("@yardimci-asistan/shared").BenefitsManagementResult<import("@yardimci-asistan/shared").CommerceOrderBenefitsPreview>>;
+  tryFulfillOrder: (input: FulfillCommerceOrderInput) => Promise<CommerceIpcMutationResult<CommerceOrderFulfillmentResult>>;
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
   getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
   prepareCustomerCreditWhatsApp: (input: PrepareCustomerCreditWhatsAppInput) => Promise<CustomerCreditWhatsAppPreparation>;

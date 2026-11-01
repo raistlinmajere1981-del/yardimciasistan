@@ -154,23 +154,26 @@
 
 .settings-web-heading {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
   min-height: 24px;
 }
 
-.settings-web-heading strong { font-size: var(--text-sm); }
-
+.settings-web-heading strong { flex-shrink: 0; white-space: nowrap; font-size: var(--text-sm); }
 
 .settings-web-choice {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: var(--text-sm);
   cursor: pointer;
 }
+
+.settings-web-enable { margin-left: auto; }
+.settings-web-indicator { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-web-fields {
   display: grid;
@@ -301,4 +304,11 @@
 .settings-service-overlay small { overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .settings-service-overlay .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.settings-local-pairing-qr {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
 }

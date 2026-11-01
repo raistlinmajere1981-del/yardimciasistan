@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 
-import { WorkspaceCanvasContext } from "../workspace/WorkspaceFrame";
+import { WorkspaceCanvasContext, WorkspaceScaleContext } from "../workspace/WorkspaceFrame";
 
 interface AppShellProps {
   contentScroll?: "page" | "workspace";
@@ -12,12 +12,13 @@ interface AppShellProps {
   workspaceLayer?: ReactNode;
   workspaceActive?: boolean;
   overlay?: ReactNode;
+  uiScale?: number;
 }
 
 export function AppShell({ contentScroll = "page", sidebar, sidebarCollapsed = false, header, children, contentRef,
-  workspaceLayer, workspaceActive = false, overlay }: AppShellProps) {
+  workspaceLayer, workspaceActive = false, overlay, uiScale = 1 }: AppShellProps) {
   return (
-    <WorkspaceCanvasContext.Provider value={contentRef ?? null}>
+    <WorkspaceScaleContext.Provider value={uiScale}><WorkspaceCanvasContext.Provider value={contentRef ?? null}>
       <div className={sidebarCollapsed ? "desktop-shell is-sidebar-collapsed" : "desktop-shell"}>
         {sidebar}
         <main className={`content page${contentScroll === "workspace" ? " content--workspace" : ""}`} ref={contentRef} tabIndex={-1} data-workspace-return-focus>
@@ -29,6 +30,6 @@ export function AppShell({ contentScroll = "page", sidebar, sidebarCollapsed = f
         </main>
         {overlay}
       </div>
-    </WorkspaceCanvasContext.Provider>
+    </WorkspaceCanvasContext.Provider></WorkspaceScaleContext.Provider>
   );
 }

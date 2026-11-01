@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
 import {mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
@@ -13,6 +14,11 @@ import {stageDemoDeployment, retiredDemoPaths} from './lib/demo-deployment.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'ya-showcase-3a-')), site = join(root, 'site');
 const evidenceDir = 'artifacts/site-redesign-plan/ortak-kaynak-demo';
+const widget = readFileSync('test-site/landing/assets/assistant/widget.js');
+const templateWidget = readFileSync('web-site-template/public/assets/core/widget.js');
+const manifest = JSON.parse(readFileSync('web-site-template/template-manifest.json', 'utf8'));
+assert.deepEqual(widget, templateWidget, 'Generated widget must match the template release');
+assert.equal(createHash('sha256').update(widget).digest('hex'), manifest.common['public/assets/core/widget.js'], 'Widget fingerprint must match the template release manifest');
 installDemoSite(join(root,'api-fixture'));
 stageDemoDeployment(resolve('test-site/landing'),site);
 // Copy only the isolated backend into the actual deployment tree.

@@ -23,6 +23,7 @@ import { MarketingImages } from "./MarketingImages";
 import { MarketingAudience } from "./MarketingAudience";
 import { MarketingChannelDetails } from "./MarketingChannelDetails";
 import { channelNames, contentDraft, newShare, resultValue } from "./share-draft";
+import { useWebAvailability } from "../../app/web-availability";
 
 type Pane = "ai" | "images" | "audience" | "channels" | "preview" | null;
 const planLabels = {active: "Planlandı", paused: "Plan duraklatıldı", cancelled: "Plan iptal edildi", completed: "Plan tamamlandı"};
@@ -34,11 +35,13 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput;
   onOpenTarget?: (target: MarketingShareTarget) => void;
 }) {
-  const channels = snapshot.channels.filter(c => c.enabled && c.configured);
+  const webAvailable = useWebAvailability();
+  const visibleChannels = snapshot.channels.filter(c => webAvailable || c.id !== "website");
+  const channels = visibleChannels.filter(c => c.enabled && c.configured);
   const [draft, setDraft] = useState<MarketingShareInput>(() => {
     const input = initial ? {content: contentDraft(initial.content), options: initial.options} : newShare(channels.filter(c => c.id === "website").map(c => c.id));
     if(publication && !initial?.targets.length) return {...input, content: {...input.content, title: publication.title, masterText: publication.text, mediaAssetIds: publication.mediaAssetIds}, options: {...input.options, channels: [publication.channel]}};
-    return initial?.targets.length ? input : {...input, options: {...input.options, channels: input.options.channels.filter(id => channels.some(c => c.id === id))}};
+    return input;
   });
   const [baseline, setBaseline] = useState(() => JSON.stringify(draft));
   const [submitted, setSubmitted] = useState(Boolean(initial?.targets.length || focusScheduleId || createScheduleInput));
@@ -58,7 +61,9 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   const [outcomes, setOutcomes] = useState<MarketingShareOutcome[]>([]);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const working = useRef(false), mounted = useRef(true), lastSaved = useRef(initial);
-  const [selectedChannel, setSelectedChannel] = useState<MarketingChannel>(initialChannel || publication?.channel || draft.options.channels[0] || "website");
+  const [storedSelectedChannel, setSelectedChannel] = useState<MarketingChannel>(initialChannel || publication?.channel || draft.options.channels[0] || "website");
+  const selectedChannel = !webAvailable && storedSelectedChannel === "website"
+    ? initial?.targets.find(t => t.channel !== "website")?.channel || channels[0]?.id || "instagram" : storedSelectedChannel;
   const [selectedPlanId, setSelectedPlanId] = useState(focusScheduleId || "");
   const [planDirty, setPlanDirty] = useState(false);
   const discardPlan = useRef<() => void>(() => {});
@@ -76,12 +81,12 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   const dirty = JSON.stringify(draft) !== baseline;
   const readOnly = pub ? !editingPublication : submitted;
   const locked = busy || readOnly || Boolean(pane);
-  const sharePlans = schedules?.schedules.filter(p => targets.some(t => t.targetId === p.schedule.targetId) || p.schedule.targetId === publication?.id || p.schedule.id === focusScheduleId || p.schedule.targetId === createScheduleInput?.targetId) || [];
+  const sharePlans = schedules?.schedules.filter(p => (webAvailable || p.schedule.channel !== "website") && (targets.some(t => t.targetId === p.schedule.targetId) || p.schedule.targetId === publication?.id || p.schedule.id === focusScheduleId || p.schedule.targetId === createScheduleInput?.targetId)) || [];
   const selectedPlan = sharePlans.find(p => p.schedule.id === selectedPlanId) || sharePlans.find(p => p.schedule.channel === selectedChannel && ["active", "paused"].includes(p.schedule.status)) || sharePlans.find(p => p.schedule.channel === selectedChannel) || sharePlans[0];
   const activePlan = sharePlans.some(p => p.schedule.targetId === pub?.id && ["active", "paused"].includes(p.schedule.status));
   const inFlight = sharePlans.some(p => p.schedule.targetId === pub?.id && p.executions.some(e => ["pending", "claimed"].includes(e.status)));
   const campaignDetail = snapshot.campaigns?.find(c => c.campaign.id === selectedTarget?.targetId);
-  const resultChannels = [...new Set<MarketingChannel>([...targets.map(t => t.channel), ...(publication ? [publication.channel] : []), ...(focusedSchedule ? [focusedSchedule.channel] : []), ...(createScheduleInput ? [createScheduleInput.channel] : [])])];
+  const resultChannels = [...new Set<MarketingChannel>([...targets.map(t => t.channel), ...(publication ? [publication.channel] : []), ...(focusedSchedule ? [focusedSchedule.channel] : []), ...(createScheduleInput ? [createScheduleInput.channel] : [])])].filter(c => webAvailable || c !== "website");
   const outcome = outcomes.find(o => o.channel === selectedChannel);
   function statusFor(channel: MarketingChannel) {
     const target = targets.find(t => t.channel === channel) || (selectedTarget?.channel === channel ? selectedTarget : undefined), p = pub?.channel === channel ? pub : snapshot.publications.find(p => p.id === target?.targetId);
@@ -98,7 +103,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     const status = statusFor(channel);
     return ["Başarısız", "Çalışma başarısız", "Kontrol gerekiyor"].includes(status) ? "danger" : ["Yayında", "Tamamlandı"].includes(status) ? "success" : "info";
   }
-  const canEditPublication = pub?.channel === "website" && !inFlight && (!activePlan || pub.desiredPublished || Boolean(pub.publishedAt)) && snapshot.channels.some(c => c.id === "website" && c.enabled && c.configured && c.supportsEditPublished);
+  const canEditPublication = webAvailable && pub?.channel === "website" && !inFlight && (!activePlan || pub.desiredPublished || Boolean(pub.publishedAt)) && channels.some(c => c.id === "website" && c.supportsEditPublished);
   const audienceChannels = draft.options.channels.filter((c): c is "sms" | "whatsapp" => c === "sms" || c === "whatsapp");
   const audienceId = draft.options.audienceId, usesSms = draft.options.channels.includes("sms"), usesWhatsapp = draft.options.channels.includes("whatsapp");
   useEffect(() => {
@@ -135,6 +140,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     return saved;
   }
   async function saveDraft() {await action(async () => {
+    if (pub?.channel === "website" && !webAvailable) return;
     if(pub) {
       const saved = resultValue(await window.yardimciDesktop!.saveMarketingPublication({id: pub.id, expectedRevision: pub.revision, contentId: pub.contentId, channel: pub.channel, placement: pub.placement, title: draft.content.title, text: draft.content.masterText, mediaAssetIds: draft.content.mediaAssetIds}));
       if(mounted.current) {setPub(saved); setBaseline(JSON.stringify(draft)); setMessage("Web içeriği kaydedildi. Eşitleme onayı bekleniyor."); setEditingPublication(false);} onMessage?.("Web içeriği kaydedildi. Eşitleme onayı bekleniyor.");
@@ -142,6 +148,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     await onReload();
   });}
   async function submit() {await action(async () => {
+    if (!webAvailable && (pub?.channel === "website" || draft.options.channels.includes("website"))) return;
     if(pub) {
       const saved = resultValue(await window.yardimciDesktop!.publishMarketingPublication(pub.id, pub.revision)); setPub(saved); setMessage("Yayın onayı bekleniyor."); await onReload(); return;
     }
@@ -173,7 +180,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     else {setDraft(next); setPane(null);}
   }
   async function publicationAction(remove: boolean) {await action(async () => {
-    if(!pub) return;
+    if(!pub || (pub.channel === "website" && !webAvailable)) return;
     const value = resultValue(await (remove ? window.yardimciDesktop!.unpublishMarketingPublication(pub.id, pub.revision) : window.yardimciDesktop!.publishMarketingPublication(pub.id, pub.revision)));
     if(mounted.current) {setPub(value); setOutcomes(previous => previous.filter(o => o.channel !== value.channel)); setRemoval(false); setMessage(remove ? "Yayından kaldırma onayı bekleniyor." : publicationLabel(value));}
     await onReload();
@@ -193,11 +200,19 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   const selectedPlanPublication = snapshot.publications.find(p => p.id === selectedPlan?.schedule.targetId);
   const previewButton = <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => openTool("preview")}><Eye size={16}/>Çoklu kanal önizlemesi</ActionButton>;
 
+  // Calendar/history can still reference a saved website publication or plan.
+  // Preserve those records while preventing entry to publishing controls.
+  if (!webAvailable && (publication?.channel === "website" || focusedSchedule?.channel === "website" || createScheduleInput?.channel === "website" || submitted && targets.length > 0 && targets.every(t => t.channel === "website"))) {
+    return <WorkspaceFrame presentation="centered" title="Paylaşım detayı" onClose={onClose} footer={<ActionButton variant="secondary" onClick={onClose}>Kapat</ActionButton>}>
+      <p>Bu yayın kanalını yönetmek için Ayarlar’dan Web bağlantısını kaydedin. Kayıtlı içerik ve yayın tercihleri korunuyor.</p>
+    </WorkspaceFrame>;
+  }
+
   return <WorkspaceFrame {...(returnFocusRef === undefined ? {} : {returnFocusRef})} presentation="centered" className="marketing-workspace-frame detail-workspace-frame marketing-share-workspace" title={pub ? editingPublication ? "Web içeriğini düzenle" : "Paylaşım detayı" : readOnly ? "Paylaşım detayı" : initial ? "Paylaşımı düzenle" : "Yeni paylaşım oluştur"}
     context={readOnly ? <span className="marketing-actions">{channelNames[selectedChannel]}<StatusBadge tone={statusTone(selectedChannel)}>{statusFor(selectedChannel)}</StatusBadge></span> : pub ? "Web içeriğini düzenle" : "İçeriği hazırlayın · araçlar gerektiğinde açılır"} onClose={() => close()} closeBlocked={busy}
     footer={<><span className="muted">{busy ? "İşlem sürüyor…" : planDirty ? "Kaydedilmemiş plan değişiklikleri" : readOnly ? "Salt okunur" : dirty ? "Kaydedilmemiş değişiklikler" : "Taslak"}</span><div className="marketing-actions">
       {!readOnly && <ActionButton variant="secondary" disabled={locked || !draft.content.title.trim()} onClick={() => void saveDraft()}>{pub ? "Değişiklikleri kaydet" : "Taslak kaydet"}</ActionButton>}
-      {!readOnly && <ActionButton disabled={busy || Boolean(pane) || (!submitted && !readiness.every(r => r.ready)) || Boolean(pub && !pub.desiredPublished && dirty)} onClick={() => void (pub?.desiredPublished ? saveDraft() : submit())}><Send size={16}/>{primary}</ActionButton>}
+      {!readOnly && <ActionButton disabled={busy || Boolean(pane) || (!submitted && !readiness.every(r => r.ready)) || (!webAvailable && draft.options.channels.includes("website")) || Boolean(pub && !pub.desiredPublished && dirty)} onClick={() => void (pub?.desiredPublished ? saveDraft() : submit())}><Send size={16}/>{primary}</ActionButton>}
       {editingPublication && <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => close(() => {setDraft(displayedPublicationDraft()); setBaseline(JSON.stringify(displayedPublicationDraft())); setEditingPublication(false);})}>Vazgeç</ActionButton>}
       {readOnly && <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => close()}>Kapat</ActionButton>}
     </div></>}
@@ -206,7 +221,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
       {removal && <ConfirmDialog withinModal tone="danger" title="Web içeriği yayından kaldırılsın mı?" description="İçerik web eşitlemesi tamamlanınca sitenizden kaldırılır." confirmLabel="Yayından kaldırmayı onayla" details={message && <p role="status">{message}</p>} busy={busy} onCancel={() => setRemoval(false)} onConfirm={() => publicationAction(true)}/>}
       {pane && <WorkspaceSubflowOverlay title={pane === "preview" && readOnly ? "Seçili kanal önizlemesi" : toolTitles[pane]} onClose={dismissTool} closeBlocked={busy} className={`marketing-tool marketing-tool--${pane}`} footer={<div className="marketing-actions"><ActionButton variant="secondary" disabled={busy} onClick={dismissTool}>{pane === "preview" ? "Paylaşıma dön" : "Vazgeç"}</ActionButton>{pane !== "ai" && pane !== "preview" && <ActionButton disabled={busy} onClick={applyTool}>Uygula</ActionButton>}</div>}>
         {pane === "ai" && <>
-          <label className="form-field form-field--fluid">Uygulama hedefi<select disabled={busy} value={aiChannel || "shared"} onChange={e => setAiChannel(e.target.value === "shared" ? undefined : e.target.value as MarketingChannel)}><option value="shared">Ortak paylaşım metni</option>{!pub && staged.options.channels.filter(c => c !== "whatsapp").map(c => <option key={c} value={c}>{channelNames[c]} metni</option>)}</select></label>
+          <label className="form-field form-field--fluid">Uygulama hedefi<select disabled={busy} value={aiChannel || "shared"} onChange={e => setAiChannel(e.target.value === "shared" ? undefined : e.target.value as MarketingChannel)}><option value="shared">Ortak paylaşım metni</option>{!pub && staged.options.channels.filter(c => c !== "whatsapp" && (webAvailable || c !== "website")).map(c => <option key={c} value={c}>{channelNames[c]} metni</option>)}</select></label>
           <MarketingTextAssistant key={aiChannel || "shared"} text={aiChannel ? staged.content.variants.find(v => v.channel === aiChannel)?.text || staged.content.masterText : staged.content.masterText} {...(aiChannel === undefined ? {} : {channel: aiChannel})} capabilities={snapshot.aiCapabilities} onBusy={childBusy} onApply={applyText}/>
         </>}
         {pane === "images" && <><p className="muted">Seçim ve sıralama Uygula ile paylaşıma aktarılır. Yüklenen ve üretilen görseller Vazgeç sonrasında da arşivde kalır.</p><MarketingImages assets={snapshot.assets} selected={staged.content.mediaAssetIds} onChange={mediaAssetIds => setStaged({...staged, content: {...staged.content, mediaAssetIds}})} onReload={onReload} aiAvailable={snapshot.aiCapabilities.includes("image_generation")} generateFirst={generateImage} onBusy={childBusy}/></>}
@@ -233,7 +248,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
             <SpeechTextField label="Paylaşım metni" value={draft.content.masterText} rows={6} maxLength={12000} disabled={locked} showRecordingHint={false} onChange={text => change({...draft, content: {...draft.content, masterText: text}})} />
           </Panel>
           <Panel as="section" className="form-stack marketing-share-section" aria-label="Seçilen paylaşım görselleri"><h3>Paylaşım görselleri</h3><div className="marketing-image-summary"><div className="marketing-image-cover"><MarketingCover snapshot={snapshot} ids={draft.content.mediaAssetIds}/></div><div><strong>{draft.content.mediaAssetIds.length} görsel seçili</strong><small>İlk görsel kapak ve Instagram görselidir.</small><div className="marketing-actions"><ActionButton variant="secondary" disabled={locked} onClick={() => openTool("images")}>Görsel seç / yükle</ActionButton><ActionButton variant="secondary" disabled={locked || !snapshot.aiCapabilities.includes("image_generation")} onClick={() => openTool("images", true)}><Sparkles size={15}/>AI ile görsel oluştur</ActionButton></div></div></div></Panel>
-          <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Kanallar ve hedef kitle"><h3>Yayın kanalları</h3><fieldset className="marketing-channel-picks" disabled={locked || Boolean(pub)}><legend>Aktif paylaşım kanalları</legend>{(pub ? snapshot.channels.filter(c => c.id === pub.channel) : channels).map(c => <label key={c.id}><input type="checkbox" checked={draft.options.channels.includes(c.id)} onChange={e => change({...draft, options: {...draft.options, channels: e.target.checked ? [...draft.options.channels, c.id] : draft.options.channels.filter(id => id !== c.id)}})}/>{channelNames[c.id]}</label>)}{!channels.length && <p>Şu anda kullanılabilir paylaşım kanalı yok. İçeriğinizi taslak olarak kaydedebilirsiniz.</p>}</fieldset><ActionButton variant="secondary" disabled={locked || Boolean(pub) || !draft.options.channels.length} onClick={() => openTool("channels")}>Kanal / gönderim ayrıntıları</ActionButton></Panel>
+          <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Kanallar ve hedef kitle"><h3>Yayın kanalları</h3><fieldset className="marketing-channel-picks" disabled={locked || Boolean(pub)}><legend>Aktif paylaşım kanalları</legend>{(pub ? visibleChannels.filter(c => c.id === pub.channel) : channels).map(c => <label key={c.id}><input type="checkbox" checked={draft.options.channels.includes(c.id)} onChange={e => change({...draft, options: {...draft.options, channels: e.target.checked ? [...draft.options.channels, c.id] : draft.options.channels.filter(id => id !== c.id)}})}/>{channelNames[c.id]}</label>)}{!channels.length && <p>Şu anda kullanılabilir paylaşım kanalı yok. İçeriğinizi taslak olarak kaydedebilirsiniz.</p>}</fieldset>{!webAvailable && draft.options.channels.includes("website") && <p>Kayıtlı Web kanalı seçimi korunuyor. Yayınlamak için Ayarlar’dan Web bağlantısını kaydedin; yerel taslağı kaydetmeye devam edebilirsiniz.</p>}<ActionButton variant="secondary" disabled={locked || Boolean(pub) || !channels.some(c => draft.options.channels.includes(c.id))} onClick={() => openTool("channels")}>Kanal / gönderim ayrıntıları</ActionButton></Panel>
         </>}
         {readOnly && <Panel as="section" className="form-stack marketing-share-section" aria-label="Kanal durumları ve sonuçlar"><h3>Kanal durumları / sonuçlar</h3>{message && <p role="status">{message}</p>}
           <div className="marketing-actions" role="group" aria-label="Sonuç kanalı">{resultChannels.map(channel => <StatusChip key={channel} tone={statusTone(channel)} selected={selectedChannel === channel} disabled={busy} onClick={() => {if (planDirty && selectedPlan) setSelectedPlanId(selectedPlan.schedule.id); setSelectedChannel(channel); setMessage("");}}>{channelNames[channel]} · {statusFor(channel)}</StatusChip>)}</div>
@@ -244,10 +259,10 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
           {pub && <>
             <div className="marketing-actions">
               {canEditPublication && <ActionButton variant="secondary" disabled={busy || planDirty} onClick={() => {setPub(pub); setDraft(displayedDraft); setBaseline(JSON.stringify(displayedDraft)); setEditingPublication(true);}}>Düzenle</ActionButton>}
-              {pub.channel === "website" && !pub.desiredPublished && pub.status !== "publishing" && !activePlan && channels.some(c => c.id === "website") && <ActionButton disabled={busy || planDirty} onClick={() => void publicationAction(false)}>Web sitesinde yayınla</ActionButton>}
-              {pub.channel === "website" && pub.status === "failed" && pub.desiredPublished && !activePlan && <ActionButton disabled={busy || !channels.some(c => c.id === "website")} onClick={() => void publicationAction(false)}>Yayını yeniden dene</ActionButton>}
+              {webAvailable && pub.channel === "website" && !pub.desiredPublished && pub.status !== "publishing" && !activePlan && channels.some(c => c.id === "website") && <ActionButton disabled={busy || planDirty} onClick={() => void publicationAction(false)}>Web sitesinde yayınla</ActionButton>}
+              {webAvailable && pub.channel === "website" && pub.status === "failed" && pub.desiredPublished && !activePlan && <ActionButton disabled={busy || !channels.some(c => c.id === "website")} onClick={() => void publicationAction(false)}>Yayını yeniden dene</ActionButton>}
               {pub.channel === "instagram" && pub.status !== "draft" && <ActionButton variant="secondary" disabled={busy || !channels.some(c => c.id === "instagram")} onClick={() => void publicationAction(false)}>Instagram yayın durumunu kontrol et</ActionButton>}
-              {pub.channel === "website" && (pub.desiredPublished || pub.status === "failed") && <ActionButton variant="danger" disabled={busy || inFlight || planDirty || !channels.some(c => c.id === "website")} onClick={() => setRemoval(true)}>Yayından kaldır</ActionButton>}
+              {webAvailable && pub.channel === "website" && (pub.desiredPublished || pub.status === "failed") && <ActionButton variant="danger" disabled={busy || inFlight || planDirty || !channels.some(c => c.id === "website")} onClick={() => setRemoval(true)}>Yayından kaldır</ActionButton>}
             </div>
             {pub.channel === "instagram" && <small>Instagram içeriği sonradan değiştirilemez veya yayından kaldırılamaz.</small>}
             {pub.providerSummary?.permalink && <a className="marketing-detail-link" href={pub.providerSummary.permalink} target="_blank" rel="noreferrer">Instagram’da görüntüle</a>}
@@ -295,11 +310,11 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
             </div> : <small>Paylaşım seçili kanallara hemen gönderilmek üzere hazırlanır.</small>}
           </>
         </Panel>}
-        {readOnly && (sharePlans.length > 0 || createScheduleInput) && <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Yayın planı"><h3>Yayın planı</h3>
+        {readOnly && (sharePlans.length > 0 || createScheduleInput && (webAvailable || createScheduleInput.channel !== "website")) && <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Yayın planı"><h3>Yayın planı</h3>
           {sharePlans.length > 1 && <label className="form-field form-field--fluid">Kanal planı<select aria-label="Kanal planı" value={selectedPlan?.schedule.id} disabled={busy || planDirty} onChange={e => setSelectedPlanId(e.target.value)}>{sharePlans.map(p => <option key={p.schedule.id} value={p.schedule.id}>{channelNames[p.schedule.channel]} · {p.schedule.name}</option>)}</select></label>}
           {createScheduleInput && !sharePlans.some(p => p.schedule.targetId === createScheduleInput.targetId && ["active", "paused"].includes(p.schedule.status))
-            ? <MarketingInlineScheduleCreate key={createScheduleInput.targetId} initial={createScheduleInput} channels={snapshot.channels} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>
-            : selectedPlan && <MarketingInlinePlan key={selectedPlan.schedule.id} detail={selectedPlan} channels={snapshot.channels} {...(selectedPlanPublication === undefined ? {} : {publication: selectedPlanPublication})} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>}
+            ? <MarketingInlineScheduleCreate key={createScheduleInput.targetId} initial={createScheduleInput} channels={visibleChannels} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>
+            : selectedPlan && <MarketingInlinePlan key={selectedPlan.schedule.id} detail={selectedPlan} channels={visibleChannels} {...(selectedPlanPublication === undefined ? {} : {publication: selectedPlanPublication})} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>}
         </Panel>}
         {readOnly && <Panel as="section" className="form-stack marketing-share-section" aria-label="Geçmiş"><h3>Geçmiş</h3>
           {pub?.publishedAt && <p>Yayınlandı · {new Date(pub.publishedAt).toLocaleString("tr-TR")}</p>}

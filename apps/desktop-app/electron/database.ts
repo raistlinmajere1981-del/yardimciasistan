@@ -1,3 +1,5 @@
+import { getTableOrderBenefitsState, previewTableOrderBenefits, settleTableOrderBenefits, type TableBenefitsAuthority } from "./table-order-benefits";
+import type { TableOrderBenefitsPreviewInput, TableOrderBenefitsCloseInput } from "@yardimci-asistan/shared";
 import { getAppLockPasswordVerifier as getAppLockPasswordVerifierStored, setAppLockPasswordVerifier as setAppLockPasswordVerifierStored, getAppLockNotificationCount as getAppLockNotificationCountStored } from "./database/app-lock-store.js";
 import { recordRejectedDealerWebOrder } from "./dealer-web-order-rejection.js";
 import { getWebSyncConfig } from "./sync-config";
@@ -79,7 +81,8 @@ import {
   resolveDatabasePath
 } from "./data-paths.js";
 import { assertCurrentDesktopSchema } from "./desktop-database-compatibility.js";
-import { applyAndroidActionTransaction } from "./android-action-application-service.js";
+import { applyAndroidActionTransaction, readAuthorizedLocalSaleReceipt } from "./android-action-application-service.js";
+import type { LocalCompanionActionContext } from "./local-companion-server.js";
 import {
   claimAutomaticBirthdayDelivery,
   getAutomaticBirthdayCandidates,
@@ -240,11 +243,22 @@ export type {
 
 // Main and short-lived service facades publish into the same renderer stream.
 
+import { CommerceBenefitsManagement, type BenefitsManagementActor, type BenefitsManagementKeys } from "./commerce-benefits-management";
+import { readAndroidPointBalance } from "./android-benefits-balance";
+import { previewAndroidCustomerSale } from "./android-customer-sale-preview";
+import { quoteAndroidPointSpend } from "./android-point-spend-quote";
+import { authorizeCompanionCouponAttempt, type CompanionCouponAttemptInput } from "./companion-coupon-permit";
+import type { BenefitsSecretKey } from "./commerce-benefits-rules";
+
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
   readonly databasePath: string;
   readonly userDataPath: string;
   readonly backupPath: string;
+
+  commerceBenefitsManagement(keys: BenefitsManagementKeys, actor: BenefitsManagementActor) {
+    return new CommerceBenefitsManagement(this.db, keys, actor);
+  }
 
   constructor(private readonly options: DesktopDatabaseOptions) {
     const dataRoot = options.dataRoot ?? options.userDataPath;
@@ -405,6 +419,29 @@ export class DesktopDatabase {
     return authorizeStoredAndroidLocalCredential(this.db, deviceId, token);
   }
 
+  getActiveBusinessId(): string {
+    const row = this.db.prepare("SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get();
+    return String(row?.id ?? "");
+  }
+
+  readAndroidPointBalance(deviceId: string, token: string, customerId: string, currency: string) {
+    const business = this.db.prepare("SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get() as { id: string } | undefined;
+    return business ? readAndroidPointBalance(this.db, business.id, deviceId, token, customerId, currency) : null;
+  }
+
+  readAndroidCustomerSalePreview(deviceId: string, token: string, input: { customerId?: string; lines: Array<{ productId: string; quantity: number }> }) {
+    return previewAndroidCustomerSale(this.db, { deviceId, token }, input);
+  }
+
+  readAndroidPointSpendQuote(deviceId: string, token: string, input: { customerId: string; lines: Array<{ productId: string; quantity: number }> }) {
+    return quoteAndroidPointSpend(this.db, { deviceId, token }, input);
+  }
+
+  /** Advisory coupon attempt permit over the existing store; never a sale authorization. */
+  readAndroidCouponAttempt(deviceId: string, token: string, input: CompanionCouponAttemptInput, key: BenefitsSecretKey) {
+    return authorizeCompanionCouponAttempt(this.db, { deviceId, token }, input, key);
+  }
+
   setAndroidDeviceRole(deviceIdInput: string, roleInput: string): DesktopAndroidDeviceMutationResult {
     return setStoredAndroidDeviceRole(this.db, deviceIdInput, roleInput, new Set(this.getEnabledBusinessCapabilities()));
   }
@@ -432,12 +469,19 @@ export class DesktopDatabase {
     return getStoredPreparedWhatsAppMessages(this.db, getRequests(this.db));
   }
 
-  applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
+  applyAndroidAction(action: AndroidSyncAction, localContext?: LocalCompanionActionContext,
+    pointsKeys?: BenefitsManagementKeys): ApplyAndroidActionResult {
     return applyAndroidActionTransaction(
       this.db,
       action,
-      this.getEnabledBusinessCapabilities()
+      this.getEnabledBusinessCapabilities(),
+      localContext,
+      pointsKeys
     );
+  }
+
+  readAuthorizedLocalSaleReceipt(action: AndroidSyncAction, deviceId: string, token: string) {
+    return readAuthorizedLocalSaleReceipt(this.db, action, deviceId, token);
   }
 
   saveDailyTask(input: SaveDailyTaskInput): DesktopStatusUpdateResult {
@@ -794,6 +838,16 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  getTableOrderBenefitsState() { return getTableOrderBenefitsState(this.db); }
+
+  previewTableOrderBenefits(input: TableOrderBenefitsPreviewInput, authority: TableBenefitsAuthority) {
+    return previewTableOrderBenefits(this.db, input, authority);
+  }
+
+  settleTableOrderBenefits(input: TableOrderBenefitsCloseInput, authority: TableBenefitsAuthority) {
+    return settleTableOrderBenefits(this.db, input, authority);
   }
 
   closeTableOrder(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {

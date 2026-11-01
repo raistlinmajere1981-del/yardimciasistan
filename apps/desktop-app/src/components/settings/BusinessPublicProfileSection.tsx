@@ -87,7 +87,8 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
 
   useEffect(() => {
     ++lookupGeneration.current;
-    if (!enabled) return;
+    // Keep the loaded snapshot and any hidden draft across Web disconnect/reconnect.
+    if (!enabled || initialDraftRef.current) return;
     let active = true;
     const load = async () => {
       const bridge = window.yardimciDesktop;

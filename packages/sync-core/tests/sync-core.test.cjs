@@ -92,7 +92,11 @@ test("local companion protocol contract keeps discovery identity independent fro
     status: "/local/v1/status",
     summary: "/local/v1/summary",
     action: "/local/v1/action",
-    pair: "/local/v1/pair"
+    pair: "/local/v1/pair",
+    benefitsBalance: "/local/v1/benefits-balance",
+    customerSalePreview: "/local/v1/customer-sale-preview",
+    pointSpendQuote: "/local/v1/point-spend-quote",
+    couponAttempt: "/local/v1/coupon-attempt"
   });
   assert.equal(LOCAL_COMPANION_DEVICE_ID_HEADER, "X-YA-Device-Id");
   assert.equal(LOCAL_COMPANION_TOKEN_HEADER, "X-YA-Local-Token");
@@ -681,6 +685,11 @@ test("Android staff permission groups produce only their documented effective pe
     "market.product_create",
     "market.cart_draft",
     "market.scan_to_desktop"
+  ]);
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_sales, [
+    "market.product.view",
+    "market.sale.complete",
+    "customer.view"
   ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.cashier, [
     "table.view",

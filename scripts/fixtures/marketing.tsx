@@ -2,12 +2,15 @@ import { useCallback, useRef, useState } from 'react';
 import type { DesktopPage } from '../../apps/desktop-app/src/app/navigation';
 import type { PageLeaveGuard } from '../../apps/desktop-app/src/app/page-navigation-guard';
 import { PageViewStateProvider } from '../../apps/desktop-app/src/app/page-view-state';
+import { WebAvailabilityProvider } from '../../apps/desktop-app/src/app/web-availability';
 import { createRoot } from 'react-dom/client';
 import { MarketingPage } from '../../apps/desktop-app/src/pages/MarketingPage';
 import { OperationCalendarPage } from '../../apps/desktop-app/src/pages/OperationCalendarPage';
 import { useCalendarPageController } from '../../apps/desktop-app/src/components/calendar/calendar-page-state';
 import '../../apps/desktop-app/src/styles/index.css';
-const fixture=window as typeof window & {__marketingCall:(method:string,args:unknown[])=>Promise<any>; __notifyScheduleChanged?:()=>void; __notifyCampaignChanged?:()=>void};
+// The test bridge deliberately returns heterogeneous fixture payloads.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fixture=window as typeof window & {__marketingCall:(method:string,args:unknown[])=>Promise<any>; __notifyScheduleChanged?:()=>void; __notifyCampaignChanged?:()=>void; __setMarketingWebAvailable?:(enabled:boolean)=>void};
 const call=(method:string,...args:unknown[])=>fixture.__marketingCall(method,args);
 const scheduleListeners=new Set<()=>void>(), campaignListeners=new Set<()=>void>();
 fixture.__notifyScheduleChanged=()=>scheduleListeners.forEach(f=>f()); fixture.__notifyCampaignChanged=()=>campaignListeners.forEach(f=>f());
@@ -21,6 +24,8 @@ window.yardimciDesktop={getMarketingStudio:()=>call('snapshot'),getMarketingChan
   onMessagingCampaignsChanged:listener=>{campaignListeners.add(listener);return()=>campaignListeners.delete(listener);}, onMarketingSchedulesChanged:listener=>{scheduleListeners.add(listener);return()=>scheduleListeners.delete(listener);},
   getMarketingAnalytics:range=>call('analytics',range),getMarketingPublicationAnalytics:id=>call('publicationAnalytics',id),getMarketingCampaignAnalytics:id=>call('campaignAnalytics',id),refreshMarketingPublicationMetrics:id=>call('refresh',id),
   testMarketingWebsiteConnection:()=>call('test')} as typeof window.yardimciDesktop;
+// This fixture supplies only the fields consumed by its calendar scenario.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const emptyDashboard={reservations:[],dailyTasks:[],rooms:[],tables:[]} as any;
 function RouteFixture() {
   const [active, setActive]=useState('marketing'),[message,setMessage]=useState('');
@@ -32,4 +37,9 @@ function RouteFixture() {
     <div style={{height:'calc(100dvh - 72px)',display:'flex',flexDirection:'column'}}>{active==='marketing'?<MarketingPage enabled onMessage={setMessage} registerPageLeaveGuard={register} onCalendar={()=>navigate('calendar')}/>:active==='calendar'?<OperationCalendarPage controller={calendar} data={emptyDashboard} marketingEnabled accommodationReservationsEnabled={false} foodReservationsEnabled={false} tasksEnabled={false} onOpenReservation={()=>{}} onCompleteTask={()=>{}} onMessage={setMessage} registerPageLeaveGuard={register}/>:<p>Diğer sayfa</p>}</div>
   </>;
 }
-createRoot(document.getElementById('root')!).render(<PageViewStateProvider><RouteFixture /></PageViewStateProvider>);
+function MarketingWebFixture() {
+  const [webAvailable, setWebAvailable] = useState(true);
+  fixture.__setMarketingWebAvailable = setWebAvailable;
+  return <WebAvailabilityProvider available={webAvailable}><RouteFixture /></WebAvailabilityProvider>;
+}
+createRoot(document.getElementById('root')!).render(<PageViewStateProvider><MarketingWebFixture /></PageViewStateProvider>);

@@ -88,7 +88,22 @@ function paymentMethod(payload: Record<string, unknown>): CustomerCreditPaymentM
 
 function applySaleComplete(context: MarketAndroidActionContext): MarketAndroidActionResult {
   const payload = context.action.payload;
-  requireFields(payload, ["lines", "location_id", "settlement", "customer_id", "payment_method", "external_payment_confirmed"]);
+  requireFields(payload, ["lines", "location_id", "settlement", "customer_id", "payment_method", "external_payment_confirmed", "requestedPointsMinor", "couponPermitId"]);
+  // A coupon permit is consumable only by the protected owner flow in
+  // android-action-application-service. Reaching this generic sale writer with a
+  // permit must never degrade into an undiscounted sale.
+  if (payload.couponPermitId !== undefined) throw new Error("Kuponlu satış korumalı masaüstü akışından işlenmelidir.");
+  // This is an immutable Android action *intent*, not authority to spend points.
+  // The live owner has no authenticated points tender/ACK route yet: fail closed
+  // before the canonical sale writer or any inventory/Finance mutation.
+  const points = payload.requestedPointsMinor;
+  if (points !== undefined && (!Number.isSafeInteger(points) || Number(points) < 0)) {
+    throw new Error("Mobil Puan tutarı geçersiz.");
+  }
+  if (Number(points ?? 0) > 0) {
+    if (payload.settlement !== "paid" || !text(payload.customer_id)) throw new Error("Puan için müşterili ücretli satış gerekli.");
+    throw new Error("Mobil Puanlı satışın güvenli kesinleştirmesi henüz etkin değil.");
+  }
   if (payload.settlement !== "paid" && payload.settlement !== "credit") throw new Error("Satış ödeme seçimi geçersiz.");
   if (!Array.isArray(payload.lines) || !payload.lines.length || payload.lines.length > 200) throw new Error("Satış için 1–200 ürün satırı gerekli.");
   const seen = new Set<string>();
@@ -108,9 +123,11 @@ function applySaleComplete(context: MarketAndroidActionContext): MarketAndroidAc
   const credit = payload.settlement === "credit";
   if (readEnabledBusinessCapabilities(context.db).includes("commerce.inventory") && !text(payload.location_id)) throw new Error("Güncel stok konumu gerekli.");
   if (credit && (!text(payload.customer_id) || text(payload.payment_method))) throw new Error("Veresiye için müşteri seçin; ödeme yöntemi boş olmalı.");
-  if (!credit && text(payload.customer_id)) throw new Error("Mobil müşteri seçimi yalnız veresiye satışta kullanılabilir.");
+  if (!credit && text(payload.customer_id) && !readEnabledBusinessCapabilities(context.db).includes("core.customers")) {
+    throw new Error("Müşteri yeteneği etkin değil.");
+  }
   const result = completeMarketSaleInTransaction(context.db, {
-    items, settlement: payload.settlement, customerId: credit ? text(payload.customer_id) : "",
+    items, settlement: payload.settlement, customerId: text(payload.customer_id),
     locationId: text(payload.location_id), paymentMethod: credit ? "" : paymentMethod(payload),
     source: "android-market-sale", operationId: context.action.id
   }, context.now);

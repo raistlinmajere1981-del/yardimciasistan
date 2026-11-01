@@ -2,6 +2,9 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState, type Dispatch, ty
 import { LockKeyhole, ScrollText } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
+import { useWebAvailability } from "../../app/web-availability";
+import { projectConnectionStatus } from "../../app/connection-status";
+import { useNetworkSignal } from "../../app/network-signal";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RequestPageChange } from "../../app/page-navigation-guard";
 import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
@@ -58,8 +61,6 @@ interface DesktopAppFrameProps {
   children: ReactNode;
 }
 
-const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
-
 export function DesktopAppFrame(props: DesktopAppFrameProps) {
   const capabilities = props.desktopSyncController.businessCapabilities;
   return <WorkspaceNavigationProvider
@@ -100,6 +101,8 @@ function DesktopAppFrameContent({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const { setupData } = setupController;
+  const webAvailable = useWebAvailability();
+  const networkSignal = useNetworkSignal();
   const { lockApp } = appLockController;
   const {
     dashboardData,
@@ -107,6 +110,12 @@ function DesktopAppFrameContent({
     automaticSyncStatus,
     pullRequests: handlePullRequests
   } = desktopSyncController;
+  const connection = projectConnectionStatus({
+    setup: setupData,
+    syncStatus: automaticSyncStatus,
+    networkSignal,
+    androidEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ANDROID)
+  });
   const {
     menuPreviewOpen,
     menuPreviewData,
@@ -119,16 +128,18 @@ function DesktopAppFrameContent({
     () => buildDesktopNotifications(
       dashboardData,
       automaticSyncStatus,
-      businessCapabilities?.enabledCapabilities ?? []
+      businessCapabilities?.enabledCapabilities ?? [],
+      undefined,
+      connection.webConfigured
     ),
-    [automaticSyncStatus, businessCapabilities, dashboardData]
+    [automaticSyncStatus, businessCapabilities, connection.webConfigured, dashboardData]
   );
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP);
   const customersEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.AI);
   const menuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_MENU);
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
-  const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
+  const qrMenuEnabled = webAvailable && runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
   const accommodationStaysEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS);
   const accommodationReservationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
@@ -140,7 +151,6 @@ function DesktopAppFrameContent({
     : activePage === "restaurant"
       ? Boolean(hospitalitySessions.restaurant)
       : false;
-  const automaticSyncNeedsAttention = automaticSyncStatus.phase === "offline" || automaticSyncStatus.phase === "error";
   const operationNotice = syncState !== "idle" && statusMessage.trim()
     ? {
         tone: syncState === "error"
@@ -151,12 +161,10 @@ function DesktopAppFrameContent({
         message: statusMessage.trim()
       }
     : null;
-  const automaticSyncNotice = automaticSyncNeedsAttention
+  const automaticSyncNotice = connection.webNotice
     ? {
         tone: "error" as GlobalMessageTone,
-        message: automaticSyncStatus.phase === "offline"
-          ? OFFLINE_SYNC_MESSAGE
-          : automaticSyncStatus.message || "Web eşitleme işlemi tamamlanamadı. Bağlantı ayarlarını kontrol edin."
+        message: connection.webNotice
       }
     : null;
   const centralNotice = operationNotice?.tone === "error"
@@ -210,6 +218,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
+      uiScale={uiPreferences.scale}
       contentScroll={getPageContentScroll(activePage)}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
@@ -227,7 +236,7 @@ function DesktopAppFrameContent({
         <PageHeader
           title={pageMeta.title}
           noticeLeading={<SyncStatusIndicator
-            automaticSyncStatus={automaticSyncStatus}
+            connection={connection}
             onSync={() => void handlePullRequests()}
           />}
           notice={centralNotice ? (
@@ -317,8 +326,9 @@ function DesktopAppFrameContent({
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             accommodationFolioEnabled,
             customerCreditEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
+            benefitsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.COMMERCE_BENEFITS),
             wholesaleEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHOLESALE),
-            dealerPortalEnabled: setupData.dealerPortalEnabled,
+            dealerPortalEnabled: webAvailable && setupData.dealerPortalEnabled,
             onPreparedCreditWhatsApp: messagingController.openPreparedCreditWhatsApp,
             onWhatsApp: messagingController.openCustomerWhatsApp,
             onSave: customerController.handleSaveCustomer,

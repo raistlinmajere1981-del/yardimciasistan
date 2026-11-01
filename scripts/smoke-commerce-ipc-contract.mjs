@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
+import ts from "typescript";
 
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -34,6 +35,7 @@ const channels = [
   "commerce:order:create",
   "commerce:order:updateStatus",
   "commerce:order:fulfill",
+  "commerce:order:previewBenefits",
   "commerce:cartDraft:list",
   "commerce:cartDraft:loadForQuickSale",
   "commerce:cartDraft:markReviewed",
@@ -53,8 +55,8 @@ for (const channel of channels) {
   );
   assert.equal(
     preloadSource.split(`"${channel}"`).length - 1,
-    1,
-    `Commerce preload bridge must invoke ${channel} exactly once.`
+    channel === "commerce:order:fulfill" ? 2 : 1,
+    `Commerce preload bridge must use the canonical ${channel} channel.`
   );
 }
 
@@ -80,6 +82,8 @@ const contractMethods = [
   "createOrder",
   "updateOrderStatus",
   "fulfillOrder",
+  "previewOrderBenefits",
+  "tryFulfillOrder",
   "listCartDrafts",
   "loadCartDraftForQuickSale",
   "markCartDraftReviewed",
@@ -212,7 +216,9 @@ assert.doesNotMatch(
 // Exercise the compiled isolated bridge rather than parsing the subscription body.
 const listeners = new Map();
 let exposedBridge;
-runInNewContext(read("apps/desktop-app/dist-electron/preload.js"), {
+runInNewContext(ts.transpileModule(preloadSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText, {
   exports: {}, require: (name) => {
     assert.equal(name, "electron");
     return { contextBridge: { exposeInMainWorld: (_key, bridge) => { exposedBridge = bridge; } }, webFrame: {}, ipcRenderer: {

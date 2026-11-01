@@ -27,11 +27,12 @@ extraResources:
     filter:
       - yardimci-asistan-release.apk
       - version.json
-      - platform-tools/**/*
 
 extraMetadata:
-  main: dist-electron/main-entry.js
+  main: dist-electron/windows-native-bootstrap.js
   name: yardimci-asistan-desktop
+
+afterPack: ../../scripts/verify-desktop-windows-native-after-pack.cjs
 
 win:
   icon: assets/app-icon.ico
@@ -41,6 +42,10 @@ win:
       to: updater
       filter:
         - windows-install.ps1
+    - from: resources/native-image
+      to: native-image
+      filter:
+        - 'image.win32-${arch}-msvc.node'
   target:
     - target: nsis
       arch:

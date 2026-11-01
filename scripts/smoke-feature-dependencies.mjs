@@ -23,7 +23,7 @@ function scenario(run) {
     const save = patch => {
       const current = fixture.database.getSetupData();
       const result = fixture.database.saveInitialSetup(createSmokeSetupInput({ ...current,
-        businessName: "Dependency fixture", phone: "", whatsapp: "", syncSecret: "dependency-fixture-secret", ...patch }));
+        businessName: "Dependency fixture", phone: "", whatsapp: "", ...patch }));
       assert.equal(result.ok, true, result.message);
       const snapshot = readBusinessCapabilitySnapshot(fixture.database.databasePath);
       assert.deepEqual(validateBusinessCapabilitySet(snapshot.enabledCapabilities), []);

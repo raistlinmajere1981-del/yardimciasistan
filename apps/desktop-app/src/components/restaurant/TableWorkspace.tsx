@@ -23,6 +23,7 @@ import { TableOrderEditor } from "./TableOrderEditor";
 import { TableAccountPanel, TableCancelOrderAction } from "./TableAccountPanel";
 import { TableRelationsPanel } from "./TableRelationsPanel";
 import { useTableOrderController } from "./use-table-order-controller";
+import { useTableOrderBenefits } from "./use-table-order-benefits";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
 
 export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inventoryEnabled = true, customersEnabled, reservationsEnabled,
@@ -39,8 +40,9 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
 }) {
   const navigation = useWorkspaceNavigation();
   const [orders, setOrders] = useState<DesktopTableOrder[]>([]);
+  const checkoutLock = useRef(false);
   const onOrderChanged = (next: DesktopTableOrder) => setOrders(current => [next, ...current.filter(item => item.id !== next.id)]);
-  const controller = useTableOrderController(intent.entityId, ordersEnabled, onOrderChanged, onDashboardDataChanged, data.revision, intent.orderId, customersEnabled);
+  const controller = useTableOrderController(intent.entityId, ordersEnabled, onOrderChanged, onDashboardDataChanged, data.revision, intent.orderId, customersEnabled, checkoutLock);
   const history = ordersEnabled && intent.mode === "history";
   const surface = useRef<HTMLDivElement>(null);
   const historyRead = useRef(0);
@@ -52,9 +54,23 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const [returnRequested, setReturnRequested] = useState(false);
   const [transferCommitted, setTransferCommitted] = useState(false);
   const [clock, setClock] = useState(Date.now());
-  const blocked = useWorkspaceCloseGuard({ busy: controller.busy, dirty: controller.dirty, scope: { entityType: "table", entityId: intent.entityId } });
   const table = data.tables.find(item => item.id === intent.entityId);
   const order = controller.active;
+  const benefits = useTableOrderBenefits({ order: ordersEnabled ? order : null, revision: data.revision,
+    customerId: customersEnabled && data.customers.some(item => item.id === table?.currentCustomerId) ? table!.currentCustomerId : "",
+    ready: !controller.busy && !controller.loading && controller.loaded && !controller.dirty && !transferCommitted,
+    lock: checkoutLock,
+    onPaid: async (_receipt, isCurrent) => {
+      controller.feedback("Adisyon ödendi olarak kapatıldı.");
+      try {
+        const dashboard = await window.yardimciDesktop!.getDashboardData();
+        if (!isCurrent()) return;
+        onDashboardDataChanged(dashboard);
+      } catch { controller.feedback("Adisyon ödendi; masa görünümü yenilenemedi. Masayı yeniden açın.", true); }
+      if (isCurrent()) setReturnRequested(true);
+    }
+  });
+  const blocked = useWorkspaceCloseGuard({ busy: controller.busy || benefits.blocked, dirty: controller.dirty, scope: { entityType: "table", entityId: intent.entityId } });
   useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); }, [returnRequested, blocked, navigation, intent.entityId]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useLayoutEffect(() => {
@@ -74,15 +90,17 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
     return () => { invalidateHistory(); };
   }, [history, ordersEnabled, data.revision, invalidateHistory]);
   async function requestReturn() {
-    if (controller.busy) return;
+    if (controller.busy || benefits.blocked) return;
+    if (benefits.stage === "committed") { setReturnRequested(true); return; }
     if (controller.loading || !controller.loaded) { navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); return; }
     if (await controller.run(async () => true)) setReturnRequested(true);
   }
   async function closeTableOrder(status: "paid" | "cancelled") {
+    if (checkoutLock.current || status === "paid" && benefits.active) return;
     if (await controller.closeTableOrder(status)) setReturnRequested(true);
   }
   async function transferTableOrderToRoomFolio(folioId: string) {
-    if (!order || !roomFolioTransferEnabled || order.total <= 0 || transferCommitted) return;
+    if (!order || !roomFolioTransferEnabled || order.total <= 0 || transferCommitted || checkoutLock.current || benefits.active) return;
     await controller.run(async isCurrent => {
       const bridge = window.yardimciDesktop!;
       const input = { folioId, kind: "manual_charge" as const,
@@ -113,13 +131,14 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
     { ordersEnabled, menuEnabled, reservationsEnabled }, new Date().toLocaleDateString("sv-SE"));
   const canStart = cardModel.quickAction?.kind === "start";
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
-  const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
+  const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted || benefits.blocked || benefits.stage === "committed";
   const tableStatus = getTableStatusAction(table.status) || table.status;
   const accountPanel = <OperationPanel title="Hesap ve İlişkiler" id="table-account" className="operation-panel--table-context" surfaceRole="finance">
     <TableAccountPanel
       table={table}
       controller={controller}
       disabled={disabled}
+      benefits={benefits}
       onCloseOrder={status => void closeTableOrder(status)}
     />
     <TableRelationsPanel
@@ -130,6 +149,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
       customersEnabled={customersEnabled}
       reservationsEnabled={reservationsEnabled}
       roomFolioTransferEnabled={roomFolioTransferEnabled}
+      transferDisabled={benefits.active}
       quickCustomerId={quickCustomerId}
       onCreateCustomer={() => navigation.openWorkspace({ entityType: "customer", entityId: "new-customer", mode: "create", returnContext: { page: "restaurant", view: "floor", entityId: table.id } }, { onReturn: context => { if (context.createdEntityId) setQuickCustomerId(context.createdEntityId); } })}
       onCreateReservation={() => setQuickAction("reservation")}
@@ -137,7 +157,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
     />
   </OperationPanel>;
   return <WorkspacePageFrame title={table.name} className="operations-workspace" closeLabel="Masa çalışma alanını kapat"
-    onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} bodyScroll="panes"
+    onClose={() => void requestReturn()} closeBlocked={controller.busy || benefits.blocked || Boolean(quickAction)} bodyScroll="panes"
     context={history && <div className="table-workspace-context"><span>{table.area || "Genel"}</span>
       <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
       {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
@@ -149,7 +169,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
         disabled={disabled}
         onCancelOrder={() => void closeTableOrder("cancelled")}
       />}
-      {ordersEnabled && <ActionButton variant="ghost" disabled={controller.busy} onClick={() => {
+      {ordersEnabled && <ActionButton variant="ghost" disabled={controller.busy || benefits.blocked || benefits.stage === "committed"} onClick={() => {
         setQuickAction(null);
         navigation.updateWorkspaceMode({ entityType: "table", mode: history ? "order" : "history" });
       }}>{history ? "← Masaya dön" : "Geçmiş"}</ActionButton>}
@@ -226,7 +246,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
       />}
     </> : undefined}>
     <div ref={surface} className={`operation-surface operation-surface--sections operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : ""}`} hidden={history}>
-      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} inventoryEnabled={inventoryEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
+      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} inventoryEnabled={inventoryEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted || benefits.blocked || benefits.stage === "committed"} accountPanel={accountPanel} />
         : <><OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>{accountPanel}</>}
     </div>
     {history && (() => {

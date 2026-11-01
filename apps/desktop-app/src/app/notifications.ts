@@ -31,7 +31,8 @@ export function buildDesktopNotifications(
   data: DesktopDashboardData,
   syncStatus: AutomaticSyncStatus,
   capabilities: Iterable<BusinessCapability>,
-  now = new Date()
+  now = new Date(),
+  webAvailable = true
 ): DesktopNotificationItem[] {
   const notifications: DesktopNotificationItem[] = [];
   const today = localDateKey(now);
@@ -144,7 +145,7 @@ export function buildDesktopNotifications(
     });
   }
 
-  if (syncStatus.enabled && syncStatus.consecutiveFailures > 0 && syncStatus.lastError) {
+  if (webAvailable && syncStatus.enabled && syncStatus.consecutiveFailures > 0 && syncStatus.lastError) {
     notifications.push({
       key: `sync:error:${syncErrorCode(syncStatus.lastError)}`,
       kind: "sync",

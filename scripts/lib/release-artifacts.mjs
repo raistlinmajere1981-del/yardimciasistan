@@ -5,6 +5,7 @@ import {homedir} from 'node:os';
 import {join,resolve,basename} from 'node:path';
 import {checkProductVersion} from '../product-version.mjs';
 import {readWindowsInstallerVersion} from './windows-installer-version.mjs';
+import {verifyWindowsReleaseNative} from './windows-installer-native.mjs';
 
 export async function fileDigest(path) {
   if(!existsSync(path)||!lstatSync(path).isFile()||statSync(path).size<1)throw Error(`Release dosyası eksik veya boş: ${path}`);
@@ -48,7 +49,7 @@ export function verifyAndroidRelease(path,metadataPath,{applicationId,version,ve
 }
 
 /** Existing landing deployment and Admin use this one artifact verification owner. */
-export async function createReleaseArtifacts(root,{certificateProvider=refreshReleaseCertificate,verifyAndroid=verifyAndroidRelease}={}) {
+export async function createReleaseArtifacts(root,{certificateProvider=refreshReleaseCertificate,verifyAndroid=verifyAndroidRelease,verifyWindowsNative=verifyWindowsReleaseNative}={}) {
   root=resolve(root);
   const product=checkProductVersion(root),version=product.version;
   const android=join(root,'apps/android-app/build/outputs/apk/release');
@@ -61,6 +62,7 @@ export async function createReleaseArtifacts(root,{certificateProvider=refreshRe
   ];
   // Missing artifacts fail before Gradle/signing tool invocation.
   for(const artifact of artifacts)Object.assign(artifact,await fileDigest(artifact.source));
+  for(const artifact of artifacts.filter(item=>item.arch))await verifyWindowsNative(root,artifact.source,artifact.arch,version);
   const certificateSha256=certificateProvider(root);
   for(const artifact of artifacts) {
     if(artifact.applicationId)Object.assign(artifact,verifyAndroid(artifact.source,artifact.metadataPath,{applicationId:artifact.applicationId,version,versionCode:product.androidVersionCode,certificateSha256}));
@@ -78,6 +80,33 @@ export function createWindowsUpdateManifests(product,artifacts,notes=[],publishe
     value:{format:'yardimci-asistan-update',version:1,channel:'stable',appVersion:product.version,publishedAt,platform:'win32',arch:artifact.arch,notes,
       artifact:{file:artifact.name,url:`../../../downloads/${artifact.name}`,size:artifact.size,sha256:artifact.sha256}}
   }));
+}
+
+/**
+ * Android stable feeds share the already verified release APK authority.
+ * Never derive update details from arbitrary upload names or debug artifacts.
+ */
+export function createAndroidUpdateManifests(product,artifacts,notes=[],publishedAt=new Date().toISOString()) {
+  if(!product || !/^\d+\.\d+\.\d+$/.test(product.version) || !Number.isSafeInteger(product.androidVersionCode) || product.androidVersionCode<1)throw Error('Android update: ürün sürümü geçersiz.');
+  const channels=[
+    {label:'Android Companion',platformDir:'android-companion',applicationId:'com.yardimciasistan.android',file:`YardimciAsistan-Android-${product.version}.apk`},
+    {label:'Bayi Android',platformDir:'android-dealer',applicationId:'com.yardimciasistan.dealer',file:`YardimciAsistan-Bayi-Android-${product.version}.apk`}
+  ];
+  return channels.map(channel=>{
+    const matches=artifacts.filter(entry=>entry.applicationId===channel.applicationId);
+    if(matches.length!==1)throw Error(`Android update: ${channel.applicationId} için tek doğrulanmış release APK gerekli.`);
+    const artifact=matches[0];
+    if(artifact.signatureVerified!==true || artifact.versionCode!==product.androidVersionCode || artifact.name!==channel.file
+       || !Number.isSafeInteger(artifact.size) || artifact.size<1 || !/^[a-f0-9]{64}$/.test(artifact.sha256)
+       || !artifact.source)throw Error(`Android update: ${channel.applicationId} APK doğrulaması eksik.`);
+    return {label:channel.label,platformDir:channel.platformDir,version:product.version,versionCode:product.androidVersionCode,
+      applicationId:channel.applicationId,file:artifact.name,sha256:artifact.sha256,
+      value:{format:'yardimci-asistan-update',version:1,channel:'stable',platform:'android',
+        applicationId:channel.applicationId,appVersion:product.version,versionName:product.version,
+        versionCode:product.androidVersionCode,publishedAt,notes,
+        artifact:{file:artifact.name,url:`../../../downloads/${artifact.name}`,size:artifact.size,sha256:artifact.sha256}}
+    };
+  });
 }
 
 /** Non-secret destination identity, kept outside the public API package. */

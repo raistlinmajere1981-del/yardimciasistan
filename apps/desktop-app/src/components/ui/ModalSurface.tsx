@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 const InsideModal = createContext(false);
 export function useInsideModalSurface() {
@@ -11,6 +11,7 @@ export interface ModalSurfaceProps {
   labelledBy: string;
   describedBy?: string;
   className?: string;
+  style?: CSSProperties;
   role?: "dialog" | "alertdialog";
   onClose: (reason: CloseReason) => void;
   closeBlocked?: boolean;
@@ -26,7 +27,7 @@ export function ModalSurface(props: ModalSurfaceProps) {
   return <InsideModal.Provider value={true}><ModalSurfaceContent {...props} /></InsideModal.Provider>;
 }
 
-function ModalSurfaceContent({ children, labelledBy, describedBy, className = "", role = "dialog", onClose,
+function ModalSurfaceContent({ children, labelledBy, describedBy, className = "", style, role = "dialog", onClose,
   closeBlocked = false, dismissOnBackdrop = false, initialFocusRef, returnFocusRef }: ModalSurfaceProps) {
   const ref = useRef<HTMLDialogElement>(null);
   // Bounded forms are also native dialogs, but are not WorkspaceFrames.
@@ -74,13 +75,18 @@ function ModalSurfaceContent({ children, labelledBy, describedBy, className = ""
   }, []);
 
   return (
-    <dialog ref={ref} className={`modal-surface ${className}`} role={role} aria-modal="true"
+    <dialog ref={ref} style={style} className={`modal-surface ${className}`} role={role} aria-modal="true"
       aria-labelledby={labelledBy} aria-describedby={describedBy} tabIndex={-1}
       onCancel={(event) => { event.preventDefault(); if (!closeBlocked) onClose("escape"); }}
       onClick={(event) => {
         if (!dismissOnBackdrop || closeBlocked || event.target !== event.currentTarget) return;
         const rect = event.currentTarget.getBoundingClientRect();
         if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose("backdrop");
+      }}
+      onKeyDownCapture={(event) => {
+        // A dirty workspace must intercept Escape before native dialog dismissal
+        // or any ancestor key listener, not only when the cancel event arrives.
+        if (event.key === "Escape" && closeBlocked) { event.preventDefault(); event.stopPropagation(); }
       }}
       onKeyDown={(event) => {
         if (event.key !== "Tab") return;

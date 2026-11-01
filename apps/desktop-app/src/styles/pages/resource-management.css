@@ -401,6 +401,20 @@
   min-width: 0;
 }
 
+.resource-management-shell.is-local-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.resource-management-shell.is-local-only .resource-management-main-pane {
+  border-inline-end: 0;
+  border-bottom: 0;
+}
+
+.resource-management-shell.is-local-only .room-management-row,
+.resource-management-shell.is-local-only .table-public-resource-row {
+  cursor: default;
+}
+
 .resource-management-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);

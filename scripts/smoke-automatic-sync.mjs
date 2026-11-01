@@ -916,6 +916,15 @@ return [
   assert.equal(offlineStatuses.at(-1)?.phase, "offline");
   assert.equal(database.getSyncRuntimeStatus().consecutiveFailures, 1);
 
+  // Explicit Web work remains available with passive sync off; its transport
+  // failure must still be reported instead of being masked as merely disabled.
+  assert.equal(offlineCoordinator.setEnabled(false).phase, "disabled");
+  const manualOffline = await offlineCoordinator.runNow();
+  assert.equal(manualOffline.ok, false);
+  assert.equal(manualOffline.status.enabled, false);
+  assert.equal(manualOffline.status.phase, "offline");
+  database.setAutoSyncEnabled(true);
+
   const capabilities = await syncApi({ action: "capabilities" });
   assert.equal(capabilities.status, 200);
   assert.deepEqual(

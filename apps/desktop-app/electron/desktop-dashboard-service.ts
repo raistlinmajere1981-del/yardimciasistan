@@ -54,7 +54,7 @@ export function createDesktopDashboardData(
     backupPath,
     webModuleUrl:
       settings?.web_module_url
-      ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
+      ?? "",
     requests,
     preparedWhatsAppMessages,
     rooms,

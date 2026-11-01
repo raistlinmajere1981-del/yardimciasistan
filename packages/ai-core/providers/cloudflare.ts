@@ -51,7 +51,7 @@ interface CloudflareEnvelope {
 export async function runCloudflareModel(config: AIProviderConfig, body: object,
   fetchImpl: typeof fetch = globalThis.fetch, responseLimit = 128 * 1024): Promise<unknown> {
   if (!config.enabled || config.service !== "cloudflare" || config.provider !== "openai_compatible" || !isCloudflareAiBaseUrl(config.baseUrl)
-    || !Object.values(CLOUDFLARE_AI_MODELS).some(model => model === config.model)
+    || !(/^@cf\/[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i.test(config.model) && config.model.length <= 160)
     || !config.apiKey || config.apiKey.length > 8192 || /[\x00-\x20\x7f]/.test(config.apiKey)) {
     throw new CloudflareAiError("configuration");
   }
@@ -117,7 +117,8 @@ async function cloudflareCompletion(config: AIProviderConfig, messages: object[]
 export function generateCloudflareChat(options: OpenAICompatibleChatOptions, fetchImpl: typeof fetch = globalThis.fetch): Promise<AICompletionResult> {
   const messages = options.messages.map(message => ({ ...message, role: message.role === "developer" ? "system" : message.role }));
   return cloudflareCompletion({ ...options, enabled: options.enabled && messages.length > 0
-    && [CLOUDFLARE_AI_MODELS.text, CLOUDFLARE_AI_MODELS.vision].some(model => model === options.model) }, messages, fetchImpl);
+    && /^@cf\/[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i.test(options.model)
+    && options.model !== CLOUDFLARE_AI_MODELS.image && options.model !== CLOUDFLARE_AI_MODELS.stt }, messages, fetchImpl);
 }
 
 /** Inline images only: no remote URL fetching and no hidden provider/model fallback. */

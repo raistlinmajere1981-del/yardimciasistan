@@ -15,6 +15,9 @@ const shared = require("@yardimci-asistan/shared");
 const handlers = new Map(), events = new Map(), modules = new Map(), immediate = [];
 const appEvents = new Map();
 const calls = [];
+const pairingSession = { credential: "yald1.runtime-boundary-private-credential", desktopId: "fixture", deviceId: "phone-fixture", expiresAt: 1_900_000_000_000 };
+const pairingInputs = [];
+const pairingChannels = ["androidDevice:beginLocalPairing", "androidDevice:readLocalPairing", "androidDevice:cancelLocalPairing"];
 let businessMessagingAuthority;
 let businessMessagingDrain = () => Promise.resolve();
 let androidIngress, androidIngressOptions, coordinatorOptions;
@@ -77,10 +80,21 @@ function stub(name) {
   return new Proxy({ __esModule: true }, { get: (target, key) => {
     if (key in target) return target[key];
     if (key === "then") return undefined;
+    if (name === "local-companion-server" && key === "getLocalPairingEndpoint") {
+      return (address, identity) => address?.protocol === "https" && identity?.spkiSha256
+        ? `https://192.168.1.20:${address.port}` : "";
+    }
     if (/^[A-Z]/.test(String(key))) return class {
       constructor(...args) {
         if (name === "business-messaging/service") businessMessagingAuthority = args[1];
         const instance = new Proxy({}, { get: (_target, method) => {
+        if (name === "local-companion-pairing-service" && (method === "begin" || method === "read")) return (...inputs) => {
+          calls.push(`${name}.${method}`);
+          pairingInputs.push([method, ...inputs]);
+          return pairingSession;
+        };
+        if (name === "local-companion-server" && method === "address") return { port: 47891, protocol: "https" };
+        if (name === "local-companion-server" && method === "tlsIdentity") return { spkiSha256: "A".repeat(43), ipAddresses: ["192.168.1.20"] };
         if (name === "business-messaging/service" && method === "drain") return () => businessMessagingDrain();
         if (method === "start" || method === "drain" || method === "suspendAndDrain") return () => Promise.resolve();
         if (method === "getStatus") return () => ({ enabled: false });
@@ -102,14 +116,19 @@ function load(file) {
     exports, __dirname: dirname(file), Buffer, URL, Error, fetch, console,
     process: { platform: process.platform, env: {}, argv: [], exit: () => assert.fail("unexpected exit") },
     setImmediate: (action) => immediate.push(action), setTimeout: () => ({ unref() {} }), clearTimeout,
+    setInterval: () => ({ unref() {} }), clearInterval: () => {},
     require: (name) => {
       if (name === "electron") return electron;
       if (name === "@yardimci-asistan/shared") return shared;
+      if (name === "node:os") return { ...require(name), networkInterfaces: () => ({
+        eth0: [{ family: "IPv4", internal: false, address: "192.168.1.20" }]
+      }) };
       if (name.startsWith("node:")) return require(name);
       if (!name.startsWith(".")) return stub(name);
       const dependency = resolve(dirname(file), name).replace(/\.js$/, "");
       const relative = dependency.slice(root.length + 1);
       if (relative === "database") return { DesktopDatabase: class { constructor() { return database; } } };
+      if (relative === "commerce-benefits-engine" || relative === "document-output-management") return require(`${dependency}.js`);
       if (relative === "desktop-logger") return { desktopLog: { info() {}, warn() {}, error() {} }, initializeDesktopLogging: () => null };
       if (relative === "desktop-startup-data") return { resolveRuntimeDataRoot: () => "/tmp/opencode/runtime-boundary-fixture", prepareRuntimeDataForStartup: async () => true };
       if (relative === "desktop-runtime") return { configureDesktopSessionRuntime() {}, createDesktopMainWindow() {}, createTrustedDesktopRendererUrlPredicate: () => () => true };
@@ -141,7 +160,24 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 296, "all production invoke registrations must execute, including dealer approval, request history, documents and product photos");
+const addedProtectedChannels = [
+  ...["prepareSaleReceipt", "listReady", "printReady", "previewReady", "pickFormImage", "readFormImage", "saveProcessedFormImage", "getPrinters", "readPrinterBinding", "savePrinterBinding", "read", "saveRule", "readTemplate", "saveTemplate"].map(name => `documentOutput:${name}`),
+  ...["get", "configure", "saveRule", "issueCoupon", "pointAccount", "adjustPoints", "expirePoints",
+    "companionGrantStatus", "companionSpendStatus", "companionSpendGrant", "companionSpendRevoke",
+    "companionDevices", "companionGrant", "companionRevoke"].map(name => `benefits:${name}`),
+  ...["benefitsState", "previewBenefits", "fullRefundMarketPreview", "fullRefundMarket", "marketHistory"].map(name => `commerce:sale:${name}`),
+  "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits"
+];
+assert.equal(handlers.size, 296 + addedProtectedChannels.length, "all production invoke registrations must execute");
+for (const channel of addedProtectedChannels) assert.ok(handlers.has(channel), `${channel}: protected registration must execute`);
+for (const channel of ["androidDevice:listInstallDevices", "androidDevice:install", "androidDevice:provision"]) {
+  assert.equal(handlers.has(channel), false, `${channel}: consumer ADB handler must stay retired`);
+}
+assert.ok(handlers.has("sync:pushAndroidSnapshot"), "ordinary Web publication must remain registered");
+assert.ok(modules.has(resolve(root, "ipc/android-device-ipc")), "actual production Android device registration module must execute");
+for (const channel of pairingChannels) {
+  assert.ok(handlers.has(channel), `${channel}: production handler must be included in the locked invocation sweep`);
+}
 for (const action of ["list", "preview", "add", "remove", "setCover", "reorder"]) {
   assert.ok(handlers.has(`commerce:product:photos:${action}`), `Product photo IPC missing: ${action}`);
 }
@@ -164,11 +200,18 @@ for (const [channel, module] of [
 assert.ok(handlers.has("sync:connectSource"), "explicit web publication ownership transfer must retain the production session lock gate");
 assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
-const renderer = Object.assign(new EventEmitter(), { id: 42, getURL: () => "fixture" });
-const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: renderer }, ...args));
+const renderer = Object.assign(new EventEmitter(), { id: 42, getType: () => "window", getURL: () => "fixture", mainFrame: { url: "fixture" } });
+const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: renderer, senderFrame: renderer.mainFrame }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
   "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus",
   "dictation:getStatus", "dictation:cancel"]);
+const benefitsResultChannels = new Set(["tableOrder:benefitsState", "tableOrder:previewBenefits", "commerce:sale:benefitsState", "commerce:sale:previewBenefits", "commerce:order:previewBenefits"]);
+const documentResultChannels = new Set(addedProtectedChannels.filter(channel => channel.startsWith("documentOutput:")));
+const managementResultChannels = new Set(addedProtectedChannels.filter(channel => channel.startsWith("benefits:")));
+for (const channel of lockFree) assert.ok(handlers.has(channel), `${channel}: lock-free registration must execute`);
+for (const module of ["ipc/document-output-ipc", "ipc/commerce-benefits-ipc", "ipc/table-order-ipc", "commerce-ipc"]) {
+  assert.ok(modules.has(resolve(root, module)), `${module}: actual production registration module must execute`);
+}
 await invoke("appLock:lock");
 assert.equal((await invoke("appLock:getStatus")).locked, true);
 assert.equal(androidIngressOptions.isSuspended(), false, "session lock keeps the existing background sync authority");
@@ -179,10 +222,25 @@ assert.equal((await invoke("dictation:getStatus")).available, false);
 assert.equal((await invoke("dictation:transcribe", {})).ok, false, "Dictation returns a sanitized failure while locked");
 assert.equal(await invoke("dictation:cancel", "dictation_lock_fixture"), true, "Lock must not prevent cancellation");
 assert.equal(calls.length, beforeDictation, "Locked dictation must not read config or call transport");
-for (const channel of handlers.keys()) {
-  if (lockFree.has(channel)) continue;
+for (const channel of pairingChannels) {
   const before = calls.length;
-  if (channel.startsWith("dictation:")) assert.equal((await invoke(channel, {})).ok, false, `${channel}: locked dictation returns sanitized failure`);
+  await assert.rejects(invoke(channel, "phone-fixture"), error => {
+    assert.match(error.message, /Uygulama kilitli/, `${channel}: trusted renderer must reach the real session gate`);
+    assert.equal(String(error).includes(pairingSession.credential), false, `${channel}: locked rejection must not expose pairing credentials`);
+    return true;
+  });
+  assert.equal(calls.length, before, `${channel}: locked mode must not read setup, begin/read a credential or cancel through IPC`);
+}
+for (const channel of handlers.keys()) {
+  if (lockFree.has(channel) || pairingChannels.includes(channel)) continue;
+  const before = calls.length;
+  if (documentResultChannels.has(channel) || managementResultChannels.has(channel) || benefitsResultChannels.has(channel)) {
+    const result = await invoke(channel, {});
+    assert.equal(result.ok, false, `${channel}: locked operation fails closed`);
+    assert.equal(result.code, documentResultChannels.has(channel) ? "DOCUMENT_SESSION_LOCKED" : "BENEFITS_SESSION_LOCKED", channel);
+  } else if (channel === "commerce:sale:fullRefundMarketPreview" || channel === "commerce:sale:marketHistory") {
+    await assert.rejects(invoke(channel, {}), error => error.code === "BENEFITS_SESSION_LOCKED", channel);
+  } else if (channel.startsWith("dictation:")) assert.equal((await invoke(channel, {})).ok, false, `${channel}: locked dictation returns sanitized failure`);
   else await assert.rejects(invoke(channel, {}), /Uygulama kilitli/, channel);
   assert.equal(calls.length, before, `${channel}: no operation/read/network dependency before session gate`);
 }
@@ -199,6 +257,32 @@ for (const [channel, input] of representatives) {
   const before = calls.length;
   assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
+}
+for (const [channel, method, args] of [
+  ["androidDevice:beginLocalPairing", "begin", ["phone-fixture"]],
+  ["androidDevice:readLocalPairing", "read", []],
+  ["androidDevice:cancelLocalPairing", "cancel", []]
+]) {
+  const before = calls.length;
+  const value = await invoke(channel, ...args);
+  if (method !== "cancel") {
+    assert.equal(value.credential, pairingSession.credential, `${channel}: unlocked trusted renderer receives the owner's session`);
+    assert.equal(value.endpoint, "https://192.168.1.20:47891", `${channel}: production root supplies the authenticated LAN endpoint`);
+    assert.equal(value.spkiSha256, "A".repeat(43), `${channel}: authenticated listener fingerprint is returned to trusted renderer`);
+  } else assert.equal(value, undefined);
+  const observed = calls.slice(before);
+  assert.equal(observed[0], "database.getEnabledBusinessCapabilities", `${channel}: capability guard executes first`);
+  assert.ok(observed.includes("database.getSetupData"), `${channel}: local network configuration checked`);
+  assert.equal(observed.at(-1), `local-companion-pairing-service.${method}`, `${channel}: canonical pairing owner is called last`);
+  if (method === "begin") assert.ok(observed.includes("local-companion-server.refreshTlsIdentity"), `${channel}: TLS SAN renewed before QR credentials`);
+}
+assert.deepEqual(pairingInputs, [["begin", "phone-fixture"], ["read"]], "pairing IPC preserves the device identity and canonical owner methods");
+for (const channel of pairingChannels) {
+  for (const senderFrame of [undefined, { url: "fixture" }]) {
+    const before = calls.length;
+    await assert.rejects(async () => handlers.get(channel)({ sender: renderer, senderFrame }, "phone-fixture"), /güvenilir masaüstü penceresinden/);
+    assert.equal(calls.length, before, `${channel}: missing or child frame cannot reach pairing credentials`);
+  }
 }
 const beforeHistory = calls.length;
 assert.deepEqual(await invoke("request:customerHistory", "customer-fixture"), [{ id: "request-fixture", customer_id: "customer-fixture" }]);
@@ -290,6 +374,8 @@ runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}
       if (channel === "appLock:getStatus") {
         const status = await invoke(channel);
         await invoke("appLock:lock");
+        await modules.get(resolve(root, "main")).reconcileLocalCompanionRuntime();
+        await modules.get(resolve(root, "main")).reconcileOptionalBackgroundServices();
         beforeHandler = calls.length; // Lock lifecycle cleanup is not a business invocation.
         return status;
       }
@@ -297,8 +383,12 @@ runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}
     } } }) });
 await invoke("appLock:lock");
 // Finish the lock transition's background-service lifecycle before measuring IPC effects.
+await modules.get(resolve(root, "main")).reconcileLocalCompanionRuntime();
 await modules.get(resolve(root, "main")).reconcileOptionalBackgroundServices();
 for (const [method, args] of [
+  ["beginLocalPairing", ["phone-fixture"]],
+  ["readLocalPairing", []],
+  ["cancelLocalPairing", []],
   ["getCustomerRequests", ["customer-fixture"]],
   ["approveDealerApplication", ["request-fixture", "dealer_b"]],
   ["requestDocument", ["request-fixture", "a".repeat(32), "open"]]
@@ -312,7 +402,7 @@ for (const method of ["saveManualFinanceEntry", "addRoomFolioPayment", "collectR
   beforeHandler = undefined;
   await assert.rejects(bridge[method]({}), /Uygulama kilitli/);
   assert.notEqual(beforeHandler, undefined, "actual preload must execute its preflight");
-  assert.equal(calls.length, beforeHandler, "preflight→handler lock change must not reach operation");
+  assert.deepEqual(calls.slice(beforeHandler), [], "preflight→handler lock change must not reach operation");
 }
 await invoke("appLock:unlock", "");
 await assert.rejects(bridge.commerce.completeMarketSale({}), /Uygulama kilitli/);

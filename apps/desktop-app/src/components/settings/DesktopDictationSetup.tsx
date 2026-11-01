@@ -10,13 +10,14 @@ export function DesktopDictationSetup({ controller, form, canonical, aiCapabilit
   aiCapability: boolean;
   disabled?: boolean;
 }) {
-  const changed = (["aiEnabled", "aiProvider", "aiService", "aiBaseUrl", "aiModel", "aiImageModel", "aiSttModel",
-    "aiTimeoutSeconds", "webModuleUrl", "syncSecret", "autoSyncEnabled"] as const).some(key => form[key] !== canonical[key])
+  const fields: ReadonlyArray<keyof SetupFormState> =
+    ["aiEnabled", "aiProvider", "aiService", "aiBaseUrl", "aiSttModel", "aiTimeoutSeconds"];
+  const changed = fields.some(key => form[key] !== canonical[key])
     || Boolean(form.aiApiKey || form.aiGoogleCurl || form.clearAiApiKey);
   const ready = aiCapability && !changed && controller.status?.ready === true;
   const message = !form.aiEnabled ? "AI Yardımcı kapalı"
     : !form.aiSttModel ? "AI modeli gerekli"
-      : changed ? "AI ve web ayarlarını kaydedin"
+      : changed ? "AI konuşma ayarlarını kaydedin"
         : ready && controller.enabled !== controller.status?.enabled ? (controller.enabled ? "Etkinleştirilecek · Masaüstü dikte" : "Kapatılacak · Masaüstü dikte")
           : controller.status?.message ?? "Kayıtlı durum kontrol ediliyor…";
   const canTest = aiCapability && !changed && controller.status?.canTest === true;

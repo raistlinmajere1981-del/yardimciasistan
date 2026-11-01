@@ -59,12 +59,15 @@ import { getPublishedMenu } from "./database/menu-store.js";
 import { saveMenuProductEntryInTransaction } from "./database/menu-product-entry-store.js";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { SaveMenuProductEntryInput } from "./database-types.js";
+import type { LocalCompanionActionContext } from "./local-companion-server.js";
 
 export function routeAndroidActionInTransaction(
   db: DatabaseSync,
   action: AndroidSyncAction,
   now: string,
-  enabledCapabilities: BusinessCapability[]
+  enabledCapabilities: BusinessCapability[],
+  // Reserved for a future explicit spend route. Existing actions never consume it.
+  _localContext?: LocalCompanionActionContext
 ): AndroidActionMutationResult {
   const authorization = authorizeAndroidAction(db, action, enabledCapabilities);
   if (!authorization.ok) {

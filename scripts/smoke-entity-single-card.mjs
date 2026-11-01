@@ -63,7 +63,7 @@ try {
       saveCustomer: input => call("saveCustomer", input), getCustomer: id => call("customer", id), assignTableCustomer: input => call("assign", input),
       getBusinessMessagingConfiguration: async () => ({ enabled: false, configured: false })
     };
-  }, { data, products: [product], categories: [category] });
+  }, { setup: database.getSetupData(), data, products: [product], categories: [category] });
   await page.goto(`${server.resolvedUrls.local[0]}single-card`);
   const dialog = page.getByRole("dialog");
   const button = name => dialog.getByRole("button", { name, exact: true });

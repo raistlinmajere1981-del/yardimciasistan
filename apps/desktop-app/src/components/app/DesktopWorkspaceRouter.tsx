@@ -8,6 +8,7 @@ import {
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { projectDesktopWorkspaceFeatures } from "../../app/desktop-workspace-features";
+import { useWebAvailability } from "../../app/web-availability";
 import { useMarketingScheduleStatus } from "../../app/use-marketing-schedule-status";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
 import { useKbsNotificationController } from "../../app/use-kbs-notification-controller";
@@ -151,11 +152,6 @@ export function DesktopWorkspaceRouter({
   } = operationController;
   const {
     androidDeviceState,
-    androidInstallState,
-    androidInstallSnapshot,
-    refreshAndroidInstallDevices,
-    handleInstallAndroidApp,
-    handleProvisionAndroidApp,
     handleSetAndroidDeviceRole,
     handleSetAndroidDeviceActive,
     handleResetAndroidDevicePermissions,
@@ -167,7 +163,8 @@ export function DesktopWorkspaceRouter({
   const calendarController = useCalendarPageController();
   const workspaceNavigation = useWorkspaceNavigation();
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
-  const features = projectDesktopWorkspaceFeatures(businessCapabilities);
+  const webAvailable = useWebAvailability();
+  const features = projectDesktopWorkspaceFeatures(businessCapabilities, webAvailable);
   const customersEnabled = features.customers;
   const requestsEnabled = features.requests;
   const tasksEnabled = features.tasks;
@@ -507,7 +504,7 @@ export function DesktopWorkspaceRouter({
           inventoryEnabled={inventoryEnabled}
         />
       ) : activePage === "marketing" ? (
-        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} onCalendar={() => requestPageChange("calendar")} />
+        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} benefitsEnabled={enabledCapabilities.includes(C.COMMERCE_BENEFITS)} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} onCalendar={() => requestPageChange("calendar")} />
 
       ) : activePage === "market" ? (
         <MarketPage
@@ -522,11 +519,6 @@ export function DesktopWorkspaceRouter({
           setupData={setupData}
           dashboardData={surfaceData}
           androidDeviceState={androidDeviceState}
-          androidInstallState={androidInstallState}
-          androidInstallSnapshot={androidInstallSnapshot}
-          onRefreshAndroidInstallDevices={() => void refreshAndroidInstallDevices()}
-          onInstallAndroidApp={(serial) => void handleInstallAndroidApp(serial)}
-          onProvisionAndroidApp={(serial) => void handleProvisionAndroidApp(serial)}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
           onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}

@@ -12,7 +12,8 @@ const cleanDataRoot = mkdtempSync(join(tmpdir(), "yardimci-clean-startup-"));
 try {
   const cleanDatabase = new DesktopDatabase({
     appPath: join(process.cwd(), "apps", "desktop-app"),
-    userDataPath: cleanDataRoot
+    userDataPath: cleanDataRoot,
+    backupPath: join(cleanDataRoot, "backups")
   });
   try {
     cleanDatabase.initialize();

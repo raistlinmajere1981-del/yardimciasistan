@@ -154,7 +154,7 @@ export function useDesktopSync({
         setAutomaticSyncStatus((current) => ({
           ...current,
           phase: "error",
-          message: "Eşitleme durumu okunamadı. İnternet ve web bağlantısı ayarlarını kontrol edin."
+          message: "Web eşitleme durumu okunamadı. Web bağlantısı ayarlarını kontrol edin."
         }));
       });
 
@@ -188,13 +188,16 @@ export function useDesktopSync({
       if (bridge.runSyncNow) {
         const cycle = await bridge.runSyncNow();
         setAutomaticSyncStatus(cycle.status);
+        const cycleMessage = cycle.status.phase === "offline"
+          ? "Web sunucusuna erişilemiyor. Yerel işlemler devam ediyor."
+          : cycle.message;
         try {
           await Promise.all([loadDashboardData(), loadBusinessCapabilities()]);
         } catch {
           setSyncState("error");
           setStatusMessage(cycle.ok
             ? "Eşitleme tamamlandı ancak ekran verileri yenilenemedi. Uygulamayı yeniden başlatmayı deneyin."
-            : `${cycle.message} Ekran verileri de yenilenemedi.`);
+            : `${cycleMessage} Ekran verileri de yenilenemedi.`);
           return;
         }
         if (cycle.ok) {
@@ -202,7 +205,7 @@ export function useDesktopSync({
           setStatusMessage("");
         } else {
           setSyncState("error");
-          setStatusMessage(cycle.message);
+          setStatusMessage(cycleMessage);
         }
         return;
       }
@@ -225,7 +228,7 @@ export function useDesktopSync({
       setStatusMessage("");
     } catch {
       setSyncState("error");
-      setStatusMessage("Bağlantı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
+      setStatusMessage("Web eşitleme tamamlanamadı. Web modülü ayarlarını kontrol edip yeniden deneyin.");
     }
   }, [loadBusinessCapabilities, loadDashboardData, setStatusMessage, setSyncState]);
 

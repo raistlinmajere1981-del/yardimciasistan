@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { listPackage } from "@electron/asar";
+
+// Check the resource owner without producing or launching an installer.
+const packagingConfig = readFileSync("apps/desktop-app/electron-builder.yml", "utf8");
+assert.match(packagingConfig, /- yardimci-asistan-release\.apk/);
+assert.match(packagingConfig, /- version\.json/);
+assert.doesNotMatch(packagingConfig, /platform-tools|adb(?:\.exe)?/i,
+  "Consumer packages must not include ADB resources");
+const resourcePreparation = readFileSync("scripts/prepare-desktop-android-resources.mjs", "utf8");
+assert.doesNotMatch(resourcePreparation, /platform-tools|AdbWin|resolvePlatformToolsSource/,
+  "APK resource preparation must not require or stage ADB");
+if (process.argv.includes("--contracts-only")) {
+  console.log("desktop-package-resource-contracts-ok");
+  process.exit(0);
+}
 
 const packageRoot = join(process.cwd(), "dist", "desktop", "linux-unpacked");
 const packageExecutable = join(packageRoot, "yardimci-asistan-desktop");
@@ -12,6 +26,9 @@ const appAsar = join(packageRoot, "resources", "app.asar");
 assert.ok(existsSync(packageRoot), `Paket klasörü bulunamadı: ${packageRoot}`);
 assert.ok(existsSync(packageExecutable), "Linux paket çalıştırılabilir dosyası bulunamadı.");
 assert.ok(existsSync(appAsar), `app.asar bulunamadı: ${appAsar}`);
+
+assert.equal(existsSync(join(packageRoot, "resources", "android", "platform-tools")), false,
+  "Consumer packages must not contain platform-tools");
 
 const stagedAndroidRoot = join(process.cwd(), "apps", "desktop-app", "resources", "android");
 const stagedApk = join(stagedAndroidRoot, "yardimci-asistan-release.apk");
@@ -26,14 +43,6 @@ if (existsSync(stagedApk) && existsSync(stagedVersion)) {
     existsSync(join(packagedAndroidRoot, "version.json")),
     "Android version metadata desktop paketine kopyalanmalı."
   );
-  const adbName = process.platform === "win32" ? "adb.exe" : "adb";
-  const stagedAdb = join(stagedAndroidRoot, "platform-tools", adbName);
-  if (existsSync(stagedAdb)) {
-    assert.ok(
-      existsSync(join(packagedAndroidRoot, "platform-tools", adbName)),
-      "Staged ADB desktop paketine kopyalanmalı."
-    );
-  }
 }
 
 const entries = new Set(listPackage(appAsar));

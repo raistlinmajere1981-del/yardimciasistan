@@ -5,6 +5,7 @@ import {
   toggleBusinessProfileOption,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
+import { isWebCapabilityVisible, useWebAvailability } from "../../app/web-availability";
 
 const C = BUSINESS_CAPABILITIES;
 
@@ -17,11 +18,13 @@ const CAPABILITY_LABELS: Partial<Record<BusinessCapability, string>> = {
   [C.QR_MENU]: "QR Menü",
   [C.INVENTORY]: "Stok takibi",
   [C.CUSTOMER_CREDIT]: "Veresiye / Müşteri Hesabı",
+  [C.COMMERCE_BENEFITS]: "İndirim ve Puan",
   [C.ONLINE_SALES]: "Online Satış",
   [C.WHOLESALE]: "Bayi / Toptan Satış",
   [C.RETAIL_PURCHASING]: "Satın alma",
   [C.RETAIL_SUPPLIERS]: "Tedarikçiler",
-  [C.RETAIL_LABELS]: "Etiketler"
+  [C.RETAIL_LABELS]: "Etiketler",
+  [C.PRINTING]: "Baskı ve Belge Paylaşımı"
 };
 
 interface BusinessProfileOptionEditorProps {
@@ -38,7 +41,8 @@ export function BusinessProfileOptionEditor({
   disabled = false
 }: BusinessProfileOptionEditorProps) {
   const profile = getBusinessProfile(profileId);
-  const options = profile.optionalCapabilities;
+  const webAvailable = useWebAvailability();
+  const options = profile.optionalCapabilities.filter(capability => isWebCapabilityVisible(capability, webAvailable));
   // Expose user-visible prerequisites as checked and locked instead of hiding them.
   const visiblePrerequisites = new Set<BusinessCapability>([C.MARKETING_STUDIO, C.RETAIL_PURCHASING]);
   const independentOptions = options.filter(capability =>

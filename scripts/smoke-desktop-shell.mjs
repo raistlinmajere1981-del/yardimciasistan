@@ -179,7 +179,7 @@ try {
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true
     };
-  }, { setup: { ...createSetupFixture(), setupRequired: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
+  }, { setup: { ...createSetupFixture(), setupRequired: false, syncSecret: 'shell-smoke-secret' }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
   // Hold the initial lazy page module to make even a one-frame fallback observable.
   let releaseDashboard;
   const dashboardGate = new Promise(resolve => { releaseDashboard = resolve; });
@@ -244,7 +244,7 @@ try {
   await page.evaluate(() => window.__pushDashboard({}));
   // The page read runs after a 150ms debounce; poll instead of assuming a fixed idle slice.
   await expect.poll(() => page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
-  await page.getByRole('button', { name: /^Eşitleme durumu:/ }).click();
+  await page.getByRole('button', { name: /^Web eşitleme durumu:/ }).click();
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__customerReadCount)).toBe(readsBeforeSync + 1);
   await search.focus();
@@ -470,7 +470,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  const syncIndicator = page.getByRole('button', { name: /Eşitleme durumu:/ });
+  const syncIndicator = page.getByRole('button', { name: /^Web eşitleme durumu:/ });
   await expect(syncIndicator).toBeVisible();
   await syncIndicator.click();
   await expect(page.locator('.global-message-bar')).toHaveCount(0);

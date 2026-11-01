@@ -29,6 +29,7 @@
     "apps/desktop-app": {
       "entry": [
         "electron/main-entry.ts",
+        "electron/windows-native-bootstrap.ts",
         "electron/commerce-store.ts",
         "electron/commerce-runtime.ts",
         "scripts/**/*.{js,mjs,cjs,ts,tsx}"

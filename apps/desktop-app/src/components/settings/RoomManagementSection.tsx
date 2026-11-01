@@ -5,6 +5,7 @@ import {
   parseMoneyToMinor
 } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
+import { useWebAvailability } from "../../app/web-availability";
 import { ActionButton } from "../ui/ActionButton";
 import { RoomMediaPanel } from "./RoomMediaPanel";
 import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
@@ -31,6 +32,7 @@ function roomPriceSummary(price: string, currency: string) {
 }
 
 export function RoomManagementSection({ controller, onEditRoom }: { controller: BusinessLayoutController; onEditRoom: (key: string) => void }) {
+  const webAvailable = useWebAvailability();
   const [mediaRoomKey, setMediaRoomKey] = useState("");
   const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, updatePublication, reportMediaDirty } = controller;
   const rooms = draft.rooms;
@@ -96,19 +98,19 @@ export function RoomManagementSection({ controller, onEditRoom }: { controller: 
                 </div>
                 {rooms.map((room) => {
                   const identity = room.number ? `Oda ${room.number}` : room.name || "Yeni Oda";
-                  const selected = mediaRoom?.key === room.key;
+                  const selected = webAvailable && mediaRoom?.key === room.key;
                   return (
                     <div
-                      className={`room-management-row interactive-surface interactive-surface--record${selected ? " is-media-selected is-selected" : ""}`}
+                      className={`room-management-row${webAvailable ? " interactive-surface interactive-surface--record" : ""}${selected ? " is-media-selected is-selected" : ""}`}
                       key={room.key}
-                      role="button"
-                      tabIndex={saving || loading ? -1 : 0}
-                      aria-label={`${identity} medyalarını seç`}
-                      aria-pressed={selected}
-                      aria-disabled={saving || loading}
-                      onClick={() => { if (!saving && !loading) setMediaRoomKey(room.key); }}
+                      role={webAvailable ? "button" : undefined}
+                      tabIndex={webAvailable ? (saving || loading ? -1 : 0) : undefined}
+                      aria-label={webAvailable ? `${identity} medyalarını seç` : undefined}
+                      aria-pressed={webAvailable ? selected : undefined}
+                      aria-disabled={webAvailable ? saving || loading : undefined}
+                      onClick={() => { if (webAvailable && !saving && !loading) setMediaRoomKey(room.key); }}
                       onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget || saving || loading || event.repeat) return;
+                        if (!webAvailable || event.target !== event.currentTarget || saving || loading || event.repeat) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           setMediaRoomKey(room.key);

@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
+import { load } from "./test-helpers/market-sale-benefits-fixture.mjs";
+import { capabilities } from "./test-helpers/commerce-benefits-fixture.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
-const require = createRequire(import.meta.url);
-const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { BUSINESS_CAPABILITIES: C } = capabilities;
+const { DesktopDatabase } = load("database");
 const {
   applyRuntimeInventoryMovement,
   createRuntimeOrder,
@@ -16,7 +16,7 @@ const {
   getRuntimeInventoryBalance,
   saveRuntimeCatalogProduct,
   updateRuntimeOrderStatus
-} = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+} = load("commerce-runtime");
 
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-order-fulfillment-"));
 const database = new DesktopDatabase({

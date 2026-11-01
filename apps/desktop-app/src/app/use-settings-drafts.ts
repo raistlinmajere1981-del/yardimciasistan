@@ -18,12 +18,26 @@ import type {
   SettingsSetupSaveResult
 } from "./settings-save";
 
+const usesWeb = (value: SetupFormState) => Boolean(value.webModuleUrl.trim() || value.syncSecret.trim());
+const webKey = (value: WebConnectionSettings) => JSON.stringify([value.webModuleUrl.trim().replace(/\/+$/, ""), value.syncSecret.trim()]);
+
 export function useSettingsDrafts(
   setupData: DesktopSetupData,
   persist: (input: SaveInitialSetupInput) => Promise<SettingsSetupSaveResult>
 ) {
   const [initial] = useState(() => toSetupForm(setupData));
   const [form, setForm] = useState(initial);
+  const [webEnabled, setWebEnabled] = useState(() => usesWeb(initial));
+  const webEnabledRef = useRef(webEnabled);
+  const verifiedWeb = useRef("");
+  const [webResetVersion, setWebResetVersion] = useState(0);
+  function setWebActive(enabled: boolean) {
+    webEnabledRef.current = enabled;
+    setWebEnabled(enabled);
+  }
+  function markWebVerified(web: WebConnectionSettings | null) {
+    verifiedWeb.current = web ? webKey(web) : "";
+  }
   const draftRef = useRef(initial);
   const canonicalRef = useRef(initial);
   const baselineRef = useRef(initial);
@@ -40,6 +54,7 @@ export function useSettingsDrafts(
         : [...getBusinessProfile(value.profileId).defaultOptionalCapabilities] };
     }
     value = { ...value, profileOptions: normalizeBusinessProfileOptions(value.profileId, value.profileOptions) };
+    if (webKey(value) !== webKey(previous)) verifiedWeb.current = "";
     draftRef.current = value;
     setForm(value);
   }, []);
@@ -51,14 +66,22 @@ export function useSettingsDrafts(
       canonicalRef.current = fresh;
       baselineRef.current = fresh;
       draftRef.current = fresh;
+      webEnabledRef.current = usesWeb(fresh);
+      setWebEnabled(webEnabledRef.current);
+      verifiedWeb.current = "";
+      setWebResetVersion(version => version + 1);
       setForm(fresh);
       return;
     }
 
-    const webDirty = JSON.stringify([draftRef.current.webModuleUrl, draftRef.current.syncSecret, draftRef.current.autoSyncEnabled])
+    const webDirty = webEnabledRef.current !== usesWeb(baselineRef.current) || JSON.stringify([draftRef.current.webModuleUrl, draftRef.current.syncSecret, draftRef.current.autoSyncEnabled])
       !== JSON.stringify([baselineRef.current.webModuleUrl, baselineRef.current.syncSecret, baselineRef.current.autoSyncEnabled]);
-    let nextDraft = next.setupRequired && webDirty ? draftRef.current : copyWebConnection(draftRef.current, fresh);
-    let nextBaseline = copyWebConnection(baselineRef.current, fresh);
+    let nextDraft = webDirty ? draftRef.current : copyWebConnection(draftRef.current, fresh);
+    let nextBaseline = webDirty ? baselineRef.current : copyWebConnection(baselineRef.current, fresh);
+    if (!webDirty) {
+      webEnabledRef.current = usesWeb(fresh);
+      setWebEnabled(webEnabledRef.current);
+    }
 
     // Each service is an independent owner even while another service is dirty.
     for (const fields of [settingsFieldOwners.business, ...Object.values(serviceSettingsFields)]) {
@@ -93,9 +116,9 @@ export function useSettingsDrafts(
     stagedSettingsCategories.map((category) => [
       category,
       isCategoryDirty(form, baselineRef.current, category)
-        || (category === "business" && setupData.setupRequired &&
+        || (category === "business" && (webEnabled !== usesWeb(baselineRef.current) ||
           JSON.stringify([form.webModuleUrl, form.syncSecret, form.autoSyncEnabled]) !==
-          JSON.stringify([baselineRef.current.webModuleUrl, baselineRef.current.syncSecret, baselineRef.current.autoSyncEnabled]))
+          JSON.stringify([baselineRef.current.webModuleUrl, baselineRef.current.syncSecret, baselineRef.current.autoSyncEnabled])))
     ])
   ) as Record<StagedSettingsCategoryId, boolean>;
 
@@ -103,9 +126,12 @@ export function useSettingsDrafts(
     if (savingRef.current) return;
 
     const categoryDraft = copyCategory(draftRef.current, canonicalRef.current, "business");
-    const next = setupData.setupRequired ? copyWebConnection(categoryDraft, canonicalRef.current) : categoryDraft;
+    const next = copyWebConnection(categoryDraft, canonicalRef.current);
+    setWebActive(usesWeb(canonicalRef.current));
+    verifiedWeb.current = "";
+    setWebResetVersion(version => version + 1);
     baselineRef.current = copyCategory(baselineRef.current, canonicalRef.current, "business");
-    if (setupData.setupRequired) baselineRef.current = copyWebConnection(baselineRef.current, canonicalRef.current);
+    baselineRef.current = copyWebConnection(baselineRef.current, canonicalRef.current);
     draftRef.current = next;
     setForm(next);
   }
@@ -125,8 +151,16 @@ export function useSettingsDrafts(
       canonicalRef.current = latestCanonical;
 
       const categoryDraft = copyCategory(latestCanonical, draftRef.current, "business");
-      const merged = setupData.setupRequired
-        ? copyWebConnection(categoryDraft, draftRef.current) : categoryDraft;
+      const merged = copyWebConnection(categoryDraft, webEnabledRef.current ? draftRef.current
+        : { webModuleUrl: "", syncSecret: "", autoSyncEnabled: false });
+      const needsWebVerification = webEnabledRef.current && (setupData.setupRequired || latest?.setupRequired
+        || !usesWeb(latestCanonical) || webKey(merged) !== webKey(latestCanonical));
+      if (needsWebVerification && (!merged.webModuleUrl.trim() || !merged.syncSecret.trim())) {
+        return { ok: false, message: "Web adresini ve güvenlik anahtarını girip Bağlan ile doğrulayın." };
+      }
+      if (needsWebVerification && verifiedWeb.current !== webKey(merged)) {
+        return { ok: false, message: "Web bağlantısını Bağlan ile doğrulayın, ardından Kaydet düğmesini kullanın." };
+      }
       const error = validateSettingsCategory(merged, "business");
 
       if (error) {
@@ -139,10 +173,12 @@ export function useSettingsDrafts(
       }
 
       sourceRef.current = result.setupData;
-      acceptCommitted(result.setupData, [...settingsFieldOwners.business, ...(setupData.setupRequired ? ["webModuleUrl", "syncSecret", "autoSyncEnabled"] as const : [])]);
+      acceptCommitted(result.setupData, [...settingsFieldOwners.business, "webModuleUrl", "syncSecret", "autoSyncEnabled"]);
+
+      setWebActive(usesWeb(toSetupForm(result.setupData)));
 
       const warning = result.refreshWarning
-        || (merged.aiEnabled && (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false)
+        || ((result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false)
           ? result.message
           : "");
 
@@ -197,42 +233,16 @@ export function useSettingsDrafts(
     }
   }
 
-  async function saveWebConnection(web: WebConnectionSettings): Promise<SettingsOperationResult> {
-    if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
-    savingRef.current = true;
-    setBusy(true);
-    try {
-      const latest = await window.yardimciDesktop?.getSetupData?.();
-      if (!latest) return { ok: false, message: "Kayıtlı ayarlar okunamadı. Tekrar deneyin." };
-      const startingSetup = latest.setupRequired;
-      const base = startingSetup
-        ? copyCategory(toSetupForm(latest), draftRef.current, "business")
-        : toSetupForm(latest);
-      const result = await persist(createSetupInput(copyWebConnection(base, web)));
-      if (!result.ok) return { ok: false, message: result.message };
-      sourceRef.current = result.setupData;
-      acceptCommitted(result.setupData, [
-        "webModuleUrl", "syncSecret", "autoSyncEnabled",
-        ...(startingSetup ? settingsFieldOwners.business : [])
-      ]);
-      const warning = result.refreshWarning
-        || (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false ? result.message : "");
-      return { ok: true, changed: true, message: warning || "Web bağlantı ayarları kaydedildi." };
-    } catch {
-      return { ok: false, message: "Web bağlantı ayarları kaydedilemedi. Tekrar deneyin." };
-    } finally {
-      savingRef.current = false;
-      setBusy(false);
-    }
-  }
-
   return {
     form,
     setDraft,
     dirty,
     busy,
     saveBusiness,
-    saveWebConnection,
+    webEnabled,
+    webResetVersion,
+    setWebActive,
+    markWebVerified,
     saveService,
     discardService,
     serviceDirty,

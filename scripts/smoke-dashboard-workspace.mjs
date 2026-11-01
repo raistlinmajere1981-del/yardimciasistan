@@ -23,6 +23,8 @@ const setup = {
   setupRequired: false,
   appPasswordConfigured: true,
   autoSyncEnabled: true,
+  webModuleUrl: "https://dashboard.test/module",
+  syncSecret: "dashboard-workspace-secret",
   aiEnabled: true,
   aiApiKeyConfigured: true
 };
@@ -84,9 +86,10 @@ try {
   // Dashboard and health are projections: supplied controller state is enough; no preload bridge is required.
   await expect(page.locator(".dashboard-page")).toBeVisible();
   await expect(page.locator(".system-health-panel")).toBeVisible();
-  await expect(page.locator(".system-health-item")).toHaveCount(5);
-  await expect(page.locator(".system-health-item").filter({ hasText: "Web bağlantısı" })).toContainText("Hazır");
-  await expect(page.locator(".system-health-item").filter({ hasText: "AI" })).toContainText("Hazır");
+  await expect(page.locator(".system-health-item")).toHaveCount(6);
+  await expect(page.locator(".system-health-item").filter({ hasText: "Web bağlantısı" })).toContainText("Web eşitlemeye hazır");
+  await expect(page.locator(".system-health-item").filter({ hasText: "Ağ sinyali" })).toContainText("İnternet ve servis erişimi doğrulanmadı");
+  await expect(page.locator(".system-health-item").filter({ hasText: "AI" })).toContainText("Yapılandırıldı");
   await expect(page.locator(".system-health-item").filter({ hasText: "Uygulama kilidi" })).toContainText("Etkin");
 
   // Dashboard actions remain launchers/canonical operation callbacks.

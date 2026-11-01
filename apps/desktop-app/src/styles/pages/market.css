@@ -870,6 +870,28 @@ button.market-list-row {
   overflow: hidden;
 }
 
+/* Benefit inputs/details scroll inside checkout while its action and cart remain reachable. */
+.market-sale-sidebar--benefits {
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.market-sale-sidebar--benefits .market-sale-checkout {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.market-sale-sidebar--benefits .market-sale-checkout-fields {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.market-sale-sidebar--benefits .market-sale-checkout-action {
+  flex: 0 0 auto;
+}
+
 .market-quick-sale-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(340px, 32%, 440px);

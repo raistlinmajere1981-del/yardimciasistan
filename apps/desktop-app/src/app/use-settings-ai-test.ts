@@ -93,7 +93,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
         aiModel: result.model,
         aiModelOptions: result.models
       }));
-    } else if (setupForm.aiService === "gemini") {
+    } else if (setupForm.aiService === "gemini" || setupForm.aiService === "cloudflare") {
       setSetupForm((current) => ({
         ...current,
         aiModel: result.model || current.aiModel,

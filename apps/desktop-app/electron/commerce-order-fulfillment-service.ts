@@ -15,6 +15,11 @@ import {
 } from "./commerce-store";
 import { getCommerceOrderDetailInTransaction } from "./commerce-order-store";
 import { recordCustomerCreditSaleInTransaction } from "./customer-credit-runtime";
+import { benefitsAssert } from "./commerce-benefits-engine";
+import { benefitsHmac, canonicalBenefitsJson, withCommerceBenefitsTransaction } from "./commerce-benefits-rules";
+import { CommerceBenefitsStore } from "./commerce-benefits-store";
+import { assertOrderBenefitsQuote, orderBenefitsOperationKey, orderBenefitsPorts, orderBenefitsPreviewInput,
+  prepareOrderBenefitsIngress, replayOrderBenefits, type OrderBenefitsAuthority } from "./commerce-order-benefits";
 
 type Row = Record<string, unknown>;
 const PAID_METHODS = new Set(["cash", "card", "bank", "other"]);
@@ -115,12 +120,30 @@ function readFulfillmentResult(
 
 export function fulfillCommerceOrder(
   databasePath: string,
-  input: FulfillCommerceOrderInput
+  input: FulfillCommerceOrderInput,
+  authority?: OrderBenefitsAuthority
 ): CommerceOrderFulfillmentResult {
   const database = openDatabase(databasePath);
   try {
-    database.exec("BEGIN IMMEDIATE");
-    try {
+    let ingress: ReturnType<typeof prepareOrderBenefitsIngress> | undefined;
+    let authorizationId: string | null = null;
+    if (input.benefits !== undefined) {
+      benefitsAssert(authority, "BENEFITS_STAFF_REQUIRED");
+      const previewInput = orderBenefitsPreviewInput(input);
+      const businessId = activeBusiness(database).id;
+      const existing = () => database.prepare("SELECT 1 FROM commerce_order_fulfillments WHERE business_id = ? AND (operation_key = ? OR order_id = ?)")
+        .get(businessId, input.operationKey.trim(), input.orderId.trim());
+      try {
+        ingress = prepareOrderBenefitsIngress(database, previewInput, authority, Boolean(existing()));
+        if (!existing()) authorizationId = ingress.authorizeCoupon();
+      } catch (error) {
+        // Another writer may commit while key I/O or the independent coupon attempt waits.
+        // Only the parent fingerprint below can authorize replay of that committed result.
+        if (!existing()) throw error;
+        ingress = prepareOrderBenefitsIngress(database, previewInput, authority, true);
+      }
+    }
+    return withCommerceBenefitsTransaction(database, Date.now(), tx => {
       const business = activeBusiness(database);
       const enabled = new Set(readEnabledBusinessCapabilities(database));
       if (!enabled.has(C.ORDERS) || !enabled.has(C.SALES)) {
@@ -135,12 +158,15 @@ export function fulfillCommerceOrder(
       }
       const locationId = String(input.locationId ?? "").trim();
       const settlement = normalizeSettlement(input.settlement);
-      const fingerprint = requestFingerprint({
+      const legacyFingerprint = requestFingerprint({
         orderId,
         settlementType: settlement.type,
         paymentMethod: settlement.paymentMethod,
         locationId
       });
+      const fingerprint = ingress ? canonicalBenefitsJson({ legacyFingerprint,
+        benefits: benefitsHmac(ingress.key, business.id, "desktop-order-fulfillment-request", input.benefits) }) : legacyFingerprint;
+      if (ingress) orderBenefitsPorts(authority!.actor, ingress.bound).authorize(database, ingress.bound, "checkout");
 
       const byOperation = database.prepare(`
         SELECT *
@@ -153,8 +179,7 @@ export function fulfillCommerceOrder(
           throw new Error("Aynı fulfillment işlem anahtarı farklı bir istekle kullanılamaz.");
         }
         const result = readFulfillmentResult(database, business.id, byOperation);
-        database.exec("COMMIT");
-        return result;
+        return ingress ? { ...result, benefits: replayOrderBenefits(database, business.id, orderId, authority!) } : result;
       }
 
       const previous = database.prepare(`
@@ -191,7 +216,21 @@ export function fulfillCommerceOrder(
         }
       }
 
-      const now = new Date().toISOString();
+      const now = new Date(tx.now).toISOString();
+      let benefitsParent: Parameters<typeof createCommerceSaleFromOrderSnapshotInTransaction>[4];
+      let benefitsStore: CommerceBenefitsStore | undefined;
+      let reservationId = "";
+      if (ingress) {
+        benefitsAssert(settlement.type === "paid", "BENEFITS_ORDER_PAID_REQUIRED");
+        const saleId = createId("sale_");
+        benefitsStore = new CommerceBenefitsStore(ingress.key, orderBenefitsPorts(authority!.actor, ingress.bound, saleId));
+        const reservation = benefitsStore.reserve(tx, ingress.intent, `${orderBenefitsOperationKey(operationKey)}:reserve`, authorizationId);
+        assertOrderBenefitsQuote(order, reservation.quote);
+        benefitsAssert(canonicalBenefitsJson(reservation.quote) === canonicalBenefitsJson(input.benefits!.expectedQuote), "BENEFITS_QUOTE_CHANGED");
+        benefitsAssert(input.benefits!.paymentAmountMinor === reservation.quote.payableMinor, "BENEFITS_ACTUAL_PAYMENT_REQUIRED");
+        reservationId = reservation.reservationId;
+        benefitsParent = { saleId, customerId: ingress.intent.customerId, quote: reservation.quote };
+      }
       const saleResult = createCommerceSaleFromOrderSnapshotInTransaction(database, {
         subtotal: order.order.subtotal,
         discountTotal: order.order.discountTotal,
@@ -208,7 +247,7 @@ export function fulfillCommerceOrder(
           quantity: item.quantity,
           lineTotal: item.lineTotal
         }))
-      }, settlement.type === "credit" ? "credit" : "paid", now);
+      }, settlement.type === "credit" ? "credit" : "paid", now, benefitsParent);
 
       if (settlement.type === "credit") {
         recordCustomerCreditSaleInTransaction(database, business.id, {
@@ -256,12 +295,9 @@ export function fulfillCommerceOrder(
       if (!fulfillmentRow) throw new Error("Fulfillment kaydı yeniden okunamadı.");
 
       const result = readFulfillmentResult(database, business.id, fulfillmentRow);
-      database.exec("COMMIT");
-      return result;
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
+      return benefitsStore ? { ...result, benefits: benefitsStore.settle(tx, business.id, reservationId,
+        `${orderBenefitsOperationKey(operationKey)}:settle`) } : result;
+    });
   } finally {
     database.close();
   }

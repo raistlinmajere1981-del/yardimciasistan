@@ -1,3 +1,4 @@
+import { useMarketSaleBenefits } from "./use-market-sale-benefits";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopCommerceBridge } from "../../electron/commerce-ipc-contract";
 import type {
@@ -24,10 +25,12 @@ function roundQuantity(value: number) {
 
 export function useMarketQuickSaleSession({
   customerCreditEnabled,
+  benefitsEnabled = false,
   customerSelectionEnabled = customerCreditEnabled,
   pricingContext = ""
 }: {
   customerCreditEnabled: boolean;
+  benefitsEnabled?: boolean;
   customerSelectionEnabled?: boolean;
   pricingContext?: string;
 }) {
@@ -108,8 +111,13 @@ export function useMarketQuickSaleSession({
     return checkoutIntent.current.operationId;
   }, []);
 
+  const benefits = useMarketSaleBenefits({ enabled: benefitsEnabled, pricingContext, priceRevision, pricesReady,
+    cart, discountTotal, paymentAmount, paymentMethod, customerId, sourceDraftId: sourceDraft?.id, transactionMode });
+
+  const { pending: pendingBenefits, clear: clearBenefits } = benefits;
+
   const addProduct = useCallback((product: CatalogProduct) => {
-    if (saleInFlight.current || pendingOrder.current) return "blocked" as const;
+    if (saleInFlight.current || pendingOrder.current || pendingBenefits.current) return "blocked" as const;
     const current = cartRef.current;
     const currentCurrency = current[0]?.product.currency ?? "";
     if (currentCurrency && product.currency !== currentCurrency) return "currency_mismatch" as const;
@@ -121,10 +129,10 @@ export function useMarketQuickSaleSession({
       : [...current, { product, quantity: 1 }];
     replaceCart(next);
     return "added" as const;
-  }, [replaceCart]);
+  }, [replaceCart, pendingBenefits]);
 
   const setQuantity = useCallback((productId: string, quantityInput: number) => {
-    if (saleInFlight.current || pendingOrder.current) return false;
+    if (saleInFlight.current || pendingOrder.current || pendingBenefits.current) return false;
     const quantity = roundQuantity(quantityInput);
     const current = cartRef.current;
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -133,9 +141,10 @@ export function useMarketQuickSaleSession({
     }
     replaceCart(current.map((line) => line.product.id === productId ? { ...line, quantity } : line));
     return true;
-  }, [replaceCart]);
+  }, [replaceCart, pendingBenefits]);
 
   const clearSale = useCallback(() => {
+    if (!clearBenefits()) return;
     pendingOrder.current = null;
     setOrderUncertain(false);
     setOrderNote("");
@@ -148,7 +157,7 @@ export function useMarketQuickSaleSession({
     setSourceDraft(null);
     setDraftLoadWarnings([]);
     checkoutIntent.current = null;
-  }, [replaceCart]);
+  }, [replaceCart, clearBenefits]);
 
   const startSale = useCallback(() => {
     if (saleInFlight.current || pendingOrder.current) return false;
@@ -171,12 +180,12 @@ export function useMarketQuickSaleSession({
   }, []);
 
   const requestCartDraft = useCallback((draftId: string) => {
-    if (saleInFlight.current || pendingOrder.current || reviewRecoveryDraft) return null;
+    if (saleInFlight.current || pendingOrder.current || pendingBenefits.current || reviewRecoveryDraft) return null;
     const request = { requestId: ++draftRequestSequence.current, draftId };
     cartDraftRequestRef.current = request;
     setCartDraftRequest(request);
     return request;
-  }, [reviewRecoveryDraft]);
+  }, [reviewRecoveryDraft, pendingBenefits]);
 
   const clearCartDraftRequest = useCallback((draftId: string) => {
     const current = cartDraftRequestRef.current;
@@ -187,7 +196,8 @@ export function useMarketQuickSaleSession({
 
   const applyLoadedDraft = useCallback((requestId: number, result: MarketCartDraftLoadResult) => {
     const pending = cartDraftRequestRef.current;
-    if (!pending || pending.requestId !== requestId || saleInFlight.current) return null;
+    if (!pending || pending.requestId !== requestId || saleInFlight.current || pendingBenefits.current) return null;
+    clearBenefits();
     const warnings = result.skippedItems.map(
       (item) => `${item.productName || item.productId} ürünü artık aktif olmadığı için sepete eklenmedi.`
     );
@@ -203,13 +213,13 @@ export function useMarketQuickSaleSession({
     setLastSale(null);
     loadedDraftRequestId.current = requestId;
     return warnings;
-  }, [replaceCart]);
+  }, [replaceCart, clearBenefits, pendingBenefits]);
 
   // The immutable intent survives workspace/tab unmounts. A lost response must
   // retry this payload and reference before the cart can become another operation.
   const createOrder = useCallback(async (input: Parameters<DesktopCommerceBridge["createOrder"]>[0]) => {
     const bridge = window.yardimciDesktop?.commerce;
-    if (!bridge || saleInFlight.current || sourceDraft || reviewRecoveryDraft) return null;
+    if (!bridge || saleInFlight.current || pendingBenefits.current || sourceDraft || reviewRecoveryDraft) return null;
     saleInFlight.current = true;
     setSubmitting(true);
     if (!pendingOrder.current) pendingOrder.current = { ...input, source: "desktop", sourceReference: `desktop-order:${crypto.randomUUID()}` };
@@ -239,9 +249,10 @@ export function useMarketQuickSaleSession({
       saleInFlight.current = false;
       setSubmitting(false);
     }
-  }, [clearSale, sourceDraft, reviewRecoveryDraft]);
+  }, [clearSale, sourceDraft, reviewRecoveryDraft, pendingBenefits]);
 
   return {
+    benefits,
     transactionMode, setTransactionMode, orderNote, setOrderNote, orderUncertain, createOrder,
     cart,
     cartRef,

@@ -123,7 +123,14 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </ActionButton>
-
+      {(form.aiService === "gemini" || form.aiService === "cloudflare") && (
+        <ActionButton variant="secondary" type="button" disabled={!form.aiEnabled}
+          onClick={() => void window.yardimciDesktop?.openExternal(form.aiService === "gemini"
+            ? "https://aistudio.google.com/usage"
+            : "https://dash.cloudflare.com/")}>
+          <ExternalLink size={15} aria-hidden="true" /> Kullanım ve limitler
+        </ActionButton>
+      )}
     </div>
   );
 
@@ -203,7 +210,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                 Cloudflare Account ID
                 <input aria-label="Cloudflare Account ID" value={cloudflareAiAccountId(form.aiBaseUrl)} onChange={event => update("aiBaseUrl", cloudflareAiBaseUrl(event.target.value))} disabled={!form.aiEnabled} autoComplete="off" spellCheck={false} />
                 <small>32 karakterli hesap kimliğinden resmi API adresi oluşturulur. API Token için Workers AI erişim yetkisi gerekir.</small>
-                <small>Modeller belgeye dayalı adaylardır; hesap erişimi ve ücretsiz kota gerçek isteklerle doğrulanır. Bağlantı testi seçili metin/görsel modellerine istek gönderir ve kota kullanır. STT ayrı denenir.</small>
+                <small>Bağlantıyı Dene ile resmî model kataloğu alınır, seçili model gerçekten çalıştırılır. Katalog erişimi kalan kotayı doğrulamaz; STT ayrı denenir.</small>
               </label>
             ) : (
               <label className="form-field form-field--long form-field--span">
@@ -216,7 +223,9 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               {form.aiService === "cloudflare" ? (
                 <select aria-label="Metin modeli" value={form.aiModel} onChange={event => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
                   <option value="">Model seçin</option>
-                  {[CLOUDFLARE_AI_MODELS.text, CLOUDFLARE_AI_MODELS.vision].map(model => <option key={model} value={model}>{model} · aday</option>)}
+                  {[...new Set([CLOUDFLARE_AI_MODELS.text, form.aiModel, ...form.aiModelOptions.map(item => item.id)])]
+                    .filter(Boolean).filter(model => !supportsImageGenerationModel("cloudflare", model))
+                    .map(model => <option key={model} value={model}>{form.aiModelOptions.find(item => item.id === model)?.label || model}</option>)}
                 </select>
               ) : form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
                 <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
@@ -227,12 +236,12 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               ) : (
                 <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
               )}
-              {form.aiService === "gemini" && (
+              {(form.aiService === "gemini" || form.aiService === "cloudflare") && (
                 <small>{form.aiModelOptions.length > 0
                   ? form.aiStoredApiKeyConfigured
                     ? `${form.aiModelOptions.length} görsel ve metin modeli bu sağlayıcı altında kayıtlı.`
                     : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
-                  : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
+                  : "Bağlantıyı Dene ile resmî API'den uygun modeller listelenir."}</small>
               )}
             </label>
             {form.aiService === "cloudflare" && <label className="form-field form-field--medium">

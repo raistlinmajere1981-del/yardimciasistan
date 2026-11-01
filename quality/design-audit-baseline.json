@@ -8,6 +8,12 @@
     "apps/desktop-app/src/components/settings/BusinessLocationMapPicker.tsx": {
       "inlineStyle": 2
     },
+    "apps/desktop-app/src/components/settings/DocumentTemplateCanvas.tsx": {
+      "inlineStyle": 3
+    },
+    "apps/desktop-app/src/components/settings/FormImagePreparation.tsx": {
+      "inlineStyle": 1
+    },
     "apps/desktop-app/src/components/settings/business-location-map-picker.css": {
       "hardcodedRadius": 2
     },

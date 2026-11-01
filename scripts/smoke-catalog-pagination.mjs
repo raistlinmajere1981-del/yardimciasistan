@@ -105,7 +105,8 @@ try {
     if (method === "getCustomer") return database.getCustomer(args[0]);
     throw new Error(`Unexpected pagination call: ${method}`);
   });
-  const initial = { snapshot: readBusinessCapabilitySnapshot(path), customers: database.getDashboardData().customers, dashboardData: database.getDashboardData() };
+  const initial = { snapshot: readBusinessCapabilitySnapshot(path), customers: database.getDashboardData().customers, dashboardData: database.getDashboardData(),
+    setup: { webModuleUrl: "https://example.test", syncSecret: "fixture-secret" } };
   await page.addInitScript(initial => {
     window.__salesInitial = initial;
     const methods = ["listProducts", "listCategories", "listOrders", "getOrder", "getInventoryBalance", "listInventoryMovements", "getCustomerCreditAccount", "resolveProductPrice", "getProductImageDataUrl", "getProductPublication"];
@@ -210,6 +211,6 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/catalog-pagination/1002-products.png" });
   console.log("catalog-pagination-smoke-ok", JSON.stringify({ records: 1002, active: 1001, queries: queries.length, maxSqlQueryMs: Math.round(Math.max(...timings)), maxBrowserLongTaskMs: Math.round(Math.max(0, ...await page.evaluate(() => window.__longTasks))) }));
 } catch (error) {
-  if (page) console.error("pagination-ui-failure", (await page.locator("body").innerText()).slice(0, 3000));
+  if (page) console.error("pagination-ui-failure", { body: (await page.locator("body").innerText()).slice(0, 3000), errors, queries });
   throw error;
 } finally { await browser?.close(); await server?.close(); sql?.close(); database.close(); rmSync(directory, { recursive: true, force: true }); }

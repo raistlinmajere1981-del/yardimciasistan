@@ -10,7 +10,8 @@ const source = (file) => readFileSync(new URL(`../apps/desktop-app/dist-electron
 const commerceModule = { exports: {} };
 runInNewContext(source("commerce-ipc"), {
   exports: commerceModule.exports,
-  require: () => ({}), Error
+  require: (name) => name === "./market-sale-full-refund" || name === "./commerce-benefits-engine"
+    ? require(`../apps/desktop-app/dist-electron/${name.slice(2)}.js`) : {}, Error
 });
 const handlers = new Map();
 const logs = [];

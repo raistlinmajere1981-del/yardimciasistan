@@ -63,3 +63,7 @@ export * from "./types/data-transfer";
 
 export * from "./types/product-photos";
 export * from "./types/public-languages";
+
+export * from "./types/document-output";
+
+export * from "./types/document-output-management";

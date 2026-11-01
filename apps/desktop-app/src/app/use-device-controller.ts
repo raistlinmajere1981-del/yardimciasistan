@@ -1,7 +1,6 @@
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
-import type { DesktopAndroidInstallationSnapshot } from "../../electron/android-installation-service";
 import { reportAppStatus, type SyncState } from "./runtime-state";
 
 interface UseDeviceControllerOptions {
@@ -11,108 +10,10 @@ interface UseDeviceControllerOptions {
 
 export function useDeviceController({ setDashboardData, androidEnabled }: UseDeviceControllerOptions) {
   const { confirm, confirmDialog } = useConfirmDialog();
-  const [backupState, setBackupState] = useState<SyncState>("idle");
-  const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
-  const [androidInstallState, setAndroidInstallState] = useState<SyncState>("idle");
-  const [androidInstallMessage, setAndroidInstallMessage] = useState("USB Android cihazları aranıyor...");
-  const [androidInstallSnapshot, setAndroidInstallSnapshot] = useState<DesktopAndroidInstallationSnapshot | null>(null);
-  const refreshAndroidInstallDevices = useCallback(async () => {
-    if (!androidEnabled) {
-      setAndroidInstallSnapshot(null);
-      setAndroidInstallState("idle");
-      setAndroidInstallMessage("Android bağlantısı kapalı.");
-      return;
-    }
-    if (!window.yardimciDesktop?.listAndroidInstallDevices) {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("");
-      reportAppStatus("error", "Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    setAndroidInstallState("loading");
-    setAndroidInstallMessage("USB Android cihazları aranıyor...");
-    try {
-      const snapshot = await window.yardimciDesktop.listAndroidInstallDevices();
-      setAndroidInstallSnapshot(snapshot);
-      setAndroidInstallState(snapshot.ok ? "success" : "error");
-      setAndroidInstallMessage("");
-      if (!snapshot.ok) reportAppStatus("error", snapshot.message);
-    } catch {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("");
-      reportAppStatus("error", "USB Android cihazları okunamadı.");
-    }
-  }, [androidEnabled]);
-
-  async function handleInstallAndroidApp(serial: string) {
-    if (!androidEnabled) {
-      setAndroidInstallSnapshot(null);
-      setAndroidInstallState("idle");
-      setAndroidInstallMessage("Android bağlantısını kullanmak için önce Android servisini açıp ayarları kaydedin.");
-      return;
-    }
-    if (!window.yardimciDesktop?.installAndroidApp) {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    setAndroidInstallState("loading");
-    setAndroidInstallMessage("Android uygulaması telefona kuruluyor...");
-    try {
-      const result = await window.yardimciDesktop.installAndroidApp(serial);
-      setAndroidInstallState(result.ok ? "success" : "error");
-      setAndroidInstallMessage("");
-      reportAppStatus(result.ok ? "success" : "error", result.message);
-      await refreshAndroidInstallDevices();
-      if (result.ok) setAndroidInstallState("success");
-    } catch {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("");
-      reportAppStatus("error", "Android uygulaması kurulamadı.");
-    }
-  }
-
-  async function handleProvisionAndroidApp(serial: string) {
-    if (!androidEnabled) {
-      setAndroidInstallSnapshot(null);
-      setAndroidInstallState("idle");
-      setAndroidInstallMessage("Android bağlantısını kullanmak için önce Android servisini açıp ayarları kaydedin.");
-      return;
-    }
-    if (!window.yardimciDesktop?.provisionAndroidApp) {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("");
-      reportAppStatus("error", "Android bağlantı aracı hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    setAndroidInstallState("loading");
-    setAndroidInstallMessage("Telefon kurulumu tamamlanıyor...");
-    try {
-      const result = await window.yardimciDesktop.provisionAndroidApp(serial);
-      setAndroidInstallState(result.ok ? "success" : "error");
-      setAndroidInstallMessage("");
-      reportAppStatus(result.ok ? "success" : "error", result.message);
-      await refreshAndroidInstallDevices();
-      if (result.ok) setAndroidInstallState("success");
-    } catch {
-      setAndroidInstallState("error");
-      setAndroidInstallMessage("");
-      reportAppStatus("error", "Telefon kurulumu tamamlanamadı.");
-    }
-  }
-
-  useEffect(() => {
-    if (!androidEnabled) {
-      setAndroidInstallSnapshot(null);
-      setAndroidInstallState("idle");
-      setAndroidInstallMessage("Android bağlantısı kapalı.");
-      return;
-    }
-    void refreshAndroidInstallDevices();
-  }, [androidEnabled, refreshAndroidInstallDevices]);
-
+  const [backupState, setBackupState] = useState<SyncState>("idle");
+  const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   async function runAndroidDeviceMutation(
     pendingMessage: string,
     operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
@@ -178,6 +79,7 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     );
   }
 
+
   async function handleCreateManualBackup() {
     setBackupState("loading");
     setBackupMessage("Yerel kayıtların ve menü görsellerinin yedeği oluşturuluyor...");
@@ -202,18 +104,13 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     reportAppStatus("success", `${result.message} ${result.backup.folderName}`);
   }
 
+
   return {
     confirmDialog,
     backupState,
     backupMessage,
     androidDeviceState,
     androidDeviceMessage,
-    androidInstallState,
-    androidInstallMessage,
-    androidInstallSnapshot,
-    refreshAndroidInstallDevices,
-    handleInstallAndroidApp,
-    handleProvisionAndroidApp,
     handleSetAndroidDeviceRole,
     handleSetAndroidDeviceActive,
     handleResetAndroidDevicePermissions,

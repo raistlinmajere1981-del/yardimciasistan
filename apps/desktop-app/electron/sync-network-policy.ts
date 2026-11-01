@@ -43,9 +43,14 @@ export function calculateRetryDelayMs(attemptCount: number) {
 }
 
 export function classifyFailurePhase(result: SyncFailure | undefined): "offline" | "error" {
+  // An HTTP response establishes contact with the Web target; auth/protocol/server
+  // errors must not become a transport-unreachable signal because of their text.
+  if (result?.status && result.status > 0) return "error";
   return result && isConnectionFailureMessage(result.message) ? "offline" : "error";
 }
 
 export function isConnectionFailureMessage(message: string) {
-  return /ulaşılamadı|internet|bağlantı|zaman aşım/i.test(message);
+  // The words "internet"/"bağlantı" also occur in configuration and auth errors.
+  // Recognize the transport's unreachable/timeout messages, not generic advice.
+  return /ulaşılamadı|zaman aşım/i.test(message);
 }

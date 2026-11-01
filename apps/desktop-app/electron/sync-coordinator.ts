@@ -31,6 +31,8 @@ export function supportsAndroidDevicePermissionSync(
     && REQUIRED_ANDROID_SYNC_FEATURES.every((feature) => capabilities.features.includes(feature));
 }
 
+// Web transport only: "offline" means this Web target is unreachable, never
+// general internet/LAN/provider connectivity. Keep the existing IPC vocabulary.
 export type AutomaticSyncPhase = "disabled" | "idle" | "syncing" | "success" | "offline" | "error";
 
 export interface AutomaticSyncStatus extends DesktopSyncRuntimeStatus {
@@ -248,7 +250,11 @@ export class SyncCoordinator {
 
   getStatus(): AutomaticSyncStatus {
     const runtime = this.options.database.getSyncRuntimeStatus();
-    if (!runtime.enabled && !this.restorePending() && this.phase !== "syncing") {
+    const config = this.options.getSyncConfig();
+    if (!config.baseUrl.trim() && !config.syncSecret.trim()) {
+      return { ...runtime, phase: "disabled", message: "Web kullanılmıyor." };
+    }
+    if (!runtime.enabled && !this.restorePending() && (this.phase === "idle" || this.phase === "disabled")) {
       return { ...runtime, phase: "disabled", message: "Otomatik senkron kapalı." };
     }
     return { ...runtime, phase: this.phase, message: this.message };
@@ -316,13 +322,17 @@ export class SyncCoordinator {
   private async runCycle(force: boolean): Promise<AutomaticSyncCycleResult> {
     const runtime = this.options.database.getSyncRuntimeStatus();
     const empty = { pulledRequests: 0, pulledActions: 0, appliedActions: 0, failedActions: 0, publishedJobs: 0 };
-    if (!runtime.enabled && !force && !this.restorePending()) {
+    const config = this.options.getSyncConfig();
+    if (!config.baseUrl.trim() && !config.syncSecret.trim()) {
       this.phase = "disabled";
-      this.message = "Otomatik senkron kapalı.";
+      this.message = "Web kullanılmıyor.";
       return this.result(true, this.message, empty);
     }
+    if (!runtime.enabled && !force && !this.restorePending()) {
+      // Passive sync being off must not erase the outcome of an explicit Web run.
+      return this.result(true, "Otomatik senkron kapalı.", empty);
+    }
 
-    const config = this.options.getSyncConfig();
     if (!isUsableSyncConfig(config)) {
       this.nextPassiveRunAt = Date.now() + 60_000;
       this.phase = "idle";

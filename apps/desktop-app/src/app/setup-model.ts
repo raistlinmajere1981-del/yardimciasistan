@@ -107,7 +107,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsapp: setupData.whatsapp || "",
     email: setupData.email || "",
     address: setupData.address || "",
-    webModuleUrl: setupData.webModuleUrl || defaultSetupData.webModuleUrl,
+    webModuleUrl: setupData.webModuleUrl,
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : "",
     autoSyncEnabled: setupData.autoSyncEnabled,
     localNetworkEnabled: setupData.localNetworkEnabled !== false,

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { emptyArasShippingConfiguration } from "@yardimci-asistan/shared";
 import type { CommerceShipment, CommerceShipmentStatus, CommerceOrder, CommerceOrderDetail } from "@yardimci-asistan/shared";
+import { useMarketOrderBenefits } from "./use-market-order-benefits";
 
 export type FulfillmentPaymentChoice = "cash" | "card" | "bank" | "other" | "credit";
 
 /** Controller-owned session survives page/tab unmounts; only the visible panel renders. */
-export function useMarketOrdersSession({ enabled, onStateChange }: {
+export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onStateChange }: {
   enabled: boolean;
+  benefitsEnabled?: boolean;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
@@ -24,7 +26,12 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   const shipmentMutationRef = useRef(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [fulfillmentPayment, setFulfillmentPayment] = useState<FulfillmentPaymentChoice>("cash");
+  const [fulfillmentPayment, setFulfillmentPaymentState] = useState<FulfillmentPaymentChoice>("cash");
+  const benefits = useMarketOrderBenefits({ enabled: enabled && benefitsEnabled, detail: selectedOrder, payment: fulfillmentPayment });
+  const pendingBenefits = benefits.pending;
+  const setFulfillmentPayment = useCallback((value: FulfillmentPaymentChoice) => {
+    if (!pendingBenefits.current && !mutationInFlight.current) setFulfillmentPaymentState(value);
+  }, [pendingBenefits]);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const reloadGeneration = useRef(0);
@@ -38,6 +45,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
 
   // Local mutation results invalidate older reads and update UI without an event round trip.
   const setSelectedOrder = useCallback((detail: CommerceOrderDetail | null) => {
+    if (pendingBenefits.current) return;
     ++reloadGeneration.current;
     ++detailGeneration.current;
     openingOrderRef.current = false;
@@ -47,7 +55,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     if (detail) setOrders((current) => current.some((order) => order.id === detail.order.id)
       ? current.map((order) => order.id === detail.order.id ? detail.order : order)
       : [detail.order, ...current]);
-  }, []);
+  }, [pendingBenefits]);
 
   const reloadOrders = useCallback(async (quiet = false) => {
     if (!bridge || !enabledRef.current) return;
@@ -59,10 +67,10 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
       if (!enabledRef.current || request !== reloadGeneration.current) return;
       setOrders(next);
       const selectedId = selectedIdRef.current;
-      if (openingOrderRef.current || !selectedId || !next.some((order) => order.id === selectedId)) return;
+      if (pendingBenefits.current || mutationInFlight.current || openingOrderRef.current || !selectedId || !next.some((order) => order.id === selectedId)) return;
       detailRequest = ++detailGeneration.current;
       const detail = await bridge.getOrder(selectedId);
-      if (enabledRef.current && request === reloadGeneration.current && detailRequest === detailGeneration.current && selectedIdRef.current === selectedId) {
+      if (!pendingBenefits.current && !mutationInFlight.current && enabledRef.current && request === reloadGeneration.current && detailRequest === detailGeneration.current && selectedIdRef.current === selectedId) {
         setSelectedOrderState(detail);
       }
     } catch (error) {
@@ -72,18 +80,18 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     } finally {
       if (request === reloadGeneration.current) setLoadingOrders(false);
     }
-  }, [bridge]);
+  }, [bridge, pendingBenefits]);
 
   const openOrder = useCallback(async (orderId: string) => {
-    if (!bridge || !enabledRef.current) return;
+    if (!bridge || !enabledRef.current || pendingBenefits.current || mutationInFlight.current) return;
     const request = ++detailGeneration.current;
     openingOrderRef.current = true;
     try {
       const detail = await bridge.getOrder(orderId);
-      if (enabledRef.current && request === detailGeneration.current) {
+      if (!pendingBenefits.current && !mutationInFlight.current && enabledRef.current && request === detailGeneration.current) {
         selectedIdRef.current = detail?.order.id ?? "";
         setSelectedOrderState(detail);
-        setFulfillmentPayment("cash");
+        setFulfillmentPaymentState("cash");
       }
     } catch (error) {
       if (enabledRef.current && request === detailGeneration.current) {
@@ -92,7 +100,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     } finally {
       if (request === detailGeneration.current) openingOrderRef.current = false;
     }
-  }, [bridge]);
+  }, [bridge, pendingBenefits]);
 
   useEffect(() => {
     if (!enabled || !bridge) return;
@@ -151,7 +159,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
 
   const mutateShipment = useCallback(async (shipmentId?: string, status?: CommerceShipmentStatus, providerAction?: "register" | "refresh") => {
     const orderId = shipmentOrderRef.current;
-    if (!bridge || !enabledRef.current || !orderId || shipmentMutationRef.current) return;
+    if (!bridge || !enabledRef.current || !orderId || shipmentMutationRef.current || pendingBenefits.current || mutationInFlight.current) return;
     shipmentMutationRef.current = true;
     setMutatingShipment(true);
     setShipmentError("");
@@ -179,11 +187,11 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
       shipmentMutationRef.current = false;
       setMutatingShipment(false);
     }
-  }, [bridge, reloadShipments]);
+  }, [bridge, reloadShipments, pendingBenefits]);
 
   return { shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments,
     search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
-    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder };
+    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder, benefits };
 }
 export type MarketOrdersSession = ReturnType<typeof useMarketOrdersSession>;

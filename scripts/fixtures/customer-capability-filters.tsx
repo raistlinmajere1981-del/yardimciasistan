@@ -23,7 +23,7 @@ function Fixture() {
   control.setCustomerFilterCapabilities = setCapabilities;
   control.setCustomerFilterKbsEnabled = setKbsEnabled;
   const snapshot: BusinessCapabilitySnapshot = { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: capabilities };
-  const features = projectDesktopWorkspaceFeatures(snapshot);
+  const features = projectDesktopWorkspaceFeatures(snapshot, true);
   // Deliberately retain old raw records: visibility must use the feature authority,
   // not rely on upstream projection having emptied every collection.
   return <PageViewStateProvider><WorkspaceNavigationProvider definitions={[]} page="customerWork">

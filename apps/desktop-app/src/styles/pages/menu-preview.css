@@ -28,7 +28,7 @@
 
 .local-menu-preview-viewport {
   overflow: auto;
-  background: #e8ebef;
+  background: var(--color-bg-app);
 }
 
 .local-menu-preview-page {

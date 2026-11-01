@@ -1,3 +1,4 @@
+import { assertPaidTableOrderTender, readTableOrderTender } from "./database/table-order-settlement-store";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { moneyToMinor } from "@yardimci-asistan/shared";
@@ -100,7 +101,7 @@ export type DesktopFinanceMutationResult =
 
 const PAYMENT_METHODS = new Set<FinancePaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
 
-export type FinanceSource = "restaurant_order" | "pension_payment" | "room_folio_payment" | "customer_credit_payment" | "commerce_sale";
+export type FinanceSource = "restaurant_order" | "pension_payment" | "room_folio_payment" | "customer_credit_payment" | "commerce_sale" | "commerce_sale_refund";
 
 /** Canonical automatic ledger writer. The source owner must write on this transaction first.
  * System collections have fixed categories, independent of manual category availability.
@@ -109,25 +110,42 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
   if (!db.isTransaction) throw new Error("Finance source write requires a transaction.");
   let row: Record<string, unknown> | undefined;
   let prefix: string, category: string, description: string;
-  if (source === "restaurant_order") {
+  const direction = source === "commerce_sale_refund" ? "expense" : "income";
+  if (source === "commerce_sale_refund") {
+    row = db.prepare(`SELECT *, cash_minor AS amount_minor, created_at AS occurred_at,
+      created_at AS updated_at, '' AS deleted_at, '' AS note FROM commerce_sale_full_refunds WHERE id = ?`).get(sourceId);
+    if (!row) throw new Error("Finance refund source not found.");
+    // All-Puan refunds return points only. Never create a zero-value ledger entry.
+    if (Number(row.amount_minor) === 0) return;
+    ensureFinanceCategories(db);
+    prefix = "finance_commerce_refund_"; category = "market_refund"; description = "Market tam satış iadesi";
+  } else if (source === "restaurant_order") {
     row = db.prepare(`SELECT o.*, CAST(ROUND(o.total * 100) AS INTEGER) AS amount_minor,
       COALESCE((SELECT currency FROM table_order_items WHERE order_id = o.id LIMIT 1), 'TRY') AS currency,
       'unspecified' AS payment_method, COALESCE(NULLIF(o.closed_at, ''), o.updated_at) AS occurred_at,
       EXISTS(SELECT 1 FROM room_folio_table_order_transfers WHERE table_order_id = o.id) AS transferred
       FROM table_orders o WHERE o.id = ?`).get(sourceId);
     if (!row) throw new Error("Finance source not found.");
-    if (row.status !== "paid" || Number(row.total) <= 0 || row.transferred) {
+    const tender = readTableOrderTender(db, sourceId);
+    if (tender) {
+      const paid = assertPaidTableOrderTender(db, sourceId);
+      row.amount_minor = paid.cash_received_minor;
+      row.payment_method = paid.payment_method;
+      row.currency = paid.currency;
+    }
+    if (row.status !== "paid" || Number(row.amount_minor) <= 0 || row.transferred) {
       db.prepare("UPDATE finance_entries SET deleted_at = ?, updated_at = ? WHERE source_type = ? AND source_id = ?")
         .run(String(row.updated_at), String(row.updated_at), source, sourceId);
       return;
     }
     prefix = "finance_restaurant_"; category = "restaurant"; description = "Restoran adisyonu";
   } else if (source === "commerce_sale") {
-    row = db.prepare(`SELECT *, COALESCE(NULLIF(closed_at, ''), created_at) AS occurred_at,
-      '' AS note FROM commerce_sales WHERE id = ?`).get(sourceId);
+    row = db.prepare(`SELECT s.*, COALESCE(NULLIF(s.closed_at, ''), s.created_at) AS occurred_at,
+      p.cash_received_minor, '' AS note FROM commerce_sales s
+      LEFT JOIN commerce_sale_settlements p ON p.sale_id = s.id AND p.business_id = s.business_id WHERE s.id = ?`).get(sourceId);
     if (!row) throw new Error("Finance source not found.");
     if (row.status === "paid" && !row.deleted_at && Number(row.total) > 0) {
-      row.amount_minor = moneyToMinor(Number(row.total));
+      row.amount_minor = row.cash_received_minor == null ? moneyToMinor(Number(row.total)) : Number(row.cash_received_minor);
     }
     if (!row.amount_minor) {
       const removedAt = String(row.deleted_at || row.updated_at);
@@ -154,12 +172,12 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
   db.prepare(`INSERT INTO finance_entries (
     id, direction, amount_minor, currency, payment_method, category, description,
     occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
-  ) VALUES (?, 'income', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
     ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
       amount_minor = excluded.amount_minor, currency = excluded.currency,
       payment_method = excluded.payment_method, occurred_at = excluded.occurred_at,
       note = excluded.note, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at`)
-    .run(prefix + sourceId, Number(row.amount_minor), String(row.currency), String(row.payment_method), category, description,
+    .run(prefix + sourceId, direction, Number(row.amount_minor), String(row.currency), String(row.payment_method), category, description,
       String(row.occurred_at), source, sourceId, String(row.note), String(row.created_at), String(row.updated_at), String(row.deleted_at ?? ""));
 }
 
@@ -193,6 +211,7 @@ const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
   { id: "pension", direction: "income", name: "Pansiyon", isSystem: true, sortOrder: 90 },
   { id: "restaurant", direction: "income", name: "Restoran", isSystem: true, sortOrder: 100 },
   { id: "market", direction: "income", name: "Market", isSystem: true, sortOrder: 110 },
+  { id: "market_refund", direction: "expense", name: "Market / Satış iadesi", isSystem: true, sortOrder: 110 },
   { id: "stock", direction: "expense", name: "Market / Stok", isSystem: false, sortOrder: 10 },
   { id: "utilities", direction: "expense", name: "Elektrik - Su", isSystem: false, sortOrder: 20 },
   { id: "rent", direction: "expense", name: "Kira", isSystem: false, sortOrder: 30 },

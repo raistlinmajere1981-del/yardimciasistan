@@ -1080,11 +1080,18 @@ export interface DesktopSyncRuntimeStatus {
   nextRetryAt: string;
 }
 
+export interface AndroidMarketSaleResultReceipt {
+  actionId: string; deviceId: string; intentHash: string; createdAt: string;
+  saleId: string; businessId: string; source: "android-market-sale"; customerId: string | null;
+  cashPaidMinor: number; pointsTenderMinor: number; discountMinor?: number; currency: string; paymentMethod: string;
+}
+
 export type ApplyAndroidActionResult =
   | {
       ok: true;
       message: string;
       alreadyApplied: boolean;
+      receipt?: AndroidMarketSaleResultReceipt;
     }
   | {
       ok: false;
