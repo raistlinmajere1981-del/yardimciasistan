@@ -78,7 +78,21 @@ try {
       };
     }
     window.__m8fActions = [];
-    delete window.yardimciDesktop;
+    window.__m8fTrafficCalls = [];
+    window.yardimciDesktop = {
+      getSiteTrafficSnapshot: async (days, fresh = false) => {
+        window.__m8fTrafficCalls.push({ days, fresh });
+        return { ok: true, stale: false, fetchedAt: "2026-11-02T15:00:00+03:00", value: {
+          enabled: true, has_data: true, days,
+          totals: { sessions: 22, views: 48, intents: 3 },
+          daily: [{ date: "2026-11-02", sessions: 22, views: 48, intents: 3 }],
+          top_pages: [{ page: "catalog:part-1", count: 15 }],
+          sources: [{ source: "search", count: 17 }],
+          conversions: { requests: 1, orders: 2 },
+          last_collected_at: "2026-11-02T15:00:00+03:00"
+        } };
+      }
+    };
   }, { dashboard, setup, syncStatus });
 
   await page.goto(`${baseUrl}dashboard-workspace-test`);
@@ -86,7 +100,20 @@ try {
   // Dashboard and health are projections: supplied controller state is enough; no preload bridge is required.
   await expect(page.locator(".dashboard-page")).toBeVisible();
   await expect(page.locator(".system-health-panel")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Site trafiği/ })).toBeVisible();
+  const trafficButton = page.getByRole("button", { name: /Site trafiği/ });
+  await expect(trafficButton).toBeVisible();
+  await expect(trafficButton).toContainText("22 bugün");
+  await trafficButton.hover();
+  const trafficDialog = page.getByRole("dialog", { name: "Site trafiği ayrıntıları" });
+  await expect(trafficDialog).toBeVisible();
+  await expect(trafficDialog).toContainText("Onaylı web siparişi");
+  await expect(trafficDialog).toContainText("Katalog · part-1");
+  await trafficDialog.getByRole("button", { name: "30 gün" }).click();
+  await expect.poll(() => page.evaluate(() => window.__m8fTrafficCalls.some(call => call.days === 30))).toBe(true);
+  await trafficDialog.getByRole("button", { name: "Raporu yenile" }).click();
+  await expect.poll(() => page.evaluate(() => window.__m8fTrafficCalls.some(call => call.days === 30 && call.fresh))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(trafficDialog).toHaveCount(0);
   await expect(page.locator(".system-health-item")).toHaveCount(6);
   await expect(page.locator(".system-health-item").filter({ hasText: "Web bağlantısı" })).toContainText("Web eşitlemeye hazır");
   await expect(page.locator(".system-health-item").filter({ hasText: "Ağ sinyali" })).toContainText("İnternet ve servis erişimi doğrulanmadı");

@@ -17,6 +17,7 @@ export function SiteTrafficCard() {
   const anchor = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoringFocus = useRef(false);
   const seq = useRef(0);
   const read = useCallback(async (days: 7 | 30, fresh = false) => {
     const current = ++seq.current;
@@ -57,7 +58,10 @@ export function SiteTrafficCard() {
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      event.preventDefault(); setOpen(false); anchor.current?.focus();
+      event.preventDefault(); setOpen(false);
+      restoringFocus.current = true;
+      try { anchor.current?.focus({ preventScroll: true }); }
+      finally { restoringFocus.current = false; }
     };
     document.addEventListener("pointerdown", dismiss, true);
     document.addEventListener("keydown", escape, true);
@@ -78,7 +82,7 @@ export function SiteTrafficCard() {
   return <section className="dashboard-site-traffic" aria-label="Site trafiği">
     <button ref={anchor} type="button" className="dashboard-site-traffic-trigger interactive-surface" aria-haspopup="dialog" aria-expanded={open}
       onMouseEnter={() => { clearClose(); setOpen(true); }} onMouseLeave={scheduleClose}
-      onFocus={() => { clearClose(); setOpen(true); }} onClick={() => { clearClose(); setOpen(v => !v); }}>
+      onFocus={() => { if (restoringFocus.current) return; clearClose(); setOpen(true); }} onClick={() => { clearClose(); setOpen(v => !v); }}>
       <span className="dashboard-site-traffic-symbol"><BarChart3 size={19} aria-hidden="true" /></span>
       <span className="dashboard-site-traffic-copy"><small>Site trafiği</small><strong>{busy && !value ? "Yükleniyor…" : value && !value.enabled ? "Site trafiği kapalı" : noData ? "Henüz ölçüm yok" : `${count(today?.sessions)} bugün`}</strong>
         <small>{value && !value.enabled ? "Ayarlar > Web bağlantısı" : noData ? "Ziyaretler ölçülmeye başlayınca görünür" : `${count(value.totals.sessions)} oturum · ${period} gün${result?.ok && result.stale ? " · güncel değil" : ""}`}</small></span>
