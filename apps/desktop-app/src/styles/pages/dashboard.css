@@ -869,7 +869,8 @@
 .dashboard-site-traffic-metrics strong { font-size: var(--text-md); }
 .dashboard-site-traffic-chart { display: flex; height: 86px; gap: 2px; align-items: end; padding-block: var(--space-2); border-bottom: 1px solid var(--color-border); }
 .dashboard-site-traffic-bar { flex: 1; height: 100%; display: flex; align-items: end; }
-.dashboard-site-traffic-bar > span { width: 100%; min-height: 2px; background: var(--color-accent); border-radius: 2px 2px 0 0; }
+.dashboard-site-traffic-bar > svg { width: 100%; height: 100%; display: block; }
+.dashboard-site-traffic-bar rect { fill: var(--color-accent); }
 .dashboard-site-traffic-popup h4 { margin: var(--space-3) 0 var(--space-2); font-size: var(--text-sm); }
 .dashboard-site-traffic-popup ol { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
 .dashboard-site-traffic-popup li { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); }

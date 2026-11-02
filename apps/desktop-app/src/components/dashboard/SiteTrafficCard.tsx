@@ -31,7 +31,8 @@ export function SiteTrafficCard() {
   useEffect(() => {
     void read(period);
     const handle = window.setInterval(() => { if (document.visibilityState === "visible") void read(period); }, 300_000);
-    return () => { ++seq.current; window.clearInterval(handle); };
+    const requestSequence = seq;
+    return () => { ++requestSequence.current; window.clearInterval(handle); };
   }, [period, read]);
   const clearClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const scheduleClose = () => { clearClose(); closeTimer.current = setTimeout(() => setOpen(false), 220); };
@@ -99,7 +100,7 @@ export function SiteTrafficCard() {
       {value && value.has_data ? <>
         <div className="dashboard-site-traffic-metrics"><div><small>Oturum</small><strong>{count(value.totals.sessions)}</strong></div><div><small>Sayfa gösterimi</small><strong>{count(value.totals.views)}</strong></div><div><small>İletişim tıklaması</small><strong>{count(value.totals.intents)}</strong></div>
           {value.conversions && <><div><small>Onaylı web talebi</small><strong>{count(value.conversions.requests)}</strong></div><div><small>Onaylı web siparişi</small><strong>{count(value.conversions.orders)}</strong></div></>}</div>
-        <div className="dashboard-site-traffic-chart" aria-label={`${period} günlük oturum grafiği`}>{value.daily.map(item => <div key={item.date} className="dashboard-site-traffic-bar" title={`${item.date}: ${item.sessions} yaklaşık oturum`}><span style={{ height: `${Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))}%` }} /></div>)}</div>
+        <div className="dashboard-site-traffic-chart" aria-label={`${period} günlük oturum grafiği`}>{value.daily.map(item => <div key={item.date} className="dashboard-site-traffic-bar" title={`${item.date}: ${item.sessions} yaklaşık oturum`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y={100 - Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))} width="100" height={Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))} /></svg></div>)}</div>
         <h4>En çok bakılan sayfalar</h4>
         {value.top_pages.length ? <ol>{value.top_pages.map(item => <li key={item.page}><span>{pageName(item.page)}</span><strong>{count(item.count)}</strong></li>)}</ol> : <small>Henüz sayfa kırılımı yok.</small>}
         <h4>Geliş kaynakları</h4>

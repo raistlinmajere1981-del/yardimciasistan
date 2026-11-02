@@ -78,7 +78,7 @@ export async function readSiteTrafficSnapshot(
       signal: AbortSignal.timeout(15_000)
     });
     if (!response.ok) throw Error(`http_${response.status}`);
-    const json = await response.json();
+    const json: unknown = await response.json();
     const value = normalizeTrafficSnapshot(json, days);
     const fetchedAt = new Date(now).toISOString();
     reportCache.set(key, { value, fetchedAt, time: now });

@@ -1241,7 +1241,8 @@ function assertCapabilitiesShape() {
       "publication_source_epochs",
       "idempotent_publications",
       "server_revision",
-      "runtime_reset"
+      "runtime_reset",
+      "traffic_analytics_v1"
     ],
     server_time: undefined,
     server_revision: undefined

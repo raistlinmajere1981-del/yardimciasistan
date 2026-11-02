@@ -12,7 +12,7 @@ try {
   await page.getByRole('button', { name: 'Analitik', exact: true }).click();
   await expect(page.getByLabel('Analitik genel özet')).toContainText('Gönderilen mesaj6');
   for (const channel of ['Web sitesi','WhatsApp Business','SMS','Instagram']) await expect(page.getByLabel(`${channel} analitiği`, { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Web sitesi analitiği')).toContainText('Ziyaret verisi toplanmıyor.');
+  await expect(page.getByLabel('Web sitesi analitiği')).toContainText('Dashboard’daki Site trafiği kartında ölçülür.');
   await expect(page.getByLabel('Web sitesi metrikleri')).toContainText('Başarısız0');
   await expect(page.getByLabel('Instagram analitiği')).toContainText('Ölçüm izni doğrulanmadı');
   await expect(page.getByLabel('Analitik genel özet')).toContainText('Onaylanan yayın2');
@@ -42,7 +42,7 @@ try {
   await page.getByLabel('Son sonuçlar').locator('.list-row').filter({hasText:'WhatsApp Business gönderimi'}).getByRole('button', { name: 'Sonucu aç' }).click();
   await page.getByRole('button',{name:'Teslim ve okunma sonuçları',exact:true}).click(); await expect(page.getByLabel('Kampanya analitiği')).toBeVisible(); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Kitle5'); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Gönderilen3');
   await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click(); await page.getByLabel('Son sonuçlar').locator('.list-row').filter({ hasText: 'Web sitesi yayını' }).getByRole('button', { name: 'Sonucu aç' }).click();
-  await expect(page.getByLabel('Yayın analitiği')).toContainText('Ziyaret verisi toplanmıyor.'); await expect(page.getByRole('region',{name:'Geçmiş',exact:true})).toContainText('Yayınlandı');
+  await expect(page.getByLabel('Yayın analitiği')).toContainText('Dashboard’daki Site trafiği kartında ölçülür.'); await expect(page.getByRole('region',{name:'Geçmiş',exact:true})).toContainText('Yayınlandı');
   // Optional provider capability supplies 0 as a measured value and preserves failed/stale snapshots.
   await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
   const openInstagram = async () => {
