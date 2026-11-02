@@ -31,6 +31,8 @@ test("demo generator emits restorable, readable packages", { timeout: 180000 }, 
 
     const manifest = JSON.parse(fs.readFileSync(path.join(output, "demo-data-manifest.json"), "utf8"));
     assert.equal(manifest.format, "yardimci-asistan-demo-data-manifest");
+    const productVersion = JSON.parse(fs.readFileSync(path.resolve(here, "../../product-version.json"), "utf8"));
+    assert.equal(manifest.version, productVersion.version, "Demo fixtures must match the published Desktop release");
     assert.deepEqual(manifest.packages.map((item) => item.id), [
       "a-pension-restaurant",
       "b-market",

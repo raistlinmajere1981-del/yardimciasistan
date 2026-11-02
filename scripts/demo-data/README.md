@@ -1,4 +1,4 @@
-# Demo data generator (2.1.0)
+# Demo data generator (current product version)
 
 Creates three synthetic Yardımcı Asistan backup packages from the **current**
 `apps/desktop-app/db/schema.sql`, then verifies them through the real desktop
@@ -13,9 +13,9 @@ Running the generator writes only under `artifacts/demo-data/`:
 
 | File | Business profile | Content |
 | --- | --- | --- |
-| `yardimci-asistan-demo-2.1.0-a-pension-restaurant.zip` | `pension_restaurant` | Rooms, stays, an open folio, table orders, QR menu, reservations, tasks, requests and Finance projections |
-| `yardimci-asistan-demo-2.1.0-b-market.zip` | `market` | Catalog, barcode stock, suppliers, a purchase order, paid sales, one full refund, benefit rules and points |
-| `yardimci-asistan-demo-2.1.0-c-market-dealer.zip` | `market` + wholesale/credit/online sales | Dealer profiles, dealer prices, web-linked dealer accounts, dealer orders, online catalog publication, customer credit and benefit rules |
+| `yardimci-asistan-demo-<version>-a-pension-restaurant.zip` | `pension_restaurant` | Rooms, stays, an open folio, table orders, QR menu, reservations, tasks, requests and Finance projections |
+| `yardimci-asistan-demo-<version>-b-market.zip` | `market` | Catalog, barcode stock, suppliers, a purchase order, paid sales, one full refund, benefit rules and points |
+| `yardimci-asistan-demo-<version>-c-market-dealer.zip` | `market` + wholesale/credit/online sales | Dealer profiles, dealer prices, web-linked dealer accounts, dealer orders, online catalog publication, customer credit and benefit rules |
 | `demo-data-manifest.json` | — | SHA-256 hashes, sizes, expected counts, read checks and limitations |
 
 Each ZIP contains exactly one backup folder:

@@ -175,7 +175,7 @@ açar ve `Ayarlar → Veriler → Geri Yükle` akışını kullanır; mevcut sü
 dosyasını doğrudan seçerek içe alma özelliği sunmaz. Geri yükleme mevcut yerel
 verilerin yerine geçer; web ve Android bağlantıları ayrıca kurulmalıdır.
 
-Paketler yalnız **aynı güncel şema ile çalışan 2.1.0 test kurulumunda**
+Paketler yalnız **aynı güncel şema ile çalışan ilgili sürüm test kurulumunda**
 kullanılır; gerçek işletme verileriyle karıştırılmaz. İsim/fiyat/müşteri ve
 işlemler sentetiktir, gerçek ürün fotoğrafları kullanılırsa kaynak/lisans
 kayıtları korunur. Sır, token, eşleştirme veya gerçek kullanıcı verisi

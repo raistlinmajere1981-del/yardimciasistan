@@ -2,7 +2,13 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-export const DEMO_VERSION = "2.1.0";
+// Demo backup release identity follows the same canonical desktop version as
+// the installer and /kurulum/ cards. Never publish renamed older-schema ZIPs.
+const productVersion = JSON.parse(fs.readFileSync(new URL("../../../product-version.json", import.meta.url), "utf8"));
+export const DEMO_VERSION = productVersion.version;
+if (typeof DEMO_VERSION !== "string" || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(DEMO_VERSION)) {
+  throw new Error("Invalid canonical demo product version");
+}
 
 // Each freshly produced pack uses the current Turkish calendar day, so "Today"
 // and "Last 7 days" remain populated. YA_DEMO_DATE can freeze a YYYY-MM-DD
