@@ -1,0 +1,61 @@
+# Demo data asset attribution
+
+The panorama source photographs under `assets/panoramas/` are **third-party
+photographs, not photographs of the synthetic demo business**. They are used
+only as representative interior/entrance panoramas inside the demo backup
+package. The business names, people, prices and orders in the package remain
+synthetic.
+
+All four files are licensed under
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+The license permits sharing and adaptation, including commercial use, provided
+attribution is given. No endorsement by the authors or NOIRLab is implied.
+
+## Source images
+
+### `room-360.jpg` (1280 × 640, equirectangular 360°)
+
+- Title: Cerro Tololo Hotel Interior 360 Panorama
+- Author: NOIRLab / NSF/AURA / P. Horálek
+- Source: <https://commons.wikimedia.org/wiki/File:Cerro_Tololo_Hotel_Interior_360_Panorama_(2022_04_08_Pano360_Tololo_Hotel_Room-CC).jpg>
+- License: CC BY 4.0 — <https://creativecommons.org/licenses/by/4.0/>
+- Changes: none (file copied as published).
+
+### `room-180.jpg` (640 × 640, 180° crop)
+
+- Title: Cerro Tololo Hotel Interior 360 Panorama (centre crop)
+- Author: NOIRLab / NSF/AURA / P. Horálek
+- Source: derived from the `room-360.jpg` source above
+- License: CC BY 4.0 — <https://creativecommons.org/licenses/by/4.0/>
+- Changes: **cropped** to the centre half of the equirectangular source so the
+  file covers approximately 180° horizontally. This is a modification, not an
+  original publication.
+
+### `restaurant-360.jpg` (1280 × 640, equirectangular 360°)
+
+- Title: Cerro Pachón Hotel and Restaurant Entrance 360 Panorama
+- Author: CTIO / NOIRLab / NSF/AURA
+- Source: <https://commons.wikimedia.org/wiki/File:Cerro_Pachón_Hotel_and_Restaurant_Entrance_360_Panorama_(2022_04_08_Pano360_Pachon_Hotel_Hall-CC).jpg>
+- License: CC BY 4.0 — <https://creativecommons.org/licenses/by/4.0/>
+- Changes: none (file copied as published).
+
+### `restaurant-180.jpg` (640 × 640, 180° crop)
+
+- Title: Cerro Pachón Hotel and Restaurant Entrance 360 Panorama (centre crop)
+- Author: CTIO / NOIRLab / NSF/AURA
+- Source: derived from the `restaurant-360.jpg` source above
+- License: CC BY 4.0 — <https://creativecommons.org/licenses/by/4.0/>
+- Changes: **cropped** to the centre half of the equirectangular source so the
+  file covers approximately 180° horizontally. This is a modification, not an
+  original publication.
+
+## Where attribution appears in a package
+
+- `assets/PANORAMA_ATTRIBUTION.txt` — human-readable notice shipped inside every
+  backup folder that contains panorama media.
+- `assets/room-media/manifest.json` and `assets/table-media/manifest.json` —
+  each media `title` names the author and the CC BY 4.0 license.
+- `scripts/demo-data/demo-data-manifest.json` — package-level panorama inventory
+  with source URLs, authors, license and file hashes.
+- The desktop media picker/list shows the stored `title`, so the attribution is
+  visible to users who inspect the media.

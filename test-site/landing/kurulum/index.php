@@ -70,6 +70,31 @@ $moduleUrl = $scheme . '://' . $host . '/yardimci-asistan';
     <p class="section-footnote"><?= e(t('install.companion_steps')) ?></p>
   </section>
 
+  <section class="setup-box sample-packages-section" aria-labelledby="sample-packages-title">
+    <span class="eyebrow"><?= e(t('sample.eyebrow')) ?></span>
+    <h2 id="sample-packages-title"><?= e(t('sample.title')) ?></h2>
+    <p class="setup-lead"><?= e(t('sample.lead')) ?></p>
+    <div class="download-grid sample-package-grid">
+      <?php foreach (demo_sample_downloads() as $sample): ?>
+      <?php if ($sample['ready']): ?>
+      <a class="sample-package-card" href="<?= e($sample['url']) ?>" download>
+        <span class="sample-package-icon" aria-hidden="true">ZIP</span>
+        <strong><?= e(t('sample.name.' . $sample['key'])) ?></strong>
+        <span><?= e(t('sample.ready')) ?></span>
+      </a>
+      <?php else: ?>
+      <div class="sample-package-card sample-package-unavailable">
+        <span class="sample-package-icon" aria-hidden="true">ZIP</span>
+        <strong><?= e(t('sample.name.' . $sample['key'])) ?></strong>
+        <span><?= e(t('sample.pending')) ?></span>
+      </div>
+      <?php endif; ?>
+      <?php endforeach; ?>
+    </div>
+    <p class="sample-restore-steps"><?= e(t('sample.steps')) ?></p>
+    <p class="sample-restore-warning"><?= e(t('sample.warning')) ?></p>
+  </section>
+
   <p class="section-footnote"><?= e(t('install.android_clean_install')) ?></p>
   <section class="setup-box" style="margin-bottom:0;" aria-labelledby="steps-title">
     <h2 id="steps-title"><?= e(t('landing.steps_title')) ?></h2>

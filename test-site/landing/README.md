@@ -49,6 +49,32 @@ API'sinin Online Satış kararını izler; yeni sipariş kabulü ve teslimat ayr
 Sepet/hesap/mutation authority'si mevcut backend'dir. İstek hatasında taslak ve
 aynı işlem niyeti için idempotency anahtarı korunur.
 
+## Yayın Laboratuvarı (demo sunumu)
+
+Demo ana sayfa `deneme/site/views/pages/home.php`, üst gezinme
+`deneme/site/views/components/header.php`, stil ve geçişler
+`deneme/assets/site/theme.css` / `theme.mjs` içinde bulunur. Ortak
+`deneme/core/` / `deneme/assets/core/` üzerinde fork oluşturmaz.
+
+- **Yayınlananlar** yalnız `bootstrap()` içinden gelen `view.pages` alanına
+  göre gerçek herkese açık sayfalara bağlantı verir. Boş/kesinti durumları ayrı
+  tutulur; demo verisiyle API başarısızlığı maskelenmez.
+- **Neler mümkün?** varlığı doğrulanmamış sayfalar için tıklanamayan,
+  açıklama amaçlı kartlar sunar. Kartlar API yayını, sipariş, yetki veya
+  gerçek kayıt oluşturmaz. Bağlantı kesildiğinde yayının durumu bilinmez.
+- **Ziyaretçi görünümü** `?page=home&view=visitor` üzerinden açılır. Bu
+  yalnız sunuma ait bir URL merceğidir; yetki, kayıt, hesap ve sepet davranışı
+  ortak çekirdekte kalır. Diğer sayfalara gezinirken `view` korunur.
+- Geri dönüş için yalnız demo üst menüsünden ana tanıtım sitesine bağlantı
+  verilir. Test sitesi kendi gezinmesini kullanır.
+- Üst tanıtımdaki 2.1.0 iş akışları kartları sabit tanıtım metnidir;
+  sektörel yetenek ağacına alternatif bir özellik kaydı değildir. Sektör bazlı
+  ayrıntılı yetenek analizi ayrı çalışma kapsamında yürütülür.
+- Yeni UI metinleri `locales/tr.json` içinde tutulur; dağıtım kopyası
+  `deneme/locales/tr.json` dosyasıyla eşit olmalıdır. Mevcut kaynak katalog
+  üst limiti 1000 anahtar olduğundan yeni kapsamlı metin eklemeleri için
+  ortak çekirdek sahibiyle limit değerlendirmesi gerekir.
+
 ## Dinamik dil
 
 Sabit hedef dil dosyası veya zorunlu İngilizce yoktur. Desktop Çoklu Dil servisinde
@@ -109,3 +135,66 @@ Yerel çalışmada gerçek veriye yazmak yerine izole test işletmesi kullanılm
 
 Canonical ayrıntılar: `docs/architecture/WEB_SITE_TEMPLATE_V1.md`,
 `docs/architecture/WEB_DATA_SERVICE_CONTRACT_V1.md` ve `docs/dev/RELEASE_WORKFLOW.md`.
+
+## Demo veri paketlerinin indirilmesi
+
+`/kurulum/` içindeki **Hazır Demo Veri Paketleri** bölümü mevcut Windows/Android
+kurulum dosyalarından ayrıdır. `inc/demo-installation.php::demo_sample_downloads()`
+üç sürüm-özel ZIP adını `release.json.desktopVersion` değerinden türetir:
+`pension-restaurant`, `market`, `market-bayi`. `downloads/` altında dosya
+bulunmadığında, boş olduğunda veya sürüm metadatası geçersizse indirme yerine
+"henüz yayınlanmadı" metni gösterilir. Dosya oluşturulmadan indirme linki
+sunulmaz. Küçük sözleşme testi: `node --test
+test-site/landing/scripts/test-demo-sample-downloads.mjs`.
+
+Üretici/fixture sahibi `scripts/demo-data/` olup paketleri `artifacts/demo-data/`
+altında üretir. Bu dosyalar **otomatik olarak siteye yüklenmez**.
+`scripts/lib/demo-deployment.mjs` normal site kaynaklarını dağıtır fakat
+`downloads/` korunan yoldur; mevcut `--with-downloads` de yalnız resmi
+installer/APK eserlerini yayımlar. Demo ZIP'leri kullanıcı onaylı, dosya
+doğrulanmış ayrı bir upload ile indirme köküne alınmalıdır.
+
+Yerel staging aşaması (sunucuya **hiç bağlanmaz**):
+
+```bash
+node test-site/landing/scripts/stage-demo-packages.mjs
+node test-site/landing/scripts/stage-demo-packages.mjs --stage
+```
+
+İlk komut paket manifesti, sürüm, ZIP hash ve ZIP dizin sözleşmesini
+kontrol eder. `--stage` yalnız doğrulanmış üç arşivi
+`test-site/landing/downloads/` içine sunum katmanının beklediği isimlerle
+kopyalar. Bu klasör Git'te ignore edilir ve normal site deploy allowlist'ine
+dahil değildir. Canlı siteye aktarım ayrıca onaylı iş olacaktır.
+
+
+Manuel geri yükleme için ZIP'in doğrudan içinde tek klasör bulunmalıdır. Bu
+klasör `backup.json`, `yardimci-asistan.sqlite`, `assets/` ve
+`qr-menu-images/` içermelidir. Kullanıcı paketi uygulamanın **yedek köküne**
+açar ve `Ayarlar → Veriler → Geri Yükle` akışını kullanır; mevcut sürüm ZIP
+dosyasını doğrudan seçerek içe alma özelliği sunmaz. Geri yükleme mevcut yerel
+verilerin yerine geçer; web ve Android bağlantıları ayrıca kurulmalıdır.
+
+Paketler yalnız **aynı güncel şema ile çalışan 2.1.0 test kurulumunda**
+kullanılır; gerçek işletme verileriyle karıştırılmaz. İsim/fiyat/müşteri ve
+işlemler sentetiktir, gerçek ürün fotoğrafları kullanılırsa kaynak/lisans
+kayıtları korunur. Sır, token, eşleştirme veya gerçek kullanıcı verisi
+gömülmez. Bu klasörler gerçek release paketinin parçası değildir.
+
+
+## Sabit fotoğraf / Efekt Atölyesi vitrini
+
+Deneme test alanı üç sabit fotoğraf içerir: kıyı/dalga, orman/ışık,
+göl/yansıma. Yerel dosyalar `deneme/assets/site/img/` altında;
+kaynak, yazar ve lisans bilgileri `SOURCES.md` dosyasındadır.
+Ana sayfanın tasarım vitrini yanında ziyaretçi görünümü, About ve
+İletişim sayfalarında da kullanılır. Fotoğraflar işletme galerisi
+veya yayınlanmış sahne değildir; animasyonları henüz yoktur.
+
+Ortak şablon 0.5.2 sabit site fotoğraflarını yalnız
+`effects-manifest.json` üzerinden bağlar. Ürün, oda/masa ve
+dinamik galeri medyası bundan bağımsızdır. Görseli Atölye'den
+yerelde hazırlamak canlı siteye yüklemek anlamına gelmez.
+Yeni kaynak çeviri anahtarı eklenmedi; mevcut 1000 anahtar sınırı
+korunuyor. Geçici sabit vitrin başlıkları sonraki TR/EN düzenlemesinde
+ortak sözlükle ele alınmalıdır.

@@ -36,3 +36,35 @@ function demo_downloads(): array
     unset($download);
     return [$downloads[0], $downloads[1], $downloads[3], $downloads[4], $downloads[2]];
 }
+
+
+/**
+ * Only published, locally present demo ZIPs appear as downloadable.
+ * Samples are not release executables and never masquerade as ready installs.
+ * A separate opt-in upload step owns the large sample artifacts.
+ */
+function demo_sample_downloads(): array
+{
+    $root = dirname(__DIR__);
+    $release = json_decode((string) @file_get_contents($root . '/release.json'), true);
+    $version = is_array($release) ? ($release['desktopVersion'] ?? '') : '';
+    if (!is_string($version) || !preg_match('/^[0-9][0-9A-Za-z.+-]*$/D', $version)) return [];
+    $samples = [
+        'combined' => 'pension-restaurant',
+        'market' => 'market',
+        'dealer' => 'market-bayi'
+    ];
+    $result = [];
+    foreach ($samples as $key => $slug) {
+        $file = "YardimciAsistan-OrnekVeri-{$slug}-{$version}.zip";
+        $path = $root . '/downloads/' . $file;
+        $ready = is_file($path) && is_readable($path) && filesize($path) > 0;
+        $result[] = [
+            'key' => $key,
+            'ready' => $ready,
+            'url' => $ready ? '/downloads/' . rawurlencode($file) : '',
+            'version' => $version
+        ];
+    }
+    return $result;
+}
