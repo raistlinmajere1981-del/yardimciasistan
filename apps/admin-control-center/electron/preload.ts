@@ -6,6 +6,7 @@ const bridge: AdminBridge = {
   loadEffectScene: (id) => ipcRenderer.invoke("admin:effects-load", id),
   saveEffectScene: (id, scene) => ipcRenderer.invoke("admin:effects-save", id, scene),
   publishEffectScene: (id) => ipcRenderer.invoke("admin:effects-publish", id),
+  prepareEffectScene: (id) => ipcRenderer.invoke("admin:effects-prepare", id),
   getOverview: () => ipcRenderer.invoke("admin:get-overview"),
   getInstallationCredentials: (installationId) => ipcRenderer.invoke("admin:get-installation-credentials", installationId),
   syncInstallationCredential: (installationId) => ipcRenderer.invoke("admin:sync-installation-credential", installationId),

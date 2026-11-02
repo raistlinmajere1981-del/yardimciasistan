@@ -91,6 +91,13 @@ ipcMain.handle("admin:effects-projects", () => runEffectStudio(REPO_ROOT, "list"
 ipcMain.handle("admin:effects-load", (_event, id: string) => runEffectStudio(REPO_ROOT, "load", { id }));
 ipcMain.handle("admin:effects-save", (_event, id: string, scene: unknown) =>
   runEffectStudio(REPO_ROOT, "save", { id, scene }));
+ipcMain.handle("admin:effects-prepare", async (_event, id: string) => {
+  if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
+      releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
+  effectPublishBusy = true;
+  try { return await runEffectStudio(REPO_ROOT, "prepare", { id }); }
+  finally { effectPublishBusy = false; }
+});
 ipcMain.handle("admin:effects-publish", async (_event, id: string) => {
   if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
       releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");

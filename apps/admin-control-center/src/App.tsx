@@ -28,7 +28,7 @@ import {
   XCircle
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CREDENTIAL_FIELDS } from "../shared/contracts";
+import { CREDENTIAL_FIELDS, deployTargetScopeNote } from "../shared/contracts";
 import { EffectStudio } from "./EffectStudio";
 import type {
   DependencyUpdateReport,
@@ -1670,9 +1670,11 @@ function Tests({
 
 function Deploy({
   data,
+  presetTargetId,
   onRefresh
 }: {
   data: OverviewSnapshot;
+  presetTargetId?: string;
   onRefresh: () => void;
 }) {
   const [targets, setTargets] = useState<DeploymentTargetSnapshot[]>([]);
@@ -1702,7 +1704,10 @@ function Deploy({
     ]).then(([nextTargets, state]) => {
       if (!active) return;
       setTargets(nextTargets);
-      setSelectedId((current) => current || nextTargets[0]?.id || "");
+      // A preset only selects an existing target. It never starts preflight or deploy.
+      const preferred = presetTargetId && nextTargets.some((target) => target.id === presetTargetId)
+        ? presetTargetId : "";
+      setSelectedId((current) => current || preferred || nextTargets[0]?.id || "");
       previousRunning = state.running;
       setRunState(state);
       setLoadError("");
@@ -1732,6 +1737,7 @@ function Deploy({
   const selectedInstallation = data.installations.find(
     (item) => item.id === selected?.installationId
   );
+  const selectedScopeNote = selected ? deployTargetScopeNote(selected.id) : "";
 
   const runTone: StatusKind = runState.result === "passed"
     ? "ready"
@@ -1833,6 +1839,7 @@ function Deploy({
                   <div>
                     <h2>{selected.title}</h2>
                     <p>{selected.description}</p>
+                    {selectedScopeNote ? <p className="quiet">{selectedScopeNote}</p> : null}
                   </div>
                 </div>
               </div>
@@ -2752,6 +2759,7 @@ function StartupSplash({
 export default function App() {
   const bridgeRecoveryScheduled = useRef(false);
   const [section, setSection] = useState<Section>("overview");
+  const [deployTargetPreset, setDeployTargetPreset] = useState("");
   const [data, setData] = useState<OverviewSnapshot | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -2837,7 +2845,11 @@ export default function App() {
               <button
                 key={item.id}
                 className={section === item.id ? "nav-item nav-item--active" : "nav-item"}
-                onClick={() => setSection(item.id)}
+                onClick={() => {
+                  // Manual navigation must not keep a one-shot target preset.
+                  if (item.id === "deploy") setDeployTargetPreset("");
+                  setSection(item.id);
+                }}
               >
                 <Icon size={18} />
                 {item.label}
@@ -2855,7 +2867,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="content">
+      <main className={section === "effects" ? "content content--effects" : "content"}>
         {error ? (
           <div className="error-banner">
             <TriangleAlert size={18} />
@@ -2873,9 +2885,12 @@ export default function App() {
         ) : section === "tests" && data ? (
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "deploy" && data ? (
-          <Deploy data={data} onRefresh={() => void loadOverview()} />
+          <Deploy data={data} presetTargetId={deployTargetPreset} onRefresh={() => void loadOverview()} />
         ) : section === "effects" && data ? (
-          <EffectStudio />
+          <EffectStudio onOpenDeploy={(targetId) => {
+            setDeployTargetPreset(targetId);
+            setSection("deploy");
+          }} />
         ) : section === "support" && data ? (
           <Support productVersion={data.product.version} />
         ) : section === "system" && data ? (

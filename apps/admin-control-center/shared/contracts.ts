@@ -322,7 +322,11 @@ export type EffectImageTarget = {
   hasDraft: boolean;
   hasScene: boolean;
   canPublish: boolean;
+  canPrepare?: boolean;
   note: string;
+  bindingStatus?: "linked" | "needs-setup" | "staged";
+  sourcePath?: string;
+  sourceHash?: string;
   width: number;
   height: number;
 };
@@ -330,8 +334,37 @@ export type EffectStudioProject = {
   id: string;
   name: string;
   siteUrl: string;
+  note?: string;
   images: EffectImageTarget[];
 };
+/**
+ * Deliberate links from an Effect Studio site id to an existing Admin Deploy
+ * target. Never infer a target from a site id, title or URL: a site gets a
+ * link only after its first activation has a reviewed deployment path.
+ */
+export const EFFECT_SITE_DEPLOY_TARGETS: Readonly<Record<string, string>> = Object.freeze({
+  landing: "landing"
+});
+
+export function effectSiteDeployTarget(siteId: string): string | null {
+  return Object.prototype.hasOwnProperty.call(EFFECT_SITE_DEPLOY_TARGETS, siteId)
+    ? EFFECT_SITE_DEPLOY_TARGETS[siteId] ?? null
+    : null;
+}
+
+/**
+ * Deploy targets whose title could be mistaken for a full site transfer.
+ * These notes only explain the existing target's scope; they never change
+ * what the deploy runner executes.
+ */
+export const DEPLOY_TARGET_SCOPE_NOTES: Readonly<Record<string, string>> = Object.freeze({
+  "teknikel-web": "Yalnız Yardımcı Asistan web modülünü günceller. Teknikel site kökü, tasarımı, sabit görselleri ve efekt sahneleri bu hedefle yayınlanmaz."
+});
+
+export function deployTargetScopeNote(targetId: string): string {
+  return DEPLOY_TARGET_SCOPE_NOTES[targetId] ?? "";
+}
+
 export type EffectScene = {
   format: string;
   version: number;
@@ -350,6 +383,7 @@ export type AdminBridge = {
   loadEffectScene(id: string): Promise<EffectStudioLoad>;
   saveEffectScene(id: string, scene: EffectScene): Promise<EffectStudioSave>;
   publishEffectScene(id: string): Promise<EffectStudioPublish>;
+  prepareEffectScene(id: string): Promise<EffectStudioPublish>;
   getOverview(): Promise<OverviewSnapshot>;
   getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
   syncInstallationCredential(installationId: string): Promise<{ ok: boolean; changed: boolean; verifiedLive: boolean; message: string }>;

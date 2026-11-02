@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { join, resolve } from "node:path";
 
-export function runEffectStudio(repoRoot: string, action: "list" | "load" | "save" | "publish", args: unknown = {}) {
+export function runEffectStudio(repoRoot: string, action: "list" | "load" | "save" | "prepare" | "publish", args: unknown = {}) {
   const studioRoot = process.env.EFEKT_ATOLYESI_ROOT
     ? resolve(process.env.EFEKT_ATOLYESI_ROOT)
     : resolve(repoRoot, "..", "EfektAtolyesi");
