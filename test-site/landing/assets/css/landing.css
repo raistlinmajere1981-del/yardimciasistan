@@ -415,3 +415,34 @@ section[id], article[id], details[id] { scroll-margin-top: 105px; }
 @media (max-width:360px) {
   .header-inner:has(.flag-language) .brand-text { max-width: 80px; font-size: 14px; line-height: 1.2; }
 }
+
+/* Version 2.1 product stories: independent of the canonical capability graph. */
+.release-section { background: #f4f7f4; border-block: 1px solid var(--line); }
+.release-highlights { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.release-card { min-width: 0; display: flex; flex-direction: column; padding: clamp(22px,3vw,32px); background: #fff; border: 1px solid #d5e1da; border-radius: 18px; box-shadow: 0 14px 36px #1b443008; transition: transform .2s ease,border-color .2s ease; }
+.release-card:hover { transform: translateY(-3px); border-color: #a2c9b7; }
+.release-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+.release-icon { display:grid; place-items:center; background:#e8f3ef; color:#24695b; width:48px; height:48px; border-radius:14px; }
+.release-icon .line-icon { width:23px; height:23px; }
+.release-index { color:#899c95; font: 12px ui-monospace, monospace; }
+.release-card h3 { font-size:19px; letter-spacing:-.5px; margin-bottom:11px; }
+.release-card p { color:var(--ink-secondary); font-size:13px; margin:0; line-height:1.8; }
+.release-outro { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:22px; font-size:12px; }
+.release-outro p { color:var(--muted); margin:0; max-width:660px; }
+.release-outro a { flex-shrink:0; display:inline-flex; gap:7px; align-items:center; font-weight:700; }
+@media(max-width:840px) { .release-highlights { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:540px) { .release-highlights { grid-template-columns:1fr; } .release-outro { align-items:flex-start; flex-direction:column; } }
+@media(prefers-reduced-motion:reduce) { .release-card { transition:none; } .release-card:hover { transform:none; } }
+
+/* Opt-in demo backup archives; not part of the installer/update feed. */
+.sample-packages-section { margin-top: 24px; }
+.sample-package-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.sample-package-card { display:flex; flex-direction:column; gap:11px; min-height:158px; padding:22px; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:12px; text-decoration:none; }
+.sample-package-card:hover { border-color:var(--primary); }
+.sample-package-card span:not(.sample-package-icon) { font-size:12px; color:var(--muted); }
+.sample-package-unavailable { background:var(--surface-alt); color:var(--muted); }
+.sample-package-icon { display: grid; place-items: center; width: 43px; height: 43px; color: #246a5d !important; background: #e4f2ec; border: 1px solid #cde6d8; font: 700 11px ui-monospace, monospace !important; border-radius: 11px; }
+.sample-restore-steps { padding: 15px 17px; margin: 18px 0 8px; color: var(--ink-secondary); background: #edf5ed; border-radius: 9px; font-size: 12px; line-height: 1.85; }
+.sample-restore-warning { color: var(--muted); font-size: 11px; margin: 10px 0 0; line-height: 1.75; }
+@media (max-width:840px) { .sample-package-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width:540px) { .sample-package-grid { grid-template-columns: 1fr; } }

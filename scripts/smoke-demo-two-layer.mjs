@@ -110,6 +110,19 @@ try {
   await expect(page.locator('.main-navigation a')).toHaveCount(1);
   await expect(page.locator('.page-grid .page-link')).toHaveCount(0);
   await expect(page.locator('.empty-state')).toBeVisible();
+  // Site-owned decorative photos exist even when no business gallery/product
+  // publication exists. They do not carry scene or runtime data yet.
+  await expect(page.locator('.lab-scene-media img')).toHaveCount(3);
+  for (const img of await page.locator('.lab-scene-media img').all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate(node => node.complete && node.naturalWidth >= 600)).toBe(true);
+    assert.match(await img.getAttribute('src'), /^\/deneme\/assets\/site\/img\//);
+  }
+  assert.deepEqual(JSON.parse(await page.locator('#site-context').textContent()).effects, []);
+  await expect(page.locator('canvas.canvas-overlay')).toHaveCount(0);
+  await page.goto(`${base}/deneme/?view=visitor`);
+  await expect(page.locator('.lab-visitor-landscape img')).toBeVisible();
+  await page.goto(`${base}/deneme/`);
   // The launcher is a demo surface, not conditional on published product/room records.
   await expect(page.locator('script[src*="widget.js"]')).toHaveAttribute('data-api-base-url','/yardimci-asistan');
   await expect(page.locator('[data-ya-open]')).toBeVisible();
@@ -198,6 +211,8 @@ try {
   // Lower layer about
   await page.goto(`${base}/deneme/?page=about`);
   await expect(page.locator('main')).toContainText('Karadeniz dağ eteklerinde geleneksel lezzetler');
+  await expect(page.locator('.lab-page-photo img')).toHaveCount(1);
+  await expect.poll(() => page.locator('.lab-page-photo img').evaluate(node => node.complete && node.naturalWidth >= 600)).toBe(true);
 
   // Real retail transaction through the shared storefront, including an uncertain response retry.
   await page.goto(`${base}/deneme/?page=catalog`);

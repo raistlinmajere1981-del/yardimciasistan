@@ -79,6 +79,30 @@ YaLanding\render_header(
   </div>
 </section>
 
+<section class="section release-section" id="yenilikler" aria-labelledby="release-title">
+  <div class="shell">
+    <div class="section-heading">
+      <span class="eyebrow"><?= e(t('release.eyebrow')) ?></span>
+      <h2 id="release-title"><?= e(t('release.title')) ?></h2>
+      <p><?= e(t('release.lead')) ?></p>
+    </div>
+    <div class="release-highlights">
+      <?php foreach ([
+        'companion' => ['01', 'phone'], 'dealer' => ['02', 'box'],
+        'sale' => ['03', 'chart'], 'loyalty' => ['04', 'people'],
+        'document' => ['05', 'message'], 'language' => ['06', 'language']
+      ] as $item => [$index, $symbol]): ?>
+      <article class="release-card">
+        <div class="release-card-top"><span class="release-icon"><?= YaLanding\icon($symbol) ?></span><span class="release-index"><?= e($index) ?></span></div>
+        <h3><?= e(t('release.' . $item . '.title')) ?></h3>
+        <p><?= e(t('release.' . $item . '.body')) ?></p>
+      </article>
+      <?php endforeach; ?>
+    </div>
+    <div class="release-outro"><p><?= e(t('release.note')) ?></p><a class="text-link" href="/deneme/"><?= e(t('release.explore')) ?> <?= YaLanding\icon('arrow') ?></a></div>
+  </div>
+</section>
+
 <section class="section discovery-section" id="yetenekler" aria-labelledby="tree-title">
   <div class="shell">
     <div class="section-heading"><span class="eyebrow"><?= e(t('tree.eyebrow')) ?></span><h2 id="tree-title"><?= e(t('tree.title')) ?></h2><p><?= e(t('tree.lead')) ?></p></div>
