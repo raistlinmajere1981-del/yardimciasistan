@@ -10,6 +10,7 @@ import java.security.*;
 import javax.net.ssl.*;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Native Java client against real local PHP/SQLite, behind a test-only trusted TLS proxy. No provider double is called here. */
 public class DealerAccountHttpTest {
@@ -33,17 +34,20 @@ public class DealerAccountHttpTest {
     while ((value = stream.read()) >= 0) { if (value == 10) break; if (value != 13) out.write(value); if (out.size() > 16384) throw new IOException("header too large"); }
     return out.toString("US-ASCII");
   }
-  private static void proxyRequest(SSLSocket client, int port) {
+  private static void proxyRequest(SSLSocket client, int port, AtomicInteger refreshPosts, List<String> refreshCookies) {
     HttpURLConnection upstream = null;
     try (SSLSocket socket = client) {
       socket.setSoTimeout(20000); InputStream input = socket.getInputStream();
       String[] request = line(input).split(" "); if (request.length < 2) return;
+      boolean accountRefresh = request[0].equals("POST") && request[1].endsWith("/api/account/refresh.php");
+      if (accountRefresh) refreshPosts.incrementAndGet();
       upstream = (HttpURLConnection) new URL("http://127.0.0.1:" + port + request[1]).openConnection();
       upstream.setInstanceFollowRedirects(false); upstream.setRequestMethod(request[0]);
       int length = 0; String header;
       while (!(header = line(input)).isEmpty()) {
         int colon = header.indexOf(':'); if (colon < 0) continue;
         String name = header.substring(0,colon), value = header.substring(colon+1).trim();
+        if (accountRefresh && name.equalsIgnoreCase("Cookie")) refreshCookies.add(value);
         if (name.equalsIgnoreCase("Content-Length")) length = Integer.parseInt(value);
         else if (!name.equalsIgnoreCase("Host") && !name.equalsIgnoreCase("Connection")) upstream.setRequestProperty(name,value);
       }
@@ -73,6 +77,8 @@ public class DealerAccountHttpTest {
       });
     }
     Process php = null; SSLServerSocket proxy = null; java.util.concurrent.ExecutorService executor = Executors.newCachedThreadPool();
+    AtomicInteger refreshPosts = new AtomicInteger();
+    List<String> refreshCookies = Collections.synchronizedList(new ArrayList<>());
     try {
       Path key = root.resolve("tls.p12");
       command(root, Paths.get(System.getProperty("java.home"), "bin/keytool").toString(), "-genkeypair", "-alias", "fixture", "-keyalg", "RSA", "-keysize", "2048", "-validity", "1", "-dname", "CN=localhost", "-ext", "SAN=dns:localhost,ip:127.0.0.1", "-storetype", "PKCS12", "-keystore", key.toString(), "-storepass", "test-only-password", "-keypass", "test-only-password", "-noprompt");
@@ -87,7 +93,7 @@ public class DealerAccountHttpTest {
       final SSLServerSocket listener = proxy;
       executor.submit(() -> {
         while (!listener.isClosed()) {
-          try { final SSLSocket client = (SSLSocket) listener.accept(); executor.submit(() -> proxyRequest(client, upstreamPort)); }
+          try { final SSLSocket client = (SSLSocket) listener.accept(); executor.submit(() -> proxyRequest(client, upstreamPort, refreshPosts, refreshCookies)); }
           catch (IOException error) { break; }
         }
       });
@@ -108,28 +114,52 @@ public class DealerAccountHttpTest {
       DealerApi.Reply web = api.call("account/login", credentials, ""), android = api.call("account/login", credentials, "");
       assertNotEquals(web.cookie, android.cookie); assertTrue(android.cookie.contains("ya_account_refresh="));
       assertEquals(ACCOUNT, api.call("account/session", null, android.cookie).body.getJSONObject("account").getString("id"));
-      assertEquals("Native dealer", api.call("session", null, android.cookie).body.getJSONObject("dealer").getString("display_name"));
-      // Deterministic 30-minute expiry: expire only the access row in this temporary fixture DB.
+
+      // Drive the production DealerSession controller, not a manual refresh, against the real PHP fixture.
+      List<String> renewed = new ArrayList<>();
+      DealerSession session = new DealerSession(base, android.cookie, renewed::add, connections);
+      assertEquals("Native dealer", session.call("session", null).body.getJSONObject("dealer").getString("display_name"));
+      assertEquals("A valid access cookie must not refresh", 0, refreshPosts.get());
+
+      // Deterministic 30-minute expiry #1: expire only the access row in this temporary fixture DB.
       Files.write(root.resolve("expire-access.php"), "<?php require __DIR__.'/module/lib/storage.php'; ya_storage_open()->exec('UPDATE customer_account_sessions SET expires_at=0 WHERE revoked_at=0');".getBytes("UTF-8"));
       command(root, "php", "expire-access.php");
-      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("session", null, android.cookie)).status);
-      DealerApi.Reply refreshed = api.call("account/refresh", new JSONObject(), android.cookie);
-      assertNotEquals(android.cookie, refreshed.cookie); assertTrue(refreshed.cookie.contains("ya_account_refresh="));
-      assertEquals(ACCOUNT, api.call("account/session", null, refreshed.cookie).body.getJSONObject("account").getString("id"));
-      assertEquals("Native dealer", api.call("session", null, refreshed.cookie).body.getJSONObject("dealer").getString("display_name"));
-      // A rotated refresh token is single-use: replaying the old pair must fail closed.
-      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("account/refresh", new JSONObject(), android.cookie)).status);
-      // A second expiry must renew from the rotated refresh cookie, not the revoked one.
+      assertEquals("Native dealer", session.call("session", null).body.getJSONObject("dealer").getString("display_name"));
+      assertEquals("Expired access must make one actual POST /account/refresh", 1, refreshPosts.get());
+      assertTrue(DealerApi.hasRotatedPair(session.cookie()));
+      assertNotEquals(android.cookie, session.cookie());
+      assertEquals(session.cookie(), renewed.get(0));
+      assertEquals(android.cookie, refreshCookies.get(0));
+      assertEquals(ACCOUNT, api.call("account/session", null, session.cookie()).body.getJSONObject("account").getString("id"));
+
+      // Independent second expiry must use the rotated pair, never the revoked original refresh key.
       command(root, "php", "expire-access.php");
-      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("session", null, refreshed.cookie)).status);
-      DealerApi.Reply second = api.call("account/refresh", new JSONObject(), refreshed.cookie);
-      assertEquals("Native dealer", api.call("session", null, second.cookie).body.getJSONObject("dealer").getString("display_name"));
+      assertEquals("Native dealer", session.call("session", null).body.getJSONObject("dealer").getString("display_name"));
+      assertEquals("Second expiry must make exactly one more refresh POST", 2, refreshPosts.get());
+      assertEquals(2, renewed.size());
+      assertEquals(session.cookie(), renewed.get(1));
+      assertNotEquals(renewed.get(0), renewed.get(1));
+      assertEquals(renewed.get(0), refreshCookies.get(1));
+      assertEquals("Native dealer", api.call("session", null, session.cookie()).body.getJSONObject("dealer").getString("display_name"));
+
+      // Replaying the revoked original pair fails closed and is not retried a second time.
+      DealerSession stale = new DealerSession(base, android.cookie, renewed::add, connections);
+      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> stale.call("session", null)).status);
+      assertEquals("Stale refresh attempt is one POST and fails", 3, refreshPosts.get());
+      assertEquals(android.cookie, refreshCookies.get(2));
+      assertEquals(android.cookie, stale.cookie());
+      assertEquals(2, renewed.size());
+
+      // Real 403 dealer demotion must not be treated as a renewable expiry.
       Files.write(root.resolve("demote.php"), "<?php require __DIR__.'/module/lib/storage.php'; ya_storage_open()->exec('UPDATE dealer_access SET enabled=0');".getBytes("UTF-8")); command(root, "php", "demote.php");
-      DealerApi.Failure normal = assertThrows(DealerApi.Failure.class, () -> api.call("session", null, second.cookie)); assertEquals(403, normal.status); assertEquals("dealer_access_required", normal.code);
-      assertEquals(ACCOUNT, api.call("account/session", null, second.cookie).body.getJSONObject("account").getString("id"));
+      DealerApi.Failure normal = assertThrows(DealerApi.Failure.class, () -> session.call("session", null));
+      assertEquals(403, normal.status); assertEquals("dealer_access_required", normal.code);
+      assertEquals("403 demotion must not refresh", 3, refreshPosts.get());
+      assertEquals(renewed.get(1), session.cookie());
+      assertEquals(ACCOUNT, api.call("account/session", null, session.cookie()).body.getJSONObject("account").getString("id"));
       Files.write(root.resolve("disable.php"), "<?php require __DIR__.'/module/lib/storage.php'; $db=ya_storage_open(); $p=ya_storage_get_publication('dealer_access_private',[]); $p['online_sales_enabled']=false; $db->prepare('UPDATE publications SET payload_json=? WHERE name=?')->execute([json_encode($p),'dealer_access_private']);".getBytes("UTF-8")); command(root, "php", "disable.php");
-      DealerApi.Failure disabled = assertThrows(DealerApi.Failure.class, () -> api.call("account/session", null, second.cookie)); assertEquals(403, disabled.status); assertEquals("online_sales_disabled", disabled.code);
-      assertTrue(api.call("account/logout", new JSONObject(), second.cookie).body.getBoolean("ok"));
+      DealerApi.Failure disabled = assertThrows(DealerApi.Failure.class, () -> api.call("account/session", null, session.cookie())); assertEquals(403, disabled.status); assertEquals("online_sales_disabled", disabled.code);
+      assertTrue(api.call("account/logout", new JSONObject(), session.cookie()).body.getBoolean("ok"));
     } finally {
       if (php != null) { php.destroy(); php.waitFor(); } if (proxy != null) proxy.close(); executor.shutdownNow();
       try (java.util.stream.Stream<Path> paths = Files.walk(root)) { paths.sorted(Comparator.reverseOrder()).forEach(path -> { try { Files.delete(path); } catch (IOException ignored) {} }); }
