@@ -489,6 +489,20 @@ if command -v curl >/dev/null 2>&1; then
   fi
 fi
 
+printf '\nBaşarılı web modülü yayını sonrası eski yedekler temizleniyor (son 1 tutulur)...\n'
+ssh "${ssh_options[@]}" "$deploy_host" bash -s -- "$backup_dir" <<'REMOTE_PRUNE_BACKUPS'
+set -Eeuo pipefail
+backup_dir="$1"
+[[ -d "$backup_dir" && ! -L "$backup_dir" ]]
+find "$backup_dir" -mindepth 1 -maxdepth 1 -type d \
+  -name 'yardimci-asistan-20??????T??????Z' -printf '%f\n' | \
+  LC_ALL=C sort -r | tail -n +2 | while IFS= read -r old_name; do
+  [[ "$old_name" =~ ^yardimci-asistan-20[0-9]{6}T[0-9]{6}Z$ ]] || exit 2
+  [[ -d "$backup_dir/$old_name" && ! -L "$backup_dir/$old_name" ]] || exit 2
+  rm -rf -- "$backup_dir/$old_name"
+done
+REMOTE_PRUNE_BACKUPS
+
 printf '\nYayın tamamlandı.\n'
 printf 'Canlı adres: %s\n' "$public_url"
 printf 'Önceki sürüm ve veri yedeği: %s\n' "$remote_backup"

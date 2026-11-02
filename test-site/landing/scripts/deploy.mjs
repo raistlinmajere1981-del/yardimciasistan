@@ -445,11 +445,11 @@ async function finalizePublishedRelease() {
 }
 
 function cleanupLandingBackups() {
-  step("Eski landing yedekleri temizleniyor (son 3 tutulur)");
+  step("Eski landing yedekleri temizleniyor (son 1 tutulur)");
   sshRun(
-    `find '${backupParent}' -mindepth 1 -maxdepth 1 -type d -name 'landing-*' -printf '%T@ %p\\n' | ` +
-    `sort -nr | tail -n +4 | cut -d' ' -f2- | while IFS= read -r old_backup; do ` +
-    `[ -n "$old_backup" ] && rm -rf -- "$old_backup"; done`
+    `find '${backupParent}' -mindepth 1 -maxdepth 1 -type d -name 'landing-20??????T??????Z' -printf '%f\\n' | ` +
+    `LC_ALL=C sort -r | tail -n +2 | while IFS= read -r old_name; do ` +
+    `[ -n "$old_name" ] && rm -rf -- '${backupParent}/'"$old_name"; done`
   );
 }
 
