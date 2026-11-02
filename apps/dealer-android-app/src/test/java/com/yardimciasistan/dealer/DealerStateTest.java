@@ -12,6 +12,59 @@ public class DealerStateTest {
     state.put("catalog", new JSONObject("{\"catalog_revision\":\"" + "a".repeat(64) + "\",\"delivery_methods\":[\"pickup\",\"shipping\"],\"products\":[{\"product_id\":\"p\",\"name\":\"Ürün\",\"price\":12.35,\"currency\":\"TRY\"},{\"product_id\":\"q\",\"name\":\"İkinci\",\"price\":2.1,\"currency\":\"TRY\"}]}"));
     return state;
   }
+  @Test public void rememberMePersistsOnlyOptedInEncryptedSessionWhileKeepingDrafts() throws Exception {
+    DealerState state = state();
+    assertFalse(state.rememberMe());
+    String secret = "ya_account_session=" + "s".repeat(43) + "; ya_account_refresh=" + "r".repeat(43);
+    state.authenticate("https://firma.example/module/", secret, new JSONObject().put("access_id", "a"), false);
+    state.put("catalog", new JSONObject("{\"catalog_revision\":\"" + "a".repeat(64) + "\",\"delivery_methods\":[\"pickup\"],\"products\":[{\"product_id\":\"p\",\"name\":\"Test\",\"price\":2,\"currency\":\"TRY\"}]}"));
+    state.quantity("p", 1);
+    assertEquals(secret, state.text("cookie")); // live session usable until process ends
+    assertFalse(disk.contains(secret));
+    assertFalse(new JSONObject(disk).has("cookie"));
+    assertEquals(1, state().object("cart").getInt("p"));
+    state.prepareOrder();
+    assertFalse(disk.contains(secret)); // pending-order copy-on-write cannot persist an opted-out session
+    assertEquals(1, state().object("cart").getInt("p"));
+    state.accepted(new JSONObject().put("order_id", "receipt"));
+    assertFalse(disk.contains(secret)); // acceptance persistence cannot leak the bearer token either
+  }
+  @Test public void rememberMeRestoresOptedInCookieAndAllowsOptingOutWithoutErasingCarts() throws Exception {
+    DealerState legacy = new DealerState("{\"cookie\":\"previous-session\"}", json -> {});
+    assertTrue(legacy.rememberMe()); // previously persisted sessions remain remembered
+    DealerState state = signedIn();
+    assertFalse(state.rememberMe()); // new logins start without persistent auth
+    state.setRememberMe(true);
+    state.quantity("p", 2);
+    assertEquals("session-a", state().text("cookie"));
+    state.setRememberMe(false);
+    assertEquals("session-a", state.text("cookie"));
+    assertFalse(new JSONObject(disk).has("cookie"));
+    assertEquals(2, state().object("cart").getInt("p"));
+    state.setRememberMe(true);
+    assertEquals("session-a", state().text("cookie"));
+    state.newCart("İkinci sepet");
+    assertEquals("session-a", state().text("cookie"));
+    state.setRememberMe(false);
+    state.newCart("Üçüncü sepet");
+    assertFalse(new JSONObject(disk).has("cookie")); // cart copy-on-write does not bypass preference
+  }
+  @Test public void rememberMeStorageFailureCannotClaimCookieWasForgotten() throws Exception {
+    DealerState state = signedIn(); state.setRememberMe(true);
+    String recorded = disk;
+    DealerState failing = new DealerState(disk, json -> { throw new java.io.IOException("disk full"); });
+    assertThrows(java.io.IOException.class, () -> failing.setRememberMe(false));
+    assertTrue(failing.rememberMe());
+    assertEquals(recorded, disk);
+    assertEquals("session-a", state().text("cookie"));
+  }
+  @Test public void rememberMeDefaultsOffForNewLoginAndUiExposesUserChoice() throws Exception {
+    assertFalse(state().rememberMe());
+    String activity = java.nio.file.Files.readString(java.nio.file.Paths.get("src/main/java/com/yardimciasistan/dealer/DealerActivity.java"));
+    assertTrue(activity.contains("remember.setText(\"Beni hatırla\")"));
+    assertTrue(activity.contains("state.setRememberMe(enabled)"));
+    assertFalse(disk.contains("password"));
+  }
   @Test public void offlineCartAndCatalogPricesAreExplicitlyUnconfirmed() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
     String pending = state.prepareOrder().toString();

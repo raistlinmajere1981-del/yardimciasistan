@@ -18,7 +18,18 @@ final class DealerState {
   DealerState(String json, Persistence persistence) throws Exception {
     data = new JSONObject(json); this.persistence = persistence;
   }
-  void save() throws Exception { persistence.write(data.toString()); }
+  // Save drafts regardless of login preference, but persist bearer cookies only with opt-in.
+  private static String diskJson(JSONObject source) throws Exception {
+    JSONObject copy = new JSONObject(source.toString());
+    if (!copy.optBoolean("remember_me", copy.has("cookie"))) copy.remove("cookie");
+    return copy.toString();
+  }
+  void save() throws Exception { persistence.write(diskJson(data)); }
+  boolean rememberMe() { return data.optBoolean("remember_me", data.has("cookie")); }
+  void setRememberMe(boolean enabled) throws Exception {
+    JSONObject next = new JSONObject(data.toString()).put("remember_me", enabled);
+    commit(next); // preference and removal of a previously saved cookie must be atomic
+  }
   String text(String key) { return data.optString(key, ""); }
   JSONObject object(String key) { JSONObject value = data.optJSONObject(key); return value == null ? new JSONObject() : value; }
   JSONArray array(String key) { JSONArray value = data.optJSONArray(key); return value == null ? new JSONArray() : value; }
@@ -32,6 +43,9 @@ final class DealerState {
   }
   void put(String key, Object value) throws Exception { data.put(key, value); save(); }
   void authenticate(String base, String cookie, JSONObject dealer) throws Exception {
+    authenticate(base, cookie, dealer, rememberMe());
+  }
+  void authenticate(String base, String cookie, JSONObject dealer, boolean remember) throws Exception {
     String owner = base + "|" + dealer.getString("access_id");
     if (!owner.equals(text("owner"))) {
       JSONObject drafts = object("saved_drafts");
@@ -47,7 +61,7 @@ final class DealerState {
       drafts.remove(owner);
       if (drafts.length() > 0) data.put("saved_drafts", drafts); else data.remove("saved_drafts");
     }
-    data.put("owner", owner).put("base", base).put("cookie", cookie).put("dealer", dealer); save();
+    data.put("owner", owner).put("base", base).put("cookie", cookie).put("dealer", dealer).put("remember_me", remember); save();
   }
   void invalidateSession() throws Exception { data.remove("cookie"); save(); }
   JSONObject product(String id) {
@@ -115,7 +129,7 @@ final class DealerState {
   void accepted(JSONObject receipt) throws Exception {
     JSONObject next = new JSONObject(data.toString());
     next.put("last_receipt", receipt); next.remove("pending"); next.remove("cart"); next.remove("note");
-    persistence.write(next.toString());
+    persistence.write(diskJson(next));
     data.put("last_receipt", receipt); data.remove("pending"); data.remove("cart"); data.remove("note");
   }
   int reorder(JSONArray items) throws Exception {
@@ -286,7 +300,7 @@ final class DealerState {
   }
   /** Copy-on-write: persist first, only then replace live state. */
   private void commit(JSONObject next) throws Exception {
-    persistence.write(next.toString());
+    persistence.write(diskJson(next));
     java.util.List<String> keys = new java.util.ArrayList<>(); data.keys().forEachRemaining(keys::add);
     for (String key : keys) data.remove(key);
     for (java.util.Iterator<String> it = next.keys(); it.hasNext();) {

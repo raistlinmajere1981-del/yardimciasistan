@@ -582,6 +582,11 @@ public final class DealerActivity extends ComponentActivity {
       email.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS);
       EditText password = field(form, "Şifre", "", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, null, 72);
       password.setSaveEnabled(false); password.setAutofillHints(View.AUTOFILL_HINT_PASSWORD);
+      CheckBox remember = new CheckBox(this);
+      remember.setText("Beni hatırla");
+      remember.setChecked(state.rememberMe());
+      remember.setOnCheckedChangeListener((button, enabled) -> safely(() -> state.setRememberMe(enabled)));
+      form.addView(remember);
       loginButton = ui.button(form, "Giriş yap", () -> safely(() -> {
         JSONObject credentials = new JSONObject().put("email", email.getText().toString().trim()).put("password", password.getText().toString());
         password.setText(""); authenticate(base, "login", credentials);
