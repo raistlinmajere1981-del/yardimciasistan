@@ -4,4 +4,6 @@
   </application>
   <instrumentation android:name="com.yardimciasistan.android.NativeUiFamilyFixture$Runner"
     android:targetPackage="com.yardimciasistan.android.uifamily" />
+  <instrumentation android:name="com.yardimciasistan.android.CompanionRetryFixture$Runner"
+    android:targetPackage="com.yardimciasistan.android.uifamily" />
 </manifest>

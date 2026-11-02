@@ -14,7 +14,7 @@ import android.view.inspector.WindowInspector;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.CheckBox;
-import android.widget.Spinner;
+import android.widget.ListView;
 import android.widget.TextView;
 import java.util.Arrays;
 import java.util.Locale;
@@ -143,7 +143,27 @@ final class MarketFlowFixture implements MarketWorkspace.Listener {
     runner.ui(() -> { require(action.equals(priorAction) && workspace.screenKey().equals("sale"), "confirmation rechecks live pending state"); });
     runner.ui(() -> { pending = 0; });
     runner.ui(() -> { render(); });
-    runner.ui(() -> { ((Spinner) described(page, "Ödeme türü")).setSelection(1); });
+    // Checkout now uses a dialog-backed single choice, not a Spinner. Exercise
+    // the real UI item click so the selected payment survives a re-render.
+    runner.ui(() -> {
+      View picker = described(page, "Ödeme türü: Nakit");
+      require(picker != null && picker.isEnabled(), "payment dialog picker visible");
+      picker.performClick();
+    });
+    runner.ui(() -> {
+      for (View root : roots()) {
+        ListView choices = paymentChoices(root);
+        if (choices == null) continue;
+        int position = 1;
+        View row = choices.getChildAt(position - choices.getFirstVisiblePosition());
+        require(row != null, "card option visible in payment dialog");
+        choices.performItemClick(row, position, choices.getAdapter().getItemId(position));
+        return;
+      }
+      throw new AssertionError("payment dialog choices not found");
+    });
+    runner.ui(() -> { require(described(page, "Ödeme türü: Kart (harici POS)") != null,
+        "dialog selection persists through form rerender"); });
     runner.ui(() -> { click("Satışı Onayla ve Gönder"); });
     runner.ui(() -> { require(find(page, "Kart ödemesinin harici POS'ta gerçekleştiğini onaylayın.") != null, "external card confirmation is required"); });
     runner.ui(() -> { click("Kart ödemesi harici POS'ta gerçekleşti; yalnız kaydını gönderiyorum."); });
@@ -245,6 +265,18 @@ final class MarketFlowFixture implements MarketWorkspace.Listener {
   private void setDialogField(String label, String value) {
     for (View root : roots()) if (find(root, label) != null) { field(root, label).setText(value); return; }
     throw new AssertionError("dialog field: " + label);
+  }
+  private ListView paymentChoices(View root) {
+    if (root instanceof ListView) {
+      ListView list = (ListView) root;
+      if (list.getAdapter() != null && list.getAdapter().getCount() > 1
+          && "Kart (harici POS)".equals(String.valueOf(list.getAdapter().getItem(1)))) return list;
+    }
+    if (root instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) root).getChildCount(); i++) {
+      ListView found = paymentChoices(((ViewGroup) root).getChildAt(i));
+      if (found != null) return found;
+    }
+    return null;
   }
   private View described(View root, String label) {
     if (label.contentEquals(root.getContentDescription() == null ? "" : root.getContentDescription())) return root;

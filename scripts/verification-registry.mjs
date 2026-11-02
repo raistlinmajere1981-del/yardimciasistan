@@ -131,6 +131,7 @@ const SMOKE_FILES = [
   "scripts/smoke-android-device-token.mjs",
   "scripts/smoke-android-device-ui.mjs",
   "scripts/smoke-android-native-ui-family.mjs",
+  "scripts/smoke-companion-device-retry.mjs",
   "scripts/smoke-android-finance-actions.mjs",
   "scripts/smoke-android-hosting-contract.mjs",
   "scripts/smoke-android-permission-matrix.mjs",
@@ -283,6 +284,7 @@ const MANUAL_SMOKE_FILES = new Set([
   // Requires a real Android device/ADB.
   "scripts/smoke-android-device-ui.mjs",
   "scripts/smoke-android-native-ui-family.mjs",
+  "scripts/smoke-companion-device-retry.mjs",
   // Requires configured live AI credentials/network.
   "scripts/smoke-live-ai.mjs"
 ]);
