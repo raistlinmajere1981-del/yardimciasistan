@@ -173,6 +173,8 @@ try {
     assert.ok(!(await page.content()).includes('GİZLİ MENÜ ÜRÜNÜ'));
     assert.ok(!(await page.content()).includes('GİZLİ DUYURU'));
   }
+  await page.goto(base + '/?page=gallery');
+  assert.equal(await page.locator('.gallery img[data-effect-slot]').count(), 0, 'Dynamic gallery records never receive effect slots');
   await page.goto(base + '/?page=contact');
   const mapFrame = page.locator('.contact-map iframe');
   await expect(mapFrame).toBeVisible();
@@ -226,18 +228,24 @@ try {
 
   // Site-owned static visual fixture; no business data, samples or scenes ship in the template.
   mkdirSync(join(site, 'site/views/components'), {recursive: true});
-  writeFileSync(join(publicRoot, 'assets/site/media/static.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64'));
-  writeFileSync(join(site, 'site/views/components/hero.php'), `<?php namespace YaSite; ?><section class="hero"><h1><?= e($view['publication']['name']) ?></h1><figure style="width:280px"><img data-effect-slot="hero" src="<?= e(asset($site, 'site/media/static.png')) ?>" width="280" height="280" alt=""></figure></section>`);
-  configure({effects: {hero: 'missing.scene.json'}});
+  const stillPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+  writeFileSync(join(publicRoot, 'assets/site/media/static.png'), stillPng);
+  writeFileSync(join(publicRoot, 'assets/site/media/static-extra.png'), stillPng);
+  // Exact source match: two fixed images, no explicit HTML slot required.
+  writeFileSync(join(site, 'site/views/components/hero.php'), `<?php namespace YaSite; ?><section class="hero"><h1><?= e($view['publication']['name']) ?></h1><figure style="width:280px"><img src="<?= e(asset($site, 'site/media/static-extra.png')) ?>" width="280" height="280" alt=""></figure><figure style="width:280px"><img src="<?= e(asset($site, 'site/media/static.png')) ?>" srcset="<?= e(asset($site, 'site/media/static-extra.png')) ?> 2x" width="280" height="280" alt=""></figure></section>`);
+  configure({effects: {}});
   await noEffects(page, base + '/');
-  assert.ok(await page.locator('img[data-effect-slot]').evaluate(image => image.complete && image.naturalWidth > 0));
+  assert.ok(await page.locator('.hero img').first().evaluate(image => image.complete && image.naturalWidth > 0));
   assert.deepEqual((await contextOf(page)).effects, []);
   const {defaultParams} = await import(pathToFileURL(join(site, 'public/assets/vendor/effect-engine/src/registry/effects.mjs')));
   const scene = {format: 'efekt-atolyesi', version: 1, name: 'Test scene', seed: 'test', photo: {src: 'assets/static.png', width: 1, height: 1, name: 'Test static raster'},
     zones: [{id: 'zone', name: 'Test zone', visible: true, points: [[0, 0], [1, 0], [1, 1], [0, 1]]}],
     effects: [{id: 'effect', type: 'sunlight', zoneId: 'zone', seed: 'test', enabled: true, params: {...defaultParams('sunlight'), count: 10}}]};
   const sceneFile = join(publicRoot, 'assets/site/scenes/hero.scene.json');
-  writeFileSync(sceneFile, '{malformed'); configure({effects: {hero: 'hero.scene.json'}});
+  const manifestFile = join(publicRoot, 'assets/site/scenes/effects-manifest.json');
+  const manifest = bindings => writeFileSync(manifestFile, JSON.stringify({version: 1, bindings}));
+  manifest([{source: 'site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}]);
+  writeFileSync(sceneFile, '{malformed');
   await noEffects(page, base + '/');
   writeFileSync(sceneFile, JSON.stringify(scene));
   const constrained = await browser.newContext({reducedMotion: 'reduce'});
@@ -282,6 +290,72 @@ try {
   assert.equal(await page.evaluate(() => window.__frameRequests), 0);
   assert.equal(await page.locator('canvas').count(), 0);
   passed.push('static visual, missing/malformed scene, reduced motion, inactive layers, engine activation and scheduler teardown');
+
+  // Opt-in manifest: only an exact hard-coded site-owned static image can bind.
+  scene.effects[0].enabled = true;
+  writeFileSync(sceneFile, JSON.stringify(scene));
+  manifest([{source: 'site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}]);
+  await page.goto(base + '/');
+  assert.deepEqual((await contextOf(page)).effects, [
+    {slot: 'hero', source: '/assets/site/media/static.png', url: '/assets/site/scenes/hero.scene.json'},
+  ]);
+  const manifestContext = await browser.newContext({reducedMotion: 'no-preference', viewport: {width: 1440, height: 960}});
+  await manifestContext.addInitScript(() => {
+    Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+    Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+    Object.defineProperty(navigator, 'connection', {value: {saveData: false, addEventListener() {}, removeEventListener() {}}});
+  });
+  const manifestPage = await manifestContext.newPage();
+  await manifestPage.goto(base + '/');
+  await expect(manifestPage.locator('canvas.canvas-overlay')).toHaveCount(1);
+  assert.deepEqual(await manifestPage.locator('.hero img').evaluateAll(images => images.map(image => image.dataset.effectState || '')), ['', 'animated'], 'Manifest binds exact static src without HTML slot, including responsive srcset variant');
+  await manifestContext.close();
+
+  const manifestReduced = await browser.newContext({reducedMotion: 'reduce'});
+  await manifestReduced.addInitScript(() => { window.__frameRequests = 0; const frame = requestAnimationFrame; window.requestAnimationFrame = callback => { window.__frameRequests++; return frame(callback); }; });
+  const manifestReducedPage = await manifestReduced.newPage(), manifestReducedRequests = [];
+  manifestReducedPage.on('request', request => manifestReducedRequests.push(request.url()));
+  await manifestReducedPage.goto(base + '/'); await manifestReducedPage.waitForLoadState('networkidle');
+  assert.equal(manifestReducedRequests.some(url => url.includes('effect-engine') || url.endsWith('.scene.json')), false);
+  assert.equal(await manifestReducedPage.locator('canvas').count(), 0);
+  assert.equal(await manifestReducedPage.evaluate(() => window.__frameRequests), 0);
+  await manifestReduced.close();
+
+  // Unsafe, remote, missing, ambiguous or duplicate entries reject the whole manifest.
+  for (const bindings of [
+    [{source: 'https://cdn.example.com/hero.png', slot: 'hero', scene: 'hero.scene.json'}],
+    [{source: '/assets/site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}],
+    [{source: 'site/media/../media/static.png', slot: 'hero', scene: 'hero.scene.json'}],
+    [{source: 'site/media/missing.png', slot: 'hero', scene: 'hero.scene.json'}],
+    [{source: 'site/media/static.png', slot: 'hero', scene: 'missing.scene.json'}],
+    [{source: 'site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}, {source: 'site/media/static.png', slot: 'other', scene: 'hero.scene.json'}],
+    [{source: 'site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}, {source: 'site/media/static-extra.png', slot: 'hero', scene: 'hero.scene.json'}],
+  ]) {
+    manifest(bindings);
+    await noEffects(page, base + '/');
+    assert.deepEqual((await contextOf(page)).effects, []);
+  }
+
+  // Dynamic gallery records remain unbound even while a valid static manifest exists.
+  manifest([{source: 'site/media/static.png', slot: 'hero', scene: 'hero.scene.json'}]);
+  const galleryRequests = [];
+  const galleryListener = request => galleryRequests.push(request.url());
+  page.on('request', galleryListener);
+  await page.goto(base + '/?page=gallery');
+  await page.waitForLoadState('networkidle');
+  assert.equal(await page.locator('.gallery img[data-effect-slot]').count(), 0);
+  assert.equal(galleryRequests.some(url => url.endsWith('.scene.json')), false, 'Gallery page never requests a scene without a matching static image');
+  assert.equal(await page.locator('canvas').count(), 0);
+  page.off('request', galleryListener);
+
+  // One canonical manifest rule: old config.effects is not an alternate path.
+  rmSync(manifestFile, {force: true});
+  configure({effects: {hero: 'hero.scene.json'}});
+  await noEffects(page, base + '/');
+  assert.deepEqual((await contextOf(page)).effects, []);
+  configure({effects: {}});
+  passed.push('manifest-only exact static image, invalid/duplicate source rejection, dynamic gallery isolation, reduced motion');
+
   assert.deepEqual(errors, []);
   await context.close();
   console.log(`web-site-template-smoke-ok: ${passed.length} groups\n${passed.map(value => '  ' + value).join('\n')}`);

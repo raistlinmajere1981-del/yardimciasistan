@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.5.0",
+  "template_version": "0.5.2",
   "site_owned": [
     "site/",
     "locales/",
@@ -14,7 +14,7 @@
     "core/legacy.php": "cfed861be701b52d75bcc53c8cb7624c6003435055d7cd68ead6068a81ecf076",
     "core/pages.php": "bc86b776688183405df65db63b1a43b892915eba6084e20db787525becfd7f6c",
     "core/publication.php": "e1c1a7d049280b3e4905563688b939f03f7f7935bfa3fc00e55cf84ed159378f",
-    "core/render.php": "fc62ddcbdd33c2626cfc5759dc74292e30564aa7187eb91d98ac330a0076c147",
+    "core/render.php": "f44c4ff7416e46fddbd4bb0e925970a839eadd2252af65e49938737db5c87981",
     "core/views/components/business-details.php": "7eb5671c830b0cbafde07883afdc84b143238f71bd2c6d9c24991fea47889065",
     "core/views/components/footer.php": "15aa1a5ba4f2200ca2461baad6097f752a343afb658d9b6057ee013572e4f405",
     "core/views/components/header.php": "21c1de2be0f2752337d1c8dd63e7c8afc2487e7e2e4241c6c41e7cc235eecdb8",
@@ -30,7 +30,7 @@
     "core/views/pages/announcements.php": "dd668c00aaa18ad140940b311f49d385132ae09ce1c2d2d10477a4e8d400994d",
     "core/views/pages/catalog.php": "e67fb8a866dfa2c0784c0c57bbfe159d41985f6c2660843d60ddefa718fcdee8",
     "core/views/pages/contact.php": "b9298ac75c69074d2952393d76be46088c06f67b170c5b758478a6b32e14b4d5",
-    "core/views/pages/gallery.php": "cdd54c338b7e0cb0c8ca771e02ee710b2ec1bff43eb01b8ebe7911b541b0a957",
+    "core/views/pages/gallery.php": "08733dbac6997d03cda66db12494ce892988cf575076d7ea9b704b0c8939f7b8",
     "core/views/pages/home.php": "7ee49d27ccc1d3ff6234b03c6f0cbf35fb763a6d988aba13274757e52dbcb712",
     "core/views/pages/menu.php": "61b42e6522a3a942110e577c888769a41c1efd15ff2f03e245aba0d4742d98c4",
     "core/views/pages/missing.php": "e3bfe0f6bf053691e28adbae3cba69e54221b59fa06fd7e036a6b5399902ede7",
@@ -45,7 +45,7 @@
     "public/assets/core/assets/nexa/web/nexa-web-speaking-header.webp": "4f430efa94d60e20f121e24d0604331691c6ced4dd1e24f65584bbf3f2780ef0",
     "public/assets/core/assets/nexa/web/nexa-web-thinking-header.webp": "7cc28fa304d87f26411de3a2442ddd1e878025ece77cd358e5d3cacf4e430611",
     "public/assets/core/cart-draft.js": "baa5fa30069445cb57ea50662eee0789e8aabc313ac2afe9ef61bf11ff6d527c",
-    "public/assets/core/effects.mjs": "ada88557c951ac8f4f5b3e4b34bd14ad8d04944878869be022b4bfbeff6b6e4d",
+    "public/assets/core/effects.mjs": "a71be7d95f287a1760ebe3b8981e88ee8dbd0870c7ffde2a8d78b269406d8f3e",
     "public/assets/core/interaction-language.js": "b93f542fdb9edcbc729449372ad86831dc880d6d9491ee1f90a574507a379537",
     "public/assets/core/language.mjs": "542ef2fcd4a7b452f2080f9b0afb4feb828e2c5d6be956a21b552c8248c15c9d",
     "public/assets/core/panorama.mjs": "394a851a36d82ceb6d0179f782bff00a80c7bd6b1de093ac9b70b3d62bf4c16a",
@@ -70,8 +70,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "e3a0c50956564b2c4780bc110e5e4d251e1b81da7530ff2b14d7db88e6fa2a3c",
-    "tools/manifest.mjs": "f8a670f3edcc4916aabeadfd0e2a9160ff868734e6dfee8fc40b036e5ae287b6",
+    "README.md": "995f63979febd4645999165ce5c1eb04a712a92f72f474032814b139bd1823f0",
+    "tools/manifest.mjs": "2873e1a18a41ec7062e7847494f51fd8d5121fd1dd230057e4abc2f74ce9db70",
     "tools/sync-effect-engine.mjs": "616f378199fbaadb26da0460c26a0e794b6994ca71616b8adf49fc6f0db52003",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

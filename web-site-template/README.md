@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.5.0
+# Ortak işletme sitesi şablonu 0.5.2
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
@@ -163,20 +163,43 @@ kataloğuna bağlıdır; ikinci hedef dil sözlüğü yoktur.
 
 ## Efekt Atölyesi
 
-Varsayılan `effects: []`: adaptör, sahne, motor, Canvas veya animasyon döngüsü yoktur.
-Statik `<img>` normal çalışır. Canonical kaynak `EfektAtolyesi/src/{runtime,registry,model}`
+Varsayılan `effects: []` ve manifest yok: adaptör, sahne, motor, Canvas veya animasyon döngüsü
+yoktur. Statik `<img>` normal çalışır. Canonical kaynak `EfektAtolyesi/src/{runtime,registry,model}`
 dizinleridir; başka sitedeki vendor kopyası kullanılmaz.
 
-1. Hakları size ait görsel için Atölye'den JSON dışa aktarın;
-   `public/assets/site/scenes/hero.scene.json` olarak koyun. Örnek işletme fotoğrafı/sahnesi dağıtılmaz.
-2. Görselde `data-effect-slot="hero"`, config'de `'effects' => ['hero' => 'hero.scene.json']`
-   kullanın. Galeri slotları `gallery.<id>`dir.
-3. Eksik/geçersiz JSON, eşleşen görsel yokluğu, etkin layer yokluğu, azaltılmış hareket,
+Efekt yalnız site sahibinin hard-coded statik tasarım görselinde kullanılır. Ürün, oda/masa,
+dinamik galeri, API'den gelen/uzak görsel, online yükleme ve ekran görüntüsü kapsam dışıdır.
+Dinamik galeri kayıtlarına efekt slotu yazılmaz.
+
+1. Atölye'de sabit site görselini seçin, efekt sahnesini hazırlayıp kaydedin.
+   Aktif sitedeki `public/assets/site/scenes/` altına hem sahne JSON'u hem de
+   `effects-manifest.json` yazılır; bu işlem sunucuya yükleme yapmaz.
+2. Her kayıt yalnız siteye ait tam sabit fotoğraf yoluyla bir sahneyi eşler:
+
+   ```json
+   {"version": 1, "bindings": [
+     {"source": "site/media/hero.jpg", "slot": "hero", "scene": "hero.scene.json"}
+   ]}
+   ```
+
+   `source`, `public/assets/` altındaki tam dosya yoludur; yalnız
+   `site/img/` veya `site/media/` altında bulunan jpg/jpeg/png/webp/avif
+   dosyaları kabul edilir. Manifest en fazla 16 KiB ve 32 kayıt olabilir.
+   Geçersiz/eksik yol, uzak API URL, aynı fotoğraf ya da slotun tekrar
+   kullanılması veya bozuk sahne tüm manifesti reddeder. Görselin yazılı
+   `src` adresiyle **tam** eşleşme aranır; ayrı HTML işareti veya config
+   `effects` yaması gerekmiyor. Birden fazla aynı DOM görseli varsa efekt
+   uygulanmaz.
+3. Şablonda artık yalnız bu manifest sözleşmesi vardır. Eski
+   `data-effect-slot` + `config.effects` uyumluluk yolu kaldırılmıştır.
+   Resimlerin ve kullanıcı verilerinin dinamik listeleri bu sisteme dahil
+   edilmez. Canlıya alma, site deploy ve doğrulama aşamasıdır.
+4. Eksik/geçersiz JSON, eşleşen görsel yokluğu, etkin layer yokluğu, azaltılmış hareket,
    veri tasarrufu ve çok düşük donanım statik kalır. JSON, görselin `src` değerini değiştirmez.
-4. Canonical `importProject` → `compileScene` → `createOverlay` kullanılır. Motor
+5. Canonical `importProject` → `compileScene` → `createOverlay` kullanılır. Motor
    viewport/sekme, FPS/DPR/piksel bütçesi ve yavaş çizim fallback'ini sahiplenir.
    Tercih değişimi/pagehide döngüyü temizler; pageshow yeniden kurabilir.
-5. İlk sürüm aynı en-boy oranlı responsive resimleri destekler; farklı kadraj/oran statik
+6. İlk sürüm aynı en-boy oranlı responsive resimleri destekler; farklı kadraj/oran statik
    kalır. Özel crop eşlemesi sonraki aşamanın site adaptörü işidir.
 
 Bakımda motor kopyasını yenileme:

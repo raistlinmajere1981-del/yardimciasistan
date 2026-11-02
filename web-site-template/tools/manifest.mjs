@@ -24,7 +24,12 @@ export function inventory(root) {
   function visit(directory, prefix = '') {
     for (const entry of readdirSync(directory, {withFileTypes: true}).sort((a, b) => a.name.localeCompare(b.name))) {
       const path = prefix + entry.name;
-      if (entry.isSymbolicLink()) throw new Error('Symlink is not supported');
+      // Site-owned runtime modules may be symlinks (e.g. /yardimci-asistan).
+      // Never traverse them, and still reject symlinks in managed common paths.
+      if (entry.isSymbolicLink()) {
+        if (commonPath(path) || commonPath(path + '/')) throw new Error('Common symlink is not supported');
+        continue;
+      }
       if (entry.isDirectory()) visit(join(directory, entry.name), path + '/');
       else if (entry.isFile() && commonPath(path)) files[path] = digest(join(root, path));
     }
@@ -37,7 +42,7 @@ export function inventory(root) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const path = join(templateRoot, 'template-manifest.json');
   if (process.argv[2] === '--write') {
-    writeFileSync(path, JSON.stringify({format: 1, template_version: '0.5.0',
+    writeFileSync(path, JSON.stringify({format: 1, template_version: '0.5.2',
       site_owned: ['site/', 'locales/', 'public/assets/site/'], common: inventory(templateRoot)}, null, 2) + '\n');
     console.log('template-manifest-written');
   } else {

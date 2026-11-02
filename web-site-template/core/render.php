@@ -116,19 +116,61 @@ function price_text(array $site, mixed $price, mixed $currency): string
     return t($site, 'content.price', ['amount' => number_text($site, (float) $price), 'currency' => $currency]);
 }
 
-function effect_bindings(string $root, array $config, string $basePath): array
+/** A scene filename is accepted only inside the site-owned scene directory. */
+function effect_scene_path(string $root, mixed $filename): ?string
 {
+    if (!is_string($filename) || !preg_match('/^[A-Za-z0-9_-]{1,64}\.scene\.json$/D', $filename)) return null;
+    $path = $root . '/public/assets/site/scenes/' . $filename;
+    if (!is_file($path) || filesize($path) > 25 * 1024 * 1024) return null;
+    $scene = json_decode((string) file_get_contents($path), true);
+    if (!is_array($scene) || ($scene['format'] ?? '') !== 'efekt-atolyesi' || ($scene['version'] ?? null) !== 1) return null;
+    return $path;
+}
+
+/**
+ * Opt-in site-owned manifest. Only an exact hard-coded static image under
+ * assets/site/img or assets/site/media can bind; API/remote/dynamic gallery
+ * sources are never accepted. Any unsafe or duplicate entry rejects the file.
+ */
+function effect_manifest_bindings(string $root, string $basePath): array
+{
+    $path = $root . '/public/assets/site/scenes/effects-manifest.json';
+    if (!is_file($path) || filesize($path) > 16 * 1024) return [];
+    $manifest = json_decode((string) file_get_contents($path), true);
+    if (!is_array($manifest) || ($manifest['version'] ?? null) !== 1 || !is_array($manifest['bindings'] ?? null)) return [];
+    if (count($manifest['bindings']) > 32) return [];
+    $assets = realpath($root . '/public/assets');
+    if ($assets === false) return [];
     $bindings = [];
-    foreach ($config['effects'] ?? [] as $slot => $filename) {
-        if (!is_string($slot) || !preg_match('/^[A-Za-z0-9_.-]{1,100}$/D', $slot)
-            || !is_string($filename) || !preg_match('/^[A-Za-z0-9_-]+\.scene\.json$/D', $filename)) continue;
-        $path = $root . '/public/assets/site/scenes/' . $filename;
-        if (!is_file($path) || filesize($path) > 25 * 1024 * 1024) continue;
-        $scene = json_decode((string) file_get_contents($path), true);
-        if (!is_array($scene) || ($scene['format'] ?? '') !== 'efekt-atolyesi' || ($scene['version'] ?? null) !== 1) continue;
-        $bindings[] = ['slot' => $slot, 'url' => $basePath . '/assets/site/scenes/' . $filename];
+    $sources = [];
+    $slots = [];
+    foreach ($manifest['bindings'] as $entry) {
+        if (!is_array($entry) || array_diff(array_keys($entry), ['source', 'slot', 'scene']) !== []) return [];
+        $source = $entry['source'] ?? null;
+        $slot = $entry['slot'] ?? null;
+        $scene = $entry['scene'] ?? null;
+        if (!is_string($source) || strlen($source) > 200
+            || !preg_match('~^site/(?:img|media)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*\.(?:jpe?g|png|webp|avif)$~D', $source)) return [];
+        if (!is_string($slot) || !preg_match('/^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,99}$/D', $slot)) return [];
+        $file = realpath($assets . '/' . $source);
+        if ($file === false || !str_starts_with($file, $assets . DIRECTORY_SEPARATOR) || !is_file($file)) return [];
+        if (effect_scene_path($root, $scene) === null) return [];
+        if (isset($sources[$source]) || isset($slots[$slot])) return [];
+        $sources[$source] = true;
+        $slots[$slot] = true;
+        $bindings[] = [
+            'slot' => $slot,
+            'source' => $basePath . '/assets/' . $source,
+            'url' => $basePath . '/assets/site/scenes/' . $scene,
+        ];
     }
     return $bindings;
+}
+
+/** One canonical binding path. Legacy slot-only configuration is removed. */
+function effect_bindings(string $root, array $config, string $basePath): array
+{
+    return effect_manifest_bindings($root, $basePath);
 }
 
 /** Deployment-owned origin; never derived from request Host or forwarded headers. */

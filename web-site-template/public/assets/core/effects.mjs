@@ -7,6 +7,23 @@ export function mountEffects(bindings, root = document) {
   const safe = () => active && !disposed && !reduced.matches && !connection?.saveData
     && !(navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 2)
     && !(navigator.deviceMemory > 0 && navigator.deviceMemory <= 2);
+  // An explicit manifest binds by exact literal img src even without
+  // modifying site HTML. Responsive srcset/currentSrc is not another target.
+  const localPath = value => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !/[?#\\]/.test(value);
+  function matchesSource(binding, node) {
+    if (!localPath(binding?.source) || !node?.matches?.('img')) return false;
+    const literal = node.getAttribute('src');
+    if (!literal) return false;
+    try {
+      const url = new URL(literal, document.baseURI);
+      return url.origin === location.origin && url.pathname === binding.source;
+    } catch { return false; }
+  }
+  function target(binding, nodes) {
+    if (!binding || typeof binding.slot !== 'string' || !localPath(binding.source)) return null;
+    const matches = nodes.filter(node => matchesSource(binding, node));
+    return matches.length === 1 ? matches[0] : null;
+  }
   function stop() {
     generation++;
     abort?.abort(); abort = null;
@@ -19,8 +36,9 @@ export function mountEffects(bindings, root = document) {
     const turn = generation;
     abort = new AbortController();
     const {signal} = abort;
-    for (const binding of bindings) {
-      const image = [...root.querySelectorAll('img[data-effect-slot]')].find(node => node.dataset.effectSlot === binding.slot);
+    const nodes = [...root.querySelectorAll('img')];
+    for (const binding of Array.isArray(bindings) ? bindings : []) {
+      const image = target(binding, nodes);
       if (!image || !image.complete || !image.naturalWidth) continue;
       image.dataset.effectState = 'static';
       try {
@@ -51,8 +69,8 @@ export function mountEffects(bindings, root = document) {
       }
     }
   }
-  const loaded = event => { if (event.target.matches?.('img[data-effect-slot]')) void sync(); };
-  const fallback = event => { if (event.target.matches?.('img[data-effect-slot]')) event.target.dataset.effectState = 'static'; };
+  const loaded = event => { if (event.target.matches?.('img') && (bindings?.some?.(binding => matchesSource(binding, event.target)))) void sync(); };
+  const fallback = event => { if (event.target.matches?.('img') && (overlays.has(event.target))) event.target.dataset.effectState = 'static'; };
   const pagehide = () => { active = false; stop(); };
   const pageshow = () => { active = true; void sync(); };
   root.addEventListener('load', loaded, true);

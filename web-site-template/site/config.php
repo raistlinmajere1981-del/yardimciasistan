@@ -11,6 +11,8 @@ return [
     // Restrict/reorder existing pages; this cannot grant publication visibility.
     'page_order' => ['home', 'about', 'rooms', 'restaurant', 'menu', 'catalog', 'gallery', 'announcements', 'reviews', 'contact'],
     'hidden_pages' => [],
-    // slot => filename under public/assets/site/scenes/. Empty means zero engine requests.
+    // Legacy explicit slot => scene filename under public/assets/site/scenes/.
+    // Opt-in static bindings live in public/assets/site/scenes/effects-manifest.json.
+    // Empty and no manifest means zero engine requests.
     'effects' => [],
 ];

@@ -17,5 +17,4 @@ return [
   'language_cookie_path' => '',
   'page_order' => ['home', 'about', 'rooms', 'restaurant', 'menu', 'catalog', 'gallery', 'announcements', 'reviews', 'contact'],
   'hidden_pages' => [],
-  'effects' => [],
 ];
