@@ -626,7 +626,10 @@ async function syncRequest<SuccessResult extends { ok: true }>(
         "X-YA-Sync-Secret": config.syncSecret
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000)
+      // The dealer snapshot includes complete per-account price catalogs and order history.
+      // Keep ordinary sync traffic at 15s, but allow this larger idempotent publication
+      // to finish without incorrectly classifying slow processing as a lost connection.
+      signal: AbortSignal.timeout(body.action === "publish_dealer_access" ? 45_000 : 15_000)
     });
     const payload = await readJsonResponse(response);
 

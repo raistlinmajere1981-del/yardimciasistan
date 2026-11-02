@@ -381,7 +381,9 @@ export class SyncCoordinator {
       ...config,
       clientId,
       sourceEpoch: source.sourceEpoch,
-      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
+      // sync-core keeps normal requests at 15s; only the large dealer publication
+      // may need 45s. Do not let the outer network guard cut it off at 15s.
+      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch, 45_000) } : {})
     });
     const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
     const androidEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID);
