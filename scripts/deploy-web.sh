@@ -473,16 +473,17 @@ if command -v curl >/dev/null 2>&1; then
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
   fi
-  if ! catalog_json="$(curl --fail --silent --show-error --max-time 20 \
-    "${public_url%/}/api/catalog.php")" \
-    || ! php -r '
-      $catalog = json_decode($argv[1] ?? "", true);
+  # Large published catalogs exceed the OS argv size limit; stream the whole
+  # response through stdin instead of passing JSON as a PHP command argument.
+  if ! curl --fail --silent --show-error --max-time 20 \
+    "${public_url%/}/api/catalog.php" | php -r '
+      $catalog = json_decode(stream_get_contents(STDIN), true);
       exit(json_last_error() === JSON_ERROR_NONE
         && is_array($catalog)
         && ($catalog["ok"] ?? false) === true
         && is_bool($catalog["enabled"] ?? null)
         && is_array($catalog["products"] ?? null) ? 0 : 1);
-    ' "$catalog_json"; then
+    '; then
     printf 'Yayın uygulandı ancak public ürün kataloğu HTTP/JSON kontrolü başarısız oldu.\n' >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
