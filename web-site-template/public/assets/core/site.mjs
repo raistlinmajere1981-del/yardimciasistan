@@ -1,7 +1,9 @@
 import {createLanguage, formatLanguageElements} from './language.mjs';
 import {createIntegrations} from './public-api.mjs';
+import {bootTraffic} from './traffic.mjs';
 
 const context = JSON.parse(document.getElementById('site-context').textContent);
+bootTraffic(context);
 const button = document.querySelector('[data-menu-toggle]');
 const navigation = document.getElementById('main-navigation');
 const mobile = matchMedia('(max-width: 760px)');

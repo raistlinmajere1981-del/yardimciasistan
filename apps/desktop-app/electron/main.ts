@@ -6,6 +6,7 @@ import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
 import { cleanupOrphanProductImages } from "./product-data-service";
 import { MarketingAnalyticsService } from "./marketing/analytics-service";
 import { registerMarketingAnalyticsIpc } from "./ipc/marketing-analytics-ipc";
+import { registerWebTrafficIpc } from "./ipc/web-traffic-ipc";
 import { MarketingScheduleService } from "./marketing/schedule-service";
 import { MarketingSchedulerService } from "./marketing/scheduler-service";
 import { MarketingScheduledTargetService } from "./marketing/scheduled-target-service";
@@ -616,6 +617,7 @@ function registerIpcHandlers() {
   registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => getSyncCoordinator().scheduleSoon(0, true)});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
+  registerWebTrafficIpc({ config: () => getWebSyncConfig(getDatabase().getSetupData()), assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingIpc({ service: marketingStudioService, shares: marketingShareService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });

@@ -3,6 +3,7 @@ import type { TranslationBridge } from "@yardimci-asistan/shared";
 import type { BenefitsManagementBridge, TableOrderBenefitsBridge } from "@yardimci-asistan/shared";
 import type { BusinessMessagingBridge, MarketingShareBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
+import type { SiteTrafficResult } from "./web-traffic/snapshot";
 import type { LocalCompanionPairingSession } from "./local-companion-pairing-service";
 import type {
   KbsConnectionTestResult,
@@ -225,6 +226,7 @@ export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsM
     setup: DesktopSetupData;
   }>;
   getDashboardData: () => Promise<DesktopDashboardData>;
+  getSiteTrafficSnapshot: (days: 7 | 30, fresh?: boolean) => Promise<SiteTrafficResult>;
   getReportData: (input: DesktopReportRangeInput) => Promise<DesktopReportQueryResult>;
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => Promise<GenerateDesktopReportAiResult>;
   generateFinanceAiComment: (input: GenerateDesktopFinanceAiInput) => Promise<GenerateDesktopFinanceAiResult>;
@@ -536,6 +538,7 @@ const bridge: DesktopBridge = {
   resetAppPassword: (webSecurityKey: string) => ipcRenderer.invoke("appLock:resetWithWebSecurityKey", webSecurityKey),
   getBootstrapData: () => ipcRenderer.invoke("app:getBootstrapData"),
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
+  getSiteTrafficSnapshot: (days, fresh) => invokeWhenUnlocked<SiteTrafficResult>("webTraffic:snapshot", days, fresh),
   getReportData: (input: DesktopReportRangeInput) => ipcRenderer.invoke("report:getData", input),
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => ipcRenderer.invoke("report:generateAiComment", input),
   generateFinanceAiComment: (input: GenerateDesktopFinanceAiInput) => invokeWhenUnlocked<GenerateDesktopFinanceAiResult>("finance:generateAiComment", input),

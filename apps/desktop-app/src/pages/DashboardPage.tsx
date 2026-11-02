@@ -27,6 +27,7 @@ import {
   type DashboardPriorityItem
 } from "../app/dashboard";
 import { SystemHealthPanel } from "../components/dashboard/SystemHealthPanel";
+import { SiteTrafficCard } from "../components/dashboard/SiteTrafficCard";
 import { ActionButton } from "../components/ui/ActionButton";
 import { Panel } from "../components/ui/Panel";
 import { PageWorkSurface } from "../components/layout/PageWorkSurface";
@@ -137,7 +138,8 @@ export function DashboardPage({
   const visibleScheduleItems = dashboard.scheduleItems;
   const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
   const capacityVisible = hasCapacityMetrics || aiEnabled;
-  const sideVisible = operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible
+  const trafficVisible = Boolean(setupData.webModuleUrl?.trim() && setupData.syncSecret?.trim());
+  const sideVisible = trafficVisible || operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible
     || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0);
 
   const renderPriorityItem = (item: DashboardPriorityItem, index: number) => (
@@ -274,6 +276,7 @@ export function DashboardPage({
         </Panel>
 
         {sideVisible && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+          {trafficVisible && <SiteTrafficCard />}
           {operationalAttentionItems.length > 0 && (
             <Panel className="dashboard-operational-attention-panel" padding="compact">
               <div className="dashboard-section-heading page-toolbar compact">

@@ -16,6 +16,7 @@ require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/android-companion-projection.php';
 require_once YA_BASE_DIR . '/lib/android-kbs-projection.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
+require_once YA_BASE_DIR . '/lib/traffic.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
 ya_sync_apply_cors($businessConfig);
@@ -28,7 +29,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_marketing_website', 'publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_marketing_website', 'publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime', 'traffic_snapshot'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -67,6 +68,10 @@ try {
     }
     if ($action === 'capabilities') {
         ya_sync_capabilities();
+    }
+
+    if ($action === 'traffic_snapshot') {
+        ya_sync_traffic_snapshot($payload, $businessConfig);
     }
 
     if ($action === 'reset_runtime') {
@@ -200,6 +205,26 @@ function ya_sync_capabilities(): void
         'message' => 'Senkron özellikleri alındı.',
         ...ya_storage_capabilities(),
         'server_time' => $now,
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_traffic_snapshot(array $payload, array $businessConfig): void
+{
+    $days = ya_sync_int($payload['days'] ?? 7, 7);
+    if (!in_array($days, [7, 30], true)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'code' => 'invalid_traffic_period',
+            'message' => 'Site trafiği dönemi 7 veya 30 gün olabilir.'
+        ]);
+    }
+    $snapshot = ya_traffic_snapshot(ya_storage_open(), $days, ya_traffic_timezone($businessConfig));
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => $snapshot['has_data'] ? 'Site trafiği özeti alındı.' : 'Henüz site trafiği verisi yok.',
+        'enabled' => ya_traffic_enabled($businessConfig),
+        ...$snapshot,
         'server_revision' => ya_storage_server_revision()
     ]);
 }

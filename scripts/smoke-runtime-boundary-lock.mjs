@@ -166,7 +166,7 @@ const addedProtectedChannels = [
     "companionGrantStatus", "companionSpendStatus", "companionSpendGrant", "companionSpendRevoke",
     "companionDevices", "companionGrant", "companionRevoke"].map(name => `benefits:${name}`),
   ...["benefitsState", "previewBenefits", "fullRefundMarketPreview", "fullRefundMarket", "marketHistory"].map(name => `commerce:sale:${name}`),
-  "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits"
+  "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits", "webTraffic:snapshot"
 ];
 assert.equal(handlers.size, 296 + addedProtectedChannels.length, "all production invoke registrations must execute");
 for (const channel of addedProtectedChannels) assert.ok(handlers.has(channel), `${channel}: protected registration must execute`);

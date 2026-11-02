@@ -80,7 +80,8 @@ function ya_storage_capabilities(): array
             'publication_source_epochs',
             'idempotent_publications',
             'server_revision',
-            'runtime_reset'
+            'runtime_reset',
+            'traffic_analytics_v1'
         ]
     ];
 }
@@ -103,6 +104,12 @@ function ya_storage_reset_runtime(): array
         'private_publication_config',
         'sync_clients',
         'sync_meta',
+        // Aggregate-only site traffic; anonymous dedupe rows expire automatically.
+        'traffic_events',
+        'traffic_sessions',
+        'traffic_pages',
+        'traffic_sources',
+        'traffic_daily',
         // These tables are created lazily by their own subsystems and may not
         // exist on installations that never used Android pairing/public forms.
         'android_device_tokens',

@@ -86,6 +86,7 @@ try {
   // Dashboard and health are projections: supplied controller state is enough; no preload bridge is required.
   await expect(page.locator(".dashboard-page")).toBeVisible();
   await expect(page.locator(".system-health-panel")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Site trafiği/ })).toBeVisible();
   await expect(page.locator(".system-health-item")).toHaveCount(6);
   await expect(page.locator(".system-health-item").filter({ hasText: "Web bağlantısı" })).toContainText("Web eşitlemeye hazır");
   await expect(page.locator(".system-health-item").filter({ hasText: "Ağ sinyali" })).toContainText("İnternet ve servis erişimi doğrulanmadı");

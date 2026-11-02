@@ -27,7 +27,7 @@ function Harness() {
     <AppShell contentScroll="workspace" sidebar={<Sidebar items={[]} activePage="dashboard" businessName="Dashboard fixture" onNavigate={() => {}} />} header={<PageHeader title="Ana Sayfa" />}>
       <DashboardPage
         data={control.__m8fInitial.dashboard}
-        setupData={control.__m8fInitial.setup}
+        setupData={sideEnabled ? control.__m8fInitial.setup : { ...control.__m8fInitial.setup, webModuleUrl: "", syncSecret: "" }}
         automaticSyncStatus={control.__m8fInitial.syncStatus}
         features={{ rooms: sideEnabled, tables: sideEnabled, whatsapp: sideEnabled, android: sideEnabled }}
         aiEnabled={sideEnabled}

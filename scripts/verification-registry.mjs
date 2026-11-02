@@ -319,6 +319,12 @@ const BASE_CHECKS = [
   check("web-account-session", "Ortak web hesabı ve özel görünüm yaşam döngüsü", "node", ["--test", "scripts/test-helpers/account-session.test.mjs"], {
     phase: 5, presets: ["full"], domains: ["web", "dealer-access"]
   }),
+  check("web-traffic-php-tests", "Anonim site trafiği saklama, dedupe ve rapor sözleşmesi", "php", ["scripts/test-web-traffic.php"], {
+    phase: 5, presets: ["dev", "full"], domains: ["web"]
+  }),
+  check("web-traffic-js-tests", "Site trafiği beacon gizlilik ve dayanıklılık testleri", "node", ["--test", "scripts/test-web-traffic.mjs"], {
+    phase: 5, presets: ["dev", "full"], domains: ["web"]
+  }),
   check("account-order-receipt", "Hesap kapsamında salt okunur sipariş sonucu kurtarma", "node", ["scripts/test-account-order-receipt.mjs"], {
     phase: 50, presets: ["full"], domains: ["web", "commerce", "dealer-access"]
   }),
