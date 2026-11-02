@@ -87,15 +87,21 @@ REMOTE_STATE
 [[ "$module_state" != blocked ]] || { echo 'Bilinmeyen içerik bulunan modül dizini korunuyor; yayın durduruldu.' >&2; exit 1; }
 printf 'Web modülü durumu: %s\n' "$module_state"
 
-# An unrelated index must never be silently replaced.
+# Permit only the owned Market Pilot site or the exact, site-domain-bound
+# canonical staging adapter previously published in this same tenant.
 ssh "${ssh_opts[@]}" "$host" bash -s -- "$www_root" <<'REMOTE_SITE_CHECK'
 set -Eeuo pipefail
 www="$1"
-if test -f "$www/index.php" &&
-   ! grep -q 'market-pilot-site' "$www/index.php" &&
-   ! { grep -Fq "market_header('home')" "$www/index.php" &&
-       grep -Fq 'data-ui="Günlük alışveriş"' "$www/index.php"; }; then
-  echo 'Market Pilot dışı index.php bulundu; yayın durduruldu.' >&2; exit 1
+if test -f "$www/index.php" && ! grep -q 'market-pilot-site' "$www/index.php"; then
+  if [[ "$(sha256sum "$www/index.php" | cut -d' ' -f1)" != 'a290a964d3399e51fdcf033c05bae7760bf8878396ee57a40bcd95375a856fea'       || ! -f "$www/site/config.php"       || ! -f "$www/.htaccess"       || "$(sha256sum "$www/.htaccess" | cut -d' ' -f1)" != '9fc4c75b0fd55205d5ce7a34dc5d803bfd5ed92aa4eeb8730758d3c977c0a0b0' ]]       || ! grep -Fq 'https://yardimciasistantest.alwaysdata.net' "$www/site/config.php"; then
+    echo 'Market Pilot dışı index.php bulundu; yayın durduruldu.' >&2; exit 1
+  fi
+  echo 'Market Pilot ortak site adaptöründen güvenli geçiş doğrulandı.'
+fi
+if test -f "$www/.htaccess" && ! grep -q '# market-pilot-site' "$www/.htaccess"; then
+  if [[ "$(sha256sum "$www/.htaccess" | cut -d' ' -f1)" != '9fc4c75b0fd55205d5ce7a34dc5d803bfd5ed92aa4eeb8730758d3c977c0a0b0' ]]; then
+    echo 'Bilinmeyen kök htaccess dosyası bulundu; yayın durduruldu.' >&2; exit 1
+  fi
 fi
 if test -f "$www/index.html" && ! grep -qi 'alwaysdata' "$www/index.html"; then
   echo 'Varsayılan olmayan index.html bulundu; yayın durduruldu.' >&2; exit 1
@@ -104,7 +110,7 @@ REMOTE_SITE_CHECK
 
 if [[ "$dry_run" == true ]]; then
   echo 'Ön kontrol geçti. Site ve modül yayınlandığında yalnız Market Pilot hesabı değişecek.'
-  echo 'Site: index.php + assets/ + inc/ + magaza/ (diğer içerikler korunur).'
+  echo 'Site: index.php + .htaccess + assets/ + inc/ + magaza/ (diğer içerikler korunur).'
   if [[ "$module_state" == first ]]; then
     echo 'İlk kurulumda yeni ve bağımsız güvenlik anahtarı oluşturulacak.'
   else
@@ -153,6 +159,7 @@ for site_directory in assets inc magaza; do
   rsync -az -e "$ssh_cmd" "$site_source/$site_directory/" "$host:$www_root/$site_directory/"
 done
 rsync -az -e "$ssh_cmd" "$site_source/index.php" "$host:$stage_index"
+rsync -az -e "$ssh_cmd" "$site_source/.htaccess" "$host:$stage_index.htaccess"
 ssh "${ssh_opts[@]}" "$host" bash -s -- "$www_root" "$backup_dir" "$stage_index" "$stamp" <<'REMOTE_SITE_ACTIVATE'
 set -Eeuo pipefail
 www="$1"
@@ -160,13 +167,16 @@ backup="$2"
 stage="$3"
 stamp="$4"
 test -f "$stage"
+test -f "$stage.htaccess"
+grep -Fq '# market-pilot-site' "$stage.htaccess"
 php -l "$stage" >/dev/null
 mkdir -p "$backup/market-pilot-$stamp"
-for index in index.php index.html; do
+for index in index.php index.html .htaccess; do
   if test -f "$www/$index"; then
     cp -p "$www/$index" "$backup/market-pilot-$stamp/$index"
   fi
 done
+mv "$stage.htaccess" "$www/.htaccess"
 mv "$stage" "$www/index.php"
 # An unchanged Alwaysdata starter page would mask the new PHP index.
 if test -f "$www/index.html"; then rm "$www/index.html"; fi
@@ -177,6 +187,23 @@ content="$(curl -fsS --max-time 20 "$site_url/")"
 [[ "$status" == 200 && "$content" == *market-pilot-site* ]] || {
   echo "Market ana sayfası kontrol edilemedi: HTTP $status" >&2; exit 1;
 }
+for path in /assets/market.css /magaza/ /magaza/urun/; do
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$site_url$path")"
+  [[ "$code" == 200 ]] || { echo "Market sayfası kontrolü başarısız: HTTP $code ($path)" >&2; exit 1; }
+done
+# Prune only this site's automatically produced rollback folders after HTTP
+# acceptance. Keep the single latest site entry backup; the web module has its
+# own independently managed one-backup retention.
+ssh "${ssh_opts[@]}" "$host" bash -s -- "$backup_dir" <<'REMOTE_SITE_BACKUP_PRUNE'
+set -Eeuo pipefail
+backup="$1"
+[[ -d "$backup" && ! -L "$backup" ]]
+find "$backup" -mindepth 1 -maxdepth 1 -type d -name 'market-pilot-20*' -printf '%f\n' | LC_ALL=C sort -r | tail -n +2 | while IFS= read -r name; do
+  [[ "$name" =~ ^market-pilot-20[0-9]{6}T[0-9]{6}Z-[0-9]+$ ]] || exit 2
+  [[ ! -L "$backup/$name" ]] || exit 2
+  rm -rf -- "$backup/$name"
+done
+REMOTE_SITE_BACKUP_PRUNE
 echo "Market Pilot yayını tamamlandı: $site_url"
 if [[ "$module_state" == first ]]; then
   echo 'Kurulum anahtarı: artifacts/market-pilot/install-info.txt (yalnız yerel)'

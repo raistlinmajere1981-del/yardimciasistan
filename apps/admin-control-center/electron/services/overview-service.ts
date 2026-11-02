@@ -115,7 +115,33 @@ function getCredentialStatus(repoRoot: string, credentialRef: string | null): Cr
   }
 }
 
-async function probeUrl(url: string | null): Promise<HealthCheckSnapshot> {
+// A cold Electron startup can race DNS/TLS initialization, especially for
+// externally hosted sites. Retry transport failures once; HTTP responses and
+// malformed payloads remain real errors and are never silently treated as OK.
+async function fetchHealthEndpoint(url: string, accept: string): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6500);
+    try {
+      return await fetch(url, {
+        method: "GET",
+        headers: { Accept: accept },
+        redirect: "follow",
+        cache: "no-store",
+        signal: controller.signal
+      });
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw lastError;
+}
+
+export async function probeUrl(url: string | null): Promise<HealthCheckSnapshot> {
   if (!url) {
     return {
       id: "site",
@@ -126,18 +152,10 @@ async function probeUrl(url: string | null): Promise<HealthCheckSnapshot> {
     };
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
   const startedAt = Date.now();
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "text/html,application/json;q=0.9,*/*;q=0.8" },
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal
-    });
+    const response = await fetchHealthEndpoint(url, "text/html,application/json;q=0.9,*/*;q=0.8");
 
     const durationMs = Date.now() - startedAt;
 
@@ -167,12 +185,10 @@ async function probeUrl(url: string | null): Promise<HealthCheckSnapshot> {
       detail: `Erişilemedi: ${reason}`,
       durationMs: Date.now() - startedAt
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
-async function getLiveWebVersion(
+export async function getLiveWebVersion(
   endpoint: string | null,
   expectedVersion: string | null
 ): Promise<{
@@ -192,17 +208,10 @@ async function getLiveWebVersion(
     };
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
   const startedAt = Date.now();
 
   try {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: controller.signal
-    });
+    const response = await fetchHealthEndpoint(endpoint, "application/json");
 
     const durationMs = Date.now() - startedAt;
 
@@ -276,8 +285,6 @@ async function getLiveWebVersion(
         durationMs: Date.now() - startedAt
       }
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
