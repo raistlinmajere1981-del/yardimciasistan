@@ -77,12 +77,20 @@ try {
 
   const raw = new DatabaseSync(database.databasePath);
   try {
-    const create = (status) => database.saveCustomer(baseCustomer({ phone: "", email: "",
+    const create = (status, email = "") => database.saveCustomer(baseCustomer({ phone: "", email,
       commercialProfile: status ? { companyName: "Dealer Company", dealerStatus: status, priceGroup: "dealer_a" } : undefined }));
-    const ordinary = create(); const inactive = create("inactive"); const active = create("active");
+    const ordinary = create(); const inactive = create("inactive"); const active = create("active", "dealer-access@example.test");
     for (const result of [ordinary, inactive, active]) assert.equal(result.ok, true, result.message);
     for (const result of [ordinary, inactive]) assert.equal(database.getDealerWebAccess(result.savedId).enabled, false);
     const id = active.savedId;
+    // Private catalogs require a verified, explicitly linked web account; unlinked customers never receive one.
+    assert.equal(database.createDealerAccessProjection().catalogs.length, 0, "unlinked dealer gets no private catalog");
+    const accountId = "acct-dealer-access-smoke";
+    raw.prepare("INSERT INTO web_customer_accounts (account_id, email, full_name, status) VALUES (?, ?, ?, 'conflict')")
+      .run(accountId, "dealer-access@example.test", "Dealer Company");
+    database.changeDealerWebAccess(id, { type: "link", accountId });
+    assert.equal(database.getDealerWebAccess(id).accountId, accountId);
+    assert.equal(database.createDealerAccessProjection().catalogs.length, 1, "linked dealer receives the private catalog");
     // Original archive order is the gallery owner. Upload acknowledgements only cache public URLs.
     const product = saveRuntimeCatalogProduct(database.databasePath, { name: "Photo fixture", sku: "PHOTO-1", brand: "",
       categoryId: "", salePrice: 100, dealerPriceA: 80, dealerPriceB: null, purchasePrice: 20,

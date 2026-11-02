@@ -79,10 +79,16 @@ try {
   assert.equal((await prepareOnlineProductMedia(database, config, revision(), upload)).ok, false, "missing cover fails, including after a valid earlier product");
   database.saveCommerceProductPublication({ productId: hidden.id, isPublished: false });
   raw.prepare("UPDATE catalog_products SET is_active=0 WHERE id=?").run(hidden.id); // Dealer channel uses all active products.
-  const customer = database.saveCustomer({ fullName: "Shared media dealer", phone: "", email: "", notes: "", tags: [],
+  const customer = database.saveCustomer({ fullName: "Shared media dealer", phone: "", email: "shared-media-dealer@example.test", notes: "", tags: [],
     identityType: "", identityNumber: "", nationality: "", birthDate: "", gender: "", address: "",
     commercialProfile: { companyName: "Fixture", dealerStatus: "active", priceGroup: "dealer_a" } });
   assert.equal(customer.ok, true, customer.message);
+  assert.equal(database.createDealerAccessProjection().catalogs.length, 0, "unlinked dealer gets no private catalog");
+  const dealerAccountId = "acct-shared-media-dealer";
+  raw.prepare("INSERT INTO web_customer_accounts (account_id, email, full_name, status) VALUES (?, ?, ?, 'conflict')")
+    .run(dealerAccountId, "shared-media-dealer@example.test", "Shared media dealer");
+  database.changeDealerWebAccess(customer.savedId, { type: "link", accountId: dealerAccountId });
+  assert.equal(database.getDealerWebAccess(customer.savedId).accountId, dealerAccountId);
   const dealer = await prepareDealerProductMedia(database, config, revision("dealer_access"), upload);
   assert.equal(dealer.ok, true, dealer.message);
   assert.deepEqual(dealer.value.catalogs[0].products.find(p => p.product_id === product.id).image_urls, expectedUrls(product, originals));
