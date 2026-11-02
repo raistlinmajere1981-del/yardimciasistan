@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const dist = resolve(here, "../dist-renderer");
