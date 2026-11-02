@@ -5,7 +5,7 @@ import { serviceSettingsFields } from "./settings-service-fields";
 
 // Setup persistence owns Business and Services. Resource overlays have their own BusinessLayout draft.
 export const settingsFieldOwners = {
-  business: ["businessName", "profileId", "profileOptions", "phone", "whatsapp", "email", "address"],
+  business: ["businessName", "profileId", "profileOptions", "phone", "whatsapp", "email", "address", "trafficEnabled"],
   services: Object.values(serviceSettingsFields).flat()
 } as const satisfies Record<StagedSettingsCategoryId, readonly (keyof SetupFormState)[]>;
 

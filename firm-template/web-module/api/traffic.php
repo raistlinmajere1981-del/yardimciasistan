@@ -41,7 +41,7 @@ if (is_string($configJson)) {
 }
 
 // Explicitly disabled collection is a silent no-op for the site.
-if (!ya_traffic_enabled($config)) {
+if (!ya_traffic_enabled(ya_traffic_effective_config($config))) {
     ya_traffic_no_content();
 }
 

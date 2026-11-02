@@ -99,7 +99,7 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
           {metrics.some(m => m.value !== null) ? <AnalyticsMetricList metrics={metrics} label={`${channelNames[c.channel]} metrikleri`}/>
             : <p aria-label={`${channelNames[c.channel]} metrikleri`}>Bu aralıkta {c.channel === "website" || c.channel === "instagram" ? "yayın" : "gönderim"} verisi yok.</p>}
           {(c.channel === "whatsapp" || c.channel === "sms") && <p className="muted">Gönderilen, servisin aldığı mesajdır. Teslim bilgisi {c.channel === "whatsapp" ? "ve okunma bilgisi" : ""} ayrıca doğrulanır.</p>}
-          {c.channel === "website" && <p className="muted">Ziyaret verisi toplanmıyor.</p>}
+          {c.channel === "website" && <p className="muted">Site ziyaretleri bu raporun dışında, Dashboard’daki Site trafiği kartında ölçülür.</p>}
           {c.channel === "instagram" && <p className="muted">{c.serviceState === "ready" && c.providerCapabilities.some(m => m.availability === "available") ? "Varsa görüntülenme ve etkileşim ölçümleri yayın ayrıntısında gösterilir." : "Görüntülenme ve etkileşim verisi alınamıyor. " + analyticsAvailabilityLabels[c.serviceState === "ready" ? (c.providerCapabilities.find(m => ["permission_denied", "permission_unverified"].includes(m.availability))?.availability ?? c.providerCapabilities[0]?.availability ?? "unsupported") : c.serviceState] + "."}</p>}
         </Panel>; })}</div>
       </section>}

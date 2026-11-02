@@ -937,6 +937,7 @@ CREATE TABLE settings (
   web_module_url TEXT NOT NULL DEFAULT '',
   sync_secret TEXT NOT NULL DEFAULT '',
   auto_sync_enabled INTEGER NOT NULL DEFAULT 1 CHECK (auto_sync_enabled IN (0, 1)),
+  traffic_enabled INTEGER NOT NULL DEFAULT 1 CHECK (traffic_enabled IN (0, 1)),
   local_network_enabled INTEGER NOT NULL DEFAULT 1 CHECK (local_network_enabled IN (0, 1)),
   ai_provider TEXT NOT NULL DEFAULT '',
   ai_service TEXT NOT NULL DEFAULT 'openai',

@@ -211,6 +211,10 @@
 .settings-web-actions .action-button {
   white-space: nowrap;
 }
+.settings-web-traffic { grid-column: 1 / -1; display: grid; gap: var(--space-1); justify-items: start; white-space: normal; }
+.settings-web-traffic-note { margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); max-width: 72ch; }
+.settings-web-traffic { grid-column: 1 / -1; flex-wrap: wrap; }
+.settings-web-traffic-note { grid-column: 1 / -1; margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); }
 
 @media (max-width: 1240px) {
   .settings-web-fields { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }

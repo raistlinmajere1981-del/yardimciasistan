@@ -1,5 +1,5 @@
 const PAGES = new Set(['home', 'about', 'rooms', 'restaurant', 'menu', 'catalog', 'gallery', 'announcements', 'reviews', 'contact']);
-const ITEM_PAGES = new Set(['rooms', 'restaurant', 'catalog']);
+const ITEM_PAGES = new Set(['rooms', 'restaurant', 'catalog', 'menu']);
 const SOURCES = new Set(['search', 'social', 'referral', 'direct']);
 const SEARCH_HOSTS = /(^|\.)(google|bing|yahoo|duckduckgo|yandex|ecosia|baidu|ask)\./i;
 const SOCIAL_HOSTS = /(^|\.)(facebook|instagram|twitter|x|linkedin|tiktok|youtube|pinterest|reddit|threads|tumblr)\./i;
@@ -37,7 +37,10 @@ export function resolvePage(url) {
   const requested = parsed.searchParams.get('page') || (parsed.pathname.replace(/\/+$/, '') === '' ? 'home' : '');
   const page = requested.toLowerCase();
   if (!PAGES.has(page)) return null;
-  const item = ITEM_PAGES.has(page) ? (parsed.searchParams.get('id') || '') : '';
+  // Canonical site routing uses ?page=menu&category=... and ?page=catalog&id|category=...
+  const item = ITEM_PAGES.has(page)
+    ? (parsed.searchParams.get('id') || parsed.searchParams.get('category') || '')
+    : '';
   if (item !== '' && !/^[A-Za-z0-9._:-]{1,80}$/.test(item)) return null;
   return {page, item};
 }

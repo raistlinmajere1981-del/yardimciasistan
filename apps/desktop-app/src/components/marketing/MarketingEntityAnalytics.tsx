@@ -48,7 +48,7 @@ export function MarketingEntityAnalytics({ kind, id, revision, inline = false }:
     {message && <p role="status">{message}</p>}
     {data ? <AnalyticsMetricList metrics={data.metrics} label={kind === "campaign" ? "Kampanya metrikleri" : "Yayın metrikleri"}/> : !message && <p>Henüz analitik veri yok.</p>}
     {publication && !inline && <p>Durum: {publication.status === "published" ? "Yayınlandı" : publication.status === "publishing" ? "Yayın onayı bekleniyor" : publication.status === "failed" ? "Başarısız" : publication.status === "unpublished" ? "Yayından kaldırıldı" : "Taslak"} · Yayın zamanı: {publication.publishedAt ? new Date(publication.publishedAt).toLocaleString("tr-TR") : "—"} · Son güncelleme: {new Date(publication.updatedAt).toLocaleString("tr-TR")}</p>}
-    {publication?.channel === "website" && <p>Ziyaret verisi toplanmıyor.</p>}
+    {publication?.channel === "website" && <p>Site ziyaretleri burada değil, Dashboard’daki Site trafiği kartında ölçülür.</p>}
     {publication?.canRefresh && <><ActionButton variant="secondary" disabled={busy || Boolean(publication.nextRefreshAt && Date.parse(publication.nextRefreshAt) > clock)} onClick={() => void refresh()}>Sağlayıcı metriklerini yenile</ActionButton>
       {publication.nextRefreshAt && Date.parse(publication.nextRefreshAt) > clock && <small>Bir sonraki yenileme: {new Date(publication.nextRefreshAt).toLocaleTimeString("tr-TR")}</small>}</>}
   </section>;

@@ -80,8 +80,8 @@ export function SiteTrafficCard() {
       onMouseEnter={() => { clearClose(); setOpen(true); }} onMouseLeave={scheduleClose}
       onFocus={() => { clearClose(); setOpen(true); }} onClick={() => { clearClose(); setOpen(v => !v); }}>
       <span className="dashboard-site-traffic-symbol"><BarChart3 size={19} aria-hidden="true" /></span>
-      <span className="dashboard-site-traffic-copy"><small>Site trafiği</small><strong>{busy && !value ? "Yükleniyor…" : noData ? "Henüz ölçüm yok" : `${count(today?.sessions)} bugün`}</strong>
-        <small>{noData ? "Ziyaretler ölçülmeye başlayınca görünür" : `${count(value.totals.sessions)} oturum · ${period} gün${result?.ok && result.stale ? " · güncel değil" : ""}`}</small></span>
+      <span className="dashboard-site-traffic-copy"><small>Site trafiği</small><strong>{busy && !value ? "Yükleniyor…" : value && !value.enabled ? "Site trafiği kapalı" : noData ? "Henüz ölçüm yok" : `${count(today?.sessions)} bugün`}</strong>
+        <small>{value && !value.enabled ? "Ayarlar > Web bağlantısı" : noData ? "Ziyaretler ölçülmeye başlayınca görünür" : `${count(value.totals.sessions)} oturum · ${period} gün${result?.ok && result.stale ? " · güncel değil" : ""}`}</small></span>
       <Activity size={17} aria-hidden="true" />
     </button>
     {open && <div ref={popup} popover="manual" role="dialog" aria-label="Site trafiği ayrıntıları" className="dashboard-site-traffic-popup"
@@ -91,14 +91,16 @@ export function SiteTrafficCard() {
       <div className="dashboard-site-traffic-toolbar"><div role="group" aria-label="Rapor dönemi">
         {([7, 30] as const).map(days => <button key={days} type="button" aria-pressed={days === period} onClick={() => setPeriod(days)}>{days} gün</button>)}
         </div><button className="dashboard-site-traffic-icon-button" type="button" aria-label="Raporu yenile" disabled={busy} onClick={() => void read(period, true)}><RefreshCw size={16} /></button></div>
+      {value && !value.enabled && <p className="dashboard-site-traffic-disabled"><Activity size={14} aria-hidden="true" /> Site trafiği ölçümü kapalı. Yalnız daha önce toplanan özet gösterilir.</p>}
       {value && value.has_data ? <>
-        <div className="dashboard-site-traffic-metrics"><div><small>Oturum</small><strong>{count(value.totals.sessions)}</strong></div><div><small>Sayfa gösterimi</small><strong>{count(value.totals.views)}</strong></div><div><small>İletişim tıklaması</small><strong>{count(value.totals.intents)}</strong></div></div>
+        <div className="dashboard-site-traffic-metrics"><div><small>Oturum</small><strong>{count(value.totals.sessions)}</strong></div><div><small>Sayfa gösterimi</small><strong>{count(value.totals.views)}</strong></div><div><small>İletişim tıklaması</small><strong>{count(value.totals.intents)}</strong></div>
+          {value.conversions && <><div><small>Onaylı web talebi</small><strong>{count(value.conversions.requests)}</strong></div><div><small>Onaylı web siparişi</small><strong>{count(value.conversions.orders)}</strong></div></>}</div>
         <div className="dashboard-site-traffic-chart" aria-label={`${period} günlük oturum grafiği`}>{value.daily.map(item => <div key={item.date} className="dashboard-site-traffic-bar" title={`${item.date}: ${item.sessions} yaklaşık oturum`}><span style={{ height: `${Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))}%` }} /></div>)}</div>
         <h4>En çok bakılan sayfalar</h4>
         {value.top_pages.length ? <ol>{value.top_pages.map(item => <li key={item.page}><span>{pageName(item.page)}</span><strong>{count(item.count)}</strong></li>)}</ol> : <small>Henüz sayfa kırılımı yok.</small>}
         <h4>Geliş kaynakları</h4>
         <div className="dashboard-site-traffic-sources">{value.sources.filter(item => item.count > 0).map(item => <span key={item.source}>{sources[item.source] || item.source}: <strong>{count(item.count)}</strong></span>)}</div>
-        <p><MousePointerClick size={13} aria-hidden="true" /> İletişim bağlantısına tıklama, görüşme veya sipariş gerçekleştiği anlamına gelmez.</p>
+        <p><MousePointerClick size={13} aria-hidden="true" /> İletişim tıklaması görüşme veya sipariş değildir. Onaylı talep/sipariş yalnız masaüstüne aktarılmış sunucu kayıtlarından sayılır; tıklamalar bunlara eklenmez.</p>
       </> : <p className="dashboard-site-traffic-empty">{result && !result.ok ? result.message : "Yeni ölçüm başlatıldı; henüz güvenilir bir ziyaret kaydı yok."}</p>}
       {todayObserved && <span className="sr-only">Bugün sayfa görüntülemesi: {count(today?.views)}</span>}
       <small className="dashboard-site-traffic-footnote">Oturumlar yaklaşık ölçülür; tekil kişi sayısı değildir.</small>

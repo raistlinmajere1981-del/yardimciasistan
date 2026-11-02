@@ -90,6 +90,7 @@ export const defaultSetupData: DesktopSetupData = {
   webModuleUrl: "",
   syncSecret: "",
   autoSyncEnabled: false,
+  trafficEnabled: true,
   localNetworkEnabled: true,
   whatsappCloud: emptyWhatsAppCloudConfiguration(),
   arasShipping: emptyArasShippingConfiguration(),

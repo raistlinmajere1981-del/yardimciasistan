@@ -2,9 +2,12 @@
 export interface SiteTrafficDay { date: string; sessions: number; views: number; intents: number }
 export interface SiteTrafficRanking { page: string; count: number }
 export interface SiteTrafficSnapshot {
+  enabled: boolean;
   has_data: boolean;
   days: 7 | 30;
   totals: { sessions: number; views: number; intents: number };
+  /** Desktop-confirmed canonical rows; never derived from browser clicks. */
+  conversions: { requests: number; orders: number } | null;
   daily: SiteTrafficDay[];
   top_pages: SiteTrafficRanking[];
   sources: { source: string; count: number }[];
@@ -25,9 +28,14 @@ const safeDate = (input: unknown): string | null => typeof input === "string" &&
 export function normalizeTrafficSnapshot(input: unknown, days: 7 | 30): SiteTrafficSnapshot {
   const raw = record(input), totals = record(raw.totals ?? raw);
   if (raw.ok !== true || typeof raw.has_data !== "boolean" || !Array.isArray(raw.daily)) throw Error("invalid_traffic_snapshot");
+  const conversions = raw.conversions && typeof raw.conversions === "object" && !Array.isArray(raw.conversions)
+    ? { requests: number(record(raw.conversions).requests), orders: number(record(raw.conversions).orders) }
+    : null;
   return {
+    enabled: raw.enabled !== false,
     has_data: raw.has_data, days,
     totals: { sessions: number(totals.sessions), views: number(totals.views), intents: number(totals.intents) },
+    conversions,
     daily: (raw.daily as unknown[]).slice(-days).map(row => {
       const d = record(row);
       return { date: typeof d.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : "", sessions: number(d.sessions), views: number(d.views), intents: number(d.intents) };

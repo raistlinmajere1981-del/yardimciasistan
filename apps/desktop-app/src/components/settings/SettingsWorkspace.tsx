@@ -333,6 +333,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
       <WebSettingsSection canonical={drafts.canonical} web={drafts.form}
         enabled={drafts.webEnabled} onEnabledChange={drafts.setWebActive}
+        trafficEnabled={drafts.form.trafficEnabled}
+        onTrafficChange={enabled => drafts.setDraft(form => ({ ...form, trafficEnabled: enabled }))}
         resetVersion={drafts.webResetVersion}
         onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
         disabled={drafts.busy || guardBusy} initialized={initialized}

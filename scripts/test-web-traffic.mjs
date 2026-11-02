@@ -43,11 +43,14 @@ test('classifies referrer into a coarse source only', () => {
 
 test('derives only allowlisted canonical pages and published ids', () => {
   assert.deepEqual(resolvePage('https://shop.example/?page=rooms&id=room_1&q=secret'), {page: 'rooms', item: 'room_1'});
+  assert.deepEqual(resolvePage('https://shop.example/?page=menu&category=cat_1&q=secret'), {page: 'menu', item: 'cat_1'});
+  assert.deepEqual(resolvePage('https://shop.example/?page=catalog&category=cat_1'), {page: 'catalog', item: 'cat_1'});
   assert.deepEqual(resolvePage('https://shop.example/?page=home'), {page: 'home', item: ''});
   assert.deepEqual(resolvePage('https://shop.example/'), {page: 'home', item: ''});
   assert.equal(resolvePage('https://shop.example/?page=account'), null);
   assert.equal(resolvePage('https://shop.example/?page=../admin'), null);
   assert.equal(resolvePage('https://shop.example/?page=rooms&id=../secret'), null);
+  assert.equal(resolvePage('https://shop.example/?page=menu&category=../secret'), null);
 });
 
 test('recognises only explicit CTA anchors', () => {

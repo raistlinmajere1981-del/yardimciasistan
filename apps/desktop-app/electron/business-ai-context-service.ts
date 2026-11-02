@@ -67,6 +67,7 @@ export function createCurrentBusinessWebContext(database: DesktopDatabase): Busi
   const businessId = database.translations().businessId();
   return {
     ...context,
+    trafficEnabled: database.getSetupData().trafficEnabled !== false,
     dealerApplicationEnabled: database.getSetupData().dealerPortalEnabled && database.getSetupData().dealerApplicationEnabled
       && database.getEnabledBusinessCapabilities().includes("commerce.wholesale") && database.getEnabledBusinessCapabilities().includes("customer.requests"),
     localization: database.translations().localization([

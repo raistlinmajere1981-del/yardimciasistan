@@ -159,6 +159,7 @@ function project_publication(array $business, array $sources, string $modulePath
         'info' => $info, 'contact' => contact_projection($info), 'rooms' => $rooms, 'tables' => $tables, 'products' => $products,
         'menu' => $menu, 'menu_updated_at' => $menu !== [] ? public_timestamp($menuPayload['updated_at'] ?? '') : '', 'categories' => $categories, 'gallery' => $gallery, 'announcements' => $announcements, 'reviews' => $reviews,
         'features' => ['chat' => ($info['ai_enabled'] ?? false) === true, 'requests' => $requests,
+            'traffic' => ($info['traffic_enabled'] ?? false) === true,
             'room_requests' => $rooms !== [] && in_array('pension_reservation', $requestTypes, true),
             'table_requests' => $tables !== [] && in_array('restaurant_reservation', $requestTypes, true),
             'dealer_application' => in_array('dealer_application', $requestTypes, true) && ($info['dealer_application_enabled'] ?? false) === true,

@@ -211,6 +211,7 @@ function ya_sync_capabilities(): void
 
 function ya_sync_traffic_snapshot(array $payload, array $businessConfig): void
 {
+    $businessConfig = ya_traffic_effective_config($businessConfig);
     $days = ya_sync_int($payload['days'] ?? 7, 7);
     if (!in_array($days, [7, 30], true)) {
         ya_sync_response(422, [
@@ -1642,6 +1643,9 @@ function ya_sync_publish_business_context(array $payload): void
         'policy_note' => mb_substr(ya_sync_string($candidate['policy_note'] ?? ''), 0, 1200),
         'payment_note' => mb_substr(ya_sync_string($candidate['payment_note'] ?? ''), 0, 800),
         'languages' => $languages,
+        'traffic_enabled' => array_key_exists('trafficEnabled', $candidate)
+            ? ya_sync_bool($candidate['trafficEnabled'])
+            : (array_key_exists('traffic_enabled', $candidate) ? ya_sync_bool($candidate['traffic_enabled']) : true),
         'features' => $features,
         'feature_ids' => $featureIds,
         'social_links' => $socialLinks,

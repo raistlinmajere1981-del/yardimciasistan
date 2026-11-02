@@ -102,6 +102,7 @@ ya_business_response(200, [
         'breakfast_start_time' => ya_business_public_clock($publicContext['breakfast_start_time'] ?? '', $accommodationDetailsEnabled),
         'breakfast_end_time' => ya_business_public_clock($publicContext['breakfast_end_time'] ?? '', $accommodationDetailsEnabled),
         'languages' => is_array($publicContext['languages'] ?? null) ? array_values($publicContext['languages']) : [],
+        'traffic_enabled' => ($publicContext['traffic_enabled'] ?? true) === true,
         'features' => is_array($publicContext['features'] ?? null) ? array_values($publicContext['features']) : [],
         'feature_ids' => is_array($publicContext['feature_ids'] ?? null) ? array_values($publicContext['feature_ids']) : [],
         'social_links' => is_array($publicContext['social_links'] ?? null) ? array_values($publicContext['social_links']) : [],

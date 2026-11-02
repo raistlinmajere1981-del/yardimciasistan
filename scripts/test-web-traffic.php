@@ -56,8 +56,24 @@ check(ya_traffic_record($database, [
     'session' => 'session_bravo', 'id' => 'event_bravo2'
 ], $now->modify('+6 minutes'), 'Europe/Istanbul')['accepted'] === true, 'contact intent accepted');
 
+// Canonical conversion rows: only desktop-acknowledged records inside the window.
+$database->exec(<<<'SQL'
+    CREATE TABLE web_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL, created_at TEXT NOT NULL, imported_at TEXT NOT NULL DEFAULT '');
+    CREATE TABLE web_orders (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, imported_at TEXT NOT NULL DEFAULT '');
+SQL);
+$insertRequest = $database->prepare('INSERT INTO web_requests (id, status, created_at, imported_at) VALUES (?, ?, ?, ?)');
+$insertRequest->execute(['request_confirmed', 'seen', '2026-11-02T01:30:00+03:00', '2026-11-02T01:35:00+00:00']);
+$insertRequest->execute(['request_pending', 'new', '2026-11-02T02:00:00+00:00', '']);
+$insertRequest->execute(['request_rejected', 'rejected', '2026-11-02T03:00:00+00:00', '2026-11-02T03:05:00+00:00']);
+$insertRequest->execute(['request_old', 'seen', '2026-09-01T00:00:00+00:00', '2026-09-01T00:05:00+00:00']);
+$insertOrder = $database->prepare('INSERT INTO web_orders (id, created_at, imported_at) VALUES (?, ?, ?)');
+$insertOrder->execute(['order_confirmed', '2026-11-02T04:00:00+00:00', '2026-11-02T04:05:00+00:00']);
+$insertOrder->execute(['order_pending', '2026-11-02T05:00:00+00:00', '']);
+
 $snapshot = ya_traffic_snapshot($database, 7, 'Europe/Istanbul', $now);
 check($snapshot['has_data'] === true, 'snapshot reports observed data');
+check(($snapshot['conversions']['requests'] ?? null) === 1, 'only imported non-rejected requests convert');
+check(($snapshot['conversions']['orders'] ?? null) === 1, 'only imported web orders convert');
 check($snapshot['sessions'] === 2, 'unique daily sessions');
 check($snapshot['views'] === 2, 'replayed view counted once');
 check($snapshot['intents'] === 1, 'intent total');
@@ -65,11 +81,16 @@ check($snapshot['top_pages'][0]['page'] === 'about' || in_array('about', array_c
 check($snapshot['sources'][0]['source'] === 'search' && $snapshot['sources'][0]['sessions'] === 1, 'grouped source sessions');
 check($snapshot['daily'][count($snapshot['daily']) - 1]['date'] === '2026-11-02', 'business-timezone day bucket');
 check($snapshot['last_collected_at'] !== '', 'last collection timestamp exposed');
+check(($snapshot['conversions']['requests'] ?? -1) === 1, 'only imported, non-rejected requests in window count once');
+check(($snapshot['conversions']['orders'] ?? -1) === 1, 'only imported orders in window count once');
+$thirty = ya_traffic_snapshot($database, 30, 'Europe/Istanbul', $now);
+check(($thirty['conversions']['requests'] ?? -1) === 1 && ($thirty['conversions']['orders'] ?? -1) === 1, '30 day conversions exclude old rows');
 
 $empty = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 ya_traffic_ensure_schema($empty);
 $emptySnapshot = ya_traffic_snapshot($empty, 7, 'Europe/Istanbul', $now);
 check($emptySnapshot['has_data'] === false && $emptySnapshot['last_collected_at'] === '', 'no data is explicit');
+check($emptySnapshot['conversions'] === null, 'missing conversion tables are explicit');
 try {
     ya_traffic_snapshot($empty, 14, 'Europe/Istanbul', $now);
     check(false, 'invalid period rejected');

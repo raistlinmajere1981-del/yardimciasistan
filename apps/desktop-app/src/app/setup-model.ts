@@ -41,6 +41,7 @@ export interface SetupFormState {
   webModuleUrl: string;
   syncSecret: string;
   autoSyncEnabled: boolean;
+  trafficEnabled: boolean;
   localNetworkEnabled: boolean;
   aiEnabled: boolean;
   aiProvider: string;
@@ -110,6 +111,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     webModuleUrl: setupData.webModuleUrl,
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : "",
     autoSyncEnabled: setupData.autoSyncEnabled,
+    trafficEnabled: setupData.trafficEnabled !== false,
     localNetworkEnabled: setupData.localNetworkEnabled !== false,
     aiEnabled: setupData.aiEnabled,
     aiProvider: setupData.aiProvider || defaultSetupData.aiProvider,
@@ -261,6 +263,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       webModuleUrl: setupForm.webModuleUrl,
       syncSecret: setupForm.syncSecret,
       autoSyncEnabled: setupForm.autoSyncEnabled,
+      trafficEnabled: setupForm.trafficEnabled,
       localNetworkEnabled: setupForm.localNetworkEnabled,
       aiEnabled: setupForm.aiEnabled,
       aiProvider: setupForm.aiProvider,

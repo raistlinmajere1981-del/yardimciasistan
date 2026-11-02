@@ -8,12 +8,14 @@ import { ActionButton } from "../ui/ActionButton";
 
 type TestState = "unchecked" | "testing" | "verified" | "failed";
 
-export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb, onEnabledChange, onVerified, onBusyChange, resetVersion, disabled, initialized }: {
+export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb, onEnabledChange, trafficEnabled, onTrafficChange, onVerified, onBusyChange, resetVersion, disabled, initialized }: {
   canonical: WebConnectionSettings;
   web: WebConnectionSettings;
   onChange: (web: WebConnectionSettings) => void;
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
+  trafficEnabled: boolean;
+  onTrafficChange: (enabled: boolean) => void;
   onVerified: (web: WebConnectionSettings | null) => void;
   onBusyChange: (busy: boolean) => void;
   resetVersion: number;
@@ -155,6 +157,12 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
           <ActionButton type="button" disabled={busy || !canConnect}
             onClick={() => void connect()}>{connecting ? "Bağlanıyor…" : "Bağlan"}</ActionButton>
         </div>
+        <label className="settings-web-choice settings-web-traffic">
+          <input type="checkbox" checked={trafficEnabled} disabled={busy}
+            onChange={event => onTrafficChange(event.target.checked)} />
+          Site trafiğini ölç
+        </label>
+        <p className="settings-web-traffic-note">Yalnız anonim ve yaklaşık oturum, sayfa gösterimi ve iletişim tıklaması sayılır. IP adresi, e-posta ve tam URL saklanmaz; kapatıldığında site ziyaretleri kaydedilmez.</p>
       </div>}
     </section>
   );

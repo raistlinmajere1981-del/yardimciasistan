@@ -264,6 +264,7 @@ const SMOKE_FILES = [
   "scripts/smoke-web-explicit-source.mjs",
   "scripts/smoke-web-form-api.mjs",
   "scripts/smoke-web-module-menu.mjs",
+  "scripts/smoke-web-traffic-e2e.mjs",
   "scripts/smoke-web-version.mjs",
   "scripts/smoke-web-widget-branding.mjs",
   "scripts/smoke-web-widget-module.mjs",
@@ -700,6 +701,8 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-public-translations-web.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file.startsWith("scripts/smoke-public-translations")) return ["build-desktop"];
   if (file === "scripts/smoke-web-data-service.mjs") return [];
+  // Uses its own copied PHP module plus a browser fixture; no Desktop/Demo build.
+  if (file === "scripts/smoke-web-traffic-e2e.mjs") return [];
   if (file === "scripts/smoke-android-auto-repair.mjs") return ["build-packages"];
   if (file === "scripts/smoke-web-table-smoking-icons.mjs") return [];
   if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["php-lint"];
@@ -759,6 +762,7 @@ function smokeDomains(file) {
 
 function smokeDomainsForGeneralOwnership(file) {
   if (file === "scripts/smoke-connection-status.mjs") return ["desktop", "web", "platform"];
+  if (file === "scripts/smoke-web-traffic-e2e.mjs") return ["web", "platform"];
   if (file === "scripts/smoke-desktop-visible-updater.mjs") return ["desktop", "settings", "platform"];
   if (file.includes("desktop-tts")) return ["voice", "settings", "desktop", "platform"];
   if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];

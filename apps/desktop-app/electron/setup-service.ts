@@ -101,6 +101,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     webModuleUrl: String(settings?.web_module_url ?? ""),
     syncSecret,
     autoSyncEnabled: Boolean(settings?.web_module_url || syncSecret) && Number(settings?.auto_sync_enabled ?? 1) === 1,
+    trafficEnabled: Number(settings?.traffic_enabled ?? 1) === 1,
     localNetworkEnabled: Number(settings?.local_network_enabled ?? 1) === 1,
     aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
     aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
@@ -161,6 +162,7 @@ export function saveSetupData(
   // still permits explicit publication through the existing outbox.
   const usesWeb = Boolean(input.webModuleUrl.trim() || syncSecret);
   const autoSyncEnabled = usesWeb && input.autoSyncEnabled !== false;
+  const trafficEnabled = usesWeb && input.trafficEnabled !== false;
   const aiProvider = input.aiProvider.trim() || "openai_compatible";
   const aiService = normalizeAiService(input.aiService);
   const aiProjectName = String(input.aiProjectName ?? "").trim();
@@ -475,17 +477,18 @@ export function saveSetupData(
     db
       .prepare(`
         INSERT INTO settings (
-          id, business_id, web_module_url, sync_secret, auto_sync_enabled,
+          id, business_id, web_module_url, sync_secret, auto_sync_enabled, traffic_enabled,
           ai_provider, ai_service, ai_last_published_at, whatsapp_mode,
           birthday_enabled, birthday_mode, birthday_send_time, birthday_message_template,
           product_data_enabled, product_data_provider, product_data_auto_search,
           product_data_include_images, setup_completed, created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
         ON CONFLICT(id) DO UPDATE SET
           business_id = excluded.business_id,
           web_module_url = excluded.web_module_url,
           sync_secret = excluded.sync_secret,
           auto_sync_enabled = excluded.auto_sync_enabled,
+          traffic_enabled = excluded.traffic_enabled,
           ai_provider = excluded.ai_provider,
           ai_service = excluded.ai_service,
           ai_last_published_at = excluded.ai_last_published_at,
@@ -508,6 +511,7 @@ export function saveSetupData(
         webModuleUrl,
         syncSecret,
         autoSyncEnabled ? 1 : 0,
+        trafficEnabled ? 1 : 0,
         storedAiProvider,
         storedAiService,
         aiLastPublishedAt,

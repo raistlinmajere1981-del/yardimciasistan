@@ -16,6 +16,20 @@ const YA_TRAFFIC_DEDUP_SECONDS = 172800;
 const YA_TRAFFIC_RETENTION_DAYS = 90;
 const YA_TRAFFIC_MAX_EVENTS_PER_SESSION_DAY = 400;
 
+/** Published business context owns the operator switch; config is the fallback. */
+function ya_traffic_effective_config(array $config): array
+{
+    try {
+        $publication = ya_storage_get_publication('business_context', []);
+        if (is_array($publication) && array_key_exists('traffic_enabled', $publication)) {
+            $config['traffic_enabled'] = $publication['traffic_enabled'];
+        }
+    } catch (Throwable) {
+        // An unavailable publication must not turn a working site into an error.
+    }
+    return $config;
+}
+
 /** Staging defaults to collection on; an explicit false disables the endpoint. */
 function ya_traffic_enabled(array $config): bool
 {
@@ -307,6 +321,39 @@ function ya_traffic_prune(PDO $database, ?DateTimeImmutable $now = null, string 
     }
 }
 
+/**
+ * Desktop-confirmed web conversions only: rows acknowledged by the canonical
+ * desktop sync. Client clicks are never converted into requests/orders here.
+ */
+function ya_traffic_confirmed_conversions(PDO $database, string $startUtc, string $endUtc): ?array
+{
+    try {
+        $tables = $database->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('web_requests', 'web_orders')")
+            ->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable) {
+        return null;
+    }
+    if (!is_array($tables) || count(array_unique($tables)) < 2) {
+        return null;
+    }
+    $request = $database->prepare(<<<'SQL'
+        SELECT COUNT(*) FROM web_requests
+        WHERE imported_at <> ''
+          AND status NOT IN ('rejected', 'cancelled', 'archived')
+          AND datetime(created_at) >= datetime(:start)
+          AND datetime(created_at) < datetime(:end)
+    SQL);
+    $request->execute([':start' => $startUtc, ':end' => $endUtc]);
+    $order = $database->prepare(<<<'SQL'
+        SELECT COUNT(*) FROM web_orders
+        WHERE imported_at <> ''
+          AND datetime(created_at) >= datetime(:start)
+          AND datetime(created_at) < datetime(:end)
+    SQL);
+    $order->execute([':start' => $startUtc, ':end' => $endUtc]);
+    return ['requests' => (int) $request->fetchColumn(), 'orders' => (int) $order->fetchColumn()];
+}
+
 /** Read-only aggregate report. Missing observation is explicit, never zero-filled as fact. */
 function ya_traffic_snapshot(PDO $database, int $days, string $timezone = 'Europe/Istanbul', ?DateTimeImmutable $now = null): array
 {
@@ -323,6 +370,9 @@ function ya_traffic_snapshot(PDO $database, int $days, string $timezone = 'Europ
     $today = $now->setTimezone($zone)->setTime(0, 0);
     $start = $today->sub(new DateInterval('P' . ($days - 1) . 'D'))->format('Y-m-d');
     $end = $today->format('Y-m-d');
+    $utc = new DateTimeZone('UTC');
+    $startUtc = $today->sub(new DateInterval('P' . ($days - 1) . 'D'))->setTimezone($utc)->format('Y-m-d H:i:s');
+    $endUtc = $today->add(new DateInterval('P1D'))->setTimezone($utc)->format('Y-m-d H:i:s');
 
     $dailyStatement = $database->prepare('SELECT day, views, intents FROM traffic_daily WHERE day BETWEEN :start AND :end');
     $dailyStatement->execute([':start' => $start, ':end' => $end]);
@@ -397,6 +447,7 @@ function ya_traffic_snapshot(PDO $database, int $days, string $timezone = 'Europ
         'daily' => $daily,
         'top_pages' => $topPages,
         'sources' => $sources,
+        'conversions' => ya_traffic_confirmed_conversions($database, $startUtc, $endUtc),
         'last_collected_at' => $lastCollected
     ];
 }
