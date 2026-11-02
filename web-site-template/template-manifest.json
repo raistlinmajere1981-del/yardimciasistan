@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.5.2",
+  "template_version": "0.6.0",
   "site_owned": [
     "site/",
     "locales/",
@@ -71,8 +71,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "995f63979febd4645999165ce5c1eb04a712a92f72f474032814b139bd1823f0",
-    "tools/manifest.mjs": "2873e1a18a41ec7062e7847494f51fd8d5121fd1dd230057e4abc2f74ce9db70",
+    "README.md": "0ef24fdb5f88c9d8c76e913d4fda7cd857b5fe40bd2ee245593821838a0dc31a",
+    "tools/manifest.mjs": "f83b1d0a911fc2712ee9e7f3674089cb5b378ca0240ffdab8e4c6f0f61f25402",
     "tools/sync-effect-engine.mjs": "616f378199fbaadb26da0460c26a0e794b6994ca71616b8adf49fc6f0db52003",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }
