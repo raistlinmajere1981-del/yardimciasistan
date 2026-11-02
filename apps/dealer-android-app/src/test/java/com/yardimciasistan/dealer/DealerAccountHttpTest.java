@@ -109,15 +109,27 @@ public class DealerAccountHttpTest {
       assertNotEquals(web.cookie, android.cookie); assertTrue(android.cookie.contains("ya_account_refresh="));
       assertEquals(ACCOUNT, api.call("account/session", null, android.cookie).body.getJSONObject("account").getString("id"));
       assertEquals("Native dealer", api.call("session", null, android.cookie).body.getJSONObject("dealer").getString("display_name"));
+      // Deterministic 30-minute expiry: expire only the access row in this temporary fixture DB.
+      Files.write(root.resolve("expire-access.php"), "<?php require __DIR__.'/module/lib/storage.php'; ya_storage_open()->exec('UPDATE customer_account_sessions SET expires_at=0 WHERE revoked_at=0');".getBytes("UTF-8"));
+      command(root, "php", "expire-access.php");
+      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("session", null, android.cookie)).status);
       DealerApi.Reply refreshed = api.call("account/refresh", new JSONObject(), android.cookie);
-      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("account/session", null, android.cookie)).status);
+      assertNotEquals(android.cookie, refreshed.cookie); assertTrue(refreshed.cookie.contains("ya_account_refresh="));
       assertEquals(ACCOUNT, api.call("account/session", null, refreshed.cookie).body.getJSONObject("account").getString("id"));
+      assertEquals("Native dealer", api.call("session", null, refreshed.cookie).body.getJSONObject("dealer").getString("display_name"));
+      // A rotated refresh token is single-use: replaying the old pair must fail closed.
+      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("account/refresh", new JSONObject(), android.cookie)).status);
+      // A second expiry must renew from the rotated refresh cookie, not the revoked one.
+      command(root, "php", "expire-access.php");
+      assertEquals(401, assertThrows(DealerApi.Failure.class, () -> api.call("session", null, refreshed.cookie)).status);
+      DealerApi.Reply second = api.call("account/refresh", new JSONObject(), refreshed.cookie);
+      assertEquals("Native dealer", api.call("session", null, second.cookie).body.getJSONObject("dealer").getString("display_name"));
       Files.write(root.resolve("demote.php"), "<?php require __DIR__.'/module/lib/storage.php'; ya_storage_open()->exec('UPDATE dealer_access SET enabled=0');".getBytes("UTF-8")); command(root, "php", "demote.php");
-      DealerApi.Failure normal = assertThrows(DealerApi.Failure.class, () -> api.call("session", null, refreshed.cookie)); assertEquals(403, normal.status); assertEquals("dealer_access_required", normal.code);
-      assertEquals(ACCOUNT, api.call("account/session", null, refreshed.cookie).body.getJSONObject("account").getString("id"));
+      DealerApi.Failure normal = assertThrows(DealerApi.Failure.class, () -> api.call("session", null, second.cookie)); assertEquals(403, normal.status); assertEquals("dealer_access_required", normal.code);
+      assertEquals(ACCOUNT, api.call("account/session", null, second.cookie).body.getJSONObject("account").getString("id"));
       Files.write(root.resolve("disable.php"), "<?php require __DIR__.'/module/lib/storage.php'; $db=ya_storage_open(); $p=ya_storage_get_publication('dealer_access_private',[]); $p['online_sales_enabled']=false; $db->prepare('UPDATE publications SET payload_json=? WHERE name=?')->execute([json_encode($p),'dealer_access_private']);".getBytes("UTF-8")); command(root, "php", "disable.php");
-      DealerApi.Failure disabled = assertThrows(DealerApi.Failure.class, () -> api.call("account/session", null, refreshed.cookie)); assertEquals(403, disabled.status); assertEquals("online_sales_disabled", disabled.code);
-      assertTrue(api.call("account/logout", new JSONObject(), refreshed.cookie).body.getBoolean("ok"));
+      DealerApi.Failure disabled = assertThrows(DealerApi.Failure.class, () -> api.call("account/session", null, second.cookie)); assertEquals(403, disabled.status); assertEquals("online_sales_disabled", disabled.code);
+      assertTrue(api.call("account/logout", new JSONObject(), second.cookie).body.getBoolean("ok"));
     } finally {
       if (php != null) { php.destroy(); php.waitFor(); } if (proxy != null) proxy.close(); executor.shutdownNow();
       try (java.util.stream.Stream<Path> paths = Files.walk(root)) { paths.sorted(Comparator.reverseOrder()).forEach(path -> { try { Files.delete(path); } catch (IOException ignored) {} }); }

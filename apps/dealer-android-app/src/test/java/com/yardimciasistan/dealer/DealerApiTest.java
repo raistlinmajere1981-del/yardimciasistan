@@ -51,6 +51,17 @@ public class DealerApiTest {
     assertThrows(IllegalStateException.class, () -> DealerApi.readBounded(new ByteArrayInputStream(new byte[20]), 10));
   }
 
+  @Test public void foldedSetCookieRotationKeepsBothCookies() throws Exception {
+    Connection connection = new Connection(new URL("https://firma.example/"));
+    String session = "ya_account_session=" + "d".repeat(43), refresh = "ya_account_refresh=" + "e".repeat(43);
+    connection.cookie = session + "; Path=/module/; Expires=Wed, 09 Jun 2027 10:18:14 GMT, "
+        + refresh + "; Path=/module/; Secure; HttpOnly; SameSite=Lax";
+    DealerApi.Reply reply = new DealerApi("https://firma.example/module/", url -> connection).call("session", null, "");
+    assertEquals(session + "; " + refresh, reply.cookie);
+    assertTrue(DealerApi.hasRotatedPair(reply.cookie));
+    assertFalse(DealerApi.hasRotatedPair(session));
+  }
+
   @Test public void renewedSessionRecoversReceiptWithoutSecondPost() throws Exception {
     final int[] count = {0};
     DealerApi api = new DealerApi("https://firma.example/", url -> {

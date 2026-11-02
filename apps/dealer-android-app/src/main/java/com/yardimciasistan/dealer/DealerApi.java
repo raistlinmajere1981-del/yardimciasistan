@@ -7,9 +7,17 @@ import java.net.URL;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Uses the existing cookie protocol; never receives a publication/sync secret. */
 final class DealerApi {
+  private static final String SESSION = "ya_account_session", REFRESH = "ya_account_refresh";
+  private static final String TOKEN = "[A-Za-z0-9_-]{43}";
+  private static final Pattern ACCOUNT_COOKIE =
+      Pattern.compile("(?:^|[;,]\\s*)(" + SESSION + "|" + REFRESH + ")=(" + TOKEN + ")(?=;|,|$)");
+  private static final Pattern COOKIE_PAIR =
+      Pattern.compile(SESSION + "=" + TOKEN + "; " + REFRESH + "=" + TOKEN);
   interface Connections { HttpURLConnection open(URL url) throws Exception; }
   static final class Failure extends Exception {
     final int status; final String code;
@@ -19,6 +27,10 @@ final class DealerApi {
   static final class Reply {
     final JSONObject body; final String cookie;
     Reply(JSONObject body, String cookie) { this.body = body; this.cookie = cookie; }
+  }
+  /** A rotation is usable only when the server issued both a fresh access and refresh cookie. */
+  static boolean hasRotatedPair(String cookie) {
+    return cookie != null && COOKIE_PAIR.matcher(cookie).matches();
   }
   private final String base;
   private final Connections connections;
@@ -70,9 +82,14 @@ final class DealerApi {
         if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Set-Cookie")) values.addAll(entry.getValue());
       if (values.isEmpty() && connection.getHeaderField("Set-Cookie") != null) values.add(connection.getHeaderField("Set-Cookie"));
       for (String header : values) {
-        String value = header.split(";", 2)[0].trim();
-        if (value.matches("ya_account_session=[A-Za-z0-9_-]{43}")) session = value;
-        if (value.matches("ya_account_refresh=[A-Za-z0-9_-]{43}")) refresh = value;
+        // Android may fold several Set-Cookie headers into one comma-separated value. Its Expires
+        // attribute also contains commas, so scan for the two exact account cookie names instead
+        // of splitting the header. Attributes and unknown names are ignored.
+        Matcher matcher = ACCOUNT_COOKIE.matcher(header.trim());
+        while (matcher.find()) {
+          String value = matcher.group(1) + "=" + matcher.group(2);
+          if (matcher.group(1).equals(SESSION)) session = value; else refresh = value;
+        }
       }
       if (!session.isEmpty() && !refresh.isEmpty()) session += "; " + refresh;
       return new Reply(json, session);

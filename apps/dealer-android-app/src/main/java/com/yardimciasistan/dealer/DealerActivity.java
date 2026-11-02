@@ -279,6 +279,15 @@ public final class DealerActivity extends ComponentActivity {
       });
     });
   }
+  private DealerSession.Renewed rotatedCookieSaver() {
+    return value -> {
+      try { state.rotateCookie(value); }
+      catch (Exception error) {
+        runOnUiThread(this::fatalStorage);
+        throw error; // no retry while a rotated token cannot be durably saved
+      }
+    };
+  }
   private void refresh() {
     if (state.text("cookie").isEmpty())
       return;
@@ -286,30 +295,23 @@ public final class DealerActivity extends ComponentActivity {
     task(
         ()
             -> {
+          DealerSession session = new DealerSession(base, cookie, rotatedCookieSaver());
+          JSONObject sessionBody = session.call("session", null).body;
+          String activeCookie = session.cookie();
+          JSONObject result = new JSONObject().put("dealer", sessionBody.getJSONObject("dealer")).put("cookie", activeCookie);
           DealerApi api = new DealerApi(base);
-          String activeCookie = cookie;
-          JSONObject session;
-          try { session = api.call("session", null, activeCookie).body; }
-          catch (DealerApi.Failure error) {
-            if (error.status != 401) throw error;
-            DealerApi.Reply renewed = api.call("account/refresh", new JSONObject(), cookie);
-            if (renewed.cookie.isEmpty()) throw new IllegalStateException("Oturum yenilenemedi.");
-            activeCookie = renewed.cookie;
-            session = api.call("session", null, activeCookie).body;
-          }
-          JSONObject result = new JSONObject().put("dealer", session.getJSONObject("dealer")).put("cookie", activeCookie);
           if (brandingRefreshDue(base)) {
             JSONObject branding = loadBusinessBrand(api, base);
             if (branding != null) result.put("branding", branding);
           }
           try {
-            result.put("catalog", api.call("catalog", null, activeCookie).body.getJSONObject("catalog"));
+            result.put("catalog", session.call("catalog", null).body.getJSONObject("catalog"));
           } catch (DealerApi.Failure error) {
             if (error.status == 401 || error.status == 403)
               throw error;
             result.put("catalog_error", error.getMessage());
           }
-          result.put("history", api.call("orders", null, activeCookie).body);
+          result.put("history", session.call("orders", null).body);
           return result;
         },
         result
@@ -1115,7 +1117,7 @@ public final class DealerActivity extends ComponentActivity {
     String base = state.text("base"), cookie = state.text("cookie");
     hideKeyboard();
     render();
-    task(() -> new DealerApi(base).submit(request, cookie), receipt -> {
+    task(() -> new DealerSession(base, cookie, rotatedCookieSaver()).submit(request), receipt -> {
       state.accepted(receipt);
       quantityDrafts.clear();
       tab = "Siparişler";

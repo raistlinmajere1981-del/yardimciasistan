@@ -63,6 +63,11 @@ final class DealerState {
     }
     data.put("owner", owner).put("base", base).put("cookie", cookie).put("dealer", dealer).put("remember_me", remember); save();
   }
+  /** Persist the server's rotated pair before any retry. A failed write leaves live state intact. */
+  void rotateCookie(String cookie) throws Exception {
+    if (!DealerApi.hasRotatedPair(cookie)) throw new IllegalArgumentException("Geçersiz oturum yenilemesi.");
+    commit(new JSONObject(data.toString()).put("cookie", cookie));
+  }
   void invalidateSession() throws Exception { data.remove("cookie"); save(); }
   JSONObject product(String id) {
     JSONArray products = object("catalog").optJSONArray("products");

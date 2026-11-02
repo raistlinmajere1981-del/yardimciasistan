@@ -58,6 +58,28 @@ public class DealerStateTest {
     assertEquals(recorded, disk);
     assertEquals("session-a", state().text("cookie"));
   }
+  @Test public void rotatedCookieIsDurableBeforeRetryAndRespectsRememberPreference() throws Exception {
+    DealerState state = signedIn();
+    String token = "ya_account_session=" + "x".repeat(43) + "; ya_account_refresh=" + "y".repeat(43);
+    state.setRememberMe(true);
+    state.rotateCookie(token);
+    assertEquals(token, state.text("cookie"));
+    assertEquals(token, state().text("cookie"));
+    state.setRememberMe(false);
+    state.rotateCookie("ya_account_session=" + "a".repeat(43) + "; ya_account_refresh=" + "b".repeat(43));
+    assertFalse(new JSONObject(disk).has("cookie"));
+    assertFalse(state.text("cookie").isEmpty());
+  }
+  @Test public void failedRotatedCookiePersistenceAbortsWithoutMutatingLiveState() throws Exception {
+    DealerState state = signedIn(); state.setRememberMe(true);
+    String before = disk;
+    DealerState failing = new DealerState(before, json -> { throw new java.io.IOException("disk unavailable"); });
+    String token = "ya_account_session=" + "x".repeat(43) + "; ya_account_refresh=" + "y".repeat(43);
+    assertThrows(java.io.IOException.class, () -> failing.rotateCookie(token));
+    assertEquals("session-a", failing.text("cookie"));
+    assertEquals(before, disk);
+    assertThrows(IllegalArgumentException.class, () -> failing.rotateCookie("invalid"));
+  }
   @Test public void rememberMeDefaultsOffForNewLoginAndUiExposesUserChoice() throws Exception {
     assertFalse(state().rememberMe());
     String activity = java.nio.file.Files.readString(java.nio.file.Paths.get("src/main/java/com/yardimciasistan/dealer/DealerActivity.java"));
