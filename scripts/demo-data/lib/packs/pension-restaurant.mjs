@@ -19,6 +19,20 @@ export const pensionRestaurantPack = {
     { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_360", sourceKey: "restaurant-360", sortOrder: 1 },
     { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_180", sourceKey: "restaurant-180", sortOrder: 1 }
   ],
+  // Original synthetic covers guarantee that every restored room and table has
+  // a real image even before any optional panorama is published.
+  coverMedia: [
+    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_cover", palette: DEMO_PALETTES.roomSea, variant: 0, sortOrder: 0, title: "Deniz Manzaralı Oda" },
+    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_cover", palette: DEMO_PALETTES.roomGarden, variant: 0, sortOrder: 0, title: "Bahçe Odası" },
+    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_cover", palette: DEMO_PALETTES.roomOlive, variant: 0, sortOrder: 0, title: "Zeytin Odası" },
+    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_cover", palette: DEMO_PALETTES.roomSuite, variant: 0, sortOrder: 0, title: "Manzara Süiti" },
+    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_cover", palette: DEMO_PALETTES.tableIndoor, variant: 0, sortOrder: 0, title: "Masa M1" },
+    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_cover", palette: DEMO_PALETTES.tableIndoor, variant: 1, sortOrder: 0, title: "Masa M2" },
+    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_cover", palette: DEMO_PALETTES.tableIndoor, variant: 2, sortOrder: 0, title: "Masa M3" },
+    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_cover", palette: DEMO_PALETTES.tableGarden, variant: 0, sortOrder: 0, title: "Masa B1" },
+    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_cover", palette: DEMO_PALETTES.tableGarden, variant: 1, sortOrder: 0, title: "Masa B2" },
+    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_cover", palette: DEMO_PALETTES.tableGarden, variant: 2, sortOrder: 0, title: "Masa B3" }
+  ],
   business: {
     id: "biz_demo_pension_restaurant",
     name: "Yamaç Konak ve Sofra",
@@ -29,7 +43,7 @@ export const pensionRestaurantPack = {
     email: "pansiyon.demo@example.test",
     address: "Örnek Mah. Test Sok. No: 1, Kaş / Antalya",
     publishRoomsWeb: true,
-    publishTablesWeb: false,
+    publishTablesWeb: true,
     publishQrMenuWeb: true,
     publicProfile: {
       description: "Deniz manzaralı sentetik demo pansiyon ve restoran işletmesi.",
@@ -153,10 +167,10 @@ export const pensionRestaurantPack = {
 
     // Rooms and stays.
     const rooms = [
-      ["room_pr_101", "Deniz Manzaralı Oda", "101", 2, "1 çift kişilik yatak", "1. Kat", "occupied", 185000, ["wifi", "klima", "deniz_manzarasi"], "Sentetik demo odası."],
-      ["room_pr_102", "Bahçe Odası", "102", 2, "2 tek kişilik yatak", "1. Kat", "available", 165000, ["wifi", "klima", "bahce"], "Sentetik demo odası."],
-      ["room_pr_201", "Zeytin Odası", "201", 3, "1 çift kişilik + 1 tek kişilik yatak", "2. Kat", "available", 210000, ["wifi", "klima", "balkon"], "Sentetik demo odası."],
-      ["room_pr_202", "Manzara Süiti", "202", 4, "1 çift kişilik + 2 tek kişilik yatak", "2. Kat", "available", 275000, ["wifi", "klima", "balkon", "minibar"], "Sentetik demo süiti."]
+      ["room_pr_101", "Deniz Manzaralı Oda", "101", 2, "1 çift kişilik yatak", "1. Kat", "occupied", 185000, ["wifi", "air_conditioning", "sea_view"], "Deniz manzarasına bakan geniş bir odadır. Sabah kahvaltısı ana binadaki sofrada servis edilir; gün batımını balkondan izleyebilirsiniz. Bu kayıt tamamen sentetik demo verisidir ve gerçek bir konaklama taahhüdü içermez."],
+      ["room_pr_102", "Bahçe Odası", "102", 2, "2 tek kişilik yatak", "1. Kat", "available", 165000, ["wifi", "air_conditioning", "garden_view"], "Bahçeye açılan sakin bir odadır. İki tek kişilik yatak, çalışma köşesi ve özel banyo bulunur. Kahvaltı dahil değildir; sentetik demo kaydıdır."],
+      ["room_pr_201", "Zeytin Odası", "201", 3, "1 çift kişilik + 1 tek kişilik yatak", "2. Kat", "available", 210000, ["wifi", "air_conditioning", "balcony"], "Üç kişilik aile odasıdır. Balkonunda oturma alanı, içinde geniş bir banyo ve bagaj dolabı vardır. Demo amaçlı üretilmiş örnek bir odadır."],
+      ["room_pr_202", "Manzara Süiti", "202", 4, "1 çift kişilik + 2 tek kişilik yatak", "2. Kat", "available", 275000, ["wifi", "air_conditioning", "balcony", "mini_fridge"], "İki odalı süittir; geniş balkonu ve oturma alanıyla uzun konaklamalar için uygundur. Mini buzdolabı ve çay-kahve köşesi bulunur. Sentetik demo süitidir."]
     ];
     for (const [id, name, number, capacity, bedInfo, floor, status, nightlyPriceMinor, features, description] of rooms) {
       db.prepare(`INSERT INTO rooms
@@ -176,11 +190,14 @@ export const pensionRestaurantPack = {
       ["tbl_pr_b3", "Masa B3", "Bahçe", 2, "available", "outdoor_only"]
     ];
     for (const [id, name, area, capacity, status, smoking] of tables) {
+      const description = area === "Bahçe"
+        ? `${name}, bahçe katında gölgelik altında konumlanır. ${capacity} kişilik oturma düzeni ve geniş servis alanı vardır. Bu kayıt sentetik demo verisidir.`
+        : `${name}, iç salonda pencereden uzakta sakin bir köşede yer alır. ${capacity} kişiliktir ve akşam yemeği için uygundur. Bu kayıt sentetik demo verisidir.`;
       db.prepare(`INSERT INTO tables
         (id, name, area, capacity, public_description, public_features_json, smoking_policy, status,
          current_customer_id, current_reservation_id, notes, is_active, sort_order, created_at, updated_at, deleted_at, sync_status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, 1, ?, ?, ?, '', 'local_only')`)
-        .run(id, name, area, capacity, "Sentetik demo masası.", json(area === "Bahçe" ? ["bahce"] : []), smoking, status,
+        .run(id, name, area, capacity, description, json(area === "Bahçe" ? ["outdoor", "garden_view"] : ["indoor"]), smoking, status,
           status === "reserved" ? "res_res_pr_table" : "", "", Number(name.match(/\d+/)?.[0] ?? 0), FIXED_NOW, FIXED_NOW);
     }
 

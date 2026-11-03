@@ -49,6 +49,13 @@ function publishCheckList() {
   return { checks, check };
 }
 
+function pngSize(bytes) {
+  if (bytes.length < 24 || bytes[0] !== 0x89 || bytes.toString("ascii", 1, 4) !== "PNG") {
+    throw new Error("Not a PNG file (missing signature).");
+  }
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
 function checkPanoramaMedia({ folderPath, expected, check }) {
   const media = expected?.media;
   if (!media) return;
@@ -63,12 +70,14 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
     table: pendingFor("table")(folderPath)
   };
 
-  check("panorama.roomMedia.count", () => pending.room.length, filesFor("room").length);
-  check("panorama.tableMedia.count", () => pending.table.length, filesFor("table").length);
-  check("panorama.roomMedia.pendingOnly", () => pending.room.every((item) => item.remoteUrl === ""), true);
-  check("panorama.tableMedia.pendingOnly", () => pending.table.every((item) => item.remoteUrl === ""), true);
-  check("panorama.counts.360", () => media.files.filter((item) => item.kind === "panorama_360").length, media.counts.roomMedia360 + media.counts.tableMedia360);
-  check("panorama.counts.180", () => media.files.filter((item) => item.kind === "panorama_180").length, media.counts.roomMedia180 + media.counts.tableMedia180);
+  check("media.roomMedia.count", () => pending.room.length, filesFor("room").length);
+  check("media.tableMedia.count", () => pending.table.length, filesFor("table").length);
+  check("media.roomMedia.pendingOnly", () => pending.room.every((item) => item.remoteUrl === ""), true);
+  check("media.tableMedia.pendingOnly", () => pending.table.every((item) => item.remoteUrl === ""), true);
+  check("media.counts.360", () => media.files.filter((item) => item.kind === "panorama_360").length, media.counts.roomMedia360 + media.counts.tableMedia360);
+  check("media.counts.180", () => media.files.filter((item) => item.kind === "panorama_180").length, media.counts.roomMedia180 + media.counts.tableMedia180);
+  check("media.counts.roomCovers", () => media.files.filter((item) => item.scope === "room" && item.kind === "cover").length, media.counts.roomCovers);
+  check("media.counts.tableCovers", () => media.files.filter((item) => item.scope === "table" && item.kind === "cover").length, media.counts.tableCovers);
 
   for (const target of media.targets) {
     check(`${target.scope}Media.list.${target.resourceId}`, () => {
@@ -76,9 +85,12 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
       return items.map((item) => `${item.id}:${item.kind}:${item.mimeType}:${item.remoteUrl === "" ? "pending" : "published"}`).sort();
     }, target.mediaIds.map((id) => {
       const record = media.files.find((item) => item.id === id);
-      return `${id}:${record.kind}:image/jpeg:pending`;
+      return `${id}:${record.kind}:${record.mimeType}:pending`;
     }).sort());
   }
+
+  const coverTargets = media.targets.filter((target) => target.mediaIds.some((id) => media.files.find((item) => item.id === id)?.kind === "cover"));
+  check("media.covers.everyTarget", () => coverTargets.length, media.targets.length);
 
   for (const manifestPath of media.manifests) {
     const scope = manifestPath.includes("room-media") ? "room" : "table";
@@ -86,18 +98,21 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
     const absolutePath = path.join(folderPath, manifestPath);
     check(`media.manifest.${scope}`, () => {
       const parsed = JSON.parse(fs.readFileSync(absolutePath, "utf8"));
+      const records = new Map(filesFor(scope).map((item) => [item.id, item]));
       return {
         version: parsed.version,
         count: Array.isArray(parsed.media) ? parsed.media.length : -1,
         idsMatch: Array.isArray(parsed.media)
           && parsed.media.map((item) => item.id).sort().join(",") === filesFor(scope).map((item) => item.id).sort().join(","),
-        fieldsValid: Array.isArray(parsed.media) && parsed.media.every((item) => (
-          typeof item[idField] === "string"
-          && item.mimeType === "image/jpeg"
-          && item.remoteUrl === ""
-          && /^[a-f0-9]{64}$/.test(String(item.contentHash))
-          && item.storedPath === `files/${item[idField]}/${item.id}.jpg`
-        ))
+        fieldsValid: Array.isArray(parsed.media) && parsed.media.every((item) => {
+          const record = records.get(item.id);
+          return Boolean(record)
+            && typeof item[idField] === "string"
+            && item.mimeType === record.mimeType
+            && item.remoteUrl === ""
+            && /^[a-f0-9]{64}$/.test(String(item.contentHash))
+            && item.storedPath === record.storedPath;
+        })
       };
     }, { version: 1, count: filesFor(scope).length, idsMatch: true, fieldsValid: true });
   }
@@ -112,52 +127,66 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
       ? { kind: listed.kind, mimeType: listed.mimeType, sizeBytes: listed.sizeBytes, sortOrder: listed.sortOrder, remoteUrl: listed.remoteUrl, title: listed.title }
       : null, {
       kind: record.kind,
-      mimeType: "image/jpeg",
+      mimeType: record.mimeType,
       sizeBytes: record.sizeBytes,
       sortOrder: record.sortOrder,
       remoteUrl: "",
       title: record.title
     });
-    check(`media.${record.id}.titleAttribution`, () => Boolean(listed
-      && listed.title.includes("CC BY 4.0")
-      && listed.title.includes(record.author)
-      && listed.title.includes("işletmenin kendi fotoğrafı değildir")), true);
+    check(`media.${record.id}.title`, () => Boolean(listed && (
+      record.kind === "cover"
+        ? listed.title.includes("Sentetik demo kapak görseli") && listed.title.includes("gerçek işletme fotoğrafı değildir")
+        : listed.title.includes("CC BY 4.0")
+          && listed.title.includes(record.author)
+          && listed.title.includes("işletmenin kendi fotoğrafı değildir")
+    )), true);
     check(`media.${record.id}.storedFile`, () => fs.existsSync(absolutePath), true);
     check(`media.${record.id}.sha256`, () => (fs.existsSync(absolutePath) ? sha256File(absolutePath) : ""), record.contentHash);
     check(`media.${record.id}.pendingStoredPath`, () => pendingItem?.storedPath ?? "", record.storedPath);
     check(`media.${record.id}.pendingContentHash`, () => pendingItem?.contentHash ?? "", record.contentHash);
-    check(`media.${record.id}.jpegDimensions`, () => {
-      if (!fs.existsSync(absolutePath)) return null;
-      const size = jpegSize(fs.readFileSync(absolutePath));
-      return {
-        width: size.width,
-        height: size.height,
-        ratio: Number((size.width / size.height).toFixed(3)),
+    if (record.mimeType === "image/png") {
+      check(`media.${record.id}.pngDimensions`, () => {
+        if (!fs.existsSync(absolutePath)) return null;
+        const size = pngSize(fs.readFileSync(absolutePath));
+        return { width: size.width, height: size.height };
+      }, { width: record.width, height: record.height });
+    } else {
+      check(`media.${record.id}.jpegDimensions`, () => {
+        if (!fs.existsSync(absolutePath)) return null;
+        const size = jpegSize(fs.readFileSync(absolutePath));
+        return {
+          width: size.width,
+          height: size.height,
+          ratio: Number((size.width / size.height).toFixed(3)),
+          expectedRatio: record.kind === "panorama_360" ? 2 : 1
+        };
+      }, {
+        width: record.width,
+        height: record.height,
+        ratio: record.kind === "panorama_360" ? 2 : 1,
         expectedRatio: record.kind === "panorama_360" ? 2 : 1
-      };
-    }, {
-      width: record.width,
-      height: record.height,
-      ratio: record.kind === "panorama_360" ? 2 : 1,
-      expectedRatio: record.kind === "panorama_360" ? 2 : 1
-    });
+      });
+    }
   }
 
-  const attributionPath = path.join(folderPath, media.attributionPath);
-  check("panorama.attribution.exists", () => fs.existsSync(attributionPath), true);
-  check("panorama.attribution.sha256", () => (fs.existsSync(attributionPath) ? sha256File(attributionPath) : ""), media.attributionSha256);
-  check("panorama.attribution.content", () => {
-    if (!fs.existsSync(attributionPath)) return {};
-    const text = fs.readFileSync(attributionPath, "utf8");
-    const normalized = text.replace(/\s+/g, " ");
-    return {
-      license: text.includes("CC BY 4.0"),
-      ownerDisclaimer: normalized.includes("demo işletmesinin kendi çekimi değildir"),
-      cropNotice: text.includes("kırp"),
-      authors: [...new Set(media.files.map((item) => item.author))].every((author) => text.includes(author)),
-      sources: [...new Set(media.files.map((item) => item.sourceUrl))].every((url) => text.includes(url))
-    };
-  }, { license: true, ownerDisclaimer: true, cropNotice: true, authors: true, sources: true });
+  if (media.attributionPath) {
+    const attributionPath = path.join(folderPath, media.attributionPath);
+    const panoramaFiles = media.files.filter((item) => item.kind.startsWith("panorama_"));
+    check("panorama.attribution.exists", () => fs.existsSync(attributionPath), true);
+    check("panorama.attribution.sha256", () => (fs.existsSync(attributionPath) ? sha256File(attributionPath) : ""), media.attributionSha256);
+    check("panorama.attribution.content", () => {
+      if (!fs.existsSync(attributionPath)) return {};
+      const text = fs.readFileSync(attributionPath, "utf8");
+      const normalized = text.replace(/\s+/g, " ");
+      return {
+        license: text.includes("CC BY 4.0"),
+        ownerDisclaimer: normalized.includes("demo işletmesinin kendi çekimi değildir"),
+        cropNotice: text.includes("kırp"),
+        authors: [...new Set(panoramaFiles.map((item) => item.author))].every((author) => text.includes(author)),
+        sources: [...new Set(panoramaFiles.map((item) => item.sourceUrl))].every((url) => text.includes(url))
+      };
+    }, { license: true, ownerDisclaimer: true, cropNotice: true, authors: true, sources: true });
+  }
 }
 
 function checkPensionRestaurant({ db, dbPath, folderPath, pack }) {

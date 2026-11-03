@@ -1,18 +1,23 @@
 /* Site-owned neutral starting theme. Replace colors, fonts, layout and component styles here. */
 :root {
-  --site-bg: #fafaf9;
-  --site-ink: #232726;
-  --site-surface: #ffffff;
-  --site-border: #d5dbd7;
-  --site-link: #205747;
-  --site-focus: #2469b2;
-  --site-font: system-ui, sans-serif;
-  --site-width: 72rem;
-  --site-section-space: 3rem;
-  --site-gap: 1.25rem;
-  --site-card-width: 17rem;
-  --site-card-padding: 1.5rem;
-  --site-radius: .5rem;
+  --site-bg: #f7f5ef;
+  --site-ink: #20251f;
+  --site-muted: #5c665b;
+  --site-surface: #fffdf8;
+  --site-border: #e1ddd1;
+  --site-link: #1e5b45;
+  --site-accent: #b56a3f;
+  --site-focus: #2064ad;
+  --site-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --site-font-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --site-width: 74rem;
+  --site-section-space: clamp(2.5rem, 5vw, 5rem);
+  --site-gap: clamp(1rem, 2vw, 1.65rem);
+  --site-card-width: 19rem;
+  --site-card-padding: clamp(1.15rem, 2vw, 1.6rem);
+  --site-radius: .9rem;
+  --site-radius-small: .55rem;
   --site-image-ratio: 4 / 3;
   --site-image-fit: cover;
+  --site-shadow: 0 1.2rem 2.8rem -2rem rgba(35, 42, 34, .45);
 }

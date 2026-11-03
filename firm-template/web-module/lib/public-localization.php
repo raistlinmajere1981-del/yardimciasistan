@@ -55,7 +55,7 @@ function ya_public_site_catalog(mixed $catalog): ?array
 {
     if (!is_array($catalog) || ($catalog['version'] ?? null) !== 1 || ($catalog['source_language'] ?? '') !== 'tr'
         || !is_string($catalog['id'] ?? null) || !preg_match('/^[a-z0-9-]{1,60}$/D', $catalog['id'])
-        || !is_array($catalog['entries'] ?? null) || !$catalog['entries'] || count($catalog['entries']) > 1000) return null;
+        || !is_array($catalog['entries'] ?? null) || !$catalog['entries'] || count($catalog['entries']) > 2048) return null;
     $entries = []; $revision = '';
     ksort($catalog['entries'], SORT_STRING);
     foreach ($catalog['entries'] as $key => $entry) {

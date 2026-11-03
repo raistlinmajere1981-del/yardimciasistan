@@ -41,6 +41,13 @@ export function publicationIdempotencyKey(clientId: string, epoch: number, jobKe
 /** An explicit Connect action claims this publication target after authenticated
  * validation. Background retries never take over an existing publication source. */
 export async function connectPublicationSource(database: DesktopDatabase, config: SyncCoreConfig) {
+  // A restored database already owns a durable activation operation/key. Reuse
+  // that CAS continuation when Settings connects; claiming a separate key here
+  // would retire this freshly rotated client ID before reconciliation can start.
+  const restore = database.getRestoreReconciliationStatus();
+  if (restore && restore.state !== "complete") {
+    return ensurePublicationSource(database, config);
+  }
   const target = config.baseUrl.trim().replace(/\/+$/, "");
   const clientId = database.getSyncRuntimeStatus().clientId;
   if (!clientId) return { ok: false as const, message: "Masaüstü yayın kimliği bulunamadı." };

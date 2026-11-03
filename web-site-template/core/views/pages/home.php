@@ -7,9 +7,12 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <p><?= e(t($site, 'state.' . $key . '.text')) ?></p>
   </section>
 <?php else: ?>
-  <div class="page-grid">
-    <?php foreach ($view['pages'] as $id => $page): if ($id === 'home') continue; ?>
-    <a class="page-link" href="<?= e(page_url($site, $id)) ?>"><?= e(t($site, $page['key'])) ?></a>
-    <?php endforeach; ?>
-  </div>
+  <section class="home-links" aria-labelledby="home-links-title">
+    <h2 id="home-links-title"><?= e(t($site, 'home.explore')) ?></h2>
+    <div class="page-grid">
+      <?php foreach ($view['pages'] as $id => $page): if ($id === 'home') continue; ?>
+      <a class="page-link" href="<?= e(page_url($site, $id)) ?>"><span><?= e(t($site, $page['key'])) ?></span><span aria-hidden="true">→</span></a>
+      <?php endforeach; ?>
+    </div>
+  </section>
 <?php endif; ?>

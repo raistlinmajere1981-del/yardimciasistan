@@ -275,19 +275,22 @@ async function exerciseTableFields(fixture) {
     for (const [otherPolicy,label] of Object.entries(desktop.TABLE_SMOKING_POLICY_LABELS)) {
       if (label) assert.equal(main.includes('>'+label+'<'),policy===otherPolicy,'Only the published smoking policy appears');
     }
+    const detailResponse = await page('restaurant&id='+table.id);
+    assert.equal(detailResponse.status,200);
+    const detail = mainOf(detailResponse.html);
     for (const item of media) {
-      assert.ok(main.includes(item.url));
-      assert.ok(main.includes('href="'+item.url+'"'),'Every valid media item retains an original-file link');
+      assert.ok(detail.includes(item.url));
+      assert.ok(detail.includes('href="'+item.url+'"'),'Every valid media item retains an original-file link');
     }
-    assert.ok(main.includes('data-panorama="panorama_180"') && main.includes('data-panorama="panorama_360"'));
-    assert.ok(/<video\b[^>]*controls[^>]*preload="metadata"/.test(main));
-    assert.ok(!/<video\b[^>]*autoplay/.test(main));
-    assert.ok(response.html.includes('core/panorama.mjs'));
+    assert.ok(detail.includes('data-panorama="panorama_180"') && detail.includes('data-panorama="panorama_360"'));
+    assert.ok(/<video\b[^>]*controls[^>]*preload="metadata"/.test(detail));
+    assert.ok(!/<video\b[^>]*autoplay/.test(detail));
+    assert.ok(detailResponse.html.includes('core/panorama.mjs'));
     assert.ok(main.includes('data-ya-action="food.reserve"'));
     assert.ok(!/class="[^"]*\bempty-state\b/.test((await page('home')).html),'Table-only publication is not reported as empty');
   }
   await sendDesktopProjection(fixture,'pushTableCatalog','table_catalog',{version:1,enabled:true,updatedAt:'',tables:[{...table,features:[],media:[{...media[0],url:'javascript:alert(1)'}]}]});
-  const cleared = mainOf((await page('restaurant')).html);
+  const cleared = mainOf((await page('restaurant&id='+table.id)).html);
   assert.ok(!cleared.includes('javascript:') && !cleared.includes('data-panorama=') && !cleared.includes('<video'));
   for (const feature of desktop.TABLE_PUBLIC_FEATURE_CATALOG) assert.ok(!cleared.includes('>'+feature.label+'<'));
   await sendDesktopProjection(fixture,'pushTableCatalog','table_catalog',{version:1,enabled:false,updatedAt:'',tables:[table]});

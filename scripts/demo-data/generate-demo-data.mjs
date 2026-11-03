@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import { DEMO_VERSION, FIXED_NOW, countFiles, sanitizeBackupFileName, sha256File, writeJson } from "./lib/util.mjs";
 import { createDemoContext, writeBackupManifest } from "./lib/build.mjs";
 import { inspectDatabase } from "./lib/integrity.mjs";
-import { addPanoramaMedia } from "./lib/panorama-media.mjs";
+import { addResourceMedia } from "./lib/resource-media.mjs";
 import { verifyPackage, formatVerification } from "./lib/verify.mjs";
 import { pensionRestaurantPack } from "./lib/packs/pension-restaurant.mjs";
 import { marketPack } from "./lib/packs/market.mjs";
@@ -122,15 +122,19 @@ function generatePackage({ pack, outputRoot, workRoot }) {
     }
     for (const hook of ctx.commitHooks) hook();
 
-    const panorama = addPanoramaMedia({ folderPath, entries: pack.panoramaMedia ?? [] });
-    if (panorama.files.length > 0) {
+    const media = addResourceMedia({
+      folderPath,
+      panoramas: pack.panoramaMedia ?? [],
+      covers: pack.coverMedia ?? []
+    });
+    if (media.files.length > 0) {
       expected.media = {
-        counts: panorama.counts,
-        targets: panorama.targets,
-        files: panorama.files,
-        manifests: panorama.manifests,
-        attributionPath: panorama.attributionPath,
-        attributionSha256: panorama.attributionSha256
+        counts: media.counts,
+        targets: media.targets,
+        files: media.files,
+        manifests: media.manifests,
+        attributionPath: media.attributionPath,
+        attributionSha256: media.attributionSha256
       };
     }
 
@@ -215,7 +219,7 @@ function main() {
     backupFormat: "yardimci-asistan-backup-v2",
     packages,
     limitations: [
-      "Pack A includes four representative CC BY 4.0 panorama photos (NOIRLab/NSF/AURA/P. Horálek and CTIO/NOIRLab/NSF/AURA). They are not photographs of the synthetic demo business; the 180° files are centre crops of the matching 360° sources. See assets/PANORAMA_ATTRIBUTION.txt inside the package and scripts/demo-data/ASSET_ATTRIBUTION.md.",
+      "Pack A includes synthetic PNG cover images for every room and table, plus four representative CC BY 4.0 panorama photos (NOIRLab/NSF/AURA/P. Horálek and CTIO/NOIRLab/NSF/AURA). The panoramas are not photographs of the synthetic demo business; the 180° files are centre crops of the matching 360° sources. See assets/PANORAMA_ATTRIBUTION.txt inside the package and scripts/demo-data/ASSET_ATTRIBUTION.md.",
       "All business names, people, phone numbers, e-mail addresses, prices, orders and payments are synthetic demo data.",
       "Packages contain no sync secret, web module URL, Android credential or service password.",
       "Windows restore expects the unzipped folder (not the ZIP itself) under the desktop backup root; see scripts/demo-data/README.md."

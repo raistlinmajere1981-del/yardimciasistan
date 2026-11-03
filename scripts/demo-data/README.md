@@ -133,12 +133,13 @@ a throwaway profile if you need the current data untouched.
 
 ## Intentional limitations
 
-- **No 180/360 panorama imagery.** No genuine equirectangular local source
-  file was available, so the generator does not pretend that its abstract
-  gradient artwork is a panorama. Product images are original synthetic PNGs
-  generated without external downloads; no real brand photography is used.
-- Images are decorative placeholders, not photographs of the named dishes or
-  products.
+- **Synthetic covers, representative panoramas.** Every demo room and table
+  gets an original synthetic PNG cover generated without external downloads.
+  Two rooms and two tables also carry representative CC BY 4.0 panorama photos;
+  the 180° files are centre crops of the matching 360° sources. Product images
+  are original synthetic PNGs; no real brand photography is used.
+- Images are decorative placeholders, not photographs of the named dishes,
+  rooms or products.
 - Names, phones (`+90 555 ...`), e-mails (`*.example.test`), prices, orders,
   payments and tax values are synthetic.
 - The dealer pack deliberately includes inactive dealers and a cancelled

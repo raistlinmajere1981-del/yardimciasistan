@@ -6,7 +6,7 @@ export function validateSiteCatalog(value: unknown): PublicSiteCatalog {
   if (!catalog || catalog.version !== 1 || catalog.source_language !== "tr" || !/^[a-z0-9-]{1,60}$/.test(catalog.id)
     || !/^[a-f0-9]{64}$/.test(catalog.revision) || !catalog.entries || typeof catalog.entries !== "object" || Array.isArray(catalog.entries)) throw Error("invalid_site_catalog");
   const entries = Object.entries(catalog.entries);
-  if (!entries.length || entries.length > 1000) throw Error("invalid_site_catalog");
+  if (!entries.length || entries.length > 2048) throw Error("invalid_site_catalog");
   for (const [key, entry] of entries) {
     if (!/^[a-zA-Z0-9_.-]{1,120}$/.test(key) || !entry || typeof entry.text !== "string" || !entry.text.trim() || entry.text.length > 12000
       || /[<>\u0000-\u0008]/u.test(entry.text) || createHash("sha256").update(entry.text).digest("hex") !== entry.hash) throw Error("invalid_site_catalog");

@@ -1,7 +1,7 @@
 <?php declare(strict_types=1); namespace YaSite;
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
  ?>
-<h1><?= e($view['title']) ?></h1>
+<?php render_view('components/page-header', ['title' => $view['title'], 'eyebrow' => t($site, 'page.menu'), 'lede' => t($site, 'menu.lede')], $site); ?>
 <form class="menu-filter" method="get" action="<?= e($site['base_path'] . '/') ?>">
   <input type="hidden" name="page" value="menu"><input type="hidden" name="lang" value="<?= e($site['language']['code']) ?>">
   <label for="menu-category"><?= e(t($site, 'menu.category')) ?></label>
@@ -10,7 +10,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <?php foreach ($view['menu_categories'] as $category): ?><option value="<?= e($category['id']) ?>"<?= $view['menu_category'] === $category['id'] ? ' selected' : '' ?>><?= e($category['name']) ?></option><?php endforeach; ?>
   </select><button type="submit"><?= e(t($site, 'menu.apply')) ?></button>
 </form>
-<p class="menu-publication-note"><?php if ($view['publication']['menu_updated_at'] !== ''): ?><span><?= e(t($site, 'menu.updated')) ?> </span><time data-menu-updated data-format-date-time data-format-date="<?= e($view['publication']['menu_updated_at']) ?>" datetime="<?= e($view['publication']['menu_updated_at']) ?>"><?= e(date_text($site, new \DateTimeImmutable($view['publication']['menu_updated_at']), true)) ?></time> · <?php endif; ?><a href="<?= e(page_url($site, 'menu') . ($view['menu_category'] !== '' ? '&category=' . rawurlencode($view['menu_category']) : '')) ?>"><?= e(t($site, 'publication.refresh')) ?></a></p>
+<?php $menuUpdatedAt = public_datetime($view['publication']['menu_updated_at']); ?>
+<p class="menu-publication-note"><?php if ($menuUpdatedAt !== null): ?><span><?= e(t($site, 'menu.updated')) ?> </span><time data-menu-updated data-format-date-time data-format-date="<?= e($menuUpdatedAt->format(\DateTimeInterface::ATOM)) ?>" datetime="<?= e($menuUpdatedAt->format(\DateTimeInterface::ATOM)) ?>"><?= e(date_text($site, $menuUpdatedAt, true)) ?></time> · <?php endif; ?><a href="<?= e(page_url($site, 'menu') . ($view['menu_category'] !== '' ? '&category=' . rawurlencode($view['menu_category']) : '')) ?>"><?= e(t($site, 'publication.refresh')) ?></a></p>
 <?php foreach ($view['publication']['categories'] as $category):
     if ($view['menu_category'] !== '' && $view['menu_category'] !== $category['id']) continue;
     $items = array_filter($view['publication']['menu'], static fn (array $item): bool => $item['category_id'] === $category['id']);

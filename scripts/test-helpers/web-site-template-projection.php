@@ -104,4 +104,17 @@ check(str_contains($seoJson, 'Bootstrap fallback') && !str_contains($seoJson, 'U
 $seoBusiness['business_publication']['fields'] = 'malformed';
 $seoView['publication'] = \YaSite\project_publication($seoBusiness, [], '/yardimci-asistan', 'tr');
 check(\YaSite\structured_data($seoSite, $seoView) === [], 'Malformed provenance is closed');
+
+// Menu/publication timestamps: numeric offsets are valid Intl input once
+// normalised, and malformed values never escape as an exception.
+$offsetDate = new \DateTimeImmutable('2026-11-03T10:00:00+01:00');
+check(\YaSite\intl_timezone_name($offsetDate) === 'GMT+01:00', 'Numeric timezone offset is normalised for Intl');
+check(\YaSite\date_text(['language' => ['locale' => 'tr-TR']], $offsetDate, true) !== '', 'Offset date formats without an Intl exception');
+check(\YaSite\public_datetime('not-a-date') === null, 'Malformed publication timestamp is rejected');
+check(\YaSite\public_datetime('') === null, 'Empty publication timestamp is rejected');
+check(\YaSite\public_timestamp('not-a-date') === '', 'Malformed menu update timestamp is dropped');
+$offsetTimestamp = \YaSite\public_timestamp('2026-11-03T10:00:00+01:00');
+check($offsetTimestamp !== '' && str_contains($offsetTimestamp, '+01:00'), 'Valid offset menu timestamp is retained');
+check(\YaSite\date_text(['language' => ['locale' => 'tr-TR']], new \DateTimeImmutable($offsetTimestamp), true) !== '', 'Projected offset timestamp renders');
+check(\YaSite\excerpt_text(str_repeat('uzun metin ', 40), 40) !== '' && \YaSite\excerpt_text(str_repeat('uzun metin ', 40), 40) !== str_repeat('uzun metin ', 40), 'List summary is truncated');
 echo "template-projection-ok\n";

@@ -19,7 +19,6 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <a class="skip-link" href="#content"><?= e(t($site, 'nav.skip')) ?></a>
   <?php render_view('components/header', $view, $site); ?>
   <main id="content" class="shell main-content" tabindex="-1">
-    <aside class="publication-freshness" data-publication-freshness hidden role="status"><p><?= e(t($site, 'publication.freshness')) ?></p><a href="<?= e(page_url($site, $view['page'] === 'missing' ? 'home' : $view['page']) . (!empty($view['room']) || !empty($view['table']) ? '&id=' . rawurlencode(($view['room'] ?? $view['table'])['id']) : '') . (($view['menu_category'] ?? '') !== '' ? '&category=' . rawurlencode($view['menu_category']) : '')) ?>"><?= e(t($site, 'publication.refresh')) ?></a></aside>
     <?php render_view('pages/' . $view['page'], $view, $site); ?>
   </main>
   <?php render_view('components/footer', $view, $site); ?>

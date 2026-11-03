@@ -63,6 +63,17 @@ function render_navigation(array $view, array $site): void
     }
 }
 
+/** Short list-card summary; the complete text stays on the detail page. */
+function excerpt_text(mixed $value, int $limit = 170): string
+{
+    $plain = preg_replace('/\s+/u', ' ', text($value));
+    if (!is_string($plain) || $plain === '' || $limit < 1) return '';
+    $length = function_exists('mb_strlen') ? mb_strlen($plain, 'UTF-8') : strlen($plain);
+    if ($length <= $limit) return $plain;
+    $cut = function_exists('mb_substr') ? mb_substr($plain, 0, $limit - 1, 'UTF-8') : substr($plain, 0, $limit - 1);
+    return rtrim((string) $cut) . '…';
+}
+
 function number_text(array $site, int|float $value): string
 {
     if (class_exists('NumberFormatter')) {
@@ -72,12 +83,38 @@ function number_text(array $site, int|float $value): string
     return (string) $value;
 }
 
+/**
+ * IntlDateFormatter rejects a bare "+01:00" timezone name, which is what
+ * DateTimeZone::getName() returns for offsets. GMT-prefixed names are valid.
+ */
+function intl_timezone_name(\DateTimeInterface $date): string
+{
+    $name = $date->getTimezone()->getName();
+    if (preg_match('/^[+-]\d{2}:\d{2}$/D', $name)) return 'GMT' . $name;
+    return $name !== '' ? $name : 'UTC';
+}
+
+/** Parse an untrusted publication timestamp without ever throwing from a template. */
+function public_datetime(mixed $value): ?\DateTimeImmutable
+{
+    if (!is_string($value) || trim($value) === '' || strlen($value) > 64) return null;
+    try {
+        return new \DateTimeImmutable($value);
+    } catch (\Throwable) {
+        return null;
+    }
+}
+
 function date_text(array $site, \DateTimeInterface $date, bool $includeTime = false): string
 {
     if (class_exists('IntlDateFormatter')) {
-        $formatter = new \IntlDateFormatter($site['language']['locale'], \IntlDateFormatter::MEDIUM, $includeTime ? \IntlDateFormatter::SHORT : \IntlDateFormatter::NONE, $date->getTimezone()->getName());
-        $result = $formatter->format($date);
-        if ($result !== false) return $result;
+        try {
+            $formatter = new \IntlDateFormatter($site['language']['locale'], \IntlDateFormatter::MEDIUM, $includeTime ? \IntlDateFormatter::SHORT : \IntlDateFormatter::NONE, intl_timezone_name($date));
+            $result = $formatter->format($date);
+            if (is_string($result) && $result !== '') return $result;
+        } catch (\Throwable) {
+            // Fall through to the deterministic ISO-style value.
+        }
     }
     return $date->format($includeTime ? 'Y-m-d H:i' : 'Y-m-d');
 }

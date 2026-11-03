@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.6.0
+# Ortak işletme sitesi şablonu 0.6.1
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
@@ -337,9 +337,8 @@ canonical/JSON-LD üretmez. API kesintisi veya eksik origin sitemap'te 503 boş 
 verir. Sitemap metadata'sı için son güncelleme zamanı uydurulmaz; yalnız açık
 sayfalar ve geçerli oda/masa/kategori kimlikleri ile yayınlı dil listesi kullanılır.
 
-Canonical projection sayfa isteğinde yeniden okunur. Sekmeye/BFCache sayfasına
-60 saniye sonra dönüldüğünde ortak sunum, mevcut form/sepet/widget state'ini
-koruyarak açık bir “Yayınları yenile” bağlantısı sunar. Menüde bu bağlantı her
-zaman vardır. İkinci poller, otomatik reload veya arka planda DOM değiştirme yoktur.
+Canonical projection her sayfa isteğinde yeniden okunur. Sekmeye/BFCache sayfasına
+dönüşte otomatik uyarı, reload veya ek poller çalışmaz; mevcut form/sepet/widget
+state'i korunur. Menü sayfasındaki manuel “Yayınları yenile” bağlantısı kalır.
 İşlem anındaki yetki/fiyat/müsaitlik denetimi mevcut API sahiplerindedir; açık
 sayfa içeriğinin kendiliğinden güncellendiği varsayılmamalıdır.

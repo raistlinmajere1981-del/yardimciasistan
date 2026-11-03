@@ -33,6 +33,9 @@ shipment execution, cloud backup and multi-device arbitration are not extended h
 5. Normal coordinator reads authenticated remote `restore_sync_state`: current source epoch
    and retained request/order sequence bounds. Persist these before CAS activation. Use the
    existing `activate_publication_source` with a stable operation activation key.
+   If the operator uses Settings → Web → Bağlan first, this action must resume **the same**
+   pending restore activation operation/key, never claim a separate explicit-connect epoch:
+   Hosting rejects reactivation of a retired client identity.
 6. Atomically persist the exact new epoch and `reconciliation_pending`. Ordinary publishers
    regenerate/freeze canonical bodies, preserving v3 exact identity/hash/receipt semantics.
 7. Mark each kind applied only after its exact receipt and conditional current-revision
@@ -120,6 +123,10 @@ visible prerequisites for convergence. Offline withdrawal cannot revoke disconne
 content until its ordered apply is accepted.
 
 ## Verification
+
+`scripts/smoke-windows-demo-restore.mjs` also exercises the extracted Windows demo
+ZIP, backup listing without setup/Web, prior normal publication and the exact
+Settings Connect → restored publication flow against disposable local PHP Hosting.
 
 `scripts/smoke-publication-protocol.mjs` invokes the real restore behavior helper at
 `scripts/test-helpers/restore-reconciliation.mjs`: A→B→restore A, actual maintenance staging,

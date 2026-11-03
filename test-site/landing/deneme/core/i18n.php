@@ -15,7 +15,7 @@ function source_catalog(string $root): array
             || strlen($value) > 12000 || preg_match('/[<>\x00-\x08]/u', $value)) throw new \RuntimeException('Invalid source catalog');
         $entries[$key] = ['text' => $value, 'hash' => hash('sha256', $value)];
     }
-    if (!$entries || count($entries) > 1000) throw new \RuntimeException('Invalid source catalog size');
+    if (!$entries || count($entries) > 2048) throw new \RuntimeException('Invalid source catalog size');
     ksort($entries, SORT_STRING);
     $revision = '';
     foreach ($entries as $key => $entry) $revision .= $key . ':' . $entry['hash'] . "\n";

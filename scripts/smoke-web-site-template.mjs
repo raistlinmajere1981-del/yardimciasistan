@@ -5,6 +5,7 @@ import {cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, write
 import {tmpdir} from 'node:os';
 import {join, relative, resolve} from 'node:path';
 import {createServer} from 'node:net';
+import {DatabaseSync} from 'node:sqlite';
 import {pathToFileURL} from 'node:url';
 import {chromium, expect} from '@playwright/test';
 import {launchChromiumForSmoke} from './test-helpers/playwright-browser.mjs';
@@ -101,6 +102,13 @@ try {
     return (!name.startsWith('data/') && !name.startsWith('media/') && !name.includes('.local.')) || ['data/.htaccess', 'media/.htaccess'].includes(name);
   }});
   mkdirSync(join(module, 'data'), {recursive: true});
+  const mediaPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+  mkdirSync(join(module, 'media/rooms/r'), {recursive: true});
+  mkdirSync(join(module, 'media/tables/t'), {recursive: true});
+  writeFileSync(join(module, 'media/rooms/r/cover.png'), mediaPng);
+  writeFileSync(join(module, 'media/rooms/r/photo.png'), mediaPng);
+  writeFileSync(join(module, 'media/tables/t/cover.png'), mediaPng);
+  writeFileSync(join(module, 'media/tables/t/photo.png'), mediaPng);
   const secret = 'isolated-template-fixture-secret';
   writeFileSync(join(module, 'config/business.json'), JSON.stringify({id: 'b', name: '', display_name: '', profile_id: 'market', sync_secret: secret, public_surfaces: [], allowed_origins: []}));
   writeFileSync(join(site, 'site.local.php'), "<?php return ['name'=>'LOCAL FAKE IDENTITY', 'phone'=>'5555555555'];");
@@ -119,6 +127,9 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({width: 1440, height: 960});
   await noEffects(page, base + '/');
+  assert.equal(await page.locator('[data-publication-freshness]').count(), 0, 'Shared layout must not render the stale-publication banner');
+  await page.evaluate(() => { const realNow = Date.now; Date.now = () => realNow() + 61000; window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); Date.now = realNow; });
+  assert.equal(await page.locator('[data-publication-freshness]').count(), 0, 'Returning to an aged page must not add the banner');
   await expect(page.getByRole('status')).toContainText('Henüz yayınlanmış içerik');
   assert.equal(await page.locator('#main-navigation a').count(), 1);
   assert.ok(!(await page.content()).includes('LOCAL FAKE IDENTITY'));
@@ -149,9 +160,22 @@ try {
     mapDisplayMode: 'manual', latitude: 40.16296, longitude: 32.783079,
     aboutText: 'Yayınlanan işletme metni <script>window.injected=true</script>', gallery: [{id: 'g', url: '/yardimci-asistan/media/gallery/gallery/published.png', title: 'Yayınlanan fotoğraf', kind: 'cover', sort_order: 0}]};
   await publish({action: 'publish_business_context', business_context: publishedContext});
-  await publish({action: 'publish_room_catalog', room_catalog: {version: 1, enabled: true, rooms: [{id: 'r', name: 'Yayınlanan oda', capacity: 2, nightly_price_minor: 125050, currency: 'TRY', media: []}]}});
-  await publish({action: 'publish_table_catalog', table_catalog: {version: 1, enabled: true, tables: [{id: 't', name: 'Yayınlanan masa', capacity: 4, media: []}]}});
-  await publish({action: 'publish_menu', menu: {enabled: true, categories: [{id: 'c', name: 'Yayınlanan menü', is_active: true}], items: [
+  const longRoomDescription = 'Deniz manzarasına bakan geniş bir süittir. Bu uzun açıklama yalnızca detay sayfasında görünmelidir; liste kartında yalnızca kısa bir özet yer alır ve gereksiz büyük bir metin bloğu oluşturmaz.';
+  await publish({action: 'publish_room_catalog', room_catalog: {version: 1, enabled: true, rooms: [
+    {id: 'r', name: 'Yayınlanan oda', description: longRoomDescription, capacity: 2, bed_info: '1 çift kişilik yatak', floor: '1. kat', nightly_price_minor: 125050, currency: 'TRY', features: ['wifi', 'sea_view'], media: [
+      {kind: 'cover', url: '/yardimci-asistan/media/rooms/r/cover.png', mime_type: 'image/png', title: 'Oda kapağı', sort_order: 0},
+      {kind: 'photo', url: '/yardimci-asistan/media/rooms/r/photo.png', mime_type: 'image/png', title: 'Oda fotoğrafı', sort_order: 1},
+    ]},
+    {id: 'r-empty', name: 'Medyasız oda', capacity: 1, nightly_price_minor: 10000, currency: 'TRY', media: []},
+  ]}});
+  await publish({action: 'publish_table_catalog', table_catalog: {version: 1, enabled: true, tables: [
+    {id: 't', name: 'Yayınlanan masa', description: 'Bahçe katında sakin bir masa.', area: 'Bahçe', capacity: 4, smoking_policy: 'outdoor_only', features: ['outdoor'], media: [
+      {kind: 'cover', url: '/yardimci-asistan/media/tables/t/cover.png', mime_type: 'image/png', title: 'Masa kapağı', sort_order: 0},
+      {kind: 'photo', url: '/yardimci-asistan/media/tables/t/photo.png', mime_type: 'image/png', title: 'Masa fotoğrafı', sort_order: 1},
+    ]},
+    {id: 't-empty', name: 'Medyasız masa', capacity: 2, area: 'İç Salon', media: []},
+  ]}});
+  await publish({action: 'publish_menu', menu: {enabled: true, updated_at: '2026-11-03T10:00:00+01:00', categories: [{id: 'c', name: 'Yayınlanan menü', is_active: true}], items: [
     {id: 'm', name: 'Yayınlanan yemek', category_id: 'c', price: 12.5, currency: 'TRY', is_available: true},
     {id: 'off', name: 'GİZLİ MENÜ ÜRÜNÜ', category_id: 'c', is_available: false},
   ]}});
@@ -204,6 +228,55 @@ try {
   await expect(page.locator('main h1')).toHaveText('Yayınlanan oda');
   assert.equal((await page.goto(base + '/?page=rooms&id=missing')).status(), 404);
   passed.push('published PHP pages, capability projection, escaped text, catalog without delivery, 320/390/768/1440 px and no-JS');
+
+  // Timezone offsets from DateTimeZone::getName() must not break Intl formatting,
+  // and a malformed menu update date hides the row instead of failing the page.
+  await page.goto(base + '/?page=menu');
+  await expect(page.locator('.menu-publication-note time')).toHaveCount(1);
+  assert.ok((await page.locator('.menu-publication-note time').innerText()).trim().length > 0, 'offset timestamp renders a readable menu date');
+  await publish({action: 'publish_menu', menu: {enabled: true, updated_at: 'not-a-date', categories: [{id: 'c', name: 'Yayınlanan menü', is_active: true}], items: [
+    {id: 'm', name: 'Yayınlanan yemek', category_id: 'c', price: 12.5, currency: 'TRY', is_available: true},
+  ]}});
+  // The source replaces invalid timestamps with its own clock. Corrupt the stored
+  // publication directly so the template reads a malformed date end to end.
+  {
+    const database = new DatabaseSync(join(module, 'data', 'yardimci-asistan.sqlite'));
+    const row = database.prepare("SELECT payload_json FROM publications WHERE name = 'menu'").get();
+    const stored = JSON.parse(row.payload_json);
+    stored.updated_at = 'not-a-date';
+    database.prepare("UPDATE publications SET payload_json = ? WHERE name = 'menu'").run(JSON.stringify(stored));
+    database.close();
+  }
+  assert.equal((await page.goto(base + '/?page=menu')).status(), 200);
+  await expect(page.locator('.menu-publication-note time')).toHaveCount(0);
+  await expect(page.locator('main')).toContainText('Yayınlanan yemek');
+  await publish({action: 'publish_menu', menu: {enabled: true, updated_at: '2026-11-03T10:00:00+01:00', categories: [{id: 'c', name: 'Yayınlanan menü', is_active: true}], items: [
+    {id: 'm', name: 'Yayınlanan yemek', category_id: 'c', price: 12.5, currency: 'TRY', is_available: true},
+    {id: 'off', name: 'GİZLİ MENÜ ÜRÜNÜ', category_id: 'c', is_available: false},
+  ]}});
+  passed.push('menu update date accepts a numeric timezone offset and hides a malformed date');
+
+  // List cards stay compact; detail pages own the long description and media gallery.
+  await page.goto(base + '/?page=rooms');
+  const roomCard = page.locator('.content-card').filter({hasText: 'Yayınlanan oda'});
+  assert.equal(await roomCard.locator('img').count(), 1, 'room card shows its cover image');
+  const roomCardText = await roomCard.innerText();
+  assert.ok(!roomCardText.includes(longRoomDescription), 'room list must not dump the full description');
+  assert.ok(roomCardText.includes('Detayı gör'), 'room card links to the detail page');
+  await page.goto(base + '/?page=rooms&id=r');
+  assert.equal(await page.locator('.resource-detail-cover img').count(), 1, 'room detail renders the cover');
+  assert.ok(await page.locator('.room-media img').count() >= 1, 'room detail renders the remaining gallery');
+  assert.ok((await page.locator('main').innerText()).includes(longRoomDescription), 'room detail keeps the full description');
+  await page.goto(base + '/?page=rooms&id=r-empty');
+  assert.equal(await page.locator('.room-media').count(), 0, 'room without media renders no empty gallery');
+  assert.equal(await page.locator('.resource-detail-cover').count(), 0, 'room without media renders no empty hero panel');
+  await page.goto(base + '/?page=restaurant&id=t');
+  assert.equal(await page.locator('.resource-detail-cover img').count(), 1, 'table detail renders the cover');
+  assert.ok(await page.locator('.room-media img').count() >= 1, 'table detail renders the remaining gallery');
+  await page.goto(base + '/?page=restaurant&id=t-empty');
+  assert.equal(await page.locator('.room-media').count(), 0, 'table without media renders no empty gallery');
+  assert.equal(await page.locator('.resource-detail-cover').count(), 0, 'table without media renders no empty hero panel');
+  passed.push('room/table list+detail media, compact summaries and safe no-media fallback');
 
   const {exerciseTemplateTranslations} = await import('./test-helpers/template-translations.mjs');
   await exerciseTemplateTranslations({page, base, api, publish, site, root, publishedContext});

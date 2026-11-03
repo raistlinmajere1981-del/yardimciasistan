@@ -1,6 +1,6 @@
 import { ActionButton } from "../ui/ActionButton";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { FolderOpen, RotateCcw, Save, Trash2 } from "lucide-react";
+import { FolderOpen, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DesktopBackupListItem } from "../../../electron/data-maintenance";
 import { reportAppStatus } from "../../app/runtime-state";
@@ -18,10 +18,9 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
 
   const busy = action !== null;
 
-  useEffect(() => {
-    if (initialized) void loadBackups();
-    else setAction(null);
-  }, [initialized]);
+  // Backup discovery and restore are local maintenance operations, including
+  // before first-run business/Web setup is complete.
+  useEffect(() => { void loadBackups(); }, []);
 
   async function loadBackups() {
     const bridge = window.yardimciDesktop;
@@ -191,7 +190,7 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
           <Save size={16} aria-hidden="true" />
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
         </ActionButton>
-        <ActionButton variant="secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy || !initialized}>
+        <ActionButton variant="secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
           <FolderOpen size={16} aria-hidden="true" />
           {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
         </ActionButton>
@@ -204,6 +203,10 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
 
       <div className="backup-list-heading">
         <strong>Mevcut Yedekler</strong>
+        <ActionButton variant="secondary" size="sm" type="button" onClick={() => void loadBackups()} disabled={busy}>
+          <RefreshCw size={15} aria-hidden="true" />
+          Yedekleri Yenile
+        </ActionButton>
       </div>
 
       <div className="backup-list" aria-busy={action === "load"}>

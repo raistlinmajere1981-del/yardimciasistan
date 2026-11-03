@@ -17,6 +17,29 @@ try {
     `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve("scripts/fixtures/settings-platform.tsx")}"></script></body></html>`) }));
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
   const visit = query => page.goto(`${server.resolvedUrls.local[0]}settings-correctness-test${query}`);
+  // Issue #87: importing a folder is local maintenance, not dependent on
+  // first-run business setup or Web connection. A folder extracted while the
+  // panel is open must appear on an explicit refresh.
+  await visit("?firstRun=on");
+  await page.getByRole("button", { name: "Veriler", exact: true }).click();
+  const backupPanel = page.locator(".settings-data-maintenance-section");
+  await expect(backupPanel.getByText("Henüz kayıtlı yedek yok.")).toBeVisible();
+  await expect(backupPanel.getByRole("button", { name: "Yedek Klasörünü Aç" })).toBeEnabled();
+  await page.evaluate(() => {
+    window.yardimciDesktop.listLocalBackups = async () => ({ ok: true, backupDirectory: "/tmp/fixture/backups", backups: [{
+      id: "yardimci-asistan-demo-a-pension-restaurant",
+      createdAt: "2026-11-02T08:00:00Z", kind: "manual",
+      folderName: "yardimci-asistan-demo-a-pension-restaurant",
+      folderPath: "/tmp/fixture/backups/yardimci-asistan-demo-a-pension-restaurant",
+      databaseFileName: "yardimci-asistan.sqlite",
+      imageCount: 14, assetFileCount: 14, sizeBytes: 2500000
+    }] });
+  });
+  await backupPanel.getByRole("button", { name: "Yedekleri Yenile" }).click();
+  await expect(backupPanel.locator(".backup-row")).toHaveCount(1);
+  await expect(backupPanel.getByRole("button", { name: "Geri Yükle" })).toBeEnabled();
+  await page.evaluate(() => window.refreshSettings({ webModuleUrl: "https://fixture.test", syncSecret: "fixture-secret-123" }));
+  await expect(backupPanel.locator(".backup-row")).toHaveCount(1);
   await visit("");
   const expandStructure = async () => {
     const toggle = page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ });

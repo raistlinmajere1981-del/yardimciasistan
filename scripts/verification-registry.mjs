@@ -263,6 +263,7 @@ const SMOKE_FILES = [
   "scripts/smoke-table-customer.mjs",
   "scripts/smoke-web-connection-test.mjs",
   "scripts/smoke-web-explicit-source.mjs",
+  "scripts/smoke-windows-demo-restore.mjs",
   "scripts/smoke-web-form-api.mjs",
   "scripts/smoke-web-module-menu.mjs",
   "scripts/smoke-web-traffic-e2e.mjs",
@@ -714,7 +715,8 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-voice-stt-hosting.mjs" || file === "scripts/smoke-voice-stt-publication.mjs") return ["build-packages", "php-lint"];
   if (file === "scripts/smoke-desktop-tts.mjs") return [];
   if (file === "scripts/smoke-android-companion-v3.mjs") return ["build-desktop", "php-lint"];
-  if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
+  if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs"
+      || file === "scripts/smoke-windows-demo-restore.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-nexa-assets.mjs") return [];
   if (["scripts/smoke-web-nexa.mjs", "scripts/smoke-web-widget-branding.mjs", "scripts/smoke-web-widget-module.mjs"].includes(file)) return ["build-demo"];
   if (file === "scripts/smoke-marketing-log-privacy.mjs") return ["php-lint"];

@@ -1,7 +1,6 @@
 <?php declare(strict_types=1); namespace YaSite;
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
- ?>
-<h1><?= e($view['title']) ?></h1>
+ render_view('components/page-header', ['title' => $view['title'], 'eyebrow' => t($site, 'page.gallery'), 'lede' => t($site, 'gallery.lede')], $site); ?>
 <div class="collection gallery">
   <?php foreach ($view['publication']['gallery'] as $image): ?>
   <figure><img src="<?= e($image['url']) ?>" alt="<?= e($image['title']) ?>" loading="lazy" decoding="async">

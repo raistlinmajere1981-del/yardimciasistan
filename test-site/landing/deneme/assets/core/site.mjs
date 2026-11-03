@@ -33,19 +33,6 @@ document.querySelector('[data-language-select]')?.addEventListener('change', eve
 
 document.querySelector('[data-menu-category]')?.addEventListener('change', event => event.target.form.requestSubmit());
 
-// Revisit is a real stale-publication case. Offer an explicit refresh rather than
-// replacing page/form/cart state or adding a second publication poller.
-const readAt = Date.now();
-const showFreshness = () => {
-  if (document.visibilityState !== 'hidden' && Date.now() - readAt >= 60000) {
-    const notice = document.querySelector('[data-publication-freshness]');
-    if (notice) notice.hidden = false;
-  }
-};
-window.addEventListener('pageshow', showFreshness);
-window.addEventListener('focus', showFreshness);
-document.addEventListener('visibilitychange', showFreshness);
-
 const integrations = createIntegrations(context);
 const language = createLanguage(context.language);
 formatLanguageElements(language);
