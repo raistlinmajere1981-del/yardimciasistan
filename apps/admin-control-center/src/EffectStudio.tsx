@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, CloudUpload, ExternalLink, RefreshCw, Save, Waves, Image as ImageIcon, Link2Off, Layers3 } from "lucide-react";
+import { CloudUpload, RefreshCw, Save, Waves } from "lucide-react";
 import { effectSiteDeployTarget } from "../shared/contracts";
 import type { DeploymentTargetSnapshot, EffectScene, EffectStudioProject } from "../shared/contracts";
 import "./effect-studio.css";
@@ -29,7 +29,7 @@ function readStoredSelection(): StoredSelection {
   }
 }
 
-export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: string) => void }) {
+export function EffectStudio() {
   const [projects, setProjects] = useState<EffectStudioProject[]>([]);
   const [selected, setSelected] = useState("");
   const [siteId, setSiteId] = useState("");
@@ -51,6 +51,9 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
   const saving = useRef<Promise<void> | null>(null);
   const loadToken = useRef(0);
   const saveCurrent = useRef<() => Promise<void>>(async () => {});
+  const target = useMemo(() => projects.flatMap((project) => project.images).find((image) => image.id === selected), [projects, selected]);
+  const editorKind = target?.kind === "sceneObject" ? "sceneObject" : "image";
+  const isLocalScene = editorKind === "sceneObject";
 
   const refresh = useCallback(async () => {
     try {
@@ -72,6 +75,24 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // The editor iframe changes document when an image target becomes a local
+  // sceneObject target. Invalidate the old frame's load token and all pending
+  // replies so a late studio:loaded cannot apply to the new editor.
+  useEffect(() => {
+    loadToken.current++;
+    activeTarget.current = "";
+    setReady(false);
+    setLoaded(false);
+    setDirty(false);
+    setError("");
+    if (autoTimer.current) clearTimeout(autoTimer.current);
+    for (const task of pending.current.values()) {
+      clearTimeout(task.timer);
+      task.reject(new Error("Düzenleyici değişti."));
+    }
+    pending.current.clear();
+  }, [editorKind]);
 
   useEffect(() => {
     if (!siteId || !selected) return;
@@ -206,7 +227,7 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
         setStatus("Görsel açılamadı.");
       }
     })();
-  }, [ready, selected, request]);
+  }, [ready, selected, request, editorKind]);
 
   // Wait for an in-flight save and, if edits arrived meanwhile, save the latest
   // revision before switching targets or preparing/publishing a scene.
@@ -218,14 +239,9 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
     if (autoTimer.current) clearTimeout(autoTimer.current);
   }, [save, loaded]);
 
-  const target = useMemo(() => projects.flatMap((project) => project.images).find((image) => image.id === selected), [projects, selected]);
   const selectedProject = useMemo(() => projects.find(project => project.id === siteId), [projects, siteId]);
-  // Only first-time local bindings wait for a site deploy. A staged image with
-  // its own publish route keeps the direct publish action instead.
-  const stagedImages = useMemo(() => selectedProject?.images.filter(image => image.bindingStatus === "staged" && !image.canPublish) ?? [], [selectedProject]);
   const mappedTargetId = selectedProject ? effectSiteDeployTarget(selectedProject.id) : null;
   const mappedDeployTarget = mappedTargetId ? deployTargets.find(item => item.id === mappedTargetId) : undefined;
-  const stagedImage = stagedImages[0];
 
   const choose = async (newId: string) => {
     if (!newId || newId === selected) return;
@@ -246,30 +262,21 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
     setSelected(next.images.find(image => image.available)?.id || "");
   };
 
-  const prepare = async () => {
-    if (!target?.canPrepare || !loaded || working) return;
-    if (!window.confirm("Seçili sabit görselin efekt sahnesi ve site manifesti yerel kaynaklara hazırlanacak. Canlı site değişmeyecek. Devam edilsin mi?")) return;
-    try {
-      await flushSave();
-      setWorking(true);
-      setStatus("Sabit görsel bağlantısı yerelde hazırlanıyor…");
-      const result = await window.adminControlCenter.prepareEffectScene(selected);
-      setStatus(result.message);
-      setError("");
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStatus("Site bağlantısı hazırlanamadı.");
-    } finally { setWorking(false); }
-  };
-
   const publish = async () => {
-    if (!target?.canPublish || !loaded || working) return;
-    if (!window.confirm("Yalnız seçili görselin efekt sahnesi canlı siteye yüklenecek. Devam edilsin mi?")) return;
+    if (isLocalScene || !target || (!target.canPublish && !target.canPrepare) || !loaded || working) return;
+    const firstPublication = !target.canPublish;
+    if (firstPublication && !mappedDeployTarget?.available) {
+      setError(mappedDeployTarget?.availabilityNote || "Bu sitenin tam site yayın bağlantısı hazır değil.");
+      return;
+    }
+    const confirmation = firstPublication
+      ? `Bu görselin ilk etkinleştirilmesi için ${mappedDeployTarget?.title} site ön kontrolü ve TAM SİTE DEPLOY işlemi yapılacak. Ardından canlı sahne ve manifest doğrulanacak. Devam edilsin mi?`
+      : "Yalnız seçili görselin efekt sahnesi canlı siteye yüklenecek. Devam edilsin mi?";
+    if (!window.confirm(confirmation)) return;
     try {
       await flushSave();
       setWorking(true);
-      setStatus("Sahne siteye yükleniyor…");
+      setStatus(firstPublication ? "İlk yayın için site ön kontrolü hazırlanıyor…" : "Sahne siteye yükleniyor…");
       const result = await window.adminControlCenter.publishEffectScene(selected);
       setStatus(result.message);
       setError("");
@@ -280,118 +287,68 @@ export function EffectStudio({ onOpenDeploy }: { onOpenDeploy?: (targetId: strin
     } finally { setWorking(false); }
   };
 
+  useEffect(() => {
+    if (!working) return;
+    return window.adminControlCenter.onDeploymentRunState?.(state => {
+      if (state.running) setStatus(`İlk yayın · ${state.stage || "Site deploy sürüyor…"}`);
+    });
+  }, [working]);
+
+  const publishBlocked = !loaded ? "Önce görselin açılmasını bekleyin."
+    : working ? "Devam eden işlemin tamamlanmasını bekleyin."
+      : !target?.canPublish && !target?.canPrepare ? target?.note || "Bu görselin yayın bağlantısı hazır değil."
+        : !target?.canPublish && !mappedDeployTarget?.available ? mappedDeployTarget?.availabilityNote || "Bu proje için tam site yayın hedefi hazır değil."
+          : "";
+  const publicationTitle = target?.canPublish ? "Yalnız seçili efekt sahnesi aktarılır ve canlı doğrulanır."
+    : target?.canPrepare ? "İlk yayın: tam site ön kontrolü, deploy ve canlı sahne/manifest doğrulaması gerekir. " + (publishBlocked || "Yayın öncesinde onayınız istenir.")
+      : target?.note || "Bu görsel yalnız yerel taslak olarak düzenlenebilir.";
+  const publicationLabel = target?.canPublish ? "Yayın bağlantılı" : target?.canPrepare ? "İlk yayın bekliyor" : "Yerel taslak";
+  const saveTitle = !loaded ? "Önce düzenleyicinin açılmasını bekleyin." : working ? "Devam eden işlemin tamamlanmasını bekleyin."
+    : dirty ? "Son değişiklikleri yerel taslağa kaydet." : "Yerel taslak kaydedildi; yeniden kaydedebilirsiniz.";
+  const statusText = error || (!selected ? "Uygun görsel yok." : dirty ? "Kaydedilmemiş değişiklikler · " + status : status);
+
   return <div className="effects-screen">
-    <header className="effects-head">
-      <div className="effects-heading"><span className="effects-kicker"><Waves size={15} /> GÖRSEL ÇALIŞMA ALANI</span><h1>Efekt Atölyesi</h1></div>
+    <header className="effects-head" aria-label="Efekt çalışma alanı işlemleri">
+      <h1 className="effects-heading" title="Efekt Atölyesi"><Waves size={16} aria-hidden="true"/> Efekt Atölyesi</h1>
       <div className="effects-controls">
-        <label>Site
-          <select aria-label="Efekt projesi" value={siteId} onChange={(event) => void chooseSite(event.target.value)}>
+        <label>Proje
+          <select aria-label="Efekt projesi" title={selectedProject?.name || "Proje seçin"} value={siteId} onChange={(event) => void chooseSite(event.target.value)}>
             {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
           </select>
         </label>
-        <label>Görsel
-          <select aria-label="Efekt görseli" value={selectedProject?.images.some(image => image.id === selected) ? selected : ""}
+        <label>{isLocalScene ? "Sahne" : "Görsel"}
+          <select aria-label="Efekt görseli" title={target?.name || "Bu projede uygun görsel yok"}
+            value={selectedProject?.images.some(image => image.id === selected) ? selected : ""}
             onChange={event => void choose(event.target.value)} disabled={!selectedProject?.images.length}>
             {!selectedProject?.images.length && <option value="">Uygun görsel yok</option>}
             {selectedProject?.images.map(image => <option key={image.id} value={image.id} disabled={!image.available}>{image.name}</option>)}
           </select>
         </label>
-        <button className="effects-small" title="Siteleri ve görselleri yenile" aria-label="Siteleri ve görselleri yenile"
-          onClick={() => void refresh()}><RefreshCw size={16}/></button>
+        <button className="effects-small" title="Projeleri ve görselleri yenile" aria-label="Siteleri ve görselleri yenile"
+          onClick={() => void refresh()}><RefreshCw size={15}/></button>
+      </div>
+      {isLocalScene ? <span className="effects-local-only" title="Yerel V2 çalışma sahnesi; siteye yayınlanmaz.">Yerel çalışma · yayın yok</span>
+        : target && <span className="effects-publication" title={publicationTitle}>{publicationLabel}</span>}
+      <div className="effects-buttons">
+        <button disabled={!loaded || working} title={saveTitle} onClick={() => void save().catch(() => {})}><Save size={15}/> {working ? "İşleniyor…" : "Kaydet"}</button>
+        {!isLocalScene && target && <button className="effects-publish" disabled={Boolean(publishBlocked)} title={publishBlocked || publicationTitle}
+          onClick={() => void publish()}><CloudUpload size={15}/> Siteye yayınla</button>}
       </div>
     </header>
+    <div className={"effects-state" + (error ? " effects-error" : "")} role="status" aria-live="polite" aria-atomic="true" title={statusText}>
+      {statusText}
+    </div>
     <div className="effects-body">
-      <aside className="effects-assets" aria-label="Site görsel gezgini">
-        <div className="effects-assets-header"><Layers3 size={15}/><strong>Site görselleri</strong><span>{selectedProject?.images.length ?? 0}</span></div>
-        <p className="effects-assets-note">Sitedeki kaynak görseller ve efekt bağlantıları</p>
-        <div className="effects-assets-list">
-          {selectedProject?.images.map(image => (
-            <button type="button" key={image.id} className={"effects-asset" + (selected === image.id ? " is-active" : "")}
-              onClick={() => void choose(image.id)} disabled={!image.available}>
-              <span className="effects-asset-symbol"><ImageIcon size={18}/></span>
-              <span className="effects-asset-copy"><strong title={image.name}>{image.name}</strong>
-                <small>{image.width} × {image.height}</small>
-                <em className={image.canPublish ? "is-bound" : ""}>{image.canPublish ? "Yayın bağlantılı" : image.bindingStatus === "staged" ? "Yerelde hazır · deploy bekliyor" : "Önce bağlantı gerekli"}</em>
-              </span>
-            </button>
-          ))}
-          {!selectedProject?.images.length && <div className="effects-empty-assets"><Link2Off size={22}/>
-            <p>{selectedProject?.note || "Bu sitenin kaynaklarında kullanılabilir bir görsel bulunamadı."}</p></div>}
-        </div>
-        {target?.sourcePath && <p className="effects-source" title={target.sourcePath}>Kaynak: {target.sourcePath}</p>}
-      </aside>
-      <section className="effects-stage" aria-label="Efekt düzenleyici">
-        <iframe ref={frame} title="Canlı efekt düzenleyici"
-          src="./effect-studio/index.html?embedded=1"
-          onLoad={() => frame.current?.contentWindow?.postMessage({ type: "studio:hello" }, "*")}
+      <section className="effects-stage" aria-label="Efekt düzenleyici" aria-busy={!loaded && Boolean(selected)}>
+        <iframe key={editorKind} ref={frame} title={isLocalScene ? "Yerel V2 nesne sahnesi düzenleyici" : "Canlı efekt düzenleyici"}
+          src={isLocalScene ? "./effect-studio/scene.html?embedded=1" : "./effect-studio/index.html?embedded=1"}
+          onLoad={() => {
+            setReady(false);
+            frame.current?.contentWindow?.postMessage({ type: "studio:hello" }, "*");
+          }}
         />
-        {(!loaded || !selected) && <div className="effects-loading">{error || (selected ? status : "Bir görsel seçilmesini bekliyor.")}</div>}
+        {(!loaded || !selected) && <div className="effects-loading">{error || (!selected ? selectedProject?.note || "Bir görsel seçin." : "")}</div>}
       </section>
     </div>
-    {stagedImage && selectedProject ? (
-      <section className="effects-activation" aria-label="İlk etkinleştirme">
-        <div className="effects-activation-copy">
-          <span className="effects-activation-icon"><CheckCircle2 size={16} /></span>
-          <div>
-            <strong>İlk etkinleştirme yerelde hazır</strong>
-            <p>
-              <b>{stagedImage.name}</b> için sahne ve <code>effects-manifest.json</code> site
-              kaynaklarında. Canlı site henüz değişmedi.
-              {selected !== stagedImage.id ? (
-                <button type="button" className="effects-inline-action" onClick={() => void choose(stagedImage.id)}>
-                  Görsele dön
-                </button>
-              ) : null}
-            </p>
-            <small>
-              {mappedDeployTarget
-                ? "Bu düğme yalnız Deploy ekranını açar; ön kontrol veya canlı yayın başlatmaz."
-                : "Site kaynakları hazır; canlıya almak için sitenin kendi deployment süreci ayrıca onaylanmalı."}
-            </small>
-          </div>
-        </div>
-        {mappedDeployTarget ? (
-          <button
-            type="button"
-            className="effects-activation-action"
-            disabled={!onOpenDeploy || !mappedDeployTarget.available}
-            title={mappedDeployTarget.availabilityNote}
-            onClick={() => onOpenDeploy?.(mappedDeployTarget.id)}
-          >
-            <ExternalLink size={15} /> Deploy ekranını aç · {mappedDeployTarget.title}
-          </button>
-        ) : (
-          <p className="effects-activation-note">
-            {mappedTargetId
-              ? "Eşlenen Admin Deploy hedefi bu kurulumda bulunamadı."
-              : "Bu site için Admin Deploy hedefi eşlenmedi."}
-          </p>
-        )}
-      </section>
-    ) : null}
-    <footer className="effects-foot">
-      <div className="effects-state">
-        {error ? <span className="effects-error">{error}</span> : <span><CheckCircle2 size={16} /> {status}</span>}
-        <small>{target?.note || (dirty ? "Kaydedilmemiş son değişiklik var." : (selectedProject?.siteUrl || ""))}</small>
-      </div>
-      <div className="effects-buttons">
-        <button disabled={!loaded || working} onClick={() => void save().catch(() => {})}><Save size={16}/> {working ? "İşleniyor…" : "Taslağı kaydet"}</button>
-        {target && !target.canPublish && (
-          <button
-            className="effects-publish"
-            disabled={!loaded || working || !target.canPrepare}
-            title={target.canPrepare ? "Yalnız yerel site kaynaklarını hazırlar; canlı yayın başlatmaz." : "Bu görsel için yerel bağlantı hazırlığı uygun değil."}
-            onClick={() => void prepare()}
-          >
-            <CloudUpload size={16} /> {target.bindingStatus === "staged" ? "Yerel sahneyi güncelle" : "Siteye bağlamayı hazırla"}
-          </button>
-        )}
-        {target?.canPublish && (
-          <button className="effects-publish" disabled={!loaded || working} onClick={() => void publish()}>
-            <CloudUpload size={16} /> Siteye yayınla
-          </button>
-        )}
-      </div>
-    </footer>
   </div>;
 }

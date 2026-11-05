@@ -1,0 +1,55 @@
+{
+  "format": "efekt-atolyesi",
+  "version": 1,
+  "name": "Yardımcı Asistan landing · orman-isik",
+  "seed": "landing:orman_isik_eb0aeffb",
+  "zones": [
+    {
+      "id": "aaa534af-9872-406a-be64-d9d7a276bd2f",
+      "name": "Bölge 1",
+      "visible": true,
+      "points": [
+        [
+          337.19,
+          221
+        ],
+        [
+          1038.15,
+          50.92
+        ],
+        [
+          1004.78,
+          550.59
+        ],
+        [
+          279.27,
+          637.83
+        ]
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "a2d360c4-fe3d-4d42-89e1-ac9360460cab",
+      "type": "shimmer",
+      "zoneId": "aaa534af-9872-406a-be64-d9d7a276bd2f",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 298,
+        "speed": 1.65,
+        "opacity": 1.25,
+        "bandOpacity": 0.94,
+        "length": 0.9,
+        "drift": 0.15
+      }
+    }
+  ],
+  "photo": {
+    "src": "assets/site-media/orman_isik_eb0aeffb.jpg",
+    "width": 1280,
+    "height": 669,
+    "name": "orman-isik",
+    "credit": ""
+  }
+}

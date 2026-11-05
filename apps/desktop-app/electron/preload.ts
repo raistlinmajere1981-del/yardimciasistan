@@ -113,6 +113,7 @@ import type {
 import type {
   DesktopBackupActionResult,
   DesktopBackupCreateResult,
+  DesktopBackupImportResult,
   DesktopBackupListResult,
   DesktopDataMaintenanceResult
 } from "./data-maintenance";
@@ -183,6 +184,7 @@ import type {
 interface AiConnectionTestInput {
   visionModel?: string;
   imageModel?: string;
+  sttModel?: string;
   provider: string;
   service: string;
   projectName: string;
@@ -194,8 +196,8 @@ interface AiConnectionTestInput {
 }
 
 type AiConnectionTestResult =
-  | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
-  | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
+  | { ok: true; message: string; model: string; models: Array<{ id: string; label: string; task?: "text" | "vision" | "image" | "stt" }> }
+  | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string; task?: "text" | "vision" | "image" | "stt" }> };
 
 type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
@@ -370,6 +372,7 @@ export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsM
   deleteDailyTask: (taskId: string) => Promise<DesktopStatusUpdateResult>;
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => Promise<DesktopStatusUpdateResult>;
   createManualBackup: () => Promise<DesktopBackupCreateResult>;
+  importLocalBackupZip: () => Promise<DesktopBackupImportResult>;
   listLocalBackups: () => Promise<DesktopBackupListResult>;
   openLocalBackupDirectory: () => Promise<DesktopBackupActionResult>;
   openLocalBackupItemDirectory: (backupId: string) => Promise<DesktopBackupActionResult>;
@@ -380,7 +383,8 @@ export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsM
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
   rewriteOwnerReplySuggestion: (input: RewriteRequestAiSuggestionInput) => Promise<RequestAiSuggestionResult>;
   generateDailyBusinessEvaluation: () => Promise<DailyBusinessEvaluationResult>;
-  testAiConnection: (input: AiConnectionTestInput) => Promise<AiConnectionTestResult>;
+  testAiConnection: (input: AiConnectionTestInput, testId: string) => Promise<AiConnectionTestResult>;
+  cancelAiConnectionTest: (testId: string) => Promise<boolean>;
   revealAiApiKey: (service: string) => Promise<AiApiKeyRevealResult>;
   pullRequests: () => Promise<PullRequestsResult>;
   markRequestsSynced: (requestIds: string[]) => Promise<MarkRequestsSyncedResult>;
@@ -789,6 +793,7 @@ const bridge: DesktopBridge = {
   deleteDailyTask: (taskId: string) => ipcRenderer.invoke("dailyTask:delete", taskId),
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => ipcRenderer.invoke("dailyTask:updateStatus", input),
   createManualBackup: () => invokeWhenUnlocked<DesktopBackupCreateResult>("dataMaintenance:createBackup"),
+  importLocalBackupZip: () => invokeWhenUnlocked<DesktopBackupImportResult>("dataMaintenance:importBackupZip"),
   listLocalBackups: () => invokeWhenUnlocked<DesktopBackupListResult>("dataMaintenance:listBackups"),
   openLocalBackupDirectory: () => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:openBackupDirectory"),
   openLocalBackupItemDirectory: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:openBackupItemDirectory", backupId),
@@ -813,7 +818,8 @@ const bridge: DesktopBridge = {
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
   rewriteOwnerReplySuggestion: (input: RewriteRequestAiSuggestionInput) => ipcRenderer.invoke("ai:rewriteOwnerReplySuggestion", input),
   generateDailyBusinessEvaluation: () => ipcRenderer.invoke("ai:generateDailyBusinessEvaluation"),
-  testAiConnection: (input: AiConnectionTestInput) => ipcRenderer.invoke("ai:testConnection", input),
+  testAiConnection: (input: AiConnectionTestInput, testId: string) => ipcRenderer.invoke("ai:testConnection", input, testId),
+  cancelAiConnectionTest: (testId: string) => ipcRenderer.invoke("ai:cancelTestConnection", testId),
   revealAiApiKey: (service: string) => ipcRenderer.invoke("ai:revealApiKey", service),
   pullRequests: () => ipcRenderer.invoke("sync:pullRequests"),
   markRequestsSynced: (requestIds: string[]) => ipcRenderer.invoke("sync:markRequestsSynced", requestIds),

@@ -158,7 +158,7 @@ export const marketDealerPack = {
     dealerPortalEnabled: true,
     onlineSalesPickup: true,
     onlineSalesDelivery: true,
-    onlineSalesShipping: true
+    onlineSalesShipping: false // No carrier credentials in a public demo; enable after an explicit provider test.
   },
   seed(ctx) {
     const { db } = ctx;

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { renderDemoPng } from "./png.mjs";
-import { FIXED_NOW, insertRow, json, slug, writeJson } from "./util.mjs";
+import { FIXED_NOW, insertRow, json, sha256File, slug, writeJson } from "./util.mjs";
 
 const require = createRequire(import.meta.url);
 const shared = require("../../../packages/shared/dist/index.js");
@@ -183,6 +183,17 @@ export function createDemoContext({ db, pack, folderPath }) {
     productIds.add(productId);
 
     let imageAssetPath = "";
+    const originalAssets = [];
+    for (const asset of input.originalAssets ?? []) {
+      if (!/^[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(asset.fileName)) throw new Error("Unsafe original image filename");
+      const assetPath = `assets/products/${productId}/${asset.fileName}`;
+      const absolute = path.join(folderPath, assetPath);
+      fs.mkdirSync(path.dirname(absolute), { recursive: true });
+      fs.copyFileSync(asset.sourcePath, absolute);
+      if (sha256File(absolute) !== asset.hash) throw new Error(`Original image SHA-256 mismatch: ${asset.fileName}`);
+      originalAssets.push({ assetPath, hash: asset.hash, format: asset.format });
+    }
+    if (originalAssets.length) imageAssetPath = originalAssets[0].assetPath;
     if (input.palette) {
       const fileName = `${slug(input.key)}.png`;
       const absolute = path.join(folderPath, "assets", "products", productId, fileName);
@@ -218,13 +229,13 @@ export function createDemoContext({ db, pack, folderPath }) {
       track_inventory: input.trackInventory === false ? 0 : 1,
       minimum_quantity: input.minimumQuantity ?? 0,
       is_active: 1,
-      image_original_assets_json: "[]",
+      image_original_assets_json: json(originalAssets),
       image_asset_path: imageAssetPath,
-      image_source_url: "",
-      data_source: "demo-data-generator",
-      source_product_url: "",
-      data_license: "Synthetic demo data (project-owned generator)",
-      image_license: imageAssetPath ? "Original synthetic artwork generated for demo data" : "",
+      image_source_url: input.imageSourceUrl ?? "",
+      data_source: input.dataSource ?? "demo-data-generator",
+      source_product_url: input.sourceProductUrl ?? "",
+      data_license: input.dataLicense ?? "Synthetic demo data (project-owned generator)",
+      image_license: input.imageLicense ?? (imageAssetPath ? "Original synthetic artwork generated for demo data" : ""),
       source_fetched_at: "",
       created_at: FIXED_NOW,
       updated_at: FIXED_NOW,

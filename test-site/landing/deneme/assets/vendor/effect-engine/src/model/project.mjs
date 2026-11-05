@@ -1,15 +1,19 @@
-import {effectRegistry,defaultParams} from '../registry/effects.mjs';
+import {effectRegistry,objectEffectRegistry,defaultParams} from '../registry/effects.mjs';
 import {isSimplePolygon} from './geometry.mjs';
 export const FORMAT='efekt-atolyesi';
 export const SCHEMA_VERSION=1;
+export const OBJECT_SCENE_VERSION=2;
+export const OBJECT_SCENE_KIND='objectScene';
 export const MAX_FILE_BYTES=25*1024*1024;
 const fail = message => {throw new Error(message);};
 const object = value => value!==null && typeof value==='object' && !Array.isArray(value);
 const string = (value,label,max=160) => {if(typeof value!=='string'||!value.trim()||value.length>max) fail(`${label}: 1–${max} karakter gerekli.`);};
 const num = (value,min,max,label) => {if(!Number.isFinite(value)||value<min||value>max) fail(`${label}: ${min}–${max} aralığında sayı gerekli.`);};
+const integer = (value,min,max,label) => {num(value,min,max,label);if(!Number.isInteger(value)) fail(`${label}: tam sayı gerekli.`);};
 const bool = (value,label) => {if(typeof value!=='boolean') fail(`${label}: doğru/yanlış değeri gerekli.`);};
 function keys(value,allowed,label) { if(!object(value)) fail(`${label}: nesne gerekli.`); for(const key of Object.keys(value)) if(!allowed.includes(key)) fail(`${label}: bilinmeyen alan “${key}”.`); }
-export function validateProject(scene) {
+
+function validateV1(scene) {
   keys(scene,['format','version','name','seed','photo','zones','effects'],'Proje');
   if(scene.format!==FORMAT) fail('Bu dosya bir Efekt Atölyesi projesi değil.');
   if(scene.version!==SCHEMA_VERSION) fail(`Sahne sürümü ${scene.version} desteklenmiyor. v1 gerekli; dosya değiştirilmedi.`);
@@ -44,8 +48,69 @@ export function validateProject(scene) {
   }
   return scene;
 }
+
+function validateObjectScene(scene) {
+  keys(scene,['format','version','kind','name','seed','sceneId','viewport','objects','effects'],'Proje');
+  if(scene.format!==FORMAT) fail('Bu dosya bir Efekt Atölyesi projesi değil.');
+  if(scene.version!==OBJECT_SCENE_VERSION) fail(`Nesne sahnesi sürümü ${scene.version} desteklenmiyor. version 2 gerekli; dosya değiştirilmedi.`);
+  if(scene.kind!==OBJECT_SCENE_KIND) fail(`Sahne türü “${scene.kind}” desteklenmiyor. kind “${OBJECT_SCENE_KIND}” gerekli.`);
+  string(scene.name,'Proje adı'); string(scene.seed,'Sahne tohumu',120); string(scene.sceneId,'Sahne kimliği',120);
+  keys(scene.viewport,['width','height'],'Görünüm');
+  integer(scene.viewport.width,1,20000,'Görünüm genişliği');
+  integer(scene.viewport.height,1,20000,'Görünüm yüksekliği');
+  if(scene.viewport.width*scene.viewport.height>80000000) fail('Görünüm boyutu 80 megapiksel sınırını aşıyor.');
+  if(!Array.isArray(scene.objects)||!Array.isArray(scene.effects)) fail('Nesneler ve efektler birer liste olmalı.');
+  if(scene.objects.length>200) fail('En fazla 200 nesne desteklenir.');
+  if(scene.effects.length>500) fail('En fazla 500 efekt desteklenir.');
+  const ids=new Set();
+  const unique = id => {string(id,'Kimlik',120); if(ids.has(id)) fail(`Tekrarlanan kimlik: ${id}`); ids.add(id);};
+  const objects=new Map();
+  for(const item of scene.objects) {
+    keys(item,['id','name','visible','pose','anchors'],'Nesne'); unique(item.id); string(item.name,'Nesne adı'); bool(item.visible,'Nesne görünürlüğü');
+    keys(item.pose,['x','y','width','height','rotation','depth'],'Nesne konumu');
+    const pose=item.pose;
+    num(pose.x,0,1,'Nesne X'); num(pose.y,0,1,'Nesne Y');
+    num(pose.width,.001,1,'Nesne genişliği'); num(pose.height,.001,1,'Nesne yüksekliği');
+    if(pose.x+pose.width>1.000000001) fail(`${item.name}: nesne sahnenin yatay sınırını aşıyor.`);
+    if(pose.y+pose.height>1.000000001) fail(`${item.name}: nesne sahnenin dikey sınırını aşıyor.`);
+    num(pose.rotation,-360,360,'Nesne dönüşü (derece)'); num(pose.depth,-100,100,'Nesne derinliği');
+    if(!Array.isArray(item.anchors)||item.anchors.length>100) fail(`${item.name}: en fazla 100 bağlantı noktası desteklenir.`);
+    const anchors=new Set();
+    for(const anchor of item.anchors) {
+      keys(anchor,['id','x','y'],'Bağlantı noktası'); string(anchor.id,'Bağlantı kimliği',120);
+      if(anchors.has(anchor.id)) fail(`Tekrarlanan bağlantı kimliği: ${anchor.id}`); anchors.add(anchor.id);
+      num(anchor.x,0,1,'Bağlantı X'); num(anchor.y,0,1,'Bağlantı Y');
+    }
+    objects.set(item.id,{...item,anchorIds:anchors});
+  }
+  for(const effect of scene.effects) {
+    keys(effect,['id','type','target','enabled','seed','params'],'Efekt'); unique(effect.id);
+    if(!Object.hasOwn(objectEffectRegistry,effect.type)) fail(`Bilinmeyen nesne efekti türü: ${effect.type}. Desteklenenler: ${Object.keys(objectEffectRegistry).join(', ')}. Mevcut proje korundu.`);
+    keys(effect.target,['kind','objectId','anchorId','offset','scale','depth'],'Efekt hedefi');
+    if(effect.target.kind!=='sceneObject') fail('Nesne efektleri yalnızca kind “sceneObject” hedefleyebilir.');
+    const targetObject=objects.get(effect.target.objectId);
+    if(!targetObject) fail(`Efektin nesnesi bulunamadı: ${effect.target.objectId}`);
+    if(!targetObject.anchorIds.has(effect.target.anchorId)) fail(`Efektin bağlantı noktası bulunamadı: ${effect.target.anchorId}`);
+    keys(effect.target.offset,['x','y'],'Efekt kaydırması');
+    num(effect.target.offset.x,-5,5,'Efekt kaydırma X'); num(effect.target.offset.y,-5,5,'Efekt kaydırma Y');
+    num(effect.target.scale,.01,10,'Efekt ölçeği'); num(effect.target.depth,-100,100,'Efekt derinliği');
+    bool(effect.enabled,'Efekt etkinliği'); string(effect.seed,'Efekt tohumu',120);
+    const controls=objectEffectRegistry[effect.type].controls;
+    keys(effect.params,controls.map(c=>c.key),'Efekt parametreleri');
+    for(const c of controls) {
+      if(c.kind==='boolean') bool(effect.params[c.key],c.label);
+      else {num(effect.params[c.key],c.min,c.max,c.label);if(c.step===1&&!Number.isInteger(effect.params[c.key])) fail(`${c.label}: tam sayı gerekli.`);}
+    }
+  }
+  return scene;
+}
+
 // v1 is the first public format. No implicit/losing migration: reject other versions.
 // A future version must have an explicit, tested migration before it can be opened.
+export function validateProject(scene) {
+  if(object(scene)&&(scene.version===OBJECT_SCENE_VERSION||scene.kind===OBJECT_SCENE_KIND)) return validateObjectScene(scene);
+  return validateV1(scene);
+}
 export function importProject(text) {
   if(typeof text!=='string'||new TextEncoder().encode(text).length>MAX_FILE_BYTES) fail('Proje dosyası 25 MB sınırını aşıyor.');
   let value;try{value=JSON.parse(text);}catch{fail('JSON okunamadı. Geçerli bir .scene.json dosyası seçin.');}

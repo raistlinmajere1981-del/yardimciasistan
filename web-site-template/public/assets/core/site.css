@@ -353,3 +353,13 @@ p { margin-block: 0 1rem; }
   .gallery { grid-template-columns: minmax(0, 1fr); }
   .resource-facts > div { align-items: flex-start; }
 }
+
+/* Common panorama expansion: native fullscreen and modal mobile fallback. */
+.panorama-expand { position: absolute; inset-block-start: .75rem; inset-inline-end: .75rem; }
+.panorama-expand, .panorama-close { min-height: 44px; padding: .65rem 1rem; color: var(--site-ink); background: var(--site-surface); border: 1px solid var(--site-border); border-radius: var(--site-radius); cursor: pointer; }
+.panorama-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; height: 100dvh; max-height: none; padding: 0; border: 0; margin: 0; color: var(--site-ink); background: #102735; }
+.panorama-dialog::backdrop { background: #102735; }
+.panorama-stage { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: stretch; background: #102735; }
+.panorama-close { flex: 0 0 auto; align-self: flex-end; margin: .5rem; }
+.panorama-stage canvas { display: block; width: 100%; height: 0; flex: 1 1 auto; min-height: 0; touch-action: none; cursor: grab; }
+.panorama-expand:focus-visible, .panorama-close:focus-visible, .panorama-stage canvas:focus-visible { outline: 3px solid var(--site-accent, #dfb968); outline-offset: -3px; }

@@ -1,11 +1,11 @@
 import { ActionButton } from "../ui/ActionButton";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { FolderOpen, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
+import { FileArchive, FolderOpen, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DesktopBackupListItem } from "../../../electron/data-maintenance";
 import { reportAppStatus } from "../../app/runtime-state";
 
-type MaintenanceAction = "load" | "backup" | "open-root" | "open-item" | "restore" | "delete" | "reset" | null;
+type MaintenanceAction = "load" | "backup" | "import" | "open-root" | "open-item" | "restore" | "delete" | "reset" | null;
 
 export function DataMaintenanceSettings({ initialized = true }: { initialized?: boolean }) {
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -65,6 +65,30 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
       reportAppStatus("success", result.message);
     } catch {
       reportAppStatus("error", "Yedek oluşturulamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function importBackupZip() {
+    if (busy) return;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.importLocalBackupZip) {
+      reportAppStatus("error", "ZIP içe aktarma hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    setAction("import");
+    setActiveBackupId("");
+    try {
+      const result = await bridge.importLocalBackupZip();
+      if (!result.ok) {
+        if (!result.cancelled) reportAppStatus("error", result.message);
+        return;
+      }
+      setBackups(result.backups);
+      reportAppStatus("success", result.message);
+    } catch {
+      reportAppStatus("error", "ZIP içe aktarılamadı. Dosyayı kontrol edip tekrar deneyin.");
     } finally {
       setAction(null);
     }
@@ -190,6 +214,10 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
           <Save size={16} aria-hidden="true" />
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
         </ActionButton>
+        <ActionButton variant="secondary" type="button" onClick={() => void importBackupZip()} disabled={busy}>
+          <FileArchive size={16} aria-hidden="true" />
+          {action === "import" ? "ZIP Alınıyor…" : "ZIP İçe Aktar"}
+        </ActionButton>
         <ActionButton variant="secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
           <FolderOpen size={16} aria-hidden="true" />
           {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
@@ -201,6 +229,7 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
       </div>
 
 
+      <p className="backup-import-help">Demo sitesinden indirilen örnek içerik ZIP'lerini doğrudan içe aktarabilirsiniz. Mevcut veriler değişmez; içe alınan paketi aşağıdan Geri Yükle ile kullanabilirsiniz.</p>
       <div className="backup-list-heading">
         <strong>Mevcut Yedekler</strong>
         <ActionButton variant="secondary" size="sm" type="button" onClick={() => void loadBackups()} disabled={busy}>

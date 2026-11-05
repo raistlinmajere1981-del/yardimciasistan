@@ -10,22 +10,44 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
   const signature = aiTestSignature(setupForm);
   const acceptedSignature = useRef("");
+  const activeRequestId = useRef<string | null>(null);
+  const nextTestId = useRef(0);
+
+  const abortActiveTest = () => {
+    const testId = activeRequestId.current;
+    activeRequestId.current = null;
+    if (testId) void window.yardimciDesktop?.cancelAiConnectionTest(testId).catch(() => undefined);
+    return Boolean(testId);
+  };
+
+  useEffect(() => () => { abortActiveTest(); }, []);
 
   useEffect(() => {
     if (signature === acceptedSignature.current) return;
+    abortActiveTest();
     beginTest();
     setAiConnectionTestState("idle");
     setAiConnectionTestMessage("Bağlantı henüz denenmedi.");
   }, [beginTest, signature, setupForm.aiStoredApiKeyConfigured]);
 
   function invalidate() {
+    abortActiveTest();
     acceptedSignature.current = "";
     beginTest();
     setAiConnectionTestState("idle");
     setAiConnectionTestMessage("Bağlantı henüz denenmedi.");
   }
 
+  function cancelAiConnection() {
+    if (!abortActiveTest()) return;
+    beginTest();
+    acceptedSignature.current = signature;
+    setAiConnectionTestState("idle");
+    setAiConnectionTestMessage("Bağlantı testi iptal edildi.");
+  }
+
   async function testAiConnection() {
+    if (activeRequestId.current) return;
     acceptedSignature.current = signature;
     const isCurrent = beginTest();
     setAiConnectionTestState("loading");
@@ -67,6 +89,8 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       }));
     }
 
+    const testId = `ai-test-${Date.now()}-${++nextTestId.current}`;
+    activeRequestId.current = testId;
     try {
     const result = await observeNexaAi(() => bridge.testAiConnection({
       provider: setupForm.aiProvider,
@@ -76,10 +100,11 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       model,
       imageModel: setupForm.aiImageModel,
       visionModel: setupForm.aiVisionModel,
+      sttModel: setupForm.aiSttModel,
       apiKey,
       useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
       timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
-    }), "success", isCurrent);
+    }, testId), "success", isCurrent);
 
     if (!isCurrent()) return;
     setAiConnectionTestState(result.ok ? "success" : "error");
@@ -96,7 +121,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     } else if (setupForm.aiService === "gemini" || setupForm.aiService === "cloudflare") {
       setSetupForm((current) => ({
         ...current,
-        aiModel: result.model || current.aiModel,
+        aiModel: result.model !== undefined ? result.model : current.aiModel,
         aiModelOptions: result.models ?? current.aiModelOptions
       }));
     }
@@ -104,10 +129,12 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       if (!isCurrent()) return;
       setAiConnectionTestState("error");
       setAiConnectionTestMessage(error instanceof Error ? error.message : "AI bağlantısı kontrol edilemedi.");
+    } finally {
+      if (activeRequestId.current === testId) activeRequestId.current = null;
     }
   }
 
-  return { aiConnectionTestState, aiConnectionTestMessage, testAiConnection, invalidate };
+  return { aiConnectionTestState, aiConnectionTestMessage, testAiConnection, cancelAiConnection, invalidate };
 }
 
 function aiTestSignature(form: SetupFormState) {

@@ -1,19 +1,34 @@
 {
+  "format": 2,
   "source": "EfektAtolyesi",
   "version": "1.1.0",
+  "compatibility": {
+    "engine_major": 1,
+    "photo_scene": 1,
+    "object_scene": 2,
+    "object_kind": "objectScene"
+  },
+  "algorithm": "sha256",
+  "fingerprint": "078c2ac168547a04e1ec5716239100e7fcd910dc67a1eb703878c80577a0f39f",
   "files": {
+    "src/model/geometry.mjs": "a91b131a51a9e5615024022ca092b253d15682968a49ff43bc4440161268dccd",
+    "src/model/project.mjs": "fe8d8d8dfdb338bf96148926c9a4f6a01fb16d011ec12a697417452092defec0",
+    "src/registry/effects.mjs": "4dcd247fd53326f7557d691292a4968338d64c46fb5d380bec0f39d062bfbb5f",
     "src/runtime/compile.mjs": "3d89eb51d4f2d70fd515f7343764c9091f0915ec5ebd6fca5849e69afcf56ad6",
-    "src/runtime/coordinates.mjs": "7f9ca65e77b4d4ceca5cbea54b962b1704b4ce77bb0c63c33ad3e4eb819ca667",
+    "src/runtime/coordinates.mjs": "d43f2ab5d48366ebeba257712f0b3766fbe697c283d8e8fa28c86980cd589f31",
     "src/runtime/core.mjs": "e01eee070874eea4c2cf9d6298d3ded9efa6ad2a5a615858b3d8fa682fcda453",
+    "src/runtime/effects/flame.mjs": "86ddbc3c6dbc991d154a05bd56b8b5b32cdc69662a08abe6fe2fcf06ab6299d2",
+    "src/runtime/effects/glow.mjs": "34dd990f6ab6ed3f6da283be56e9a9bd9cb6ff1d8ce76ab90bbc6d205a66f3c5",
     "src/runtime/effects/offshore.mjs": "f0c8b681eb3e970299a92db14975331e806cf7464a630055658179e1cdafd930",
     "src/runtime/effects/shimmer.mjs": "1aebe735c1945fc1d6662d4fe8d2f9fa6e6567fa81ce8eeb7f6df38e0649b358",
+    "src/runtime/effects/smoke.mjs": "af34df84328cec5def020ea0c1e948b1091000d93985049afd699dfd65c1e4d9",
     "src/runtime/effects/sunlight.mjs": "1776bc4b24efbc7515e61f9978fca6525ba7f36cac10d26e2dd6471ff7c07c3e",
-    "src/runtime/index.mjs": "321684790a5a94e4ea8bb999dc608f0385c8d402bc21f67ae2d14d49452a984a",
+    "src/runtime/index.mjs": "3252e8abf1a887b5e6f97d930a7fdc8995c45768d27494072e2bbb422533b009",
+    "src/runtime/object-compile.mjs": "dfd7c691a1f748213f089f663fee4defa6e955606e3644508aa0ce1a61f5e2c7",
+    "src/runtime/object-overlay.mjs": "9491c7e361a23ad17af4c1411878524ce6585085c6c71db520b2c3779735866a",
+    "src/runtime/object-scene.mjs": "4536ca9d1f0b5eafd552798e763114d714cb5421444155717e4a43fb312c7a94",
     "src/runtime/polygon-sampling.mjs": "9e4af806ca0631c271af2a6b99ff7ad0d50b8f6405d4365f3649efe8b9a16e78",
     "src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
-    "src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
-    "src/registry/effects.mjs": "7ede45d5da873a2e731f2180d5c73b2e097ab6a6507671cb0f46c619ae362e29",
-    "src/model/geometry.mjs": "a91b131a51a9e5615024022ca092b253d15682968a49ff43bc4440161268dccd",
-    "src/model/project.mjs": "e6947b24efc6d702180f7a5848427a086a7d6ffcae6190c6ba3b9dd0b76e4e3e"
+    "src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc"
   }
 }

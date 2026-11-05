@@ -49,6 +49,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
 import { DesktopDictationSetup } from "./DesktopDictationSetup";
+import { translationBlockedReason } from "./service-prerequisites";
 import { WebSettingsSection } from "./WebSettingsSection";
 import { AiSettingsSection } from "./AiSettingsSection";
 
@@ -292,6 +293,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           />
         </div>
         <div className="settings-utility-actions">
+          {printingEnabled && <ActionButton id="settings-print-button" variant="secondary" onClick={() => setPrintOpen(true)}>Baskı Yönetimi</ActionButton>}
+          {initialized && translations.saved.enabled && <ActionButton id="settings-language-button" variant="secondary" onClick={() => setLanguageOpen(true)}>Dil Yönetimi</ActionButton>}
           <SettingsActionPopover id="settings-security-button" label="Güvenlik" open={utility === "security"} onOpenChange={open => setUtility(open ? "security" : null)}>
             <PasswordSettings controller={password} />
           </SettingsActionPopover>
@@ -372,8 +375,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   )}
               {isBusinessServiceAvailable("ai", capabilities) &&
                 <AiSettingsSection form={drafts.form} onFormChange={drafts.setDraft} {...ai}
-                  disabled={businessBusy || guardBusy} onTestAiConnection={() => void ai.testAiConnection()} />}
-              <TranslationSettingsSection controller={translations} aiAvailable={capabilities.includes(C.AI) && drafts.form.aiEnabled && Boolean(drafts.form.aiModel && (drafts.form.aiStoredApiKeyConfigured || drafts.form.aiApiKey || drafts.form.aiGoogleCurl) && !drafts.form.clearAiApiKey)} disabled={businessBusy || guardBusy} />
+                  disabled={businessBusy || guardBusy}
+                  onTestAiConnection={() => void ai.testAiConnection()} onCancelAiConnection={ai.cancelAiConnection} />}
+              <TranslationSettingsSection controller={translations} aiAvailable={!translationBlockedReason(drafts.form, drafts.canonical, capabilities.includes(C.AI))}
+                blockedReason={translationBlockedReason(drafts.form, drafts.canonical, capabilities.includes(C.AI))} disabled={businessBusy || guardBusy} />
               <SpeechSettingsSection controller={tts} disabled={businessBusy || guardBusy} />
               <DesktopDictationSetup controller={dictation} form={drafts.form} canonical={drafts.canonical}
                 aiCapability={capabilities.includes(C.AI)} disabled={businessBusy || guardBusy} />
@@ -397,6 +402,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               )}
               <StagedSettingsContributionSlot
                 category="services"
+                allowOfflineDeliveryRepair={drafts.canonical.onlineSalesDeliveryEnabled && drafts.canonical.onlineSalesDelivery.shippingEnabled}
                 form={drafts.form}
                 onFormChange={drafts.setDraft}
                 busy={businessBusy || guardBusy}
@@ -417,10 +423,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                       <BusinessContactFields form={drafts.form} onFormChange={drafts.setDraft} />
                     </fieldset>
                     <div className="settings-company-management-actions">
-                      {printingEnabled && <ActionButton id="settings-print-button" variant="secondary" onClick={() => setPrintOpen(true)}>Baskı Yönetimi</ActionButton>}
                       {roomsEnabled && <ActionButton id="settings-rooms-button" variant="secondary" onClick={() => setLayoutOpen("rooms")}>Oda Yönetimi</ActionButton>}
                       {tablesEnabled && <ActionButton id="settings-tables-button" variant="secondary" onClick={() => setLayoutOpen("tables")}>Masa Yönetimi</ActionButton>}
-                      {initialized && translations.saved.enabled && <ActionButton id="settings-language-button" variant="secondary" onClick={() => setLanguageOpen(true)}>Dil Yönetimi</ActionButton>}
                       {initialized && webAvailable && <ActionButton id="settings-gallery-button" variant="secondary" onClick={() => setGalleryOpen(true)}>Galeri Yönetimi</ActionButton>}
                     </div>
                   </div>

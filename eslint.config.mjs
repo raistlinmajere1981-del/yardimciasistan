@@ -26,6 +26,8 @@ export default tseslint.config(
       "test-site/landing/deneme/assets/vendor/**",
       "web-site-template/public/assets/core/widget.js",
       "web-site-template/public/assets/vendor/**",
+      // Synced upstream Efekt Atölyesi snapshot; lint in its source repository.
+      "apps/admin-control-center/public/effect-studio/**",
       "demo-data/**"
     ]
   },

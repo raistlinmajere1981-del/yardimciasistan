@@ -170,18 +170,23 @@ try {
   assert.equal(rooms.rooms.length, 4, "restored demo room catalog is complete");
   assert.equal(tables.enabled, true, "demo tables publish to the website");
   assert.equal(tables.tables.length, 6, "restored demo table catalog is complete");
-  const assertCoverServed = async (record, scope) => {
-    const cover = (record.media ?? []).find(item => item.kind === "cover" && item.url);
-    assert.ok(cover, `restored ${scope} ${record.id} has a published cover image`);
-    assert.ok(cover.url.startsWith("/media/"), `${scope} ${record.id} must use local media, not an external URL`);
-    const response = await fetch(new URL(cover.url, config.baseUrl));
-    assert.equal(response.status, 200, `${scope} ${record.id} cover must be readable over HTTP`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${scope} ${record.id} must serve real PNG bytes`);
+  const expectedMediaKinds = ["cover", "photo", "panorama_180", "panorama_360"];
+  const assertMediaServed = async (record, scope) => {
+    for (const kind of expectedMediaKinds) {
+      const media = (record.media ?? []).find(item => item.kind === kind && item.url);
+      assert.ok(media, `restored ${scope} ${record.id} has a published ${kind} image`);
+      assert.ok(media.url.startsWith("/media/"), `${scope} ${record.id} ${kind} must use local media, not an external URL`);
+      const response = await fetch(new URL(media.url, config.baseUrl));
+      assert.equal(response.status, 200, `${scope} ${record.id} ${kind} must be readable over HTTP`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const isPng = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      const isJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      assert.ok(isPng || isJpeg, `${scope} ${record.id} ${kind} must serve real PNG or JPEG bytes`);
+    }
   };
-  for (const room of rooms.rooms) await assertCoverServed(room, "room");
-  for (const table of tables.tables) await assertCoverServed(table, "table");
-  console.log("demo-restore-connect-republish-ok (local PHP, real demo ZIP, room/table covers served over HTTP)");
+  for (const room of rooms.rooms) await assertMediaServed(room, "room");
+  for (const table of tables.tables) await assertMediaServed(table, "table");
+  console.log("demo-restore-connect-republish-ok (local PHP, real demo ZIP, all four room/table media kinds served over HTTP)");
 } finally {
   if (database) database.close();
   if (server) server.kill();

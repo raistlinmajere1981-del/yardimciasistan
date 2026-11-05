@@ -145,6 +145,20 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
   };
 }
 
+/** Selected Cloudflare models must match task metadata from the fetched catalog. */
+function cloudflareCatalogMismatch(
+  options: DesktopAiModelOption[],
+  selection: { text: string; vision: string; image: string; stt: string }
+): string {
+  for (const task of ["text", "vision", "image", "stt"] as const) {
+    const selected = selection[task];
+    if (selected && !options.some(item => item.id === selected && item.task === task)) {
+      return "Cloudflare için seçilen model güncel katalogda doğru görev türünde bulunmuyor. Bağlantıyı Dene ile modelleri yenileyin.";
+    }
+  }
+  return "";
+}
+
 export function saveSetupData(
   db: DatabaseSync,
   input: SaveInitialSetupInput,
@@ -261,6 +275,15 @@ export function saveSetupData(
   if (aiSttModel && !isSupportedSttBaseUrl(profileService, input.aiBaseUrl)) {
     return { ok: false, message: "Konuşma tanıma için sağlayıcının resmi HTTPS bağlantı adresi kullanılmalı." };
   }
+  if (profileService === "cloudflare") {
+    const options = normalizeAiModelOptions(
+      input.aiModelOptions === undefined ? existingAiProfile?.model_options_json : input.aiModelOptions
+    );
+    const mismatch = cloudflareCatalogMismatch(options, {
+      text: aiModel, vision: aiVisionModel, image: aiImageModel, stt: aiSttModel
+    });
+    if (mismatch) return { ok: false, message: mismatch };
+  }
   const aiApiKeyResolution = resolveEncryptedAiApiKey({
     rawKeyProvided: rawAiApiKeyProvided,
     clearRequested: Boolean(input.clearAiApiKey),
@@ -356,6 +379,12 @@ export function saveSetupData(
     if (service === "cloudflare" && (profileInput.baseUrl || model || imageModel || visionModel)
         && !isCloudflareAiBaseUrl(profileInput.baseUrl)) {
       return { ok: false, message: "Cloudflare profili için geçerli Account ID ve resmi API adresi gerekli." };
+    }
+    if (service === "cloudflare") {
+      const options = normalizeAiModelOptions(profileInput.modelOptions === undefined
+        ? existingProfile?.model_options_json : profileInput.modelOptions);
+      const mismatch = cloudflareCatalogMismatch(options, { text: model, vision: visionModel, image: imageModel, stt: sttModel });
+      if (mismatch) return { ok: false, message: mismatch };
     }
     const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
     const rawKeyProvided = Boolean(String(profileInput.apiKey ?? "").trim());

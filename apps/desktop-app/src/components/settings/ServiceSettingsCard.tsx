@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings2 } from 'lucide-react';
 import type { SettingsOperationResult } from '../../app/settings-save';
 import { reportAppStatus, type AppStatusState } from '../../app/runtime-state';
 import { ActionButton } from '../ui/ActionButton';
@@ -29,30 +28,45 @@ interface ServiceSettingsCardProps {
   status?: string;
   readiness?: ServiceReadiness;
   testMessage?: string;
+  /** Keep feedback in the global status bar without repeating it inside this dialog. */
+  showTestMessageInDialog?: boolean;
   messageState?: AppStatusState;
   enabled: boolean;
   onEnabledChange?: (enabled: boolean) => void;
   toggleLabel?: string;
   toggleAriaLabel?: string;
   toggleDisabled?: boolean;
+  /** External prerequisites block the launcher, including keyboard/search entry. */
+  blockedReason?: string | undefined;
   headerActions?: ReactNode;
   /** Only prerequisite verification required before the service can be enabled. */
   prerequisiteActions?: ReactNode;
+  prerequisiteLabel?: string;
   disabled?: boolean;
   saveDisabled?: boolean;
+  /** Keep the test's cancel button interactive while the owner blocks Save/Close. */
+  allowActionDuringTest?: boolean;
   onDialogClose?: () => void;
   children: ReactNode;
 }
 
 /** One compact projection and one modal boundary; persistence stays with each owner. */
-export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilmedi', testMessage, messageState, enabled, onEnabledChange, toggleLabel, toggleAriaLabel, toggleDisabled, headerActions, prerequisiteActions, disabled, saveDisabled = false, onDialogClose, className = '', children }: ServiceSettingsCardProps) {
+export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilmedi', testMessage, showTestMessageInDialog = true, messageState, enabled, onEnabledChange, toggleLabel, toggleAriaLabel, toggleDisabled, blockedReason, headerActions, prerequisiteActions, prerequisiteLabel = 'Ön koşul doğrulaması', disabled, saveDisabled = false, allowActionDuringTest = false, onDialogClose, className = '', children }: ServiceSettingsCardProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const host = useContext(ServiceSettingsContext);
   const [localOpen, setLocalOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const owner = host?.owner(id);
-  const open = host ? host.active === id : localOpen;
+  const requestedOpen = host ? host.active === id : localOpen;
+  // An already open editor can still discard or turn a service off if its
+  // prerequisite changes. A blocked search entry must not open a new editor.
+  const wasOpen = useRef(false);
+  const open = requestedOpen && (!blockedReason || wasOpen.current);
+  useEffect(() => { wasOpen.current = open; }, [open]);
+  useEffect(() => {
+    if (requestedOpen && !open) { if (host) host.open(null); else setLocalOpen(false); }
+  }, [host, open, requestedOpen]);
   const busy = disabled || working || owner?.busy;
   useEffect(() => {
     if (testMessage) reportAppStatus(messageState ?? (readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'error' : readiness === 'Kontrol ediliyor…' ? 'loading' : 'success'), testMessage);
@@ -84,21 +98,18 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
   const preference = owner?.savedEnabled !== undefined && enabled !== owner.savedEnabled
     ? `${enabled ? 'Etkinleştirilecek' : 'Kapatılacak'} · Bekliyor` : `${enabled ? 'Etkin' : 'Kapalı'}${owner?.dirty ? ' · Bekliyor' : ''}`;
   const savedEnabled = owner?.savedEnabled ?? enabled;
-  const indicatorLabel = `${title}: ${savedEnabled ? 'Etkin' : 'Kapalı'}${owner?.dirty ? ' · Bekliyor' : ''}`;
+  const indicatorLabel = `${title}: ${savedEnabled ? 'Etkin' : 'Kapalı'}${owner?.dirty ? ' · Bekliyor' : ''}${blockedReason ? ` · Kullanılamıyor: ${blockedReason}` : ''}`;
   return <>
-    <div ref={node => { triggerRef.current = node?.querySelector<HTMLElement>("button") ?? null; }} id={id} tabIndex={-1} className="settings-service-row" role="group" aria-label={title}>
-      <StatusBadge className="settings-service-indicator" role="img" aria-label={indicatorLabel} title={indicatorLabel}
-        tone={owner?.dirty ? 'warning' : savedEnabled ? 'success' : 'neutral'}
-        data-state={owner?.dirty ? 'pending' : savedEnabled ? 'active' : 'inactive'}>
-        {owner?.dirty ? 'Bekliyor' : savedEnabled ? 'Etkin' : 'Kapalı'}
-      </StatusBadge>
-      <strong className="settings-service-name">{title}</strong>
-      <ActionButton variant="accent" size="sm" className="settings-service-action"
-        aria-label={`${title} ayarları`} title={`${title} ayarları`} aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => host ? host.open(id) : setLocalOpen(true)} disabled={working}>
-        <Settings2 size={16} aria-hidden="true" /><span>Ayarlar</span>
-      </ActionButton>
-    </div>
+    <ActionButton ref={node => { triggerRef.current = node; }} id={id} variant="secondary" className="settings-service-row"
+      aria-label={`${title} ayarları`} aria-describedby={`${id}-state${blockedReason ? ` ${id}-prerequisite` : ''}`}
+      aria-haspopup="dialog" aria-expanded={open} disabled={Boolean((busy || blockedReason) && !open)}
+      onClick={() => { if (!busy && !blockedReason) { if (host) host.open(id); else setLocalOpen(true); } }}>
+      <span id={`${id}-state`} className="settings-service-indicator" role="img" aria-label={indicatorLabel} title={indicatorLabel}
+        data-state={blockedReason ? 'blocked' : savedEnabled ? 'active' : 'inactive'} />
+      <span className="settings-service-copy"><strong className="settings-service-name">{title}</strong>
+        {blockedReason && <small id={`${id}-prerequisite`} className="settings-service-prerequisite">{blockedReason}</small>}
+      </span>
+    </ActionButton>
     {open && createPortal(<FormDialog title={title} dialogClassName={`settings-service-overlay settings-service-overlay--${id.replace(/^settings-/, "")}`} returnFocusRef={triggerRef} closeBlocked={Boolean(busy || confirmClose)} dismissOnBackdrop
       onClose={requestClose} onSubmit={event => { event.preventDefault(); void save(); }}
       overlay={confirmClose && <SettingsUnsavedChangesDialog open withinModal intent="close" categoryTitle={title} busy={Boolean(busy)}
@@ -106,19 +117,23 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
       footer={<><ActionButton type="button" variant="secondary" disabled={Boolean(busy)} onClick={() => void cancel()}>İptal</ActionButton>
         <ActionButton type="submit" disabled={!owner || Boolean(busy) || saveDisabled}>Kaydet</ActionButton></>}>
       <div className={`settings-service-detail form-stack ${className}`}>
-        <div className="settings-service-detail-status">
-          <StatusBadge tone={owner?.dirty ? 'warning' : enabled ? 'success' : 'neutral'} aria-label="Etkinleştirme tercihi">{preference}</StatusBadge>
-          <StatusBadge tone={readiness === 'Hazır' ? 'success' : readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'danger' : readiness === 'Kontrol ediliyor…' ? 'info' : 'neutral'} aria-label="Canlı kontrol durumu">{readiness}</StatusBadge>
+        <div className="settings-service-feedback">
+          <div className="settings-service-detail-status">
+            <StatusBadge tone={owner?.dirty ? 'warning' : enabled ? 'success' : 'neutral'} aria-label="Etkinleştirme tercihi">{preference}</StatusBadge>
+            <StatusBadge tone={readiness === 'Hazır' ? 'success' : readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'danger' : readiness === 'Kontrol ediliyor…' ? 'info' : 'neutral'} aria-label="Canlı kontrol durumu">{readiness}</StatusBadge>
+          </div>
+          {showTestMessageInDialog && testMessage && <div className="settings-service-feedback-result" role={readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'alert' : 'status'} aria-live="polite">{testMessage}</div>}
         </div>
         {onEnabledChange && <label className="settings-service-toggle"><input type="checkbox" role="switch"
-          aria-label={toggleAriaLabel ?? toggleLabel ?? `${title} servisi`} checked={enabled} disabled={Boolean(busy || toggleDisabled)}
-          onChange={event => onEnabledChange(event.target.checked)} /><span>{toggleLabel ?? 'Servis etkin'}</span></label>}
+          aria-label={toggleAriaLabel ?? toggleLabel ?? `${title} servisi`} checked={enabled} disabled={Boolean(busy || (!enabled && (toggleDisabled || blockedReason)))}
+          onChange={event => { if (!event.target.checked || (!toggleDisabled && !blockedReason)) onEnabledChange(event.target.checked); }} /><span>{toggleLabel ?? 'Servis etkin'}</span></label>}
+        {blockedReason && <small role="status">{blockedReason}</small>}
         {status && <small>{status}</small>}
         {prerequisiteActions && <fieldset className="settings-resource-fields form-stack" disabled={Boolean(busy)}>
-          <legend>Ön koşul doğrulaması</legend>
+          <legend>{prerequisiteLabel}</legend>
           {prerequisiteActions}
         </fieldset>}
-        <fieldset className="settings-resource-fields form-stack" disabled={Boolean(busy || !enabled)}>
+        <fieldset className="settings-resource-fields form-stack" disabled={Boolean((busy && !allowActionDuringTest) || !enabled)}>
           <legend>Yapılandırma</legend>
           {headerActions}{children}
         </fieldset>

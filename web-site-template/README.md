@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.6.1
+# Ortak işletme sitesi şablonu 0.7.0
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
@@ -49,7 +49,7 @@ sunucudaki sahipliği korunur.
 | `core/views/` | Ortak layout, sayfa ve bileşenler. |
 | `public/assets/core/` | Navigasyon, yapı CSS'i, HTTP ve opsiyonel efekt adaptörü. |
 | `site/`, `public/assets/site/` | Kuruluma ait ayarlar, override, tema, davranış, görseller, sahneler. |
-| `public/assets/vendor/effect-engine/` | Değiştirilmemiş canonical Efekt Atölyesi 1.1.0 runtime/model/registry. |
+| `public/assets/vendor/effect-engine/` | Değiştirilmemiş canonical Efekt Atölyesi runtime/model/registry; sürüm ve SHA-256 envanteri `provenance.json` içinde. |
 
 Profil adı sayfa açmaz. Backend `public_surfaces` içinde profil/capability/yayın kararını
 taşır. Oda/restoran/ürün için surface + `enabled:true` + gerçek kayıt gerekir. QR Menü
@@ -206,12 +206,44 @@ Bakımda motor kopyasını yenileme:
 
 ```bash
 node tools/sync-effect-engine.mjs /path/to/EfektAtolyesi
+node tools/sync-effect-engine.mjs --check /path/to/EfektAtolyesi
 ```
 
-Araç yalnız 1.1.0 kabul eder; üç ağacı byte-identical kopyalar, SHA-256 provenance üretir.
-Siteye özel motor fork'u yoktur. Canonical kaynak yalnız bakımda gereklidir; runtime'da
-gerekmez. Vendor'ın Türkçe şema/parametre tanımları canonical kaynaktır; UI'de veya ham hata
-olarak gösterilmez.
+İlk komut açık kaynak yazarlığı adımıdır; build/test tarafından çağrılmaz. Araç kaynak
+`ENGINE_VERSION` değerini okur; desteklenen semantik major 1 yanında gerçek API, v1 fotoğraf
+ve v2 objectScene şemalarını ve sceneObject flame/glow/smoke kayıtlarını doğrular. Sürüm
+etiketi içerik eşitliği sayılmaz. Üç ağacın tüm `.mjs` dosyaları byte-identical kopyalanır;
+symlink, kapsam dışı import ve beklenmeyen dosyalar reddedilir. Önce geçici kardeş dizin
+hazırlanıp doğrulanır, eski hedef rename ile korunur, yeni hedef yayınlanır; rename hatasında
+geri alınır. Bu işlem crash-atomic exchange değildir. Eski modüller yeni hedefte kalmaz.
+
+Provenance format 2; zaman damgası/makine yolu içermez. `files` deterministik yol → SHA-256
+envanteridir; `fingerprint`, envanter sırasındaki her `path:sha256\n` satırının birleşiminin
+SHA-256'sıdır. `--check` kaynak, envanter ve provenance'ın tam eşitliğini salt okunur sınar;
+bozuk hash, eksik/fazla modül veya aynı sürümde değişen baytlar hata verir.
+
+Yardımcı Asistan kökünden Admin ve şablonu birlikte kontrol edin:
+
+```bash
+node apps/admin-control-center/scripts/sync-effect-studio.mjs --check
+node --test scripts/test-effect-engine-sync.mjs
+```
+
+CI'da canonical checkout yolu `EFEKT_ATOLYESI_ROOT` ile verilebilir; Admin'in Git dışı
+snapshot'ı önce açık `npm run effect:sync -w @yardimci-asistan/admin-control-center` adımıyla
+üretilir. Bu adım tam editörü (`scene.html`, `scene.css`, `src`, `assets`, `examples` dahil)
+kopyalar; yerel editör değişikliklerini önce inceleyin. Zaten aynı motoru taşıyan snapshot
+için `node apps/admin-control-center/scripts/sync-effect-studio.mjs --write-provenance`
+yalnız Admin `effect-engine-provenance.json` kaydını yazar, editöre dokunmaz. Admin'in dev/build
+kancaları yalnız `--check` çalıştırır. Kontroller otomatik onarım yapmaz. Bilinçli kaynak
+yenilemesinden sonra son adım `node tools/manifest.mjs --write`, ardından
+`node tools/manifest.mjs` olmalıdır (şablon dizininden); sürüm otomatik artırılmaz.
+
+Vendor v2 nesne runtime'ını içerir; statik fotoğraf adaptörünün bağlama sözleşmesi hâlâ v1
+fotoğraf sahnesidir. V2 DOM nesne bağlama ve siteye yayın ayrı entegrasyon işidir; v2 JSON
+fotoğraf gibi tahmin edilmez, statik kalır. Siteye özel motor fork'u yoktur. Canonical kaynak
+bakım ve CI eşitlik kontrolünde gereklidir; site runtime'ında gerekmez. Vendor'ın Türkçe
+şema/parametre tanımları canonical kaynaktır; UI'de ham hata olarak gösterilmez.
 
 ## Kontrollü güncelleme
 
@@ -296,7 +328,22 @@ Widget kaynak sahibi `test-site/landing/assistant/` olmaya devam eder. Bilinçli
 bakımında `npm run build:demo` çıktısındaki widget bundle'ı bu şablonun
 `public/assets/core/widget.js` sürümüne alınır; manifest ve demo kopyası açıkça güncellenir.
 Build/test ortak sürüm dosyalarını yazmaz; showcase smoke kaynak build'inin bundle ile
-bütünlüğünü denetler. Demo yerleşimi ve yayın planı canonical mimari sözleşmesindedir.
+bütünlüğünü denetler. Yalnız widget bakımında showcase build'ini çalıştırmadan:
+
+```sh
+cd test-site/landing
+npx vite build --config vite.config.ts
+cd ../..
+cp test-site/landing/assets/assistant/widget.js web-site-template/public/assets/core/widget.js
+node --test --test-isolation=none scripts/test-widget-direct-request-focus.mjs
+node scripts/test-panorama-focus.mjs
+```
+
+Son komut 390/1440px ortak panorama ve widget odak testidir; izole fixture kullanır,
+canlı API'ye bağlanmaz. Sandbox HTTP/tarayıcıyı engellerse host üzerinde çalıştırılır.
+Panorama genişletmesi WebGL ve görsel hazır olduğunda görünür; native fullscreen
+kullanılamazsa aynı kapatma/Escape/odak davranışı modal dialog'da devam eder.
+ Demo yerleşimi ve yayın planı canonical mimari sözleşmesindedir.
 
 ## Siteye ait editoryal sayfalar ve oda detayı
 

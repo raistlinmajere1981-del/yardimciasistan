@@ -327,6 +327,12 @@ for (const [provider, root, model] of [["openai", config.baseUrl, "whisper-1"], 
 }
 
 // Actual Settings presentation without a browser listener: only STT-relevant drafts block tests.
+// Run the real prerequisite helper to catch producer/consumer drift.
+const prerequisites = {};
+const prerequisitesCode = ts.transpileModule(readFileSync("apps/desktop-app/src/components/settings/service-prerequisites.ts", "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+runInContext(`(function(exports) { ${prerequisitesCode}\n})`, context)(prerequisites);
 const presentation = {};
 const presentationCode = ts.transpileModule(readFileSync("apps/desktop-app/src/components/settings/DesktopDictationSetup.tsx", "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX }
@@ -335,11 +341,12 @@ runInContext(`(function(exports, require) { ${presentationCode}\n})`, context)(p
   if (name === "react/jsx-runtime") return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
   if (name.endsWith("/ActionButton")) return { ActionButton: "button" };
   if (name.endsWith("/ServiceSettingsCard")) return { ServiceSettingsCard: "card" };
+  if (name === "./service-prerequisites") return prerequisites;
   throw new Error(`Unexpected presentation dependency: ${name}`);
 });
 for (const service of ["openai", "gemini", "cloudflare"]) {
   const canonical = { aiEnabled: true, aiProvider: "openai_compatible", aiService: service, aiBaseUrl: "official-root",
-    aiSttModel: "saved-stt", aiTimeoutSeconds: "30", aiApiKey: "", aiGoogleCurl: "", clearAiApiKey: false };
+    aiSttModel: "saved-stt", aiTimeoutSeconds: "30", aiApiKey: "", aiGoogleCurl: "", aiStoredApiKeyConfigured: true, clearAiApiKey: false };
   const controller = { status: { ready: true, canTest: true, enabled: false, message: "ready" }, enabled: false, busy: false };
   for (const patch of [{}, { aiModel: "chat-draft" }, { aiImageModel: "image-draft" }, { webModuleUrl: "" }, { syncSecret: "" }, { autoSyncEnabled: false }]) {
     const view = presentation.DesktopDictationSetup({ controller, canonical, form: { ...canonical, ...patch }, aiCapability: true });

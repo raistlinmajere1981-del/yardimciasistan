@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createRequire } from "node:module";
-import { FIXED_NOW, countFiles, sha256File } from "./util.mjs";
+import { FIXED_NOW, countFiles, json, sha256File, sha256Text } from "./util.mjs";
+import { catalogIdentitySha256, TEKNIKEL_DATA_PROVENANCE, TEKNIKEL_PHOTO_PROVENANCE } from "./teknikel-sources.mjs";
 import { inspectDatabase } from "./integrity.mjs";
 import { jpegSize } from "./panorama-media.mjs";
 
@@ -23,7 +24,8 @@ const { loadCommerceBenefitsRules } = electron("commerce-benefits-rules");
 const { readCommercePointBalance } = electron("commerce-benefits-points");
 const { listMarketSaleHistory, getFullRefundMarketSalePreview } = electron("market-sale-full-refund");
 const { DesktopRoomFolioService } = electron("room-folio");
-const { readProductImageAsset } = electron("product-image-reader");
+const { readProductImageAsset, readProductOriginalAssets } = electron("product-image-reader");
+const { createCommerceOnlineCatalog } = electron("commerce-online-catalog-publication");
 const { listRoomMedia, listPendingRoomMedia } = electron("room-media-service");
 const { listTableMedia, listPendingTableMedia } = electron("table-media-service");
 
@@ -78,6 +80,8 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
   check("media.counts.180", () => media.files.filter((item) => item.kind === "panorama_180").length, media.counts.roomMedia180 + media.counts.tableMedia180);
   check("media.counts.roomCovers", () => media.files.filter((item) => item.scope === "room" && item.kind === "cover").length, media.counts.roomCovers);
   check("media.counts.tableCovers", () => media.files.filter((item) => item.scope === "table" && item.kind === "cover").length, media.counts.tableCovers);
+  check("media.counts.roomPhotos", () => media.files.filter((item) => item.scope === "room" && item.kind === "photo").length, media.counts.roomPhotos);
+  check("media.counts.tablePhotos", () => media.files.filter((item) => item.scope === "table" && item.kind === "photo").length, media.counts.tablePhotos);
 
   for (const target of media.targets) {
     check(`${target.scope}Media.list.${target.resourceId}`, () => {
@@ -91,6 +95,11 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
 
   const coverTargets = media.targets.filter((target) => target.mediaIds.some((id) => media.files.find((item) => item.id === id)?.kind === "cover"));
   check("media.covers.everyTarget", () => coverTargets.length, media.targets.length);
+  const fullSets = media.targets.filter((target) => {
+    const kinds = new Set(target.mediaIds.map((id) => media.files.find((item) => item.id === id)?.kind));
+    return ["cover", "photo", "panorama_180", "panorama_360"].every((kind) => kinds.has(kind));
+  });
+  check("media.fullSet.everyTarget", () => fullSets.length, media.targets.length);
 
   for (const manifestPath of media.manifests) {
     const scope = manifestPath.includes("room-media") ? "room" : "table";
@@ -133,13 +142,10 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
       remoteUrl: "",
       title: record.title
     });
-    check(`media.${record.id}.title`, () => Boolean(listed && (
-      record.kind === "cover"
-        ? listed.title.includes("Sentetik demo kapak görseli") && listed.title.includes("gerçek işletme fotoğrafı değildir")
-        : listed.title.includes("CC BY 4.0")
-          && listed.title.includes(record.author)
-          && listed.title.includes("işletmenin kendi fotoğrafı değildir")
-    )), true);
+    check(`media.${record.id}.title`, () => Boolean(listed
+      && listed.title.includes(record.license)
+      && listed.title.includes(record.author)
+      && listed.title.includes("işletmenin kendi fotoğrafı değildir")), true);
     check(`media.${record.id}.storedFile`, () => fs.existsSync(absolutePath), true);
     check(`media.${record.id}.sha256`, () => (fs.existsSync(absolutePath) ? sha256File(absolutePath) : ""), record.contentHash);
     check(`media.${record.id}.pendingStoredPath`, () => pendingItem?.storedPath ?? "", record.storedPath);
@@ -158,34 +164,33 @@ function checkPanoramaMedia({ folderPath, expected, check }) {
           width: size.width,
           height: size.height,
           ratio: Number((size.width / size.height).toFixed(3)),
-          expectedRatio: record.kind === "panorama_360" ? 2 : 1
+          expectedRatio: Number((record.width / record.height).toFixed(3))
         };
       }, {
         width: record.width,
         height: record.height,
-        ratio: record.kind === "panorama_360" ? 2 : 1,
-        expectedRatio: record.kind === "panorama_360" ? 2 : 1
+        ratio: Number((record.width / record.height).toFixed(3)),
+        expectedRatio: Number((record.width / record.height).toFixed(3))
       });
     }
   }
 
   if (media.attributionPath) {
     const attributionPath = path.join(folderPath, media.attributionPath);
-    const panoramaFiles = media.files.filter((item) => item.kind.startsWith("panorama_"));
-    check("panorama.attribution.exists", () => fs.existsSync(attributionPath), true);
-    check("panorama.attribution.sha256", () => (fs.existsSync(attributionPath) ? sha256File(attributionPath) : ""), media.attributionSha256);
-    check("panorama.attribution.content", () => {
+    check("media.attribution.exists", () => fs.existsSync(attributionPath), true);
+    check("media.attribution.sha256", () => (fs.existsSync(attributionPath) ? sha256File(attributionPath) : ""), media.attributionSha256);
+    check("media.attribution.content", () => {
       if (!fs.existsSync(attributionPath)) return {};
       const text = fs.readFileSync(attributionPath, "utf8");
       const normalized = text.replace(/\s+/g, " ");
       return {
-        license: text.includes("CC BY 4.0"),
+        licenses: [...new Set(media.files.map((item) => item.license))].every((license) => text.includes(license)),
         ownerDisclaimer: normalized.includes("demo işletmesinin kendi çekimi değildir"),
         cropNotice: text.includes("kırp"),
-        authors: [...new Set(panoramaFiles.map((item) => item.author))].every((author) => text.includes(author)),
-        sources: [...new Set(panoramaFiles.map((item) => item.sourceUrl))].every((url) => text.includes(url))
+        authors: [...new Set(media.files.map((item) => item.author))].every((author) => text.includes(author)),
+        sources: [...new Set(media.files.map((item) => item.sourceUrl))].every((url) => text.includes(url))
       };
-    }, { license: true, ownerDisclaimer: true, cropNotice: true, authors: true, sources: true });
+    }, { licenses: true, ownerDisclaimer: true, cropNotice: true, authors: true, sources: true });
   }
 }
 
@@ -301,10 +306,99 @@ function checkMarketDealer({ db, dbPath, pack }) {
   return checks;
 }
 
+function checkTeknikel({ db, dbPath, folderPath, pack }) {
+  const { checks, check } = publishCheckList();
+  const { readChecks: expected, ids } = pack.expected;
+  const count = table => Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count);
+  const rows = db.prepare("SELECT * FROM catalog_products ORDER BY sort_order, id").all();
+  const store = getCommerceStoreSnapshot(dbPath);
+  const first = listCatalogProducts(dbPath, { activeOnly: true, limit: 100 });
+  const second = listCatalogProducts(dbPath, { activeOnly: true, limit: 100, offset: 100 });
+  const caps = db.prepare("SELECT capability_id FROM business_capabilities WHERE is_enabled = 1").all().map(row => String(row.capability_id));
+  const online = createCommerceOnlineCatalog(db, caps);
+  check("sqlite.integrity_check", () => Object.values(db.prepare("PRAGMA integrity_check").get())[0], "ok");
+  check("business.market", () => db.prepare("SELECT profile_id FROM business").get().profile_id, "market");
+  check("capabilities.teknikel", () => ["commerce.wholesale", "channel.online_sales", "commerce.customer_credit"].every(cap => caps.includes(cap)), true);
+  check("catalog.products", () => first.total, 179);
+  check("catalog.browseAll", () => [first.items.length, first.nextOffset, second.items.length, second.nextOffset, new Set([...first.items, ...second.items].map(p => p.id)).size], [100, 100, 79, null, 179]);
+  check("catalog.sourceNamesAndSkus", () => catalogIdentitySha256(store.products), expected.catalogIdentitySha256);
+  check("catalog.categories", () => count("catalog_categories"), 25);
+  check("catalog.other", () => listCatalogProducts(dbPath, { categoryId: "cat_tk_other", activeOnly: true }).total, 151);
+  check("catalog.syntheticLabels", () => rows.every(row => row.data_license === TEKNIKEL_DATA_PROVENANCE && row.description.includes("DEMO") && row.tax_rate === 20 && row.purchase_price > 0 && row.dealer_price_b < row.dealer_price_a && row.dealer_price_a < row.sale_price), true);
+  check("inventory.balances", () => count("inventory_balances"), 179);
+  check("inventory.ledger", () => db.prepare(`SELECT COUNT(*) AS count FROM inventory_balances b WHERE b.quantity <> (SELECT SUM(m.quantity_delta) FROM inventory_movements m WHERE m.product_id = b.product_id AND m.location_id = b.location_id)`).get().count, 0);
+  check("online.enabled", () => online.enabled, true);
+  check("online.deliveryMethods", () => online.deliveryMethods, ["pickup"]);
+  check("settings.shippingDisabledUntilConfigured", () => db.prepare("SELECT online_sales_delivery_enabled AS delivery, online_sales_pickup_enabled AS pickup, online_sales_shipping_enabled AS shipping FROM settings").get(), { delivery: 1, pickup: 1, shipping: 0 });
+  check("online.curated", () => [online.products.length, online.categories.length, online.products.every(p => p.categoryId !== "cat_tk_other")], [28, 24, true]);
+  check("online.noUnacknowledgedImages", () => online.products.every(p => !p.imageUrl && p.imageUrls.length === 0), true);
+  check("customers.count", () => count("customers"), 30);
+  check("customers.sourceIdentities", () => sha256Text(json(db.prepare("SELECT full_name, phone, email FROM customers ORDER BY id").all().map(c => [c.full_name, c.phone, c.email]))), expected.customerIdentitySha256);
+  check("customers.profiles", () => count("customer_commercial_profiles"), 20);
+  check("customers.retail", () => db.prepare("SELECT COUNT(*) AS count FROM customers c LEFT JOIN customer_commercial_profiles p ON p.customer_id = c.id WHERE p.customer_id IS NULL").get().count, 10);
+  check("customers.tiers", () => db.prepare("SELECT dealer_status, price_group, COUNT(*) AS count FROM customer_commercial_profiles GROUP BY dealer_status, price_group ORDER BY dealer_status, price_group").all().map(p => [p.dealer_status, p.price_group, p.count]), [["active", "dealer_a", 5], ["active", "dealer_b", 5], ["inactive", "dealer_a", 5], ["inactive", "dealer_b", 5]]);
+  check("accounts.none", () => count("web_customer_accounts"), 0);
+  check("accounts.noBindings", () => db.prepare("SELECT COUNT(*) AS count FROM customer_web_access WHERE account_id <> ''").get().count, 0);
+  check("accounts.portalDisabled", () => createDealerAccessProjection(db).enabled, false);
+  for (const [customerId, group, priceColumn] of [[ids.dealerA, "dealer_a", "dealer_price_a"], [ids.dealerB, "dealer_b", "dealer_price_b"], [ids.inactiveDealer, "retail", "sale_price"], [ids.retail, "retail", "sale_price"]]) {
+    const product = rows.find(p => p.id === ids.priceProduct);
+    check(`price.${customerId}`, () => {
+      const price = resolveCommerceProductPrice(dbPath, { productId: ids.priceProduct, customerId });
+      return [price.appliedGroup, price.unitPrice];
+    }, [group, product[priceColumn]]);
+  }
+  const orders = listCommerceOrders(dbPath);
+  check("orders.statuses", () => orders.map(order => order.status).sort(), ["cancelled", "confirmed", "fulfilled", "placed"]);
+  check("orders.demo", () => orders.every(order => order.source === "desktop" && order.sourceReference.startsWith("DEMO-TK-") && order.note.includes("DEMO")), true);
+  for (const order of orders) {
+    check(`order.${order.id}.items`, () => {
+      const detail = getCommerceOrder(dbPath, order.id);
+      return detail.items.length === 2 && Math.round(detail.items.reduce((sum, item) => sum + item.lineTotal, 0) * 100) === Math.round(order.total * 100)
+        && detail.items.every(item => {
+          const product = rows.find(row => row.id === item.productId);
+          return product && item.productName === product.name && item.sku === product.sku && item.taxRate === 20
+            && Math.round(item.lineTotal * 100) === Math.round(item.unitPrice * item.quantity * 100);
+        });
+    }, true);
+  }
+  check("suppliers", () => store.suppliers.length, 1);
+  const purchases = listCommercePurchaseOrders(dbPath);
+  check("purchases", () => purchases.map(p => p.status), ["draft"]);
+  check("purchase.totals", () => {
+    const detail = getCommercePurchaseOrder(dbPath, "po_tk_1");
+    return Math.round(detail.items.reduce((sum, item) => sum + item.lineTotal, 0) * 100) === Math.round(detail.order.total * 100);
+  }, true);
+  const credit = getCustomerCreditAccount(dbPath, ids.dealerB);
+  check("credit.entries", () => credit.entries.length, 2);
+  check("credit.balanceMinor", () => credit.balances.find(b => b.currency === "TRY")?.amountMinor, expected.creditBalanceMinor);
+  const attribution = JSON.parse(fs.readFileSync(path.join(folderPath, "assets", "TEKNIKEL_SOURCE_MANIFEST.json"), "utf8"));
+  check("source.provenance", () => [attribution.dataProvenance, attribution.photoProvenance], [TEKNIKEL_DATA_PROVENANCE, TEKNIKEL_PHOTO_PROVENANCE]);
+  check("source.originalManifest", () => sha256Text(json(attribution.originals)), expected.originalAssetsSha256);
+  const allAssets = rows.flatMap(row => JSON.parse(row.image_original_assets_json).map(asset => ({ ...asset, productId: row.id, sku: row.sku })));
+  check("images.counts", () => [allAssets.length, new Set(allAssets.map(asset => asset.hash)).size, rows.filter(row => row.image_asset_path).length], [68, 67, 35]);
+  check("images.fileCount", () => countFiles(path.join(folderPath, "assets", "products")), 68);
+  check("images.sourceAssociations", () => allAssets.every(asset => attribution.originals.some(original => ["assetPath", "hash", "format", "productId", "sku"].every(key => original[key] === asset[key]))), true);
+  for (const row of rows.filter(row => row.image_asset_path)) {
+    check(`images.${row.id}.gallery`, () => {
+      const stored = JSON.parse(row.image_original_assets_json);
+      const readable = readProductOriginalAssets(dbPath, row.id, row);
+      return stored[0].assetPath === row.image_asset_path && readable.length === new Set(stored.map(asset => asset.hash)).size && row.image_license === TEKNIKEL_PHOTO_PROVENANCE;
+    }, true);
+  }
+  for (const asset of allAssets) {
+    check(`images.${path.basename(asset.assetPath)}.bytes`, () => {
+      const dataUri = readProductImageAsset(dbPath, asset.assetPath);
+      return asset.assetPath.startsWith(`assets/products/${asset.productId}/`) && dataUri.startsWith(`data:${asset.format};base64,`) && sha256File(path.join(folderPath, asset.assetPath)) === asset.hash;
+    }, true);
+  }
+  return checks;
+}
+
 const PACK_CHECKS = {
   "a-pension-restaurant": checkPensionRestaurant,
   "b-market": checkMarket,
-  "c-market-dealer": checkMarketDealer
+  "c-market-dealer": checkMarketDealer,
+  "d-teknikel": checkTeknikel
 };
 
 function capabilityChecks(db) {

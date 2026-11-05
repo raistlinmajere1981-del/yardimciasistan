@@ -315,6 +315,7 @@ export type OverviewSnapshot = {
   };
 };
 
+export type EffectTargetKind = "image" | "sceneObject";
 export type EffectImageTarget = {
   id: string;
   name: string;
@@ -323,6 +324,7 @@ export type EffectImageTarget = {
   hasScene: boolean;
   canPublish: boolean;
   canPrepare?: boolean;
+  kind?: EffectTargetKind;
   note: string;
   bindingStatus?: "linked" | "needs-setup" | "staged";
   sourcePath?: string;
@@ -343,7 +345,9 @@ export type EffectStudioProject = {
  * link only after its first activation has a reviewed deployment path.
  */
 export const EFFECT_SITE_DEPLOY_TARGETS: Readonly<Record<string, string>> = Object.freeze({
-  landing: "landing"
+  landing: "landing",
+  blacksea: "blacksea",
+  gundogdu: "gundogdu-site"
 });
 
 export function effectSiteDeployTarget(siteId: string): string | null {
@@ -365,7 +369,7 @@ export function deployTargetScopeNote(targetId: string): string {
   return DEPLOY_TARGET_SCOPE_NOTES[targetId] ?? "";
 }
 
-export type EffectScene = {
+export type EffectImageScene = {
   format: string;
   version: number;
   name: string;
@@ -374,6 +378,18 @@ export type EffectScene = {
   zones: unknown[];
   effects: unknown[];
 };
+export type EffectObjectScene = {
+  format: string;
+  version: 2;
+  kind: "objectScene";
+  name: string;
+  seed: string;
+  sceneId: string;
+  viewport: { width: number; height: number };
+  objects: unknown[];
+  effects: unknown[];
+};
+export type EffectScene = EffectImageScene | EffectObjectScene;
 export type EffectStudioLoad = { scene: EffectScene; source: "draft" | "installed" | "new" };
 export type EffectStudioSave = { ok: boolean; message: string; effectCount: number };
 export type EffectStudioPublish = { ok: boolean; message: string; siteUrl: string };

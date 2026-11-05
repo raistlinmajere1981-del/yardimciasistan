@@ -29,9 +29,20 @@ try {
   const toggle=section.getByRole("switch",{name:"Instagram servisi"});
   const save=section.getByRole("button",{name:"Kaydet",exact:true});
   const cancel=section.getByRole("button",{name:"İptal",exact:true});
-  const open=async()=>{await row.getByRole('button',{name:'Instagram ayarları'}).click();await expect(section).toBeVisible();};
+  const open=async()=>{
+    await expect(row).toHaveAttribute('aria-expanded','false');
+    await row.click();
+    await expect(row).toHaveAttribute('aria-expanded','true');
+    await expect(section).toHaveRole('dialog');
+    await expect(section).toHaveAccessibleName('Instagram');
+    await expect(section).toBeVisible();
+  };
   await expect(row).toBeVisible();
-  await expect(row.locator('input')).toHaveCount(0);
+  await expect(row).toHaveRole('button');
+  await expect(row).toHaveAccessibleName('Instagram ayarları');
+  await expect(row).toHaveAttribute('aria-haspopup','dialog');
+  await expect(row.getByRole('img')).toHaveAttribute('aria-label','Instagram: Kapalı');
+  await expect(row.locator('button, input')).toHaveCount(0);
   await expect(section).toHaveCount(0);
   await open();
   await expect(toggle).not.toBeChecked();
@@ -46,6 +57,8 @@ try {
   await expect(section).toBeVisible();
   await expect(section.getByRole('alertdialog')).toBeVisible();
   await cancelSettingsService(page);
+  await expect(section).toHaveCount(0);
+  await expect(row).toBeFocused();
   await open();
   await expect(toggle).not.toBeChecked();
   await toggle.check();
@@ -86,11 +99,16 @@ try {
   await expect(section).toHaveCount(0);
   await expect(page.locator('.global-message-bar')).toHaveText("Instagram kaydedildi.");
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),true);
+  await expect(row).toHaveAttribute('aria-expanded','false');
+  await expect(row.getByRole('img')).toHaveAttribute('aria-label','Instagram: Etkin');
+  await expect(row).toBeFocused();
   await open();
   await toggle.uncheck();
   await expect(section.getByRole("button",{name:"Bağlantıyı test et"})).toBeDisabled();
   assert.equal(await page.evaluate(()=>window.__igSettingsState.savedEnabled),true,"off must remain staged");
   await cancel.click();
+  await expect(section).toHaveCount(0);
+  await expect(row.getByRole('img')).toHaveAttribute('aria-label','Instagram: Etkin');
   await open();
   await expect(toggle).toBeChecked();
   await toggle.uncheck();

@@ -1028,5 +1028,7 @@
   "room.bed_info": "Yatak düzeni",
   "room.nightly_price": "Gecelik fiyat",
   "table.area": "Bölüm",
-  "table.smoking": "Sigara kullanımı"
+  "table.smoking": "Sigara kullanımı",
+  "room.panorama.expand": "Panoramayı tam ekran aç",
+  "room.panorama.close": "Panoramayı kapat"
 }

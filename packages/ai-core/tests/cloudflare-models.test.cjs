@@ -44,3 +44,26 @@ test("Cloudflare listed text models can be tested through secured adapter",async
  });
  assert.equal(result.ok,true);
 });
+
+test("Cloudflare live catalog task labels and pagination never inject hardcoded models", async()=>{
+  const requested=[];
+  const first=Array.from({length:100},(_,i)=>({name:`@cf/fixture/model${i}`,task:{name:"Text Generation"}}));
+  first[0]={name:"@cf/fixture/model0",task:{name:"Image-to-Text"}};
+  first[1]={name:"@cf/fixture/model1",task:{name:"Text-to-Image"}};
+  first[2]={name:"@cf/fixture/model2",task:{name:"Automatic Speech Recognition"}};
+  const second=[{name:"@cf/fixture/model100",task:{name:"Text Generation"}}];
+  const result=await listCloudflareAiModels({baseUrl,apiKey},async (url)=>{
+    requested.push(String(url));
+    return response({success:true,result:requested.length===1?first:second,
+      result_info:{page:requested.length,count:requested.length===1?100:1,total_count:101,per_page:100}});
+  });
+  assert.equal(result.ok,true);
+  assert.equal(result.models.length,101);
+  assert.deepEqual(result.models.filter(m=>m.task==="vision").map(m=>m.id),["@cf/fixture/model0"]);
+  assert.deepEqual(result.models.filter(m=>m.task==="image").map(m=>m.id),["@cf/fixture/model1"]);
+  assert.deepEqual(result.models.filter(m=>m.task==="stt").map(m=>m.id),["@cf/fixture/model2"]);
+  assert.equal(result.models.filter(m=>m.task==="text").length,98);
+  assert.equal(requested.length,2);
+  assert.ok(requested[1].endsWith("&page=2"));
+  assert.equal(result.models.some(m=>m.id==="@cf/zai-org/glm-4.7-flash"),false);
+});

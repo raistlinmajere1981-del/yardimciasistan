@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {spawn, spawnSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
 import {cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join, relative, resolve} from 'node:path';
@@ -11,6 +10,7 @@ import {chromium, expect} from '@playwright/test';
 import {launchChromiumForSmoke} from './test-helpers/playwright-browser.mjs';
 import {exercisePublicationContracts} from './test-helpers/template-publication-contracts.mjs';
 import {activateFixtureSource, publicationEnvelope} from './test-helpers/publication-protocol.mjs';
+import {canonicalProvenance, checkCopy} from '../web-site-template/tools/sync-effect-engine.mjs';
 
 if (process.argv.includes('--contracts-only') || process.argv.includes('--access-only')) {
   const checks = await exercisePublicationContracts({accessOnly:process.argv.includes('--access-only')});
@@ -80,9 +80,8 @@ try {
   }
   run(process.execPath, [join(source, 'tools/manifest.mjs')]);
   run('php', ['scripts/test-helpers/web-site-template-projection.php', site]);
-  const provenance = JSON.parse(readFileSync(join(site, 'public/assets/vendor/effect-engine/provenance.json'), 'utf8'));
-  assert.equal(provenance.version, '1.1.0');
-  for (const [path, hash] of Object.entries(provenance.files)) assert.equal(createHash('sha256').update(readFileSync(join(site, 'public/assets/vendor/effect-engine', path))).digest('hex'), hash);
+  const engineRoot = join(site, 'public/assets/vendor/effect-engine');
+  checkCopy(engineRoot, await canonicalProvenance(engineRoot));
   // Update plans never overwrite customer-owned design/catalog files and detect core edits.
   writeFileSync(join(site, 'public/assets/site/theme.css'), readFileSync(join(site, 'public/assets/site/theme.css'), 'utf8') + '\n/* local design */\n');
   let plan = JSON.parse(run(process.execPath, [join(source, 'tools/update-plan.mjs'), source, site]));

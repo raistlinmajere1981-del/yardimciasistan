@@ -477,6 +477,8 @@ export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "cl
 export interface DesktopAiModelOption {
   id: string;
   label: string;
+  /** Provider catalog task; Cloudflare selections are scoped by this. */
+  task?: "text" | "vision" | "image" | "stt";
 }
 
 export interface DesktopAiServiceProfile {

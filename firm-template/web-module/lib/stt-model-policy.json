@@ -1,0 +1,15 @@
+{
+  "cloudflare": [
+    "@cf/openai/whisper-large-v3-turbo"
+  ],
+  "openai": [
+    "gpt-4o-mini-transcribe",
+    "gpt-4o-transcribe",
+    "whisper-1"
+  ],
+  "gemini": [
+    "gemini-3.6-flash",
+    "gemini-3.8-flash",
+    "gemini-2.5-flash"
+  ]
+}

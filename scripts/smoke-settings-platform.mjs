@@ -43,7 +43,7 @@ try {
   const expand = async () => { if (await structure.getAttribute('aria-expanded') === 'false') await structure.click(); };
   const manage = async id => {
     await expand();
-    await page.locator(`#${id}`).getByRole('button').click();
+    await page.locator(`#${id}`).click();
     await expect(page.locator('dialog[open]')).toHaveCount(1);
     return page.locator('.settings-service-overlay');
   };
@@ -67,14 +67,16 @@ try {
   await expect(page.locator('#settings-web')).toBeVisible();
   await expand();
   await expect(page.getByLabel('Sektör tipi')).toBeVisible();
-  const expectedServices = ['settings-google-reviews', 'settings-ai', 'settings-speech', 'settings-dictation', 'settings-whatsapp', 'settings-android', 'settings-kbs'];
+  const expectedServices = ['settings-google-reviews', 'settings-ai', 'settings-speech', 'settings-whatsapp', 'settings-android', 'settings-kbs'];
+  await page.evaluate(() => window.refreshSettings({ whatsapp: '+905555551111' }));
+  await expect(page.locator('#settings-dictation')).toBeDisabled();
   for (const id of expectedServices) {
     const row = page.locator(`#${id}`);
-    await expect(row).toHaveClass('settings-service-row');
-    await expect(row.getByRole('button')).toHaveCount(1);
+    await expect(row).toHaveClass(/settings-service-row/);
+    await expect(row).toHaveRole('button');
     await expect(row.locator('input, textarea, select')).toHaveCount(0);
     await expect(row.getByRole('img')).toHaveAttribute('aria-label', /Etkin|Kapalı/);
-    await expect(row.getByRole('button')).toHaveText('Ayarlar');
+    await expect(row.locator('button')).toHaveCount(0);
     await expect(row.locator('[aria-label="Canlı kontrol durumu"]')).toHaveCount(0);
     await expect(row).not.toContainText(/Test edilmedi|Test kullanılamıyor|Hazır/);
   }
@@ -90,13 +92,25 @@ try {
     return { feature: css(feature), services: css(services) };
   });
   expect(groupStyles.services).toEqual(groupStyles.feature);
-  const action = page.locator('#settings-android .settings-service-action');
-  await expect(action).toHaveText('Ayarlar');
+  const action = page.locator('#settings-android');
+  await expect(action).toHaveText('Android');
   await expect(action).toHaveAttribute('aria-label', 'Android ayarları');
+  await expect(action).toBeEnabled();
+  await page.mouse.move(0, 0);
   const beforeHover = await action.evaluate(node => getComputedStyle(node).backgroundColor);
   await action.hover();
-  const afterHover = await action.evaluate(node => getComputedStyle(node).backgroundColor);
-  expect(afterHover).not.toBe(beforeHover);
+  // The shared button animates background-color; hover() can finish before its first frame.
+  await expect.poll(() => action.evaluate(node => getComputedStyle(node).backgroundColor)).not.toBe(beforeHover);
+  await page.mouse.move(0, 0);
+  await expect(action).toHaveCSS('background-color', beforeHover);
+  await action.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(action).toBeFocused();
+  expect(await action.evaluate(node => {
+    const css = getComputedStyle(node);
+    return node.matches(':focus-visible') && css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0;
+  })).toBe(true);
   for (const [width, columns] of [[1920, 4], [1649, 4], [1440, 4], [1200, 3], [900, 2], [600, 1]]) {
     await page.setViewportSize({ width, height: 900 });
     const grid = page.locator('.settings-services-grid');
@@ -273,10 +287,8 @@ try {
   overlay = await manage('settings-speech');
   await expect(overlay.getByRole('switch')).toBeChecked({ checked: originalTts });
   await cancel();
-  overlay = await manage('settings-dictation');
-  await expect(overlay.getByRole('switch')).toBeDisabled();
-  await expect(overlay.getByLabel('Canlı kontrol durumu')).toHaveText('Test kullanılamıyor');
-  await cancel();
+  await expect(page.locator('#settings-dictation')).toBeDisabled();
+  await expect(page.locator('#settings-dictation')).toContainText('AI Yardımcı kapalı');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'dictation-test').length)).toBe(0);
   overlay = await manage('settings-kbs');
   const kbsTest = overlay.getByRole('button', { name: /KBS Girişini Dene|Bağlantısını Dene/ }).first();
@@ -329,16 +341,22 @@ try {
     ['places', 'Google Yorumları'], ['ai', 'AI Yardımcı'], ['AI', 'AI Yardımcı'],
     ['AI Bağlantısını Dene', 'AI Bağlantısını Dene', 'AI Yardımcı'],
     ['companion', 'Android'], ['Telefon Kurulumu', 'Telefon Kurulumu', 'Android'],
-    ['tts', 'Metin Seslendirme'], ['stt', 'Konuşmadan Metne'],
+    ['tts', 'Metin Seslendirme'],
     ['KBS', 'Kimlik Bildirim Sistemi', 'Kimlik Bildirim Sistemi (KBS)'], ['doğum günü', 'WhatsApp']
   ]) {
     await openSearchResult(term, resultTitle, overlayTitle);
     await cancel();
   }
+  // Search must not bypass an AI-dependent service while AI is unavailable.
+  await search.fill('stt');
+  await page.locator('.settings-search-results').getByRole('button', { name: 'Konuşmadan Metne', exact: true }).click();
+  await expect(page.locator('.settings-service-overlay')).toHaveCount(0);
+  await expect(page.locator('#settings-dictation')).toBeDisabled();
+  await search.fill('');
   // Keyboard focus is trapped and restored; geometry at the minimum supported desktop size.
   await page.setViewportSize({ width: 900, height: 768 });
   await expand();
-  const trigger = page.locator('#settings-android').getByRole('button');
+  const trigger = page.locator('#settings-android');
   await trigger.focus(); await page.keyboard.press('Enter');
   overlay = page.locator('.settings-service-overlay');
   await expect(overlay).toBeVisible();
@@ -364,6 +382,23 @@ try {
   await expect(structure).toHaveAttribute('aria-expanded', 'false');
   expect(await page.evaluate(() => window.persistedSettings().businessName)).toBe('');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'web-test').length)).toBe(0);
+  // A restored demo may have an active but unconfigured shipping option before
+  // the web connection has been saved. The local repair editor must be reachable
+  // and must not disappear when shipping is unchecked before saving.
+  await visit('?profile=market&wholesale=on&web=off');
+  await expand();
+  await expect(page.locator('#settings-online-delivery')).toHaveCount(0);
+  await page.evaluate(() => window.refreshSettings({
+    onlineSalesDeliveryEnabled: true, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true }
+  }));
+  await expect(page.locator('#settings-online-delivery')).toBeVisible();
+  overlay = await manage('settings-online-delivery');
+  await overlay.getByLabel('Kargo ile gönderim', { exact: true }).uncheck();
+  await expect(overlay).toBeVisible();
+  await serviceSave();
+  await expect.poll(() => page.evaluate(() => window.persistedSettings().onlineSalesDelivery.shippingEnabled)).toBe(false);
+  await expect(page.locator('#settings-online-delivery')).toHaveCount(0);
+  await expect(page.locator('#settings-dealer-portal')).toHaveCount(0);
   await visit('?profile=market&wholesale=on&online=on');
   await expand();
   // Registered extensions retain their visibility gates and their own save owner.

@@ -54,8 +54,10 @@ ikincil, non-canonical bir yüzey gerekirse düşünülebilir.
 Ayarlar tek sayfadır; kategori sekmeleri yoktur. İşletme Yapısı ve Özellikler,
 sektör/yetenekler ve genişliğe göre 3–4 kolonlu kompakt servis grid’ini içerir.
 Dar ekranlarda kolon sayısı azalır. Servisler, Ek özellikler ile aynı çerçeve ve
-iç yüzeyi paylaşır. Her hücre yalnız ad, açıklamalı etkinlik göstergesi ve
-belirgin Ayarlar düğmesini taşır; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
+iç yüzeyi paylaşır. Her hücre tek erişilebilir Ayarlar düğmesidir; ad ve büyük dairesel etkinlik
+göstergesi taşır (etkin yeşil, kapalı kırmızı, dış ön koşulu eksik gri). Durum
+erişilebilir metinle de bildirilir. Dış ön koşulu eksik hücre kısa neden gösterir
+ve tıklama/klavye/arama yoluyla açılamaz; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
 açıktır; normal her ziyarette kapalı başlar. Kurulum tamamlanınca taslaklar temiz
 olduğunda kapanır. Her servis ortak, klavye erişimli detay penceresinde kendi
 Kaydet/İptal işlemlerini kullanır. Etkinleştirme tercihi ile gerçek test sonucu ayrı
@@ -68,7 +70,9 @@ Servis etkin kutusu kapalıyken yalnız yapılandırma alanındaki tüm kontroll
 Etkinleştirme için başarılı doğrulama gerektiren STT bağlantı testi, kayıtlı AI/web
 ön koşulları hazırsa servis kapalıyken ortak bileşenin ayrı ön koşul doğrulama alanında
 çalışabilir. Başarısız test etkinleştirmeyi açmaz; yapılandırma kontrolleri servis
-kutusu seçilene kadar pasif kalır. Bu alan genel servis yapılandırmasını serbest bırakmaz.
+kutusu seçilene kadar pasif kalır. Bu alan genel servis yapılandırmasını serbest bırakmaz. WhatsApp Business hesap
+bilgileri kendi penceresindeki ayrı ön koşul alanında servis kapalıyken girilebilir;
+WABA ID, Phone Number ID ve anahtar tamamlanmadan etkinleştirme açılamaz.
 
 Güncellemeler global sidebar altındaki durum göstergesinden açılır; tercihleri kendi
 Kaydet/Geri Al eylemlerini kullanır. Güvenlik ve Veriler, arama satırının sağında
@@ -104,7 +108,12 @@ diğer sahiplerin taslaklarını korur. Arama aynı servis detayını açar; kat
 geçişi yoktur. Appearance immediate preference'tır. Backup, update, password ve cihaz revoke gibi
 işlemler staged field gibi davranmaz; açık action/resource lifecycle'ı kullanır.
 
-Çoklu Dil kendi servis kayıt sahibini kullanır; AI manuel çeviri için ön koşul değildir.
+Çoklu Dil kendi servis kayıt sahibini kullanır; servis ayarları AI yeteneği, kayıtlı
+etkin AI ve model/anahtar ön koşulunu gerektirir. Manuel çeviri editörü bu servis
+launcher kuralından bağımsızdır. Konuşmadan Metne kayıtlı AI konuşma modeli ve
+bağlantı ön koşulunu gerektirir; henüz test edilmemiş yapılandırmanın kendi
+penceresindeki doğrulama testine erişimi korunur. Metin Seslendirme AI’dan bağımsızdır.
+WhatsApp, İşletme Bilgileri içindeki WhatsApp numarası olmadan açılamaz.
 Kalıcı servis etkinse Dil Yönetimi, İşletme Bilgileri yönetim düğmelerinde sektör
 bağımsız görünür. Tek overlay içinde yaklaşık 65/35 kayıt/işlem düzeni ve sınırlı
 sayfalama kullanır; dar görünümde liste/editör aşamaları filtre, seçim ve taslağı

@@ -175,11 +175,16 @@ try {
   assert.equal(db.getSetupData().aiModel, "gpt-4.1");
   assert.equal(db.getSetupData().aiImageModel, "gpt-image-1");
   assert.deepEqual([db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")], storedKeys, "STT changes preserve all provider ciphertext");
-  const cfModels = shared.CLOUDFLARE_AI_MODELS;
+  // Catalog fixture, not a production fallback list.
+  const cfModels = {
+    text: "@cf/zai-org/glm-4.7-flash", vision: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    image: "@cf/black-forest-labs/flux-1-schnell", stt: "@cf/openai/whisper-large-v3-turbo"
+  };
+  const cfCatalog = Object.entries(cfModels).map(([task, id]) => ({ id, label: id, task }));
   const beforeCloudflare = model.toSetupForm(db.getSetupData());
   let cfForm = model.selectAiService(beforeCloudflare, "cloudflare");
   cfForm = { ...cfForm, aiBaseUrl: shared.cloudflareAiBaseUrl("a".repeat(32)), aiModel: cfModels.text,
-    aiVisionModel: cfModels.vision, aiImageModel: cfModels.image, aiSttModel: cfModels.stt, aiApiKey: "voice-cloudflare-fixture-key" };
+    aiModelOptions: cfCatalog, aiVisionModel: cfModels.vision, aiImageModel: cfModels.image, aiSttModel: cfModels.stt, aiApiKey: "voice-cloudflare-fixture-key" };
   assert.equal(drafts.isCategoryDirty(cfForm, model.selectAiService(beforeCloudflare, "cloudflare"), "services"), true);
   const switched = model.selectAiService(model.selectAiService(cfForm, "gemini"), "cloudflare");
   assert.equal(switched.aiVisionModel, cfModels.vision); assert.equal(switched.aiSttModel, cfModels.stt);
@@ -189,12 +194,14 @@ try {
   const cfConnection = { provider: "openai_compatible", service: "cloudflare", projectName: "", baseUrl: cfForm.aiBaseUrl,
     model: cfModels.text, visionModel: cfModels.vision, imageModel: "", apiKey: cfForm.aiApiKey, useStoredApiKey: false, timeoutSeconds: 30 };
   globalThis.fetch = async (url, init) => {
+    if (url.includes("/models/search?")) return new Response(JSON.stringify({ success: true,
+      result: cfCatalog.map(item => ({ name: item.id, task: { name: ({ text: "text-generation", vision: "image-to-text", image: "text-to-image", stt: "automatic-speech-recognition" })[item.task] } })) }));
     cfRequests.push({ url, body: JSON.parse(init.body) });
     return new Response(JSON.stringify({ success: true, result: { response: "Cloudflare bağlantısı hazır." } }));
   };
   const cfConnectionResult = await testAiConnection(db, cfConnection);
   assert.equal(cfConnectionResult.ok, true);
-  assert.equal(cfConnectionResult.models.some(model => model.id === cfModels.image), false, "untested image candidate is not presented as verified");
+  assert.equal(cfConnectionResult.models.some(model => model.id === cfModels.image && model.task === "image"), true, "catalog discovery retains task metadata without granting audio evidence");
   assert.equal(cfRequests.length, 2, "text and selected vision are actual separate requests");
   assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "text/vision never grants audio evidence");
   assert.ok(cfRequests[1].url.endsWith(`/run/${cfModels.vision}`));
@@ -202,7 +209,7 @@ try {
   assert.equal(unsafeConnection.ok, false); assert.equal(cfRequests.length, 2, "invalid account root never sends token");
   globalThis.fetch = async () => new Response(JSON.stringify({ success: false, errors: [{ code: 5018, message: cfForm.aiApiKey }] }), { status: 403 });
   const deniedConnection = await testAiConnection(db, cfConnection);
-  assert.equal(deniedConnection.ok, false); assert.match(deniedConnection.message, /erişim izni/);
+  assert.equal(deniedConnection.ok, false); assert.match(deniedConnection.message, /erişim izni|yetki/i);
   assert.equal(deniedConnection.message.includes(cfForm.aiApiKey), false);
   globalThis.fetch = publicationFetch;
   const cfInput = model.createSetupInput(cfForm), cfSecret = createAiApiKeyUpdate(cfInput);
@@ -227,7 +234,7 @@ try {
   onSend = null;
   assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
   assert.equal(sent.at(-1).ai_settings.vision_model, cfModels.vision);
-  for (const patch of [{ aiBaseUrl: `${cfForm.aiBaseUrl}?evil` }, { aiVisionModel: cfModels.text }, { aiSttModel: "whisper-1" }]) assert.equal(save(patch).ok, false);
+  for (const patch of [{ aiBaseUrl: `${cfForm.aiBaseUrl}?evil` }, { aiVisionModel: cfModels.text }, { aiSttModel: "whisper-1" }, { aiSttModel: "@cf/vendor/unmapped-asr" }]) assert.equal(save(patch).ok, false);
   assert.equal(save({ aiVisionModel: undefined, aiProfiles: undefined }).ok, true, "vision omission preserves choice");
   assert.equal(db.getSetupData().aiVisionModel, cfModels.vision);
   const backToOpenai = model.selectAiService(model.toSetupForm(db.getSetupData()), "openai");
@@ -246,7 +253,7 @@ try {
     db.recordServiceSettingsVerification("desktop_stt", { fixture: "before provider switch" });
     assert.equal(db.saveInitialSetup(selected).ok, true);
     assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "Provider/model switch withdraws evidence");
-    for (const patch of [{ aiModel: `${chatModel}-fixture` }, { aiModel: chatModel },
+    for (const patch of [...(service === "cloudflare" ? [] : [{ aiModel: `${chatModel}-fixture` }]), { aiModel: chatModel },
       { aiImageModel: "" }, { aiProjectName: "Unrelated project label" },
       { webModuleUrl: "", syncSecret: "", autoSyncEnabled: false }, { autoSyncEnabled: true }]) {
       db.recordServiceSettingsVerification("desktop_stt", { fixture: "preserve audio" });

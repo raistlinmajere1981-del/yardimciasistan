@@ -576,5 +576,7 @@
   "order.reorder_missing": "{0} ürün artık katalogda yok veya erişilemiyor; diğer ürünler güncel fiyatlarla sepete eklendi.",
   "order.reorder_added": "Ürünler güncel fiyatlarla sepete eklendi.",
   "order.reorder_failed": "Ürünler sepete eklenemedi. Güncel kataloğu ve miktar sınırlarını kontrol edin.",
-  "order.reorder_unavailable": "Bu siparişin ürünleri artık katalogda yok veya erişilemiyor. Sepetiniz değiştirilmedi."
+  "order.reorder_unavailable": "Bu siparişin ürünleri artık katalogda yok veya erişilemiyor. Sepetiniz değiştirilmedi.",
+  "room.panorama.expand": "Panoramayı tam ekran aç",
+  "room.panorama.close": "Panoramayı kapat"
 }

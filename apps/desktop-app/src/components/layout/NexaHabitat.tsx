@@ -85,6 +85,12 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
     rig.current?.update({ state, motion: motionActive, size: size === "micro" ? 40 : size === "compact" ? 64 : 112, natural: true });
   }, [state, motionActive, size, visible]);
 
+  // Notify modal paint geometry after React commits speech/visibility changes.
+  // SVG rig animation changes paint only and does not emit layout notifications.
+  useLayoutEffect(() => {
+    host.current?.dispatchEvent(new Event("nexa:geometry-change", { bubbles: true }));
+  }, [state, size, collapsed, rigFailed, motionActive, dark]);
+
   const mode = size === "hidden" ? "micro" : size;
   const rule = manifest.runtime.desktop[mode];
   const character = resolveNexaAsset(manifest, { ...rule, state });

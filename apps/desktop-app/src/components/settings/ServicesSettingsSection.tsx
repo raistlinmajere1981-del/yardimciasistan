@@ -6,6 +6,7 @@ import { LocalCompanionPairingPanel } from "./LocalCompanionPairingPanel";
 import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
+import { whatsappBlockedReason } from "./service-prerequisites";
 export interface ServicesSettingsProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
@@ -57,7 +58,7 @@ export function ServicesSettingsSection({
         <>
 
           {isBusinessServiceAvailable("whatsapp", enabledCapabilities) && (
-          <ServiceSettingsCard disabled={disabled} readiness="Test kullanılamıyor" id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
+          <ServiceSettingsCard disabled={disabled} blockedReason={whatsappBlockedReason(form.whatsapp, setupData.whatsapp)} readiness="Test kullanılamıyor" id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
             <div className="setup-birthday-settings form-stack">
               <div className="setup-section-title setup-section-title--subsection">
                 <h3>Doğum Günü Mesajları</h3>

@@ -1,14 +1,15 @@
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
-import { CLOUDFLARE_AI_MODELS, cloudflareAiAccountId, cloudflareAiBaseUrl, imageGenerationModelOptions, sttModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { cloudflareAiAccountId, cloudflareAiBaseUrl, imageGenerationModelOptions, sttModelOptions, supportsSttModel, supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
+import { ExternalLink, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { aiServicePresets, isAiServiceProfileStored, selectAiService, type SetupFormState } from "../../app/setup-model";
 import type { SetupFieldsProps } from "./setup-fields";
 import type { SyncState } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
-export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiConnectionTestState, aiConnectionTestMessage, disabled = false }: SetupFieldsProps & {
+export function AiSettingsSection({ form, onFormChange, onTestAiConnection, onCancelAiConnection, aiConnectionTestState, aiConnectionTestMessage, disabled = false }: SetupFieldsProps & {
   onTestAiConnection: () => void;
+  onCancelAiConnection: () => void;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   disabled?: boolean;
@@ -117,11 +118,15 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
     onFormChange(selectAiService(form, service));
   };
 
+  const cloudflareOptions = (task: "text" | "vision" | "image" | "stt") => form.aiModelOptions.filter(item => item.task === task);
+
   const renderAiConnectionActions = (inline: boolean) => (
     <div id="settings-ai-test" tabIndex={-1} className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
-      <ActionButton variant="secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
-        <RefreshCw size={16} aria-hidden="true" />
-        {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
+      <ActionButton variant={aiConnectionTestState === "loading" ? "danger" : "secondary"} type="button"
+        onClick={aiConnectionTestState === "loading" ? onCancelAiConnection : onTestAiConnection}
+        disabled={!form.aiEnabled || (aiConnectionTestState !== "loading" && form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
+        {aiConnectionTestState === "loading" ? <XCircle size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
+        {aiConnectionTestState === "loading" ? "Testi İptal Et" : "Bağlantıyı Dene"}
       </ActionButton>
       {(form.aiService === "gemini" || form.aiService === "cloudflare") && (
         <ActionButton variant="secondary" type="button" disabled={!form.aiEnabled}
@@ -134,17 +139,46 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
     </div>
   );
 
+  const renderAiApiKeyField = () => (
+    <div className={`form-field form-field--long${form.aiService === "cloudflare" ? "" : " form-field--span"}`}>
+              <span>{form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}</span>
+              <div className="field-control-group setup-secret-input">
+                <input
+                  aria-label={form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}
+                  value={genericSecretValue}
+                  onChange={(event) => replaceGenericSecret(event.target.value)}
+                  onFocus={(event) => {
+                    if (genericUsesStoredApiKey) event.currentTarget.select();
+                  }}
+                  type={showAiApiKey || genericUsesStoredApiKey ? "text" : "password"}
+                  placeholder={form.aiStoredApiKeyConfigured ? "Yeni anahtar girmezseniz bu sağlayıcının kayıtlı anahtarı korunur" : "Servis erişim anahtarını girin"}
+                  disabled={!form.aiEnabled || form.clearAiApiKey}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                />
+                <ActionButton variant="secondary" size="sm" type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
+                  {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
+                </ActionButton>
+              </div>
+              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
+              {aiApiKeyRevealMessage && <small className="setup-secret-error" role="alert">{aiApiKeyRevealMessage}</small>}
+            </div>
+  );
+
   return (
         <><ServiceSettingsCard id="settings-ai" title="AI Yardımcı" className="setup-ai-section" enabled={form.aiEnabled}
           disabled={disabled} readiness={aiConnectionTestState === "success" ? "Hazır" : aiConnectionTestState === "error" ? "Hata" : aiConnectionTestState === "loading" ? "Kontrol ediliyor…" : "Test edilmedi"}
-          testMessage={aiConnectionTestState === "success" || aiConnectionTestState === "error" ? aiConnectionTestMessage : ""}
+          testMessage={aiConnectionTestState !== "idle" || aiConnectionTestMessage === "Bağlantı testi iptal edildi." ? aiConnectionTestMessage : ""}
+          showTestMessageInDialog={false}
+          allowActionDuringTest={aiConnectionTestState === "loading"}
+          onDialogClose={onCancelAiConnection}
           onEnabledChange={enabled => update("aiEnabled", enabled)}>
           {confirmDelete && <div role="group" aria-label="Anahtar silme onayı">
             <p>Bu sağlayıcının anahtarı servis kaydedildiğinde silinecek.</p>
             <ActionButton variant="danger" onClick={() => { onFormChange({ ...form, clearAiApiKey: true, aiEnabled: false }); setConfirmDelete(false); }}>Silmeyi Onayla</ActionButton>
             <ActionButton variant="secondary" onClick={() => setConfirmDelete(false)}>Vazgeç</ActionButton>
           </div>}
-          <div className="form-grid">
+          <div className="form-grid" inert={aiConnectionTestState === "loading"}>
             <div className="setup-ai-provider-row form-field--span">
               <label className="form-field form-field--medium setup-ai-service-field">
                 Servis sağlayıcı
@@ -203,15 +237,19 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                   )}
                   {aiApiKeyRevealMessage && <small className="setup-secret-error" role="alert">{aiApiKeyRevealMessage}</small>}
                 </div>
-                {renderAiConnectionActions(true)}
               </>
             ) : form.aiService === "cloudflare" ? (
-              <label className="form-field form-field--long form-field--span">
-                Cloudflare Account ID
-                <input aria-label="Cloudflare Account ID" value={cloudflareAiAccountId(form.aiBaseUrl)} onChange={event => update("aiBaseUrl", cloudflareAiBaseUrl(event.target.value))} disabled={!form.aiEnabled} autoComplete="off" spellCheck={false} />
-                <small>32 karakterli hesap kimliğinden resmi API adresi oluşturulur. API Token için Workers AI erişim yetkisi gerekir.</small>
-                <small>Bağlantıyı Dene ile resmî model kataloğu alınır, seçili model gerçekten çalıştırılır. Katalog erişimi kalan kotayı doğrulamaz; STT ayrı denenir.</small>
-              </label>
+              <div className="setup-ai-credentials form-field--span">
+                <strong>Bağlantı bilgileri</strong>
+                <div className="setup-ai-credentials-grid">
+                  <label className="form-field">
+                    Cloudflare Account ID
+                    <input aria-label="Cloudflare Account ID" value={cloudflareAiAccountId(form.aiBaseUrl)} onChange={event => update("aiBaseUrl", cloudflareAiBaseUrl(event.target.value))} disabled={!form.aiEnabled} autoComplete="off" spellCheck={false} placeholder="32 karakterli hesap kimliği" />
+                  </label>
+                  {renderAiApiKeyField()}
+                </div>
+                <small>Workers AI yetkili API Token gerekir. Bağlantıyı Dene ile güncel katalog ve seçilen modeller kontrol edilir; kota STT için ayrıca doğrulanmalıdır.</small>
+              </div>
             ) : (
               <label className="form-field form-field--long form-field--span">
                 Bağlantı adresi
@@ -222,10 +260,8 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               Model adı
               {form.aiService === "cloudflare" ? (
                 <select aria-label="Metin modeli" value={form.aiModel} onChange={event => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
-                  <option value="">Model seçin</option>
-                  {[...new Set([CLOUDFLARE_AI_MODELS.text, form.aiModel, ...form.aiModelOptions.map(item => item.id)])]
-                    .filter(Boolean).filter(model => !supportsImageGenerationModel("cloudflare", model))
-                    .map(model => <option key={model} value={model}>{form.aiModelOptions.find(item => item.id === model)?.label || model}</option>)}
+                  <option value="">Metin modeli seçin</option>
+                  {cloudflareOptions("text").map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
                 </select>
               ) : form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
                 <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
@@ -238,9 +274,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               )}
               {(form.aiService === "gemini" || form.aiService === "cloudflare") && (
                 <small>{form.aiModelOptions.length > 0
-                  ? form.aiStoredApiKeyConfigured
-                    ? `${form.aiModelOptions.length} görsel ve metin modeli bu sağlayıcı altında kayıtlı.`
-                    : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
+                  ? `${form.aiModelOptions.length} katalog modeli hazır. Model seçimini yaptıktan sonra tekrar bağlantı testi yapın.`
                   : "Bağlantıyı Dene ile resmî API'den uygun modeller listelenir."}</small>
               )}
             </label>
@@ -248,56 +282,38 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               Görsel analiz modeli
               <select aria-label="Görsel analiz modeli" value={form.aiVisionModel} onChange={event => update("aiVisionModel", event.target.value)} disabled={!form.aiEnabled}>
                 <option value="">Kapalı</option>
-                <option value={CLOUDFLARE_AI_MODELS.vision}>{CLOUDFLARE_AI_MODELS.vision} · aday</option>
+                {cloudflareOptions("vision").map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
             </label>}
             <label className="form-field form-field--medium">
               Görsel üretim modeli
-              <select aria-label="Görsel üretim modeli" value={form.aiImageModel} onChange={(event) => update("aiImageModel", event.target.value)}>
-                <option value="">Otomatik / Uygun modeli seç</option>
-                {imageGenerationModelOptions(form.aiService, [form.aiImageModel, form.aiModel, ...form.aiModelOptions.map(model => model.id)]).map(model =>
-                  <option key={model} value={model}>{model}</option>)}
+              <select aria-label="Görsel üretim modeli" value={form.aiImageModel} onChange={(event) => update("aiImageModel", event.target.value)} disabled={!form.aiEnabled}>
+                <option value="">Kapalı / Otomatik</option>
+                {form.aiService === "cloudflare"
+                  ? cloudflareOptions("image").map(item => <option key={item.id} value={item.id}>{item.label}</option>)
+                  : imageGenerationModelOptions(form.aiService, [form.aiImageModel, form.aiModel, ...form.aiModelOptions.map(model => model.id)]).map(model =>
+                    <option key={model} value={model}>{model}</option>)}
               </select>
             </label>
             <label className="form-field form-field--medium">
               Konuşma tanıma modeli (STT)
               <select aria-label="Konuşma tanıma modeli (STT)" value={form.aiSttModel}
                 onChange={(event) => update("aiSttModel", event.target.value)}
-                disabled={!form.aiEnabled || sttModelOptions(form.aiService).length === 0}>
+                disabled={!form.aiEnabled || (form.aiService !== "cloudflare" && sttModelOptions(form.aiService).length === 0)}>
                 <option value="">Model seçilmedi</option>
-                {sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model === "gemini-3.6-flash" ? "Gemini 3.6 Flash (önerilen)" : model === "gemini-2.5-flash" ? "Gemini 2.5 Flash (eski hesaplar)" : model}</option>)}
+                {form.aiService === "cloudflare"
+                  ? cloudflareOptions("stt").filter(item => supportsSttModel("cloudflare", item.id)).map(item => <option key={item.id} value={item.id}>{item.label}</option>)
+                  : sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model === "gemini-3.6-flash" ? "Gemini 3.6 Flash (önerilen)" : model === "gemini-2.5-flash" ? "Gemini 2.5 Flash (eski hesaplar)" : model}</option>)}
               </select>
-              {sttModelOptions(form.aiService).length === 0 && <small>Sağlayıcının STT desteği yok.</small>}
+              {form.aiService !== "cloudflare" && sttModelOptions(form.aiService).length === 0 && <small>Sağlayıcının STT desteği yok.</small>}
             </label>
             <label className="form-field form-field--short">
               Yanıt bekleme süresi (saniye)
               <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
             </label>
-            {form.aiService !== "gemini" && <div className="form-field form-field--long form-field--span">
-              <span>{form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}</span>
-              <div className="field-control-group setup-secret-input">
-                <input
-                  aria-label={form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}
-                  value={genericSecretValue}
-                  onChange={(event) => replaceGenericSecret(event.target.value)}
-                  onFocus={(event) => {
-                    if (genericUsesStoredApiKey) event.currentTarget.select();
-                  }}
-                  type={showAiApiKey || genericUsesStoredApiKey ? "text" : "password"}
-                  placeholder={form.aiStoredApiKeyConfigured ? "Yeni anahtar girmezseniz bu sağlayıcının kayıtlı anahtarı korunur" : "Servis erişim anahtarını girin"}
-                  disabled={!form.aiEnabled || form.clearAiApiKey}
-                  autoComplete="new-password"
-                  spellCheck={false}
-                />
-                <ActionButton variant="secondary" size="sm" type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
-                  {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
-                </ActionButton>
-              </div>
-              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
-              {aiApiKeyRevealMessage && <small className="setup-secret-error" role="alert">{aiApiKeyRevealMessage}</small>}
-            </div>}
+            {form.aiService !== "gemini" && form.aiService !== "cloudflare" && renderAiApiKeyField()}
           </div>
-          {form.aiService !== "gemini" && renderAiConnectionActions(false)}
+          {renderAiConnectionActions(form.aiService === "gemini")}
         </ServiceSettingsCard></>
 
   );

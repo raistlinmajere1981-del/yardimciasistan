@@ -7,13 +7,13 @@ import {
 } from "../shared/contracts.ts";
 
 test("effect studio links only explicitly reviewed site/deploy pairs", () => {
-  assert.deepEqual(EFFECT_SITE_DEPLOY_TARGETS, { landing: "landing" });
+  assert.deepEqual(EFFECT_SITE_DEPLOY_TARGETS, { landing: "landing", blacksea: "blacksea", gundogdu: "gundogdu-site" });
   assert.equal(effectSiteDeployTarget("landing"), "landing");
   // A similar name, URL or neighbouring site must never be inferred.
   assert.equal(effectSiteDeployTarget("landing-web"), null);
   assert.equal(effectSiteDeployTarget("teknikel"), null);
-  assert.equal(effectSiteDeployTarget("blacksea"), null);
-  assert.equal(effectSiteDeployTarget("gundogdu"), null);
+  assert.equal(effectSiteDeployTarget("blacksea"), "blacksea");
+  assert.equal(effectSiteDeployTarget("gundogdu"), "gundogdu-site");
   assert.equal(effectSiteDeployTarget(""), null);
 });
 

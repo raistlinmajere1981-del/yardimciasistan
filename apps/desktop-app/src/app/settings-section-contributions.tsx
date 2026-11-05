@@ -132,6 +132,8 @@ interface StagedSettingsContributionSlotProps<C extends StagedSettingsCategoryId
   configurationCapabilities: readonly BusinessCapability[];
   initialized: boolean;
   runtimeSnapshot?: BusinessCapabilitySnapshot | null;
+  /** Persisted invalid shipping must stay editable until the repair is saved. */
+  allowOfflineDeliveryRepair?: boolean;
   contributions?: readonly SettingsSectionContribution<C>[];
 }
 
@@ -143,6 +145,7 @@ export function StagedSettingsContributionSlot<C extends StagedSettingsCategoryI
   configurationCapabilities,
   initialized,
   runtimeSnapshot,
+  allowOfflineDeliveryRepair = false,
   contributions
 }: StagedSettingsContributionSlotProps<C>) {
   const activeContributions = contributions
@@ -152,13 +155,20 @@ export function StagedSettingsContributionSlot<C extends StagedSettingsCategoryI
 
   return <>
     {activeContributions
-      .filter((contribution) => isSettingsSectionVisible(
-        contribution.definition,
-        configurationCapabilities,
-        initialized,
-        runtimeSnapshot,
-        webAvailable
-      ))
+      .filter((contribution) => {
+        // A restored backup can contain shipping enabled without a saved web
+        // connection. Keep only that already-active delivery editor reachable
+        // so it can be turned off; do not expose other web-only services.
+        const needsShippingRepair = contribution.definition.id === "settings-online-delivery"
+          && allowOfflineDeliveryRepair;
+        return isSettingsSectionVisible(
+          contribution.definition,
+          configurationCapabilities,
+          initialized,
+          runtimeSnapshot,
+          webAvailable || needsShippingRepair
+        );
+      })
       .map((contribution) => (
         <fieldset className="settings-resource-fields" disabled={busy} key={contribution.definition.id}>
           {contribution.render({

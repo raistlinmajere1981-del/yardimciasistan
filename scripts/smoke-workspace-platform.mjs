@@ -88,8 +88,8 @@ try {
   expect(centered.y, 'Centered workspace must leave topbar feedback visible').toBeGreaterThanOrEqual(topBarBounds.y + topBarBounds.height - 1);
   expect(centered.y + centered.height).toBeLessThanOrEqual(901);
   const backdropClip = await dialog.evaluate(el => getComputedStyle(el, "::backdrop").clipPath);
-  expect(backdropClip).toContain("inset(");
-  const clipTop = Number(backdropClip.match(/inset\(([0-9.]+)px/)?.[1]);
+  expect(backdropClip).toContain("polygon(evenodd");
+  const clipTop = Number(backdropClip.match(/polygon\(evenodd,\s*0(?:px)?\s+([0-9.]+)px/)?.[1]);
   expect(clipTop, "Backdrop must begin below the measured topbar").toBeGreaterThanOrEqual(topBarBounds.y + topBarBounds.height - 1);
   // The canvas is measured through ResizeObserver; a taller shell header must
   // shift and constrain an already-open workspace without remounting it.
@@ -249,7 +249,7 @@ try {
     return form.y >= shell.y + shell.height - 1 && form.y + form.height <= 901;
   }).toBe(true);
   const dialogClip = await formDialog.evaluate(el => getComputedStyle(el, '::backdrop').clipPath);
-  const measuredClip = Number(dialogClip.match(/inset\(([0-9.]+)px/)?.[1]);
+  const measuredClip = Number(dialogClip.match(/polygon\(evenodd,\s*0(?:px)?\s+([0-9.]+)px/)?.[1]);
   const [, shell] = await formBounds();
   expect(measuredClip).toBeGreaterThanOrEqual(shell.y + shell.height - 1);
   await page.locator('.page-header').evaluate(el => el.style.minHeight = '150px');

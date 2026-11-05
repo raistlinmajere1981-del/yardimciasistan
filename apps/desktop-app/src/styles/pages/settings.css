@@ -89,6 +89,11 @@
   gap: var(--space-3);
 }
 .settings-search > .form-field { max-width: var(--field-width-lg); flex: 1; min-width: 0; }
+@media (max-width: 1050px) {
+  .settings-search { flex-wrap: wrap; }
+  .settings-search > .form-field { flex: 1 1 12rem; }
+  .settings-utility-actions { flex-wrap: wrap; justify-content: flex-end; }
+}
 .settings-search-results {
   position: absolute;
   z-index: var(--z-dropdown);

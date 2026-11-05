@@ -1,4 +1,4 @@
-import { CLOUDFLARE_AI_MODELS, isCloudflareAiBaseUrl, supportsVisionModel } from "@yardimci-asistan/shared";
+import { isCloudflareAiBaseUrl, isCloudflareAiModelId, supportsVisionModel } from "@yardimci-asistan/shared";
 import type { AICompletionFailureReason, AICompletionResult, AIProviderConfig } from "../types";
 import type { OpenAICompatibleChatOptions } from "./openai-compatible";
 import { classifyAIProviderFailure, parseRetryAfterSeconds } from "./failure-classification";
@@ -94,13 +94,15 @@ export async function runCloudflareModel(config: AIProviderConfig, body: object,
   } finally { clearTimeout(timeout); }
 }
 
-async function cloudflareCompletion(config: AIProviderConfig, messages: object[], fetchImpl: typeof fetch): Promise<AICompletionResult> {
+async function cloudflareCompletion(config: AIProviderConfig, messages: object[], fetchImpl: typeof fetch,
+  modelInput?: object): Promise<AICompletionResult> {
   try {
-    const result = await runCloudflareModel(config, { messages, stream: false }, fetchImpl) as {
-      response?: unknown; choices?: Array<{ message?: { content?: unknown }; finish_reason?: string }>;
+    const result = await runCloudflareModel(config, modelInput ?? { messages, stream: false }, fetchImpl) as {
+      response?: unknown; description?: unknown; answer?: unknown; caption?: unknown;
+      choices?: Array<{ message?: { content?: unknown }; finish_reason?: string }>;
     };
     const choice = result.choices?.[0];
-    const text = result.response ?? choice?.message?.content;
+    const text = result.response ?? result.description ?? result.answer ?? result.caption ?? choice?.message?.content;
     if (typeof text !== "string" || !text.trim() || text.length > 64000
       || (choice?.finish_reason && choice.finish_reason !== "stop")) throw new CloudflareAiError("invalid_response");
     return { ok: true, provider: "openai_compatible", service: "cloudflare", model: config.model, answer: text.trim().split(config.apiKey).join("[gizlendi]") };
@@ -118,22 +120,42 @@ export function generateCloudflareChat(options: OpenAICompatibleChatOptions, fet
   const messages = options.messages.map(message => ({ ...message, role: message.role === "developer" ? "system" : message.role }));
   return cloudflareCompletion({ ...options, enabled: options.enabled && messages.length > 0
     && /^@cf\/[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i.test(options.model)
-    && options.model !== CLOUDFLARE_AI_MODELS.image && options.model !== CLOUDFLARE_AI_MODELS.stt }, messages, fetchImpl);
+    }, messages, fetchImpl);
 }
 
-/** Inline images only: no remote URL fetching and no hidden provider/model fallback. */
+/** Inline images only: no remote URL fetching and no hidden provider/model fallback.
+ * Image-to-text models have different native REST schemas even when listed in
+ * the same Cloudflare vision task. Keep the live catalog as the task authority. */
 export function analyzeCloudflareImage(config: AIProviderConfig, prompt: string, imageDataUrl: string,
   fetchImpl: typeof fetch = globalThis.fetch): Promise<AICompletionResult> {
-  const valid = supportsVisionModel("cloudflare", config.model) && Boolean(prompt.trim())
+  let valid = supportsVisionModel("cloudflare", config.model) && Boolean(prompt.trim())
     && imageDataUrl.length <= 7 * 1024 * 1024 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(imageDataUrl);
+  let modelInput: object | undefined;
+  if (valid && config.model === "@cf/llava-hf/llava-1.5-7b-hf") {
+    // LLaVA ImageToText accepts an array of 8-bit image bytes plus a prompt.
+    try {
+      const bytes = Uint8Array.from(atob(imageDataUrl.slice(imageDataUrl.indexOf(",") + 1)), char => char.charCodeAt(0));
+      const png = [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => bytes[i] === byte);
+      const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+      const webp = [82, 73, 70, 70].every((byte, i) => bytes[i] === byte)
+        && [87, 69, 66, 80].every((byte, i) => bytes[i + 8] === byte);
+      valid = imageDataUrl.startsWith("data:image/png;") ? png
+        : imageDataUrl.startsWith("data:image/jpeg;") ? jpeg : webp;
+      if (valid) modelInput = { image: Array.from(bytes), prompt, max_tokens: 512 };
+    } catch { valid = false; }
+  } else if (valid && config.model === "@cf/moondream/moondream3.1-9B-A2B") {
+    // Moondream 3.1 query uses image data URI + question; returns result.answer.
+    modelInput = { task: "query", image: imageDataUrl, question: prompt, reasoning: false, stream: false };
+  }
   return cloudflareCompletion({ ...config, enabled: config.enabled && valid }, [{ role: "user", content: [
     { type: "text", text: prompt }, { type: "image_url", image_url: { url: imageDataUrl } }
-  ] }], fetchImpl);
+  ] }], fetchImpl, modelInput);
 }
 
 export async function generateCloudflareImage(config: AIProviderConfig, prompt: string, fetchImpl: typeof fetch = globalThis.fetch) {
-  if (config.model !== CLOUDFLARE_AI_MODELS.image || !prompt.trim() || prompt.length > 2048) throw new CloudflareAiError("invalid_request");
-  const result = await runCloudflareModel(config, { prompt, steps: 4 }, fetchImpl, 42 * 1024 * 1024) as { image?: unknown };
+  if (!isCloudflareAiModelId(config.model) || !prompt.trim() || prompt.length > 2048) throw new CloudflareAiError("invalid_request");
+  // The generic text-to-image contract accepts prompt. Model-specific options are not assumed.
+  const result = await runCloudflareModel(config, { prompt }, fetchImpl, 42 * 1024 * 1024) as { image?: unknown };
   const encoded = result.image;
   if (typeof encoded !== "string" || encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new CloudflareAiError("invalid_response");
   const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));

@@ -69,7 +69,9 @@ export function normalizeAiModelOptions(value: unknown, selectedModel = ""): Des
     }
     const label = rawLabel && rawLabel.length <= 300 && !/[\x00-\x1F\x7F]/.test(rawLabel) ? rawLabel : id;
     seen.add(id);
-    options.push({ id, label });
+    const task = ["text", "vision", "image", "stt"].includes(String(record.task))
+      ? (record.task as DesktopAiModelOption["task"]) : undefined;
+    options.push({ id, label, ...(task ? { task } : {}) });
     if (options.length >= 100) {
       break;
     }

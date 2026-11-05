@@ -1,7 +1,13 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { generateConfiguredChat, analyzeCloudflareImage, generateConfiguredImage, CloudflareAiError } = require("../dist");
-const { CLOUDFLARE_AI_MODELS: models, cloudflareAiBaseUrl, cloudflareAiAccountId, isCloudflareAiBaseUrl, supportsSttModel, supportsImageGenerationModel } = require("@yardimci-asistan/shared");
+const { cloudflareAiBaseUrl, cloudflareAiAccountId, isCloudflareAiBaseUrl, supportsSttModel, supportsImageGenerationModel } = require("@yardimci-asistan/shared");
+const models = {
+  text: "@cf/zai-org/glm-4.7-flash",
+  vision: "@cf/meta/llama-4-scout-17b-16e-instruct",
+  image: "@cf/black-forest-labs/flux-1-schnell",
+  stt: "@cf/openai/whisper-large-v3-turbo"
+};
 const baseUrl = cloudflareAiBaseUrl("a".repeat(32));
 const config = { enabled: true, provider: "openai_compatible", service: "cloudflare", baseUrl, apiKey: "fixture-cloudflare-token", model: models.text, timeoutMs: 500 };
 const messages = [{ role: "user", content: "Merhaba" }];
@@ -13,7 +19,9 @@ test("Cloudflare exact account root and documented capability policy", () => {
   assert.ok(isCloudflareAiBaseUrl(baseUrl));
   for (const invalid of [baseUrl.replace("https:", "http:"), baseUrl.replace("api.cloudflare.com", "api.cloudflare.com.evil.test"), baseUrl.replace(".com/", ".com:443/"), `${baseUrl}?token=x`, `${baseUrl}#x`, baseUrl.replace("/ai", "/ai/../ai"), cloudflareAiBaseUrl("short")]) assert.equal(isCloudflareAiBaseUrl(invalid), false);
   assert.equal(supportsSttModel("cloudflare", models.stt), true);
-  assert.equal(supportsSttModel("cloudflare", models.text), false);
+  // Capability/model-task binding is verified against the live catalog in Settings.
+  assert.equal(supportsSttModel("cloudflare", "@cf/vendor/whisper-current"), false);
+  assert.equal(supportsSttModel("cloudflare", "../unsafe-model"), false);
   assert.equal(supportsImageGenerationModel("cloudflare", models.image), true);
   assert.equal(supportsImageGenerationModel("gemini", models.image), false);
 });
@@ -69,7 +77,7 @@ test("Cloudflare FLUX JPEG is decoded via host normalizer before claiming PNG", 
   let converted = false;
   const fetchImage = async (url, init) => {
     assert.equal(url, `${baseUrl}/run/${models.image}`);
-    assert.deepEqual(JSON.parse(init.body), { prompt: "A blue circle", steps: 4 });
+    assert.deepEqual(JSON.parse(init.body), { prompt: "A blue circle" });
     return json({ image: jpeg.toString("base64") });
   };
   const image = await generateConfiguredImage(imageConfig, "A blue circle", "landscape", fetchImage, (bytes, aspect) => {
@@ -95,8 +103,52 @@ test("FLUX NSFW false positives report Cloudflare content filtering, not malform
 });
 
 test("Cloudflare unsafe config fails before credentials leave the adapter", async () => {
-  for (const patch of [{ baseUrl: `${baseUrl}?evil` }, { apiKey: "key\r\nInjected: x" }, { model: "../evil" }, { model: models.image }, { enabled: false }]) {
+  for (const patch of [{ baseUrl: `${baseUrl}?evil` }, { apiKey: "key\r\nInjected: x" }, { model: "../evil" }, { enabled: false }]) {
     const result = await generateConfiguredChat({ ...config, ...patch, messages }, () => { throw new Error("must not fetch"); });
     assert.equal(result.reason, "configuration");
   }
+});
+
+test("Cloudflare LLaVA image-to-text uses its native byte-array request and description response", async () => {
+  const model = "@cf/llava-hf/llava-1.5-7b-hf";
+  const image = `data:image/png;base64,${png.toString("base64")}`;
+  const completion = await analyzeCloudflareImage({ ...config, model }, "Görseli tarif et", image, async (url, init) => {
+    assert.equal(url, `${baseUrl}/run/${model}`);
+    assert.deepEqual(JSON.parse(init.body), {
+      image: [...png], prompt: "Görseli tarif et", max_tokens: 512
+    });
+    assert.equal(JSON.parse(init.body).messages, undefined);
+    return json({ description: "Küçük bir görsel." });
+  });
+  assert.equal(completion.ok, true);
+  assert.equal(completion.answer, "Küçük bir görsel.");
+});
+
+test("Cloudflare Moondream 3.1 uses query/image/question and parses answer (not chat messages)", async () => {
+  const model = "@cf/moondream/moondream3.1-9B-A2B";
+  const image = `data:image/png;base64,${png.toString("base64")}`;
+  const completion = await analyzeCloudflareImage({ ...config, model }, "Ne görüyorsun?", image, async (url, init) => {
+    assert.equal(url, `${baseUrl}/run/${model}`);
+    assert.deepEqual(JSON.parse(init.body), { task: "query", image, question: "Ne görüyorsun?", reasoning: false, stream: false });
+    return json({ answer: "Mavi bir şekil.", finish_reason: "stop" });
+  });
+  assert.equal(completion.ok, true);
+  assert.equal(completion.answer, "Mavi bir şekil.");
+  const invalid = await analyzeCloudflareImage({ ...config, model }, "Soru", image, async () => json({ answer: "" }));
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.reason, "invalid_response");
+});
+
+test("Cloudflare image rejection never fetches remote URLs or malformed base64 and keeps other vision models working", async () => {
+  for (const image of ["https://example.test/private.png", "data:image/png;base64,abc", "data:image/png;base64,<bad>"]) {
+    const result = await analyzeCloudflareImage({ ...config, model: "@cf/llava-hf/llava-1.5-7b-hf" }, "Görsel", image,
+      () => { throw Error("Invalid image must not reach provider"); });
+    assert.equal(result.reason, "configuration");
+  }
+  const image = `data:image/png;base64,${png.toString("base64")}`;
+  const generic = await analyzeCloudflareImage({ ...config, model: models.vision }, "Görsel", image, async (_url, init) => {
+    assert.equal(JSON.parse(init.body).messages[0].content[1].image_url.url, image);
+    return json({ response: "Mevcut genel biçim korunuyor." });
+  });
+  assert.equal(generic.ok, true);
 });

@@ -11,27 +11,52 @@ export const pensionRestaurantPack = {
   folderName: "yardimci-asistan-demo-a-pension-restaurant",
   title: "Pansiyon + Restoran",
   extraCapabilities: [],
-  // Representative CC BY 4.0 panoramas, not photographs of this synthetic business.
-  // One genuine 360° and one genuine 180° file per source image.
+  // Open-licensed photographs, not photographs of this synthetic business.
+  // Every room and table gets a cover, a normal photo and one genuine 180° plus
+  // one genuine 360° panorama. Panorama sources are reused where needed.
   panoramaMedia: [
-    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_360", sourceKey: "room-360", sortOrder: 1 },
-    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_180", sourceKey: "room-180", sortOrder: 1 },
-    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_360", sourceKey: "restaurant-360", sortOrder: 1 },
-    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_180", sourceKey: "restaurant-180", sortOrder: 1 }
+    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_180", sourceKey: "room-180", sortOrder: 2 },
+    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_360", sourceKey: "room-360", sortOrder: 3 },
+    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_180", sourceKey: "room-alt-180", sortOrder: 2 },
+    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_360", sourceKey: "room-alt-360", sortOrder: 3 },
+    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_180", sourceKey: "room-relax-180", sortOrder: 2 },
+    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_360", sourceKey: "room-relax-360", sortOrder: 3 },
+    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_180", sourceKey: "room-180", sortOrder: 2 },
+    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_360", sourceKey: "room-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_180", sourceKey: "restaurant-hall-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_360", sourceKey: "restaurant-hall-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_180", sourceKey: "restaurant-hall-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_360", sourceKey: "restaurant-hall-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_180", sourceKey: "restaurant-hall-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_360", sourceKey: "restaurant-hall-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_180", sourceKey: "restaurant-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_360", sourceKey: "restaurant-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_180", sourceKey: "restaurant-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_360", sourceKey: "restaurant-360", sortOrder: 3 },
+    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_180", sourceKey: "restaurant-180", sortOrder: 2 },
+    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_360", sourceKey: "restaurant-360", sortOrder: 3 }
   ],
-  // Original synthetic covers guarantee that every restored room and table has
-  // a real image even before any optional panorama is published.
-  coverMedia: [
-    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_cover", palette: DEMO_PALETTES.roomSea, variant: 0, sortOrder: 0, title: "Deniz Manzaralı Oda" },
-    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_cover", palette: DEMO_PALETTES.roomGarden, variant: 0, sortOrder: 0, title: "Bahçe Odası" },
-    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_cover", palette: DEMO_PALETTES.roomOlive, variant: 0, sortOrder: 0, title: "Zeytin Odası" },
-    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_cover", palette: DEMO_PALETTES.roomSuite, variant: 0, sortOrder: 0, title: "Manzara Süiti" },
-    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_cover", palette: DEMO_PALETTES.tableIndoor, variant: 0, sortOrder: 0, title: "Masa M1" },
-    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_cover", palette: DEMO_PALETTES.tableIndoor, variant: 1, sortOrder: 0, title: "Masa M2" },
-    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_cover", palette: DEMO_PALETTES.tableIndoor, variant: 2, sortOrder: 0, title: "Masa M3" },
-    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_cover", palette: DEMO_PALETTES.tableGarden, variant: 0, sortOrder: 0, title: "Masa B1" },
-    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_cover", palette: DEMO_PALETTES.tableGarden, variant: 1, sortOrder: 0, title: "Masa B2" },
-    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_cover", palette: DEMO_PALETTES.tableGarden, variant: 2, sortOrder: 0, title: "Masa B3" }
+  photoMedia: [
+    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_cover", sourceKey: "room-101-cover", sortOrder: 0 },
+    { scope: "room", resourceId: "room_pr_101", id: "room_media_demo_pr_101_photo", sourceKey: "room-101-photo", sortOrder: 1 },
+    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_cover", sourceKey: "room-102-cover", sortOrder: 0 },
+    { scope: "room", resourceId: "room_pr_102", id: "room_media_demo_pr_102_photo", sourceKey: "room-102-photo", sortOrder: 1 },
+    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_cover", sourceKey: "room-201-cover", sortOrder: 0 },
+    { scope: "room", resourceId: "room_pr_201", id: "room_media_demo_pr_201_photo", sourceKey: "room-201-photo", sortOrder: 1 },
+    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_cover", sourceKey: "room-202-cover", sortOrder: 0 },
+    { scope: "room", resourceId: "room_pr_202", id: "room_media_demo_pr_202_photo", sourceKey: "room-202-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_cover", sourceKey: "table-m1-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_m1", id: "table_media_demo_pr_m1_photo", sourceKey: "table-m1-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_cover", sourceKey: "table-m2-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_m2", id: "table_media_demo_pr_m2_photo", sourceKey: "table-m2-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_cover", sourceKey: "table-m3-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_m3", id: "table_media_demo_pr_m3_photo", sourceKey: "table-m3-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_cover", sourceKey: "table-b1-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_b1", id: "table_media_demo_pr_b1_photo", sourceKey: "table-b1-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_cover", sourceKey: "table-b2-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_b2", id: "table_media_demo_pr_b2_photo", sourceKey: "table-b2-photo", sortOrder: 1 },
+    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_cover", sourceKey: "table-b3-cover", sortOrder: 0 },
+    { scope: "table", resourceId: "tbl_pr_b3", id: "table_media_demo_pr_b3_photo", sourceKey: "table-b3-photo", sortOrder: 1 }
   ],
   business: {
     id: "biz_demo_pension_restaurant",

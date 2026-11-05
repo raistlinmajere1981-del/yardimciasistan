@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { join, resolve } from "node:path";
 
-export function runEffectStudio(repoRoot: string, action: "list" | "load" | "save" | "prepare" | "publish", args: unknown = {}) {
+export function runEffectStudio(repoRoot: string, action: "list" | "load" | "save" | "prepare" | "activate" | "inspect" | "publish", args: unknown = {}) {
   const studioRoot = process.env.EFEKT_ATOLYESI_ROOT
     ? resolve(process.env.EFEKT_ATOLYESI_ROOT)
     : resolve(repoRoot, "..", "EfektAtolyesi");
@@ -15,7 +15,8 @@ export function runEffectStudio(repoRoot: string, action: "list" | "load" | "sav
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const timer = setTimeout(() => child.kill(), action === "publish" ? 120_000 : 25_000);
+    const timer = setTimeout(() => child.kill(), action === "publish" ? 120_000 : action === "activate" ? 75_000 :
+      action === "inspect" || action === "list" ? 90_000 : 25_000);
     child.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
       if (stdout.length > 38 * 1024 * 1024) child.kill();

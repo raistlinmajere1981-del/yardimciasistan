@@ -257,6 +257,7 @@ function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
 
   const summary = document.createElement("div");
   summary.className = "ya-widget-request-success-card";
+  summary.setAttribute("role", "status");
   summary.innerHTML = `${checkIcon()}<div><strong>${html("Talebiniz kaydedildi.")}</strong></div>`;
   success.appendChild(summary);
 
@@ -288,6 +289,9 @@ function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
 
   success.appendChild(actions);
   form.replaceWith(success);
+  // Replacing the focused form otherwise leaves focus on body, outside the
+  // widget's Escape handler. Never steal focus after the widget was closed.
+  if (success.isConnected) doneButton.focus({ preventScroll: true });
 }
 
 function showWhatsAppFallback(form: HTMLFormElement, message: string) {

@@ -92,7 +92,24 @@ try {
   expect(await page.evaluate(() => window.settingsCalls.filter(call => call.kind === "setup").at(-1).input.aiSttModel)).toBe("");
   await provider.selectOption("cloudflare");
   await expect(stt).toHaveValue("");
+  // Cloudflare choices are now discovered from the provider catalog, not a fixed list.
+  await page.evaluate(() => {
+    const originalTest = window.yardimciDesktop.testAiConnection;
+    window.yardimciDesktop.testAiConnection = async input => {
+      const result = await originalTest(input);
+      if (input.service !== "cloudflare") return result;
+      return { ...result, model: input.model || "@cf/zai-org/glm-4.7-flash", models: [
+        { id: "@cf/zai-org/glm-4.7-flash", label: "Metin", task: "text" },
+        { id: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Görsel analiz", task: "vision" },
+        { id: "@cf/black-forest-labs/flux-1-schnell", label: "Görsel üretim", task: "image" },
+        { id: "@cf/openai/whisper-large-v3-turbo", label: "STT", task: "stt" }
+      ] };
+    };
+  });
   await ai.getByLabel("Cloudflare Account ID", { exact: true }).fill("a".repeat(32));
+  await ai.getByLabel("Cloudflare API Token", { exact: true }).fill("fixture-ui-cloudflare-token");
+  await ai.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).click();
+  await expect(ai.locator("#settings-ai-test")).toHaveClass(/sync-success/);
   await ai.getByLabel("Metin modeli", { exact: true }).selectOption("@cf/zai-org/glm-4.7-flash");
   await ai.getByLabel("Görsel analiz modeli", { exact: true }).selectOption("@cf/meta/llama-4-scout-17b-16e-instruct");
   await ai.getByLabel("Görsel üretim modeli", { exact: true }).selectOption("@cf/black-forest-labs/flux-1-schnell");

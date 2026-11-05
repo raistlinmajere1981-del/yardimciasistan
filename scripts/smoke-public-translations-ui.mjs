@@ -45,12 +45,14 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}translation-ui-test?profile=market&translations=on`);
   await expect(page.getByRole("button",{name:"Dil Yönetimi",exact:true})).toHaveCount(0);
   await page.getByRole("button",{name:/^İşletme Yapısı ve Özellikler/}).click();
+  await expect(page.locator("#settings-translation")).toBeDisabled();
+  await page.evaluate(() => window.refreshSettings({ aiEnabled: true, aiModel: "fixture-model", aiApiKeyConfigured: true }));
   await page.getByRole("button",{name:"Çoklu Dil ayarları"}).click();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   const service=page.getByRole("dialog",{name:"Çoklu Dil",exact:true});
   await expect(service.getByLabel("Hedef yayın dili")).toBeDisabled();
   await service.getByRole("switch",{name:"Çoklu Dil servisi"}).check();
-  await expect(service.getByRole("status")).toContainText("AI etkin değil");
+  await expect(service.getByRole("status")).toContainText("AI ile otomatik");
   await service.getByLabel("Hedef yayın dili").selectOption("de");
   await service.getByRole("button",{name:"Hedef Dili Ekle"}).click();
   await service.getByLabel("Hedef yayın dili").selectOption("fr");
@@ -68,6 +70,8 @@ try {
   await expect(service).toBeHidden();
   assert.equal(store.settings().enabled,true,await page.locator("body").innerText());
   await expect(page.getByRole("button",{name:"Oda Yönetimi",exact:true})).toHaveCount(0);
+  await page.evaluate(() => window.refreshSettings({ aiEnabled: false }));
+  await expect(page.locator("#settings-translation")).toBeDisabled();
   await page.getByRole("button",{name:"Dil Yönetimi",exact:true}).click();
   const workspace=page.getByRole("dialog",{name:"Dil Yönetimi",exact:true});
   await expect(workspace.locator(".list-row")).toHaveCount(50);

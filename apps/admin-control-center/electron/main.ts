@@ -9,6 +9,7 @@ import {
 } from "./services/credentials-service";
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
 import { runEffectStudio } from "./services/effect-studio-service";
+import { publishManagedEffect } from "./services/effect-publication-service";
 import { getOverviewSnapshot } from "./services/overview-service";
 import { ReleaseRunner } from "./services/release-runner";
 import {
@@ -102,7 +103,7 @@ ipcMain.handle("admin:effects-publish", async (_event, id: string) => {
   if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
       releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
   effectPublishBusy = true;
-  try { return await runEffectStudio(REPO_ROOT, "publish", { id }); }
+  try { return await publishManagedEffect(REPO_ROOT, id, deploymentRunner); }
   finally { effectPublishBusy = false; }
 });
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));

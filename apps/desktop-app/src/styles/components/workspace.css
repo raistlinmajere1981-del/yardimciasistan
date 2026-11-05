@@ -1,5 +1,6 @@
 /* One anatomy and modal boundary; presentation changes geometry only. */
 .modal-surface {
+  --backdrop-cutout-top: var(--header-height);
   position: fixed;
   inset: 0;
   margin: auto;
@@ -14,15 +15,16 @@
   border-radius: var(--radius-dialog);
   box-shadow: var(--shadow-lg);
 }
-/* Keep operation feedback in the persistent top bar legible while a service
-   dialog is open. Modal focus and backdrop interaction remain unchanged. */
+/* Exempt the topbar and two measured Nexa shapes. Native modal hit testing
+   and focus isolation remain in effect through the visual cutouts. */
 .modal-surface::backdrop {
   background: var(--color-backdrop);
-  clip-path: inset(var(--header-height) 0 0 0);
+  clip-path: var(--nexa-backdrop-clip, polygon(evenodd,
+    0 var(--backdrop-cutout-top), 100% var(--backdrop-cutout-top), 100% 100%, 0 100%));
 }
 /* Workspace canvases know the true topbar height, including zoom and wrapping. */
-.workspace-frame::backdrop {
-  clip-path: inset(var(--workspace-canvas-top, var(--header-height)) 0 0 0);
+.workspace-frame {
+  --backdrop-cutout-top: var(--workspace-canvas-top, var(--header-height));
 }
 .workspace-frame[open] { display: flex; flex-direction: column; }
 .workspace-page-frame {
@@ -144,8 +146,8 @@
   margin: auto;
   max-height: max(0px, calc(var(--form-canvas-height, 100dvh) - var(--space-4)));
 }
-.form-dialog::backdrop {
-  clip-path: inset(var(--form-canvas-top, var(--header-height)) 0 0 0);
+.form-dialog {
+  --backdrop-cutout-top: var(--form-canvas-top, var(--header-height));
 }
 .form-dialog form {
   display: flex;

@@ -4,16 +4,9 @@ import { createHash } from "node:crypto";
 
 import { FIXED_NOW, writeJson } from "./util.mjs";
 import { addPanoramaMedia } from "./panorama-media.mjs";
-import { renderDemoPng } from "./png.mjs";
+import { addPhotoMedia } from "./photo-media.mjs";
 
-const COVER_WIDTH = 960;
-const COVER_HEIGHT = 640;
-
-function safeSegment(value, label) {
-  const text = String(value ?? "");
-  if (!/^[A-Za-z0-9._-]{1,120}$/.test(text)) throw new Error(`Unsafe ${label}: ${text}`);
-  return text;
-}
+const ATTRIBUTION_FILE = "MEDIA_ATTRIBUTION.txt";
 
 function manifestPath(folderPath, scope) {
   return path.join(folderPath, "assets", scope === "room" ? "room-media" : "table-media", "manifest.json");
@@ -42,63 +35,68 @@ function writeManifest(folderPath, scope, records) {
   return path.posix.join("assets", scope === "room" ? "room-media" : "table-media", "manifest.json");
 }
 
-function coverRecord(folderPath, entry, seenIds) {
-  const scope = entry.scope === "room" || entry.scope === "table" ? entry.scope : null;
-  if (!scope) throw new Error(`Invalid cover scope: ${entry.scope}`);
-  const resourceId = safeSegment(entry.resourceId, `${scope} id`);
-  const id = safeSegment(entry.id, "media id");
-  if (seenIds.has(id)) throw new Error(`Duplicate media id: ${id}`);
-  seenIds.add(id);
-  if (!Array.isArray(entry.palette) || entry.palette.length < 2) {
-    throw new Error(`Cover palette required for ${id}`);
+function renderAttribution(files) {
+  const groups = new Map();
+  for (const record of files) {
+    const group = groups.get(record.originalName) ?? { record, storedPaths: [] };
+    group.storedPaths.push(record.storedPath);
+    groups.set(record.originalName, group);
   }
-  const bytes = renderDemoPng({
-    width: COVER_WIDTH,
-    height: COVER_HEIGHT,
-    palette: entry.palette,
-    variant: Number.isInteger(entry.variant) ? entry.variant : 0
-  });
-  const rootDirectory = scope === "room" ? "room-media" : "table-media";
-  const storedPath = `files/${resourceId}/${id}.png`;
-  const absolutePath = path.join(folderPath, "assets", rootDirectory, "files", resourceId, `${id}.png`);
-  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-  fs.writeFileSync(absolutePath, bytes);
-  const label = String(entry.title ?? "").trim() || resourceId;
-  const title = `${label} — Sentetik demo kapak görseli; gerçek işletme fotoğrafı değildir.`;
-  return {
-    scope,
-    resourceId,
-    id,
-    kind: "cover",
-    originalName: `${id}.png`,
-    mimeType: "image/png",
-    title: title.slice(0, 240),
-    sortOrder: Number.isInteger(entry.sortOrder) ? entry.sortOrder : 0,
-    sizeBytes: bytes.length,
-    updatedAt: FIXED_NOW,
-    remoteUrl: "",
-    storedPath,
-    contentHash: createHash("sha256").update(bytes).digest("hex"),
-    width: COVER_WIDTH,
-    height: COVER_HEIGHT,
-    author: "Yardımcı Asistan demo üreteci",
-    license: "Sentetik demo görseli",
-    licenseUrl: "",
-    sourceUrl: "",
-    modification: "Yok (özgün, soyut üretilmiş görsel)."
-  };
+
+  const licenses = [...new Set(files.map((record) => record.license))].sort();
+  const lines = [
+    "DEMO MEDYA GÖRSELLERİ — ATIF VE LİSANS",
+    "",
+    "Bu klasördeki kapak, fotoğraf ve panorama görselleri üçüncü taraflara",
+    "aittir ve demo işletmesinin kendi çekimi değildir. Sentetik demo",
+    "işletmesini temsilen kullanılmıştır; gerçek işletme, müşteri veya",
+    "rezervasyon kanıtı sayılmaz. Aynı kaynak görsel birden fazla odada veya",
+    "masada kullanılabilir.",
+    "",
+    `Kullanılan lisanslar: ${licenses.join(", ")}.`,
+    "CC BY lisansları atıf verilmesi ve değişikliklerin belirtilmesi koşuluyla",
+    "paylaşıma açıktır. CC0 ve Public domain görsellerde atıf zorunlu değildir;",
+    "yine de kaynak ve yazar bilgisi korunmuştur. Yazarlar veya kurumlar",
+    "tarafından onaylandığı ima edilmez.",
+    "",
+    "Kaynaklar:"
+  ];
+
+  for (const { record, storedPaths } of groups.values()) {
+    lines.push(
+      "",
+      `- ${record.originalName} (${record.width} x ${record.height}, ${record.kind})`,
+      `  Eser: ${record.title.replace(/ — Temsili demo görseli.*$/, "")}`,
+      `  Yazar: ${record.author}`,
+      `  Kaynak: ${record.sourceUrl}`,
+      `  Lisans: ${record.license}${record.licenseUrl ? ` — ${record.licenseUrl}` : ""}`,
+      `  Değişiklik: ${record.modification}`,
+      `  Yerel dosyalar: ${[...new Set(storedPaths)].sort().join(", ")}`
+    );
+    if (record.kind === "panorama_180") {
+      lines.push("  Not: 180° dosya, aynı 360° kaynağın merkez yarısından üretilmiş kırpmadır.");
+    }
+  }
+  lines.push("");
+  return lines.join("\n");
 }
 
 /**
- * Writes synthetic covers and optional CC BY panorama media into the backup's
- * assets/<room-media|table-media> manifest contract. Every demo room/table can
- * therefore expose at least one published image after restore.
+ * Writes open-licensed cover, photo and panorama media into the backup's
+ * assets/<room-media|table-media> manifest contract, then writes one combined
+ * attribution file covering every third-party source.
  */
-export function addResourceMedia({ folderPath, panoramas = [], covers = [] }) {
-  const panorama = addPanoramaMedia({ folderPath, entries: panoramas });
-  const seenIds = new Set((panorama.files ?? []).map((item) => item.id));
-  const coverFiles = covers.map((entry) => coverRecord(folderPath, entry, seenIds));
-  const files = [...(panorama.files ?? []), ...coverFiles];
+export function addResourceMedia({ folderPath, panoramas = [], photos = [] }) {
+  const files = [
+    ...addPanoramaMedia({ folderPath, entries: panoramas }),
+    ...addPhotoMedia({ folderPath, entries: photos })
+  ];
+
+  const seenIds = new Set();
+  for (const record of files) {
+    if (seenIds.has(record.id)) throw new Error(`Duplicate media id: ${record.id}`);
+    seenIds.add(record.id);
+  }
 
   const byScope = { room: [], table: [] };
   for (const record of files) byScope[record.scope].push(record);
@@ -119,11 +117,19 @@ export function addResourceMedia({ folderPath, panoramas = [], covers = [] }) {
     }
   }
 
+  const attributionPath = path.posix.join("assets", ATTRIBUTION_FILE);
+  fs.writeFileSync(path.join(folderPath, "assets", ATTRIBUTION_FILE), renderAttribution(files), "utf8");
+  const attributionSha256 = createHash("sha256")
+    .update(fs.readFileSync(path.join(folderPath, "assets", ATTRIBUTION_FILE)))
+    .digest("hex");
+
   const countKind = (scope, kind) => files.filter((item) => item.scope === scope && item.kind === kind).length;
   return {
     counts: {
       roomCovers: countKind("room", "cover"),
       tableCovers: countKind("table", "cover"),
+      roomPhotos: countKind("room", "photo"),
+      tablePhotos: countKind("table", "photo"),
       roomMedia360: countKind("room", "panorama_360"),
       roomMedia180: countKind("room", "panorama_180"),
       tableMedia360: countKind("table", "panorama_360"),
@@ -133,7 +139,7 @@ export function addResourceMedia({ folderPath, panoramas = [], covers = [] }) {
     targets,
     files,
     manifests,
-    attributionPath: panorama.attributionPath,
-    attributionSha256: panorama.attributionSha256
+    attributionPath,
+    attributionSha256
   };
 }

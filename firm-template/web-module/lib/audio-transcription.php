@@ -6,15 +6,18 @@ const YA_STT_MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 const YA_STT_MAX_RESPONSE_BYTES = 128 * 1024;
 const YA_STT_MAX_TEXT_CHARS = 16000;
 
-/** Documented adapter contracts in parity with shared metadata; access needs a real audio test. */
+/** Generated from shared STT_MODEL_POLICY; catalog discovery does not grant transport support. */
 function ya_stt_models(string $service): array
 {
-    return match ($service) {
-        'cloudflare' => ['@cf/openai/whisper-large-v3-turbo'],
-        'openai' => ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1'],
-        'gemini' => ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-2.5-flash'],
-        default => []
-    };
+    static $policy = null;
+    if ($policy === null) {
+        try {
+            $policy = json_decode((string) file_get_contents(__DIR__ . '/stt-model-policy.json'), true, 8, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            $policy = [];
+        }
+    }
+    return is_array($policy[$service] ?? null) ? $policy[$service] : [];
 }
 
 function ya_stt_base_url_supported(string $service, string $baseUrl): bool

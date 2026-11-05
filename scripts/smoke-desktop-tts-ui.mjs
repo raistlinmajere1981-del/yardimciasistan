@@ -33,6 +33,9 @@ try {
   await ui.goto(`${server.resolvedUrls.local[0]}tts-settings-test?profile=market`);
   const openSpeech = () => openSettingsService(ui, "settings-speech");
   const panel = ui.locator(".settings-service-overlay");
+  // TTS keeps local feedback as well as the shell notice; only AI is topbar-only.
+  const feedback = panel.locator(".settings-service-feedback-result");
+  const topbar = ui.locator(".page-header .global-message-bar");
   const save = () => saveSettingsService(ui);
   await openSpeech();
   await expect(panel).toBeVisible();
@@ -56,7 +59,11 @@ try {
   await expect(ui.locator("#settings-speech").getByRole("img")).toHaveAttribute("aria-label", /Bekliyor/);
   assert.equal(await ui.evaluate(() => localStorage.getItem("yardimci-asistan.desktop-tts")), null);
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(ui.getByText("Ses denemesi tamamlandı.", { exact: true })).toBeVisible();
+  await expect(feedback).toHaveText("Ses denemesi tamamlandı.");
+  await expect(feedback).toBeVisible();
+  await expect(feedback).toHaveRole("status");
+  await expect(topbar).toContainText("Ses denemesi tamamlandı.");
+  await expect(topbar).toBeVisible();
   await expect(panel.getByLabel("Canlı kontrol durumu")).toHaveText("Hazır");
   assert.deepEqual(await ui.evaluate(() => {
     const spoken = window.__ttsMock.spoken.at(-1);
@@ -88,16 +95,21 @@ try {
   await ui.evaluate(voices => window.__ttsVoices(voices.slice(0, 2)), voices);
   await expect(panel).toContainText("Kayıtlı ses bulunamadı");
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(ui.getByText("Ses denemesi tamamlandı.", { exact: true })).toBeVisible();
+  await expect(feedback).toHaveText("Ses denemesi tamamlandı.");
+  await expect(feedback).toBeVisible();
   assert.equal(await ui.evaluate(() => window.__ttsMock.spoken.at(-1).voice.name), "Türkçe Bir");
   assert.equal(await ui.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.desktop-tts")).voiceId), secondVoice);
 
   await ui.evaluate(() => { window.__ttsMock.mode = "never-start"; });
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(ui.getByText(/Konuşma başlatılamadı/)).toBeVisible();
+  await expect(feedback).toContainText(/Konuşma başlatılamadı/);
+  await expect(feedback).toBeVisible();
+  await expect(feedback).toHaveRole("alert");
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
   await panel.getByRole("button", { name: "Sesi Durdur", exact: true }).click();
-  await expect(ui.getByText("Ses denemesi durduruldu.", { exact: true })).toBeVisible();
+  await expect(feedback).toHaveText("Ses denemesi durduruldu.");
+  await expect(feedback).toBeVisible();
+  await expect(feedback).toHaveRole("status");
 
   // Storage failure keeps the dirty category and blocks Save-and-continue.
   await slider("Ses düzeyi", 60);
@@ -112,7 +124,9 @@ try {
   await expect(panel).toBeVisible();
   await save();
   await expect(panel).toBeVisible();
-  await expect(ui.getByText(/saklanamadı/)).toBeVisible();
+  await expect(topbar).toContainText(/saklanamadı/);
+  await expect(topbar).toBeVisible();
+  await expect(topbar).toHaveRole("alert");
   await ui.evaluate(() => { Storage.prototype.setItem = window.__setItem; });
   await save();
   await expect(panel).toHaveCount(0);

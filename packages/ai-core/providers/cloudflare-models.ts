@@ -19,10 +19,10 @@ export function isCloudflareTextModelId(value: string): boolean {
 function normalizeTask(input: unknown): CloudflareModelOption["task"] | undefined {
   const raw = (typeof input === "string" ? input
     : input && typeof input === "object" && "name" in input ? String(input.name) : "").toLowerCase();
-  if (raw === "text-generation" || raw === "text-to-text") return "text";
-  if (raw === "image-text-to-text" || raw === "image-to-text") return "vision";
+  if (["text-generation", "text-to-text", "text generation"].includes(raw)) return "text";
+  if (["image-text-to-text", "image-to-text"].includes(raw)) return "vision";
   if (raw === "text-to-image") return "image";
-  if (raw === "automatic-speech-recognition") return "stt";
+  if (["automatic-speech-recognition", "automatic speech recognition"].includes(raw)) return "stt";
   return undefined;
 }
 function parseRows(input: unknown): CloudflareModelOption[] {
@@ -33,9 +33,7 @@ function parseRows(input: unknown): CloudflareModelOption[] {
     const id = String(row.name ?? row.model ?? "").trim();
     const task = normalizeTask(row.task);
     if (!isCloudflareTextModelId(id) || !task) return [];
-    const displayName = typeof row.description === "string" && row.description.length <= 100
-      ? row.description.trim() : "";
-    return [{ id, label: displayName ? id : id, task }];
+    return [{ id, label: id, task }];
   });
 }
 
@@ -49,25 +47,33 @@ export async function listCloudflareAiModels(
     return { ok: false, reason: "configuration", message: "Cloudflare hesap adresi veya API Token geçersiz." };
   }
   const account = cloudflareAiAccountId(options.baseUrl.replace(/\/+$/, ""));
-  const url = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/models/search?hide_experimental=true&per_page=100`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.min(Math.max(options.timeoutMs ?? 15000, 1000), 120000));
+  const unique = new Map<string, CloudflareModelOption>();
   try {
-    const response = await fetchImpl(url, {
-      headers: { Authorization: `Bearer ${options.apiKey}` },
-      redirect: "error",
-      signal: controller.signal
-    });
-    const raw = await response.text();
-    if (raw.length > 512 * 1024) throw new Error("oversized");
-    const payload = JSON.parse(raw) as { success?: boolean; result?: unknown; errors?: Array<{ code?: number }> };
-    if (!response.ok || !payload.success) {
-      return { ok: false, reason: classifyCloudflareFailure(response.status, String(payload.errors?.[0]?.code ?? "")),
-        message: "Cloudflare model listesi alınamadı; token yetkilerini kontrol edin." };
+    for (let page = 1; page <= 10; page++) {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/models/search?hide_experimental=true&per_page=100${page > 1 ? `&page=${page}` : ""}`;
+      const response = await fetchImpl(url, {
+        headers: { Authorization: `Bearer ${options.apiKey}` },
+        redirect: "error", signal: controller.signal
+      });
+      const raw = await response.text();
+      if (raw.length > 512 * 1024) throw new Error("oversized");
+      const payload = JSON.parse(raw) as {
+        success?: boolean;
+        result?: unknown;
+        errors?: Array<{ code?: number }>;
+        result_info?: { count?: number; page?: number; per_page?: number };
+      };
+      if (!response.ok || !payload.success) {
+        return { ok: false, reason: classifyCloudflareFailure(response.status, String(payload.errors?.[0]?.code ?? "")),
+          message: "Cloudflare model listesi alınamadı; token yetkilerini kontrol edin." };
+      }
+      if (!Array.isArray(payload.result)) throw new Error("invalid catalog");
+      for (const row of parseRows(payload.result)) unique.set(row.id, row);
+      if (payload.result.length < 100) break;
     }
-    const rows = parseRows(payload.result);
-    const unique = new Map(rows.map(row => [row.id, row]));
-    return { ok: true, models: [...unique.values()].sort((a, b) => a.id.localeCompare(b.id)).slice(0, 100) };
+    return { ok: true, models: [...unique.values()].sort((a, b) => a.id.localeCompare(b.id)).slice(0, 500) };
   } catch (error) {
     return { ok: false, reason: controller.signal.aborted ? "timeout" : "network",
       message: "Cloudflare model kataloğuna ulaşılamadı." };

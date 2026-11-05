@@ -70,6 +70,11 @@ const SMOKE_FILES = [
   "scripts/smoke-catalog-pagination.mjs",
   "scripts/smoke-settings-correctness.mjs",
   "scripts/smoke-settings-ui-correctness.mjs",
+  "scripts/smoke-ai-connection-cancel.mjs",
+  "scripts/smoke-ai-connection-cancel-ui.mjs",
+  "scripts/smoke-backup-zip-import.mjs",
+  "scripts/smoke-backup-zip-import-ui.mjs",
+  "scripts/smoke-teknikel-shipping-repair-ui.mjs",
   "scripts/smoke-voice-stt-settings.mjs",
   "scripts/smoke-voice-stt-provider.php",
   "scripts/smoke-voice-stt-publication.mjs",
@@ -247,6 +252,8 @@ const SMOKE_FILES = [
   "scripts/smoke-room-public-details.mjs",
   "scripts/smoke-sector-feature-contributions.mjs",
   "scripts/smoke-settings-platform.mjs",
+  "scripts/smoke-service-prerequisites.mjs",
+  "scripts/smoke-service-tiles-ui.mjs",
   "scripts/smoke-setup-profile-contract.mjs",
   "scripts/smoke-stock-image-analysis.mjs",
   "scripts/smoke-stock-image-import-db.mjs",
@@ -279,6 +286,8 @@ export const IGNORED_SMOKE_FILES = new Set([
 ]);
 
 const MANUAL_SMOKE_FILES = new Set([
+  // Requires prebuilt A/B/C ZIPs in artifacts/demo-data (generate-demo-data.mjs).
+  "scripts/smoke-backup-zip-import.mjs",
   // Native Electron PDF host check requires Linux utilities (pdfinfo/pdftotext).
   "scripts/smoke-document-output-pdf.mjs",
   "scripts/smoke-dealer-android-device.mjs",
@@ -320,6 +329,12 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("demo-data-tests", "Varsayılan A/B/C backup-v2 demo paketleri", "node", ["--test", "scripts/demo-data/demo-data.test.mjs"], {
+    phase: 50, presets: ["full"], domains: ["desktop", "commerce"], requires: ["build-desktop"]
+  }),
+  check("demo-data-teknikel-tests", "İsteğe bağlı Teknikel kaynakları ve backup-v2 ZIP içe aktarma", "node", ["--test", "scripts/demo-data/teknikel.test.mjs"], {
+    phase: 50, manual: true, domains: ["desktop", "commerce"], requires: ["build-desktop"]
+  }),
   check("web-account-session", "Ortak web hesabı ve özel görünüm yaşam döngüsü", "node", ["--test", "scripts/test-helpers/account-session.test.mjs"], {
     phase: 5, presets: ["full"], domains: ["web", "dealer-access"]
   }),
@@ -355,6 +370,13 @@ const BASE_CHECKS = [
   }),
   check("verification-registry-tests", "Doğrulama registry testleri", "node", ["--test", "scripts/test-verification-registry.mjs"], {
     phase: 5, presets: ["full"], domains: ["platform"]
+  }),
+  // Explicit local multi-repo audit; requires all three owner site worktrees.
+  check("site-release-readiness", "Site package/version/legacy-denial local contracts", "node", ["scripts/test-site-release-readiness.mjs"], {
+    phase: 5, manual: true, domains: ["web", "release"]
+  }),
+  check("effect-engine-consistency", "Canonical/template/Admin effect SHA-256 consistency", "node", ["--test", "scripts/test-effect-engine-sync.mjs"], {
+    phase: 5, domains: ["web", "platform"]
   }),
   check("admin-tests", "Admin Control Center doğrulaması", "npm", ["run", "test:admin"], {
     phase: 5, presets: ["full"], domains: ["platform"]
@@ -674,6 +696,9 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (["scripts/smoke-ai-connection-cancel-ui.mjs", "scripts/smoke-backup-zip-import-ui.mjs",
+    "scripts/smoke-teknikel-shipping-repair-ui.mjs"].includes(file)) return ["build-packages"];
+  if (file === "scripts/smoke-service-prerequisites.mjs" || file === "scripts/smoke-service-tiles-ui.mjs") return [];
   if (file === "scripts/smoke-companion-points-ingress.mjs") return [];
   if (file === "scripts/smoke-c19-android-fixture.mjs") return [];
   if (file === "scripts/smoke-form-image-perspective.mjs" || file === "scripts/smoke-document-output-render-snapshot.mjs") return [];
@@ -738,6 +763,8 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (/^scripts\/smoke-(ai-connection-cancel|backup-zip-import|teknikel-shipping-repair)(-ui)?\.mjs$/.test(file)) return ["desktop", "settings"];
+  if (file === "scripts/smoke-service-prerequisites.mjs" || file === "scripts/smoke-service-tiles-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-print-management-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-table-order-benefits.mjs" || file === "scripts/smoke-table-order-benefits-ui.mjs") return ["desktop", "hospitality", "commerce", "finance", "customers"];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["web", "translations", "commerce"];

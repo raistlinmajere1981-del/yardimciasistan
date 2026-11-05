@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import { readProductImageAsset } from "./product-image-reader";
 import { randomUUID } from "node:crypto";
 import { beginRestoreReconciliation } from "./database/restore-reconciliation-store";
-import { app, ipcMain, session, shell } from "electron";
+import { app, dialog, ipcMain, session, shell, BrowserWindow } from "electron";
+import { extractBackupZipToStage } from "./backup-zip-import";
 import { desktopLog } from "./desktop-logger";
 import {
   DESKTOP_DATABASE_FILE_NAME,
@@ -39,6 +40,10 @@ export type DesktopBackupListResult =
 export type DesktopBackupCreateResult =
   | { ok: true; message: string; backup: DesktopBackupListItem; backupDirectory: string; backups: DesktopBackupListItem[] }
   | { ok: false; message: string };
+
+export type DesktopBackupImportResult =
+  | { ok: true; message: string; backup: DesktopBackupListItem; backups: DesktopBackupListItem[] }
+  | { ok: false; message: string; cancelled?: boolean };
 
 export type DesktopBackupActionResult =
   | { ok: true; message: string; backups?: DesktopBackupListItem[] }
@@ -513,6 +518,67 @@ function getBackups(userDataPath: string): DesktopBackupListResult {
   }
 }
 
+/** Import a manifest-backed desktop/demo ZIP without changing live application data. */
+async function importBackupZip(userDataPath: string, owner: Electron.BrowserWindow | null): Promise<DesktopBackupImportResult> {
+  const picker = {
+    title: "Yardımcı Asistan Yedek ZIP Dosyası Seç",
+    properties: ["openFile"] as Array<"openFile">,
+    filters: [{ name: "Yedek ZIP dosyası", extensions: ["zip"] }]
+  };
+  const selection = owner ? await dialog.showOpenDialog(owner, picker) : await dialog.showOpenDialog(picker);
+  if (selection.canceled || selection.filePaths.length === 0) {
+    return { ok: false, cancelled: true, message: "ZIP seçimi iptal edildi." };
+  }
+
+  const paths = resolvePaths(userDataPath);
+  ensureProjectBackupPath(paths);
+  const stage = path.join(paths.projectBackupPath, `.tmp-import-${randomUUID()}`);
+  try {
+    const folderName = await extractBackupZipToStage(selection.filePaths[0]!, stage);
+    const stagedFolder = path.join(stage, folderName);
+    const manifest = readBackupManifest(stagedFolder);
+    const item = readBackupItem(stagedFolder);
+    if (!manifest || !item || !["manual", "safety"].includes(manifest.kind)
+      || !Number.isFinite(Date.parse(manifest.createdAt))) {
+      throw new Error("ZIP geçerli bir Yardımcı Asistan yedek manifesti taşımıyor.");
+    }
+    if (manifest.qrMenuImages.count !== manifest.qrMenuImages.files.length
+      || manifest.qrMenuImages.count !== directoryFileCount(path.join(stagedFolder, QR_IMAGE_DIRECTORY))
+      || manifest.assets.fileCount !== directoryFileCount(path.join(stagedFolder, ASSET_DIRECTORY))) {
+      throw new Error("ZIP içindeki manifest ile görsel dosya sayıları uyuşmuyor.");
+    }
+    for (const image of manifest.qrMenuImages.files) {
+      const name = image.fileName;
+      if (typeof name !== "string" || !name || path.basename(name) !== name
+        || name.includes("\\") || name.includes(":") || name === "." || name === "..") {
+        throw new Error("ZIP içindeki QR menü görselleri eksik veya geçersiz.");
+      }
+      const imagePath = path.join(stagedFolder, QR_IMAGE_DIRECTORY, name);
+      if (!fs.existsSync(imagePath) || !fs.statSync(imagePath).isFile()) {
+        throw new Error("ZIP içindeki QR menü görselleri eksik veya geçersiz.");
+      }
+    }
+    validateYardimciDatabase(path.join(stagedFolder, BACKUP_DATABASE_FILE));
+    const destination = path.join(paths.projectBackupPath, folderName);
+    if (fs.existsSync(destination)) {
+      throw new Error("Aynı isimde yedek zaten mevcut. Mevcut yedek üzerine yazılmadı.");
+    }
+    fs.renameSync(stagedFolder, destination);
+    const imported = readBackupItem(destination);
+    if (!imported) throw new Error("İçe alınan yedek yeniden okunamadı.");
+    return {
+      ok: true,
+      message: "ZIP yedeği içe aktarıldı. Verileri değiştirmek için listedeki Geri Yükle işlemini kullanabilirsiniz.",
+      backup: imported,
+      backups: listBackupItems(paths)
+    };
+  } catch (error) {
+    return { ok: false, message: `ZIP içe aktarılamadı: ${errorMessage(error)}` };
+  } finally {
+    removeDirectoryIfExists(stage);
+  }
+}
+
 async function openBackupDirectory(userDataPath: string): Promise<DesktopBackupActionResult> {
   const paths = resolvePaths(userDataPath);
   try {
@@ -822,6 +888,7 @@ export function registerDataMaintenanceIpcHandlers(
 ) {
   const channels = [
     "dataMaintenance:createBackup",
+    "dataMaintenance:importBackupZip",
     "dataMaintenance:listBackups",
     "dataMaintenance:openBackupDirectory",
     "dataMaintenance:openBackupItemDirectory",
@@ -841,6 +908,10 @@ export function registerDataMaintenanceIpcHandlers(
     return approved;
   };
   ipcMain.handle("dataMaintenance:createBackup", () => unlocked(() => createManualBackup(userDataPath())));
+  ipcMain.handle("dataMaintenance:importBackupZip", async (event) => {
+    options.assertUnlocked();
+    return importBackupZip(userDataPath(), BrowserWindow.fromWebContents(event.sender));
+  });
   ipcMain.handle("dataMaintenance:listBackups", () => unlocked(() => getBackups(userDataPath())));
   ipcMain.handle("dataMaintenance:openBackupDirectory", () => unlocked(() => openBackupDirectory(userDataPath())));
   ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => unlocked(() => openBackupItemDirectory(userDataPath(), backupId)));

@@ -1,11 +1,3 @@
-/** Documented API candidates. Static metadata never proves account access or free quota. */
-export const CLOUDFLARE_AI_MODELS = {
-  text: "@cf/zai-org/glm-4.7-flash",
-  vision: "@cf/meta/llama-4-scout-17b-16e-instruct",
-  image: "@cf/black-forest-labs/flux-1-schnell",
-  stt: "@cf/openai/whisper-large-v3-turbo"
-} as const;
-
 const ACCOUNT_PREFIX = "https://api.cloudflare.com/client/v4/accounts/";
 
 /** Also represents incomplete Settings drafts; validate before persistence/transport. */
@@ -23,6 +15,11 @@ export function isCloudflareAiBaseUrl(baseUrl: string): boolean {
   return /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/[a-fA-F0-9]{32}\/ai\/?$/.test(baseUrl);
 }
 
+export function isCloudflareAiModelId(model: string): boolean {
+  return model.length <= 160 && /^@cf\/[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i.test(model);
+}
+
+/** Cloudflare task is verified separately using live catalog metadata. */
 export function supportsVisionModel(service: string, model: string): boolean {
-  return service === "cloudflare" && model === CLOUDFLARE_AI_MODELS.vision;
+  return service === "cloudflare" && isCloudflareAiModelId(model);
 }

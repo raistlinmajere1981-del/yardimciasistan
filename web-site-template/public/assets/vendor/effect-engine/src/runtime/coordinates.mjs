@@ -8,7 +8,7 @@ function position(value, space, axis) {
 
 // Map original photograph coordinates to the rendered <img>, including a
 // pre-cropped <picture> source. The actual image is never drawn to the canvas.
-export function photoTransform({width, height, crop, fit = 'cover', objectPosition = '50% 50%', naturalWidth, naturalHeight}) {
+export function photoTransform({width, height, crop, fit = 'cover', objectPosition = '50% 50%', naturalWidth}) {
   let sx = width / crop.width, sy = height / crop.height;
   if (fit !== 'fill') {
     let scale = fit === 'cover' ? Math.max(sx, sy) : Math.min(sx, sy);

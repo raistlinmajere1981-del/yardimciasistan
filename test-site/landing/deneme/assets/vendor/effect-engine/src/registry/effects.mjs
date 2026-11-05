@@ -1,6 +1,9 @@
 import {createSunlight} from '../runtime/effects/sunlight.mjs';
 import {createOffshore} from '../runtime/effects/offshore.mjs';
 import {createShimmer} from '../runtime/effects/shimmer.mjs';
+import {createFlame} from '../runtime/effects/flame.mjs';
+import {createGlow} from '../runtime/effects/glow.mjs';
+import {createSmoke} from '../runtime/effects/smoke.mjs';
 import {polygonBounds} from '../model/geometry.mjs';
 
 const number = (key,label,value,min,max,step=1) => ({key,label,default:value,min,max,step,kind:'number'});
@@ -17,7 +20,7 @@ const bandGroups=[
 
 export const effectRegistry = Object.freeze({
   offshore: {
-    label:'Yüzey dalgacıkları', description:'Hafif ilerleyen dalga tepeleri ve küçük kırılmalar.', create:createOffshore,
+    label:'Yüzey dalgacıkları', description:'Hafif ilerleyen dalga tepeleri ve küçük kırılmalar.', create:createOffshore, targetKinds:['image'],
     controls:[...common,number('length','Dalga boyutu',1,.15,3,.05),number('travel','İlerleme mesafesi',1,0,3,.05),number('breakProbability','Kırılma olasılığı',.06,0,1,.01),toggle('crestLines','Dalga tepeleri',true),toggle('breaking','Küçük köpükler',true)],
     compile(zone,p) {
       const bounds=polygonBounds(zone.points), unit=bounds.width/635;
@@ -27,7 +30,7 @@ export const effectRegistry = Object.freeze({
     },
   },
   sunlight: {
-    label:'İnce güneş parıltıları', description:'Su yüzeyinde bağımsız, ince ve hareketli ışık çizgileri.', create:createSunlight,
+    label:'İnce güneş parıltıları', description:'Su yüzeyinde bağımsız, ince ve hareketli ışık çizgileri.', create:createSunlight, targetKinds:['image'],
     controls:[number('count','Yoğunluk / parçacık',110,0,500),number('opacity','Opaklık',1.1,0,2,.05),number('drift','Sürüklenme',1,0,3,.05),number('length','Parıltı boyutu',1,.15,3,.05)],
     compile(zone,p) {
       const b=polygonBounds(zone.points), unit=Math.min(b.width/600,b.height/240);
@@ -36,7 +39,7 @@ export const effectRegistry = Object.freeze({
     },
   },
   shimmer: {
-    label:'Güneş yansıması', description:'Bölgeyle birlikte taşınan ışık şeridi ve parıltılar.', create:createShimmer,
+    label:'Güneş yansıması', description:'Bölgeyle birlikte taşınan ışık şeridi ve parıltılar.', create:createShimmer, targetKinds:['image'],
     controls:[number('count','Yoğunluk / parçacık',140,0,800),number('speed','Hız',1.45,0,5,.05),number('opacity','Opaklık',1.15,0,2,.05),number('bandOpacity','Işık şeridi',.69,0,2,.01),number('length','Parıltı boyutu',1,.15,3,.05),number('drift','Sürüklenme',1,0,3,.05)],
     compile(zone,p) {
       const b=polygonBounds(zone.points), unit=b.width/740;
@@ -47,3 +50,55 @@ export const effectRegistry = Object.freeze({
   },
 });
 export const defaultParams = type => Object.fromEntries(effectRegistry[type].controls.map(c=>[c.key,c.default]));
+
+// Object-scene effects never share the image/zone registry above. Validation and
+// compilation select the registry from the explicit document version, so a v1
+// file cannot name flame/glow/smoke and a v2 file cannot name water effects.
+const objectCommon = [
+  number('width','Genişlik',.12,.01,.9,.01),
+  number('height','Yükseklik',.3,.01,1,.01),
+  number('opacity','Opaklık',.95,0,1,.01),
+  number('speed','Hız',1,.05,3,.05),
+];
+export const objectEffectRegistry = Object.freeze({
+  flame: {
+    label:'Alev', description:'Nesneye bağlı, hareketli ve sivri alev silueti.', create:createFlame,
+    targetKinds:['sceneObject'], placement:'bottom',
+    controls:[...objectCommon,number('sway','Salınım',.35,0,1,.01)],
+    presets:{
+      Sakin:{width:.08,height:.22,opacity:.8,speed:.7,sway:.2},
+      Doğal:{width:.12,height:.3,opacity:.95,speed:1,sway:.35},
+      Canlı:{width:.16,height:.4,opacity:1,speed:1.4,sway:.55},
+    },
+    compile(object,target,params) {
+      return {...params,width:params.width*target.scale,height:params.height*target.scale};
+    },
+  },
+  glow: {
+    label:'Işık halesi', description:'Nesne çevresinde yumuşak, nabız atan sıcak ışık.', create:createGlow,
+    targetKinds:['sceneObject'], placement:'center',
+    controls:[...objectCommon,number('pulse','Nabız',.2,0,1,.01)],
+    presets:{
+      Sakin:{width:.28,height:.28,opacity:.4,speed:.4,pulse:.1},
+      Doğal:{width:.35,height:.35,opacity:.55,speed:.6,pulse:.2},
+      Canlı:{width:.45,height:.45,opacity:.7,speed:.9,pulse:.35},
+    },
+    compile(object,target,params) {
+      return {...params,width:params.width*target.scale,height:params.height*target.scale};
+    },
+  },
+  smoke: {
+    label:'Duman', description:'Yukarı süzülen, seyrek ve yumuşak duman parçacıkları.', create:createSmoke,
+    targetKinds:['sceneObject'], placement:'bottom',
+    controls:[...objectCommon,number('count','Parçacık',36,0,120),number('spread','Yayılım',.35,0,1,.01)],
+    presets:{
+      Sakin:{width:.14,height:.4,opacity:.35,speed:.5,count:24,spread:.2},
+      Doğal:{width:.18,height:.5,opacity:.5,speed:.8,count:36,spread:.35},
+      Canlı:{width:.22,height:.65,opacity:.68,speed:1.1,count:64,spread:.55},
+    },
+    compile(object,target,params) {
+      return {...params,width:params.width*target.scale,height:params.height*target.scale};
+    },
+  },
+});
+export const defaultObjectParams = type => Object.fromEntries(objectEffectRegistry[type].controls.map(c=>[c.key,c.default]));

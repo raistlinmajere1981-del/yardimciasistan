@@ -65,12 +65,9 @@ try {
   await expect(speaker()).toHaveCount(2);
   await settings(); await setSpeech(false); await editor(); await expect(speaker()).toHaveCount(0);
   await settings(); await setSpeech(true); await editor(); await expect(speaker()).toHaveCount(2);
-  await settings(); await openSettingsService(page, 'settings-dictation');
-  await expect(dictationToggle).not.toBeChecked();
-  await expect(dictationToggle).toBeDisabled();
-  await expect(sttTest).toHaveCount(0);
-  await expect(configuration).toHaveJSProperty("disabled", true);
-  await cancelSettingsService(page);
+  await settings();
+  await expect(page.locator('#settings-dictation')).toBeDisabled();
+  await expect(page.locator('#settings-dictation')).toContainText('AI Yardımcı kapalı');
   await settings(); await openSettingsService(page, 'settings-ai');
   await overlay.getByRole('switch').check();
   await overlay.getByLabel('Model adı', { exact: true }).fill('gpt-4.1');
@@ -93,7 +90,7 @@ try {
   await expect(overlay.getByLabel('Canlı kontrol durumu')).toHaveText('Hata');
   assert.equal(await testCalls(), testsBeforeFailure + 1, 'Failed STT test reaches its bridge owner');
   await expect(page.locator('.global-message-bar')).toContainText('Fixture STT bağlantı hatası');
-  await expect.poll(() => overlay.evaluate(dialog => getComputedStyle(dialog, "::backdrop").clipPath)).toContain("inset(");
+  await expect.poll(() => overlay.evaluate(dialog => getComputedStyle(dialog, "::backdrop").clipPath)).toContain("polygon(evenodd");
   await expect(page.locator(".page-header .global-message-bar")).toBeVisible();
   await expect(sttTest).toBeEnabled();
   assert.equal(await page.evaluate(() => window.settingsCalls.filter(call => call.kind === 'dictation-save').length), 0);

@@ -44,13 +44,13 @@ export function useTranslationSettings(enabled: boolean) {
     }
   };
 }
-export function TranslationSettingsSection({ controller, disabled, aiAvailable }: { controller: ReturnType<typeof useTranslationSettings>; disabled: boolean; aiAvailable: boolean }) {
+export function TranslationSettingsSection({ controller, disabled, aiAvailable, blockedReason }: { controller: ReturnType<typeof useTranslationSettings>; disabled: boolean; aiAvailable: boolean; blockedReason?: string | undefined }) {
   const {draft, setDraft} = controller;
   const [language, setLanguage] = useState("");
   const choices = PUBLIC_LANGUAGES.filter(l => l.code !== "tr" && !draft.targetLanguages.includes(l.code));
   return <ServiceSettingsCard id="settings-translation" title="Çoklu Dil" enabled={draft.enabled}
     onEnabledChange={enabled => setDraft({...draft,enabled,automatic:true})} disabled={disabled || controller.loading || controller.saving}
-    readiness="Test kullanılamıyor">
+    blockedReason={blockedReason} readiness="Test kullanılamıyor">
     {controller.error && <p role="alert">{controller.error}</p>}
     <label className="form-field">Kaynak dil<select value="tr" disabled><option value="tr">Türkçe</option></select></label>
     <div className="form-stack">

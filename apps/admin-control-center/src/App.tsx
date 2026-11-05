@@ -2759,7 +2759,6 @@ function StartupSplash({
 export default function App() {
   const bridgeRecoveryScheduled = useRef(false);
   const [section, setSection] = useState<Section>("overview");
-  const [deployTargetPreset, setDeployTargetPreset] = useState("");
   const [data, setData] = useState<OverviewSnapshot | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -2845,11 +2844,7 @@ export default function App() {
               <button
                 key={item.id}
                 className={section === item.id ? "nav-item nav-item--active" : "nav-item"}
-                onClick={() => {
-                  // Manual navigation must not keep a one-shot target preset.
-                  if (item.id === "deploy") setDeployTargetPreset("");
-                  setSection(item.id);
-                }}
+                onClick={() => setSection(item.id)}
               >
                 <Icon size={18} />
                 {item.label}
@@ -2885,12 +2880,9 @@ export default function App() {
         ) : section === "tests" && data ? (
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "deploy" && data ? (
-          <Deploy data={data} presetTargetId={deployTargetPreset} onRefresh={() => void loadOverview()} />
+          <Deploy data={data} onRefresh={() => void loadOverview()} />
         ) : section === "effects" && data ? (
-          <EffectStudio onOpenDeploy={(targetId) => {
-            setDeployTargetPreset(targetId);
-            setSection("deploy");
-          }} />
+          <EffectStudio />
         ) : section === "support" && data ? (
           <Support productVersion={data.product.version} />
         ) : section === "system" && data ? (

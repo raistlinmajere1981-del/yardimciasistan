@@ -5,7 +5,7 @@ export async function expandSettingsStructure(page) {
 }
 export async function openSettingsService(page, id) {
   await expandSettingsStructure(page);
-  await page.locator(`#${id}`).getByRole('button').click();
+  await page.locator(`#${id}`).click();
   return page.locator('.settings-service-overlay');
 }
 export async function cancelSettingsService(page) {

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "bindings": [
+    {
+      "source": "site/img/orman-isik.jpg",
+      "slot": "orman_isik_eb0aeffb",
+      "scene": "orman_isik_eb0aeffb.scene.json"
+    }
+  ]
+}

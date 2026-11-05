@@ -113,7 +113,7 @@ function load(file) {
   if (modules.has(file)) return modules.get(file);
   const exports = {}; modules.set(file, exports);
   runInNewContext(readFileSync(`${file}.js`, "utf8"), {
-    exports, __dirname: dirname(file), Buffer, URL, Error, fetch, console,
+    exports, __dirname: dirname(file), Buffer, URL, Error, AbortController, fetch, console,
     process: { platform: process.platform, env: {}, argv: [], exit: () => assert.fail("unexpected exit") },
     setImmediate: (action) => immediate.push(action), setTimeout: () => ({ unref() {} }), clearTimeout,
     setInterval: () => ({ unref() {} }), clearInterval: () => {},
@@ -166,6 +166,8 @@ const addedProtectedChannels = [
     "companionGrantStatus", "companionSpendStatus", "companionSpendGrant", "companionSpendRevoke",
     "companionDevices", "companionGrant", "companionRevoke"].map(name => `benefits:${name}`),
   ...["benefitsState", "previewBenefits", "fullRefundMarketPreview", "fullRefundMarket", "marketHistory"].map(name => `commerce:sale:${name}`),
+  // Reviewed additions: window-owned cancellation and native-picker-only backup import.
+  "ai:cancelTestConnection", "dataMaintenance:importBackupZip",
   "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits", "webTraffic:snapshot"
 ];
 assert.equal(handlers.size, 296 + addedProtectedChannels.length, "all production invoke registrations must execute");
@@ -247,15 +249,15 @@ for (const channel of handlers.keys()) {
 const representatives = [
   ["finance:saveManualEntry", {}], ["roomFolio:addPayment", {}], ["customer:save", {}],
   ["reservation:updateStatus", { reservationId: "reservation", status: "approved" }],
-  ["tableOrder:open", "table"], ["ai:testConnection", {}], ["report:generateAiComment", {}],
+  ["tableOrder:open", "table"], ["ai:testConnection", {}, "ai-test-lock-fixture"], ["report:generateAiComment", {}],
   ["roomFolio:collectPayment", { folioId: "folio" }],
   ["customer:checkoutStayWithSettlement", { stayId: "stay", roomId: "room", settleCurrent: true, previousFolioIds: [] }],
   ["reservation:assignRoom", { reservationId: "reservation", roomId: "room" }], ["commerce:sale:completeMarket", {}]
 ];
-for (const [channel, input] of representatives) {
+for (const [channel, ...args] of representatives) {
   await invoke("appLock:unlock", "");
   const before = calls.length;
-  assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
+  assert.equal((await invoke(channel, ...args)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
 }
 for (const [channel, method, args] of [

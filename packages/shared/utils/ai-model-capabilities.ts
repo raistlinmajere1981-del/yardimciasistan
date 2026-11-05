@@ -1,22 +1,32 @@
-import { CLOUDFLARE_AI_MODELS, isCloudflareAiBaseUrl } from "./cloudflare-ai";
+import { isCloudflareAiModelId, isCloudflareAiBaseUrl } from "./cloudflare-ai";
 /** Static capability metadata shared by provider selection and Settings presentation. */
 export function supportsImageGenerationModel(service: string, model: string): boolean {
-  if (service === "cloudflare") return model === CLOUDFLARE_AI_MODELS.image;
+  if (service === "cloudflare") return isCloudflareAiModelId(model);
   return service === "gemini" ? /^gemini-[\w.-]*image[\w.-]*$/.test(model)
     : ["openai", "custom"].includes(service) && /^gpt-image-[\w.-]+$/.test(model);
 }
 
 export function imageGenerationModelOptions(service: string, models: readonly string[]): string[] {
-  return [...new Set([...(service === "openai" ? ["gpt-image-1"] : service === "cloudflare" ? [CLOUDFLARE_AI_MODELS.image] : []), ...models])]
+  return [...new Set([...(service === "openai" ? ["gpt-image-1"] : []), ...models])]
     .filter(model => supportsImageGenerationModel(service, model));
 }
 
-/** Documented audio input contracts; account access needs a separate real audio test. */
+/** Adapter-supported models, not an account catalog or inference entitlement.
+ * Cloudflare additionally requires live catalog task metadata. A new ASR model
+ * must get an explicit compatible transport before it can receive audio.
+ * Refresh the Hosting snapshot with scripts/sync-stt-model-policy.mjs.
+ */
+export const STT_MODEL_POLICY = {
+  cloudflare: ["@cf/openai/whisper-large-v3-turbo"],
+  openai: ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"],
+  gemini: ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash"]
+} as const;
+
 export function sttModelOptions(service: string): readonly string[] {
   switch (service) {
-    case "cloudflare": return [CLOUDFLARE_AI_MODELS.stt];
-    case "openai": return ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"];
-    case "gemini": return ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash"];
+    case "cloudflare": return STT_MODEL_POLICY.cloudflare;
+    case "openai": return STT_MODEL_POLICY.openai;
+    case "gemini": return STT_MODEL_POLICY.gemini;
     default: return [];
   }
 }
