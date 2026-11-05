@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.7.3",
+  "template_version": "0.7.4",
   "site_owned": [
     "site/",
     "locales/",
@@ -20,7 +20,7 @@
     "core/views/components/header.php": "21c1de2be0f2752337d1c8dd63e7c8afc2487e7e2e4241c6c41e7cc235eecdb8",
     "core/views/components/hero.php": "2a8b6d850cc7d42a2cc4d359385b1fdabb97dcd45952551301e7bfa95b47c637",
     "core/views/components/page-header.php": "13aad20c1bc60665d2dbc455d925d22cbec0f686cb5820af7400f1f7232d07dd",
-    "core/views/components/product-card.php": "2e5b0e82e588770817b2f094e95b70246a3486d54e58a6574152eb25babf393f",
+    "core/views/components/product-card.php": "7147017d7209e27d6fc995aa02d65ce55906a1a624d56b596e5f822896812cbe",
     "core/views/components/resource-card.php": "ccae701ccd1d59a978758857bfebf5743d0c1b667cf52a0d1618aea7751a471e",
     "core/views/components/resource-detail.php": "d228bdbf3e80c763aec80e1e6fb8b180c75422a792b8c91e86a9e24fd1f17bb1",
     "core/views/components/resource-features.php": "f40ea503f0dd864846804c22c9f238bc084b555c3db26e78f81363156273443a",
@@ -30,7 +30,7 @@
     "core/views/pages/about.php": "7da2c6fcf9b2c0319b8b96633494beba488f4fd9250bf130a7a582736239b8c7",
     "core/views/pages/account.php": "e40dd77575429e7676f8934bfb670ab1c6c89a4cf9f177173b49e0476aed846e",
     "core/views/pages/announcements.php": "78b8d4178466501032d13601ac1ff5385e10ec6cc07c0cf58a4ea26c87a68480",
-    "core/views/pages/catalog.php": "e67fb8a866dfa2c0784c0c57bbfe159d41985f6c2660843d60ddefa718fcdee8",
+    "core/views/pages/catalog.php": "c99c987001968f64515afd7241cfa30aa0b7d2b4de0eed62dea367210b4aff68",
     "core/views/pages/contact.php": "0d014ac6cae39afbaa8f23a450098d3c4597c8b721633ee5a8f0c38e29e4188c",
     "core/views/pages/gallery.php": "932b74d73d92e9ff3170a40f5c07a109cc318611e3dff78b2ab3050a04d1ad68",
     "core/views/pages/home.php": "76ae78be270b724634f9100fa8980c2bcc6c85a6bb2e9c2aab1bac10b0282ecf",
@@ -53,9 +53,9 @@
     "public/assets/core/panorama.mjs": "855dad87020e020d43a42f4e0a7e112d298cefdd0dcb82f6e77eab8fe407c118",
     "public/assets/core/portal.js": "93e0d5cc902159c3f1f6df736abc8ced7f57e2bbc4c214c2bef566802480425e",
     "public/assets/core/public-api.mjs": "13c466f841c500908ec0219e4d52e231b2730ad700ccb6a07922db6c49a9df11",
-    "public/assets/core/site.css": "731ab258ec07f03a531a8138f776e14f81d469612ecb422d72da83b19de4ee32",
+    "public/assets/core/site.css": "a6477f2fa512feb36cae934db55d0256bb829e15c3b7eeaa0bc3598d4613a3ef",
     "public/assets/core/site.mjs": "99392879f8bd69792ed45d80abd785b2df3f8729edc974739e6f7407d659ecaa",
-    "public/assets/core/storefront.js": "c95afcf2514e2cf03925a5f5a4098da21f1f09fedd0eb7e7b50438169fa0b085",
+    "public/assets/core/storefront.js": "1ab7648918748d94a00589009327482f6fe312c6b5f294f4f49459b010ccc10e",
     "public/assets/core/traffic.mjs": "bdf1db77359516684b03f01326e6c51001269e9c28fa15c1ac7260d01e58bfe1",
     "public/assets/core/widget.js": "7984a72b2c7c5caee57dcb5856c0f634679cdcbc7fff62ac7eb2cb3d2947d5e6",
     "public/assets/vendor/effect-engine/provenance.json": "e2bea927a0834dd4cff457fd5567a9cfee46f4e597b0c2d09ce51c3107ca466d",
@@ -79,8 +79,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "8e0b2a1127c0cc57198239b689ee4365eccf039768ec7cca57d40149070097f2",
-    "tools/manifest.mjs": "c088fdcb0cd7c904b447218e6ddf638086455bd1f55f226ceef2d0fb568e1f95",
+    "README.md": "b980a8da060261780e1804aa699b2e06c6f840b250c0d5aa3d4ef77fc97f3cbd",
+    "tools/manifest.mjs": "acd0f216c9f09a403188743dc96873523c163d7b056320eea032e6b25afc105f",
     "tools/sync-effect-engine.mjs": "1ea62825931112e2e6b566368da56d9a0d94c2f7995c322fb92b50a040607600",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

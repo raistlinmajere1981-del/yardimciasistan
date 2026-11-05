@@ -131,6 +131,8 @@
     $('success').hidden = true; $('reference').textContent = '';
     $('store-layout').hidden = false; $('product-grid').replaceChildren();
     $('cart-lines').replaceChildren(); $('subtotal').replaceChildren(); $('cart-count').textContent = '0';
+    const headerCount = document.getElementById('header-cart-count');
+    if (headerCount) { headerCount.textContent = '0'; headerCount.hidden = true; }
     $('catalog-account').textContent = ''; $('catalog-account').hidden = true;
     $('cart-message').textContent = ''; message('');
     for (const id of ['catalog-category','catalog-brand']) $(id)?.replaceChildren();
@@ -207,9 +209,43 @@
       field.value = filters[key];
     }
     $('catalog-brand-field').hidden = ![...catalog.values()].some(product => product.brand);
-    $('catalog-category').closest('label').hidden = categories.length === 0;
+    $('catalog-category-field').hidden = categories.length === 0;
+    renderCategoryOptions();
     $('catalog-sku').closest('label').hidden = ![...catalog.values()].some(product => product.sku);
     $('catalog-search').value = filters.q; $('catalog-sku').value = filters.sku;
+  }
+  function renderCategoryOptions() {
+    const options = $('category-options'), query = $('category-query');
+    const selected = categories.find(row => row.id === filters.category);
+    const selectedChip = $('category-selected');
+    selectedChip.hidden = !selected;
+    selectedChip.replaceChildren();
+    if (selected) {
+      const remove = button(selected.name + ' ×', () => selectCategory(''), 'category-chip');
+      remove.setAttribute('aria-label', ui('Filtreleri temizle') + ': ' + selected.name);
+      selectedChip.append(remove);
+    }
+    const normalize = value => String(value || '').toLocaleLowerCase(locale).normalize('NFKD');
+    const matching = categories.filter(row => normalize(row.name).includes(normalize(query.value.trim())));
+    options.replaceChildren();
+    if (!query.value.trim()) {
+      const all = button(ui('Tüm kategoriler'), () => selectCategory(''), 'category-option');
+      all.setAttribute('aria-pressed', String(!filters.category));
+      options.append(all);
+    }
+    for (const row of matching) {
+      const option = button(row.name, () => selectCategory(row.id), 'category-option');
+      option.dataset.categoryId = row.id;
+      option.setAttribute('aria-pressed', String(filters.category === row.id));
+      options.append(option);
+    }
+    if (!matching.length) options.append(el('p', ui('Ürün bulunamadı.'), 'category-no-results'));
+  }
+  function selectCategory(value) {
+    $('catalog-category').value = value;
+    $('category-query').value = '';
+    $('catalog-category').dispatchEvent(new Event('change',{bubbles:true}));
+    renderCategoryOptions();
   }
   function syncFilterUrl() {
     const url = new URL(location.href);
@@ -373,7 +409,7 @@
     for (const product of products.slice((pageNumber - 1) * pageSize,pageNumber * pageSize)) {
       const card = el('article', undefined, 'product-card');
       card.dataset.productId = product.product_id;
-      const media = el('div', undefined, 'product-media');
+      const media = el('a', undefined, 'product-media'); media.href = productUrl(product.product_id); media.setAttribute('aria-label',product.name);
       const fallback = el('span', ui("Görsel yok")); media.append(fallback);
       const url = safeImage(product.image_url);
       if (url) {
@@ -385,10 +421,14 @@
       const heading = el('h3'), link = el('a',product.name); link.href = productUrl(product.product_id); link.dataset.productLink = '';
       heading.append(link); body.append(heading);
       if (product.sku) body.append(el('p', `${ui('Stok kodu')}: ${product.sku}`, 'product-sku'));
-      if (product.brand) body.append(el('p',product.brand));
-      if (product.description) body.append(el('p', product.description, 'description'));
-      if (product.image_urls.length > 1) body.append(productGallery(product));
-      body.append(el('div', `${money(product.price, product.currency)} / ${units[product.unit]}`, 'price'), el('span', ui("Satışta"), 'availability'));
+      if (product.brand) body.append(el('span',product.brand,'product-brand'));
+      if (product.image_urls.length > 1) {
+        const galleryLink = el('a',ui('Fotoğraflar ({0})',{0:product.image_urls.length}),'product-gallery-link');
+        galleryLink.href = productUrl(product.product_id);
+        galleryLink.setAttribute('aria-label',product.name);
+        body.append(galleryLink);
+      }
+      body.append(el('div', money(product.price, product.currency) + ' / ' + units[product.unit], 'price'));
       const add = button(ui("Sepete ekle"), () => addProduct(product), ''); add.disabled = !deliveryMethods.length || Boolean(pending) || busy || reordering || auth.status === 'unavailable';
       const compareLabel = el('label',undefined,'compare-choice'), compare = el('input',undefined,'compare-select');
       compare.type = 'checkbox'; compare.checked = selected.has(product.product_id); compare.dataset.productId = product.product_id;
@@ -416,11 +456,23 @@
     const focusedLabel = document.activeElement?.closest('.quantity-controls') ? document.activeElement.getAttribute('aria-label') : null;
     $('cart-lines').replaceChildren();
     $('cart-count').textContent = String(cart.length);
+    const headerCount = document.getElementById('header-cart-count');
+    if (headerCount) { headerCount.textContent = String(cart.length); headerCount.hidden = cart.length === 0; }
     const totals = new Map();
     if (!cart.length) $('cart-lines').append(el('li', ui("Sepetiniz henüz boş.")));
     cart.forEach((item, index) => {
       const product = item.display, row = el('li', undefined, 'cart-line');
-      row.append(el('strong', product.name), el('p', `${money(product.price, product.currency)} / ${units[product.unit]}`));
+      const heading = el('div', undefined, 'cart-line-heading'), thumbnail = el('div', undefined, 'cart-line-thumb');
+      const thumbnailUrl = safeImage(product.image_url);
+      if (thumbnailUrl) {
+        const photo = el('img'); photo.src = thumbnailUrl; photo.alt = '';
+        photo.loading = 'lazy'; photo.referrerPolicy = 'no-referrer';
+        photo.addEventListener('error', () => photo.remove(), {once:true});
+        thumbnail.append(photo);
+      }
+      const copy = el('div',undefined,'cart-line-copy');
+      copy.append(el('strong',product.name), el('p', money(product.price, product.currency) + ' / ' + units[product.unit]));
+      heading.append(thumbnail,copy); row.append(heading);
       const available = catalogStatus === 'ready' && catalog.has(item.productId);
       if (!available || !quantity(item.q / scale, product.unit)) row.append(el('p', catalogStatus === 'loading' ? ui("Ürün kontrol ediliyor…") : !available ? ui("Artık satışta değil veya katalog doğrulanamadı. Satırı kaldırın ya da ürünleri yenileyin.") : ui("Bu ürünün birimi değişti. Miktarı güncelleyin."), 'unavailable'));
       const controls = el('div', undefined, 'quantity-controls');
@@ -715,10 +767,32 @@
   }
   $('catalog-filters').addEventListener('submit',event => event.preventDefault());
   for (const [id,key,event] of [['catalog-search','q','input'],['catalog-sku','sku','input'],['catalog-category','category','change'],['catalog-brand','brand','change']]) {
-    $(id).addEventListener(event,() => { filters[key] = $(id).value; pageNumber = 1; syncFilterUrl(); renderProducts(); });
+    $(id).addEventListener(event,() => { filters[key] = $(id).value; pageNumber = 1; syncFilterUrl(); if (key === 'category') renderCategoryOptions(); renderProducts(); });
   }
-  $('catalog-reset').addEventListener('click',() => { for (const key of Object.keys(filters)) filters[key] = ''; favoritesOnly = false; $('favorites-only').checked = false; pageNumber = 1; renderFilters(); syncFilterUrl(); renderProducts(); });
+  $('category-query').addEventListener('input', renderCategoryOptions);
+  $('category-query').addEventListener('keydown', event => {
+    if (event.key === 'Escape') { $('category-query').value = ''; renderCategoryOptions(); return; }
+    if (event.key === 'ArrowDown') { event.preventDefault(); $('category-options').querySelector('button')?.focus(); }
+    if (event.key === 'Enter') { event.preventDefault(); $('category-options').querySelector('button')?.click(); }
+  });
+  $('category-options').addEventListener('keydown',event => {
+    if (!['ArrowDown','ArrowUp','Home','End','Escape'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Escape') { $('category-query').focus(); return; }
+    const nodes = [...$('category-options').querySelectorAll('button')];
+    const i = nodes.indexOf(document.activeElement);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? nodes.length - 1
+      : event.key === 'ArrowDown' ? Math.min(nodes.length - 1,i + 1) : Math.max(0,i - 1);
+    nodes[next]?.focus();
+  });
+  $('catalog-reset').addEventListener('click',() => { for (const key of Object.keys(filters)) filters[key] = ''; favoritesOnly = false; $('favorites-only').checked = false; pageNumber = 1; $('category-query').value = ''; renderFilters(); syncFilterUrl(); renderProducts(); });
   $('favorites-only').addEventListener('change',() => { favoritesOnly = $('favorites-only').checked; pageNumber = 1; renderProducts(); });
+  $('filter-panel-toggle').addEventListener('click', () => {
+    const collapsed = $('catalog-filter-rail').classList.toggle('rail-collapsed');
+    $('filter-panel-toggle').setAttribute('aria-expanded',String(!collapsed));
+    if (!collapsed) $('category-query').focus();
+  });
+  $('cart-panel-toggle').addEventListener('click', () => $('cart').scrollIntoView({behavior:'smooth',block:'start'}));
   for (const [id,step] of [['catalog-prev',-1],['catalog-next',1]]) $(id).addEventListener('click',() => { pageNumber += step; renderProducts(); });
   window.addEventListener('storage',event => { if (event.key === favoritesKey && catalogStatus === 'ready' && auth.status !== 'unavailable') { restoreFavorites(); renderProducts(); renderDetail(); } });
   $('compare-open').addEventListener('click',() => showComparison());

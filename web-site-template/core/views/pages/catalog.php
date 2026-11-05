@@ -9,10 +9,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <a class="skip-link" href="#products"><?= e(t($site, 'nav.skip')) ?></a>
     <header class="store-header">
       <div>
-        <p class="eyebrow"><?= e(t($site, 'order.title')) ?></p>
         <h1><?= e($view['title']) ?></h1><p id="catalog-account" hidden></p>
       </div>
-      <a class="button secondary cart-access" href="#cart"><?= e(t($site, 'cart.title')) ?> <span id="cart-count">0</span></a>
     </header>
 
     <section id="success" class="state" hidden tabindex="-1" aria-labelledby="success-title">
@@ -23,21 +21,36 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     </section>
 
     <div id="store-layout" class="store-layout">
-      <section aria-labelledby="products-title" id="products" tabindex="-1">
-        <div class="section-heading">
-          <h2 id="products-title"><?= e(t($site, 'page.catalog')) ?></h2>
-          <button id="refresh" class="quiet" type="button"><?= e(t($site, 'account.refresh_products')) ?></button>
-        </div>
-        <div id="catalog-state" class="state" role="status" aria-live="polite"></div>
+      <aside id="catalog-filter-rail" class="catalog-filter-rail" aria-label="<?= e(t($site, 'catalog.category')) ?>">
+        <div class="rail-heading"><strong><?= e(t($site, 'catalog.category')) ?></strong><span aria-hidden="true">☷</span></div>
         <form class="catalog-filters" id="catalog-filters" role="search">
-          <label for="catalog-search"><?= e(t($site, 'catalog.search')) ?><input id="catalog-search" type="search" maxlength="180" autocomplete="off"></label>
-          <label for="catalog-category"><?= e(t($site, 'catalog.category')) ?><select id="catalog-category"><option value=""><?= e(t($site, 'catalog.categories_all')) ?></option></select></label>
-          <label for="catalog-sku"><?= e(t($site, 'catalog.sku')) ?><input id="catalog-sku" type="search" maxlength="80" autocomplete="off"></label>
-          <label for="catalog-brand" id="catalog-brand-field" hidden><?= e(t($site, 'catalog.brand')) ?><select id="catalog-brand"><option value=""><?= e(t($site, 'catalog.brands_all')) ?></option></select></label>
+          <label for="catalog-search"><span class="sr-only"><?= e(t($site, 'catalog.search')) ?></span><input id="catalog-search" type="search" maxlength="180" autocomplete="off" placeholder="<?= e(t($site, 'catalog.search')) ?>"></label>
+          <div class="category-picker" id="catalog-category-field">
+            <label for="catalog-category" class="sr-only"><?= e(t($site, 'catalog.category')) ?></label>
+            <select id="catalog-category" class="catalog-native-select" tabindex="-1" aria-hidden="true"><option value=""><?= e(t($site, 'catalog.categories_all')) ?></option></select>
+            <label for="category-query" class="sr-only"><?= e(t($site, 'catalog.category')) ?></label>
+            <input id="category-query" type="search" autocomplete="off" aria-controls="category-options" placeholder="<?= e(t($site, 'catalog.category')) ?>" aria-label="<?= e(t($site, 'catalog.category')) ?>">
+            <div id="category-selected" class="category-selected" hidden></div>
+            <div id="category-options" class="category-options" role="group" aria-label="<?= e(t($site, 'catalog.category')) ?>"></div>
+          </div>
+          <label for="catalog-sku"><span class="sr-only"><?= e(t($site, 'catalog.sku')) ?></span><input id="catalog-sku" type="search" maxlength="80" autocomplete="off" placeholder="<?= e(t($site, 'catalog.sku')) ?>"></label>
+          <label for="catalog-brand" id="catalog-brand-field" hidden><span class="sr-only"><?= e(t($site, 'catalog.brand')) ?></span><select id="catalog-brand"><option value=""><?= e(t($site, 'catalog.brands_all')) ?></option></select></label>
           <label for="favorites-only" class="favorites-filter"><input id="favorites-only" type="checkbox"> <?= e(t($site, 'catalog.favorites_only')) ?></label>
           <button id="catalog-reset" type="button" class="quiet"><?= e(t($site, 'catalog.reset')) ?></button>
         </form>
-        <div class="section-heading"><p id="catalog-count" role="status" aria-live="polite"></p><button id="compare-open" class="button secondary" type="button" disabled><?= e(t($site, 'catalog.compare')) ?></button></div>
+      </aside>
+      <section aria-label="<?= e(t($site, 'page.catalog')) ?>" id="products" tabindex="-1">
+        <div class="catalog-results-bar">
+          <button id="filter-panel-toggle" type="button" class="button secondary mobile-rail-toggle" aria-expanded="false" aria-controls="catalog-filter-rail"><?= e(t($site, 'catalog.category')) ?></button>
+          <p id="catalog-count" role="status" aria-live="polite"></p>
+          <div class="catalog-result-actions">
+            <button id="refresh" class="quiet" type="button"><?= e(t($site, 'account.refresh_products')) ?></button>
+            <button id="compare-open" class="button secondary" type="button" disabled><?= e(t($site, 'catalog.compare')) ?></button>
+            <button id="cart-panel-toggle" type="button" class="button secondary mobile-rail-toggle" aria-expanded="false" aria-controls="cart"><?= e(t($site, 'cart.title')) ?></button>
+          </div>
+        </div>
+        <div id="catalog-state" class="state" role="status" aria-live="polite"></div>
+
         <section id="product-detail" class="content-card" hidden tabindex="-1" aria-labelledby="product-detail-title"></section>
         <section id="comparison-panel" class="content-card" hidden tabindex="-1" aria-labelledby="comparison-title"></section>
         <div id="product-grid" class="product-grid" aria-busy="true">
@@ -52,7 +65,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
 
       <aside id="cart" class="cart-panel" aria-labelledby="cart-title" tabindex="-1">
         <div class="section-heading">
-          <h2 id="cart-title"><?= e(t($site, 'cart.title')) ?></h2>
+          <h2 id="cart-title"><?= e(t($site, 'cart.title')) ?> <span id="cart-count" class="cart-rail-count">0</span></h2>
           <button id="clear-cart" class="quiet" type="button"><?= e(t($site, 'cart.clear')) ?></button>
         </div>
         <p id="cart-message" role="status" aria-live="polite"></p>
