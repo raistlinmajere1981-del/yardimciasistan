@@ -23,7 +23,7 @@ for(const [name,id] of sites) test(name+' exact package, redacted deterministic 
   const a=readFileSync(join(one,id.replace('-site','')+'-release.json'),'utf8');
   assert.equal(a,readFileSync(join(two,id.replace('-site','')+'-release.json'),'utf8'));
   const receipt=JSON.parse(a);assert.deepEqual(receipt.files,Object.fromEntries(files.map(p=>[p,sha(join(one,p))])));
-  assert.equal(receipt.retirement_mode,'preview-only-deploy-blocked');assert.equal(receipt.origin,new URL(receipt.module_url).origin);
+  assert.equal(receipt.retirement_mode,'pre-retired-hash-verified');assert.equal(receipt.origin,new URL(receipt.module_url).origin);
   assert.equal(receipt.template_manifest_sha256,sha(join(main,'web-site-template/template-manifest.json')));
   assert.equal(receipt.local_installed_manifest_sha256,sha(join(repo,'canonical/template-manifest.json')));
   assert.equal(receipt.effect_provenance_sha256,sha(join(main,'web-site-template/public/assets/vendor/effect-engine/provenance.json')));
@@ -98,7 +98,11 @@ test('deployed access rules deny remaining legacy PHP and JS before physical-fil
  }
  for(const [name] of sites) {
   const deploy=readFileSync(join(workspace,name,'scripts/deploy-site.sh'),'utf8');
-  assert.ok(deploy.indexOf('exit 4')<deploy.indexOf('ssh "'),'Deploy blocked before remote access');
+  assert.doesNotMatch(deploy,/DEPLOY BLOCKER|exit 4/);
+  assert.match(deploy,/retired_sha=.*sha256sum/);
+  assert.match(deploy,/Retired legacy path still present/);
+  assert.match(deploy,/sha256sum "\$root\/retired-paths\.json"/);
+  assert.match(deploy,/site-release-target\.mjs --verify-backend/);
   assert.match(deploy,/StrictHostKeyChecking=yes/);assert.match(deploy,/--proto '=https'/);assert.match(deploy,/site-release-target.mjs --verify-backend/);
   assert.ok(!deploy.includes('2.2.1')&&!deploy.includes('0.6.1'));
  }

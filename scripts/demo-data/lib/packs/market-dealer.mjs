@@ -430,7 +430,7 @@ export const marketDealerPack = {
         orders: 4,
         dealerOrders: 3,
         dealerAccessEligible: true,
-        dealerCatalogProducts: products.length,
+        dealerCatalogProducts: publicationCount,
         creditBalanceMinor: 100000,
         benefitRules: 2,
         pointBalanceMinor: 5000,

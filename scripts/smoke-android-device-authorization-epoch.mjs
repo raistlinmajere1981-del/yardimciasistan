@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -24,7 +25,7 @@ function load(file) {
 }
 const owner = load("apps/desktop-app/electron/database/android-device-store.ts");
 assert.equal(typeof owner.readAndroidDeviceAuthorizationEpoch, "function", "internal device epoch reader required");
-const root = mkdtempSync("/tmp/opencode/android-device-epoch-");
+const root = mkdtempSync(join(existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir(), "android-device-epoch-"));
 const path = join(root, "fixture.sqlite");
 const db = new DatabaseSync(path);
 try {

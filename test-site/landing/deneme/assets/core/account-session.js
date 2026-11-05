@@ -48,7 +48,18 @@
         catch (error) {
           if (started !== state.generation) return state;
           if (error.status !== 401) throw error;
-          await raw('refresh', {});
+          try {
+            await raw('refresh', {});
+          } catch (refreshError) {
+            // A 401 session check confirms a guest. An unconfigured *optional*
+            // account refresh service must not disable the public retail checkout.
+            // Other refresh failures stay fail-closed (including ambiguous outages).
+            if (refreshError.status === 503 && refreshError.code === 'account_unconfigured') {
+              if (started === state.generation) clear('guest');
+              return state;
+            }
+            throw refreshError;
+          }
           if (started !== state.generation) return state;
           result = await raw('session');
         }
@@ -120,7 +131,15 @@
   window.addEventListener('online', () => { void refresh(); });
   window.addEventListener('pagehide', () => clear('pagehide'));
   window.addEventListener('pageshow', () => { void refresh(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) clear('hidden'); else void refresh(); });
+  document.addEventListener('visibilitychange', () => {
+    // A guest holds no private account data: keep the public catalog and retail
+    // cart in the same document when merely switching browser tabs. On return,
+    // refresh() still detects a login/logout made in another tab.
+    // Authenticated / uncertain states remain fail-closed on backgrounding.
+    if (document.hidden) {
+      if (state.status !== 'guest' || state.account) clear('hidden');
+    } else void refresh();
+  });
   window.addEventListener('storage', event => {
     if (event.key !== markerKey || !event.newValue) return;
     let marker; try { marker = JSON.parse(event.newValue); } catch { return; }

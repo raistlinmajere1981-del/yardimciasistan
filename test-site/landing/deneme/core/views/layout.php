@@ -13,6 +13,9 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <?php if (in_array($view['page'], ['missing','account'], true)): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
   <?php $structured = structured_data($site, $view); if ($structured !== []): ?><script type="application/ld+json"><?= json_html($structured) ?></script><?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'core/site.css')) ?>">
+  <?php if ($view['page'] === 'catalog' && is_file($site['root'] . '/public/assets/site/catalog.css')): ?>
+    <link rel="stylesheet" href="<?= e(asset($site, 'site/catalog.css')) ?>">
+  <?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'site/theme.css')) ?>">
 </head>
 <body>
@@ -41,7 +44,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <script src="<?= e(asset($site, 'core/portal.js')) ?>" defer></script>
   <?php endif; ?>
   <?php if ($view['page'] === 'catalog'): ?>
-    <script src="<?= e(asset($site, 'core/storefront.js')) ?>" data-api-base="<?= e($site['module_path']) ?>/api/" defer></script>
+    <script src="<?= e(asset($site, 'core/commerce.js')) ?>" defer></script>
+    <script src="<?= e(catalog_runtime($site)) ?>" data-api-base="<?= e($site['module_path']) ?>/api/" defer></script>
   <?php endif; ?>
   <?php if (!empty($publication['features']['chat']) || !empty($publication['features']['requests']) || $publication['contact']['available'] || !empty($view['demo_widget_visible'])): ?>
     <script src="<?= e(asset($site, 'core/widget.js')) ?>" data-api-base-url="<?= e($site['module_path']) ?>" data-business-name="<?= e($publication['name']) ?>" data-whatsapp-phone="<?= e($publication['contact']['whatsapp'] !== '' ? text($publication['info']['whatsapp'] ?? '') : '') ?>" data-ai-enabled="<?= $publication['features']['chat'] ? 'true' : 'false' ?>" data-requests-enabled="<?= $publication['features']['requests'] ? 'true' : 'false' ?>" data-request-types="<?= e(json_html($publication['info']['request_types'] ?? [])) ?>" data-public-surfaces="<?= e(json_html($publication['info']['public_surfaces'] ?? [])) ?>" data-force-visible="<?= !empty($view['demo_widget_visible']) ? 'true' : 'false' ?>" data-whatsapp-enabled="<?= $publication['contact']['whatsapp'] !== '' ? 'true' : 'false' ?>" defer></script>
