@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.7.0",
+  "template_version": "0.7.1",
   "site_owned": [
     "site/",
     "locales/",
@@ -55,7 +55,7 @@
     "public/assets/core/public-api.mjs": "13c466f841c500908ec0219e4d52e231b2730ad700ccb6a07922db6c49a9df11",
     "public/assets/core/site.css": "731ab258ec07f03a531a8138f776e14f81d469612ecb422d72da83b19de4ee32",
     "public/assets/core/site.mjs": "99392879f8bd69792ed45d80abd785b2df3f8729edc974739e6f7407d659ecaa",
-    "public/assets/core/storefront.js": "2d6bc7c29f22ffec932836c4280536ca789d737e5bbec4e1420e34b8fe12d02e",
+    "public/assets/core/storefront.js": "c95afcf2514e2cf03925a5f5a4098da21f1f09fedd0eb7e7b50438169fa0b085",
     "public/assets/core/traffic.mjs": "bdf1db77359516684b03f01326e6c51001269e9c28fa15c1ac7260d01e58bfe1",
     "public/assets/core/widget.js": "7984a72b2c7c5caee57dcb5856c0f634679cdcbc7fff62ac7eb2cb3d2947d5e6",
     "public/assets/vendor/effect-engine/provenance.json": "e2bea927a0834dd4cff457fd5567a9cfee46f4e597b0c2d09ce51c3107ca466d",
@@ -79,8 +79,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "63ea6253777e73f032889a89e2e712de97f4583e4c91a60a02f66aee681b3e1d",
-    "tools/manifest.mjs": "b57fb455904227f819cda0677a147cef31bcc3abe5bb4989a3aa497b3c677518",
+    "README.md": "da48e96fc8b0143511626adbfb82c500a9163b8413c618540efdf4397d0a7a70",
+    "tools/manifest.mjs": "9214251aa6794e72bec24783b1872d050d01bfbbc7bd952785647f3363ec31fd",
     "tools/sync-effect-engine.mjs": "1ea62825931112e2e6b566368da56d9a0d94c2f7995c322fb92b50a040607600",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

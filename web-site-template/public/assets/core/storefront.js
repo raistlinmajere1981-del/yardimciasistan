@@ -38,6 +38,10 @@
   for (const key of Object.keys(filters)) filters[key] = (parameters.get(key) || '').slice(0,180);
   const isPrivate = () => auth.status === 'authenticated' && Boolean(auth.account?.dealer);
   const current = stamp => stamp === generation && auth.status !== 'unavailable';
+  // Failure to verify account status must fence private data and checkout,
+  // but must not erase the independently authorized public product listing.
+  const publicReadOnly = () => auth.status === 'unavailable' && auth.reason === 'unavailable' && !auth.account;
+  const catalogCurrent = stamp => stamp === generation && (auth.status !== 'unavailable' || publicReadOnly());
   const units = { piece: ui("adet"), kg: 'kg', g: 'g', l: 'l', ml: 'ml', pack: ui("paket"), box: ui("kutu"), meter: ui("metre"), other: ui("birim") };
   const discrete = (unit) => ['piece', 'pack', 'box'].includes(unit);
   const scale = 10000;
@@ -139,7 +143,9 @@
   function setOwner(state) {
     const key = identity(state);
     const changed = key !== ownerKey || state.generation !== auth.generation || state.status === 'unavailable';
-    if (changed && ownerKey) closePrivate(['hidden','pagehide'].includes(state.reason) || (!auth.account && state.reason === 'offline'));
+    const samePublicGuest = key === 'guest' && ownerKey === 'guest' && !auth.account && !state.account
+      && !['hidden','pagehide','offline'].includes(state.reason);
+    if (changed && ownerKey && !samePublicGuest) closePrivate(['hidden','pagehide'].includes(state.reason) || (!auth.account && state.reason === 'offline'));
     auth = state; ownerKey = key;
     cartKey = `ya:storefront:${scope}:${encodeURIComponent(ownerKey)}:cart:v2`;
     attemptKey = `ya:storefront:${scope}:${encodeURIComponent(ownerKey)}:attempt:v2`;
@@ -148,7 +154,14 @@
       $('buyer-name').value = state.account.fullName || ''; $('buyer-email').value = state.account.email || '';
     }
     $('buyer-name').readOnly = Boolean(state.account); $('buyer-email').readOnly = Boolean(state.account);
-    if (state.status !== 'unavailable' && (changed || !restored)) void loadCatalog();
+    if (publicReadOnly()) {
+      if (!samePublicGuest || (!restored && !loading)) void loadCatalog();
+      if (catalogStatus === 'ready') {
+        $('catalog-state').hidden = false;
+        $('catalog-state').textContent = ui('Hesap şu anda doğrulanamıyor. Lütfen yeniden deneyin.');
+      }
+      renderProducts(); renderCart();
+    } else if (state.status !== 'unavailable' && ((changed && !samePublicGuest) || (!restored && !loading))) void loadCatalog();
   }
   function forgetAttempt() { pending = null; write('sessionStorage', attemptKey, null); }
   function message(text) { $('submission-message').textContent = text; }
@@ -376,7 +389,7 @@
       if (product.description) body.append(el('p', product.description, 'description'));
       if (product.image_urls.length > 1) body.append(productGallery(product));
       body.append(el('div', `${money(product.price, product.currency)} / ${units[product.unit]}`, 'price'), el('span', ui("Satışta"), 'availability'));
-      const add = button(ui("Sepete ekle"), () => addProduct(product), ''); add.disabled = !deliveryMethods.length || Boolean(pending) || busy || reordering;
+      const add = button(ui("Sepete ekle"), () => addProduct(product), ''); add.disabled = !deliveryMethods.length || Boolean(pending) || busy || reordering || auth.status === 'unavailable';
       const compareLabel = el('label',undefined,'compare-choice'), compare = el('input',undefined,'compare-select');
       compare.type = 'checkbox'; compare.checked = selected.has(product.product_id); compare.dataset.productId = product.product_id;
       compare.disabled = !selected.has(product.product_id) && selected.size >= 2;
@@ -389,7 +402,7 @@
   function validCart() { return cart.length > 0 && deliveryMethods.length > 0 && catalogStatus === 'ready' && cart.every((item) => catalog.has(item.productId) && quantity(item.q / scale, item.display.unit)); }
   function updateControls() {
     $('clear-cart').disabled = !cart.length || Boolean(pending) || busy || reordering;
-    $('open-checkout').disabled = !validCart() || Boolean(pending) || busy || reordering;
+    $('open-checkout').disabled = !validCart() || Boolean(pending) || busy || reordering || auth.status === 'unavailable';
     $('buyer-fields').disabled = busy || Boolean(pending?.payload);
     $('delivery-fields').disabled = busy || Boolean(pending?.payload);
     renderDelivery();
@@ -397,7 +410,7 @@
     $('submit-order').textContent = busy ? ui("Gönderiliyor…") : pending ? ui("Aynı siparişi tekrar dene") : ui("Siparişi gönder");
     $('checkout-form').setAttribute('aria-busy', String(busy));
     const detailAdd = $('product-detail')?.querySelector('button.button');
-    if (detailAdd) detailAdd.disabled = busy || reordering || Boolean(pending) || !deliveryMethods.length || catalogStatus !== 'ready';
+    if (detailAdd) detailAdd.disabled = busy || reordering || Boolean(pending) || !deliveryMethods.length || catalogStatus !== 'ready' || auth.status === 'unavailable';
   }
   function renderCart() {
     const focusedLabel = document.activeElement?.closest('.quantity-controls') ? document.activeElement.getAttribute('aria-label') : null;
@@ -426,7 +439,7 @@
       });
       const plus = button('+', () => changeQuantity(item, item.q + step)); plus.setAttribute('aria-label', ui("{0}: miktarı artır", {0: product.name}));
       const remove = button(ui("Kaldır"), () => { if (pending || busy || reordering) return; cart = cart.filter((line) => line !== item); persistCart(); renderCart(); }, 'quiet'); remove.setAttribute('aria-label', ui("{0}: satırı kaldır", {0: product.name}));
-      for (const control of [minus, input, plus, remove]) { control.disabled = Boolean(pending) || busy || reordering; controls.append(control); }
+      for (const control of [minus, input, plus, remove]) { control.disabled = Boolean(pending) || busy || reordering || auth.status === 'unavailable'; controls.append(control); }
       row.append(controls, error); $('cart-lines').append(row);
       // Integer arithmetic for quantity and line subtotal, rounded to currency cents.
       const scaledPrice = BigInt(product.price.toFixed(4).replace('.', ''));
@@ -441,12 +454,12 @@
   }
   function canChangeQuantity(item, q) { return q > 0 && q <= 1000 * scale && cart.reduce((sum, line) => sum + (line === item ? q : line.q), 0) <= 10000 * scale; }
   function changeQuantity(item, q) {
-    if (pending || busy || reordering) return;
+    if (pending || busy || reordering || auth.status === 'unavailable') return;
     if (!canChangeQuantity(item, q)) { $('cart-message').textContent = ui("Satır miktarı en fazla 1000, toplam miktar en fazla 10000 olabilir."); return; }
     item.q = q; persistCart(); renderCart();
   }
   function addProduct(product) {
-    if (!deliveryMethods.length || catalogStatus !== 'ready' || pending || busy || reordering) return;
+    if (!deliveryMethods.length || catalogStatus !== 'ready' || pending || busy || reordering || auth.status === 'unavailable') return;
     const existing = cart.find((item) => item.productId === product.product_id);
     if (existing) {
       if (!canChangeQuantity(existing, existing.q + scale)) { $('cart-message').textContent = ui("Satır miktarı en fazla 1000, toplam miktar en fazla 10000 olabilir."); return; }
@@ -528,17 +541,17 @@
     } finally { if (current(stamp)) { reordering = false; renderProducts(); renderCart(); } }
   }
   async function loadCatalog() {
-    if (loading || auth.status === 'unavailable') return;
+    if (loading || (auth.status === 'unavailable' && !publicReadOnly())) return;
     loading = true; const sequence = ++loadSequence, stamp = generation;
     catalogStatus = 'loading'; $('refresh').disabled = true;
     $('catalog-state').hidden = false; $('catalog-state').textContent = ui('Ürünler yükleniyor…'); $('product-grid').setAttribute('aria-busy','true');
     renderProducts(); renderCart();
     try {
       const response = await fetch(new URL(isPrivate() ? 'dealer/catalog.php' : 'catalog.php',apiBase), {cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(15000)});
-      if (!current(stamp) || sequence !== loadSequence) return;
+      if (!catalogCurrent(stamp) || sequence !== loadSequence) return;
       if ([401,403].includes(response.status) && auth.account) { accountOwner?.clear('unavailable'); return; }
       const source = await response.json();
-      if (!current(stamp) || sequence !== loadSequence) return;
+      if (!catalogCurrent(stamp) || sequence !== loadSequence) return;
       const result = isPrivate() ? {ok:source.ok,enabled:true,...source.catalog} : (demoLang.localize?.(source,'online_catalog') || source);
       if (!response.ok || result.ok !== true || typeof result.enabled !== 'boolean' || !Array.isArray(result.products)
           || !Array.isArray(result.delivery_methods) || result.delivery_methods.length > 2
@@ -563,17 +576,21 @@
       $('catalog-account').textContent = auth.account?.fullName || '';
       $('catalog-state').textContent = !result.enabled || !deliveryMethods.length ? ui('Mağazamız şu anda online sipariş almıyor.') : !catalog.size ? ui('Şu anda satışta ürün bulunmuyor.') : '';
       $('catalog-state').hidden = result.enabled && deliveryMethods.length > 0 && catalog.size > 0;
+      if (publicReadOnly() && catalogStatus === 'ready') {
+        $('catalog-state').hidden = false;
+        $('catalog-state').textContent = ui('Hesap şu anda doğrulanamıyor. Lütfen yeniden deneyin.');
+      }
       const blockedByAttempt = Boolean(pending) || window.YaCartDraft?.hasPending(ownerKey) !== false;
       await recoverAttempt(stamp);
       await prepareReorder(stamp,blockedByAttempt);
     } catch {
-      if (!current(stamp) || sequence !== loadSequence) return;
+      if (!catalogCurrent(stamp) || sequence !== loadSequence) return;
       if (auth.account) { accountOwner?.clear('unavailable'); return; }
       catalog.clear(); clearComparison(); catalogStatus = 'error';
       $('product-detail').replaceChildren(); $('product-detail').hidden = true;
       $('catalog-state').hidden = false; $('catalog-state').textContent = ui('Ürünler şu anda yüklenemiyor. Ürünleri yenile düğmesiyle tekrar deneyin.');
     } finally {
-      if (current(stamp) && sequence === loadSequence) {
+      if (catalogCurrent(stamp) && sequence === loadSequence) {
         loading = false; $('refresh').disabled = false; $('product-grid').setAttribute('aria-busy','false'); renderProducts(); renderCart();
       }
     }
