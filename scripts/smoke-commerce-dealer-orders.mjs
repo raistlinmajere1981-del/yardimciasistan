@@ -19,7 +19,9 @@ try {
   const a=customers.find(x=>x.email==='a@example.test'),b=customers.find(x=>x.email==='b@example.test'),ordinary=customers.find(x=>x.email==='ordinary@example.test');
   for(const [customer,priceGroup] of [[a,'dealer_a'],[b,'dealer_b']])assert.equal(database.saveCustomer({...customer,commercialProfile:{companyName:customer.fullName,dealerStatus:'active',priceGroup}}).ok,true);
   const product=saveRuntimeCatalogProduct(database.databasePath,{name:'Private Price Fixture',sku:'ACCOUNT-1',brand:'Fixture',categoryId:'',salePrice:100,dealerPriceA:80,dealerPriceB:60,purchasePrice:30,currency:'TRY',unit:'piece',taxRate:20,trackInventory:false,isActive:true});
-  database.saveCommerceProductPublication({productId:product.id,isPublished:true});
+  database.saveCommerceProductPublication({productId:product.id,isPublished:true,titleOverride:'Published TEST item',descriptionOverride:'Published TEST details'});
+  const unpublished=saveRuntimeCatalogProduct(database.databasePath,{name:'Unpublished TEST part',sku:'HIDDEN-1',brand:'Fixture',categoryId:'',salePrice:555,dealerPriceA:444,dealerPriceB:333,purchasePrice:30,currency:'TRY',unit:'piece',taxRate:20,trackInventory:false,isActive:true});
+  database.saveCommerceProductPublication({productId:unpublished.id,isPublished:false});
   const unlinked=database.saveCustomer({fullName:'Unlinked Demo Dealer',email:'unlinked@example.test',phone:'',commercialProfile:{companyName:'Unlinked Demo Dealer',dealerStatus:'active',priceGroup:'dealer_a'}});
   assert.equal(unlinked.ok,true,unlinked.message);
   const beforeLink=database.createDealerAccessProjection();
@@ -27,8 +29,15 @@ try {
   assert.equal(beforeLink.catalogs.length,2,'never build private catalogs for unverified, unlinked web accounts');
   await f.publish();
   const ac=await f.login('a@example.test'),bc=await f.login('b@example.test','android'),oc=await f.login('ordinary@example.test');
+  const publicIds=database.createCommerceOnlineCatalog().products.map(row=>row.productId);
+  assert.deepEqual(publicIds,[product.id],'unpublished inventory is not part of the retail catalog');
   for(const [cookie,price] of [[ac,80],[bc,60]]) {
     const result=await call('dealer/catalog',undefined,cookie);assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.catalog.products[0].price,price);
+    assert.deepEqual(result.body.catalog.products.map(row=>row.product_id),publicIds,'dealer and retail have the same published product list');
+    assert.equal(result.body.catalog.products[0].name,'Published TEST item');
+    assert.equal(result.body.catalog.products[0].description,'Published TEST details');
+    assert.equal(result.body.catalog.products[0].name,database.createCommerceOnlineCatalog().products[0].name);
+    assert.equal(result.body.catalog.products.some(row=>row.product_id===unpublished.id),false,'unpublished product must never be dealer-visible');
     assert.equal(JSON.stringify(result.body).includes('dealer_price'),false);assert.equal(JSON.stringify(result.body).includes('customer_id'),false);
   }
   assert.equal((await call('dealer/catalog',undefined,oc)).status,403);assert.equal((await call('dealer/catalog')).status,401);

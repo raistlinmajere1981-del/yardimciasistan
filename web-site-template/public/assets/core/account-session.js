@@ -48,7 +48,18 @@
         catch (error) {
           if (started !== state.generation) return state;
           if (error.status !== 401) throw error;
-          await raw('refresh', {});
+          try {
+            await raw('refresh', {});
+          } catch (refreshError) {
+            // A 401 session check confirms a guest. An unconfigured *optional*
+            // account refresh service must not disable the public retail checkout.
+            // Other refresh failures stay fail-closed (including ambiguous outages).
+            if (refreshError.status === 503 && refreshError.code === 'account_unconfigured') {
+              if (started === state.generation) clear('guest');
+              return state;
+            }
+            throw refreshError;
+          }
           if (started !== state.generation) return state;
           result = await raw('session');
         }

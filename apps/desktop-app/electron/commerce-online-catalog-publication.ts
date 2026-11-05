@@ -6,6 +6,25 @@ import { retailProductImageUrls, type RetailProductImageResolver } from "./retai
 
 export { publicImageUrl } from "./retail-product-image-projection";
 
+/** The one publishable product universe for retail and dealer shopping.
+ * Price selection is resolved separately for each authorized buyer.
+ */
+export function publishedOnlineProductRows(db: DatabaseSync, businessId: string) {
+  return db.prepare(`
+      SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate,
+             p.image_source_url, p.image_asset_path, p.image_original_assets_json,
+             p.updated_at AS product_updated_at, publication.title_override,
+             publication.description_override, publication.sort_order, publication.updated_at,
+             COALESCE(c.name, '') AS category_name
+      FROM commerce_product_publications publication
+      JOIN catalog_products p ON p.id = publication.product_id AND p.business_id = publication.business_id
+      LEFT JOIN catalog_categories c ON c.id = p.category_id AND c.business_id = p.business_id AND c.deleted_at = ''
+      WHERE publication.business_id = ? AND publication.channel = 'online_sales'
+        AND publication.is_published = 1 AND p.is_active = 1 AND p.deleted_at = ''
+      ORDER BY publication.sort_order, p.name, p.id
+    `).all(businessId);
+}
+
 export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iterable<BusinessCapability>, imageResolver?: RetailProductImageResolver): CommerceOnlineCatalog {
   if (!hasBusinessCapability(capabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
     return { version: 1, enabled: false, updatedAt: "", deliveryMethods: [], products: [] };
@@ -21,16 +40,7 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     if (deliveryEnabled && Number(settings?.online_sales_pickup_enabled) === 1) deliveryMethods.push("pickup");
     if (deliveryEnabled && Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
     if (deliveryEnabled && !deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
-    const rows = db.prepare(`
-      SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url, p.image_asset_path, p.image_original_assets_json,
-             p.updated_at AS product_updated_at, publication.title_override,
-             publication.description_override, publication.sort_order, publication.updated_at
-      FROM commerce_product_publications publication
-      JOIN catalog_products p ON p.id = publication.product_id AND p.business_id = publication.business_id
-      WHERE publication.business_id = ? AND publication.channel = 'online_sales'
-        AND publication.is_published = 1 AND p.is_active = 1 AND p.deleted_at = ''
-      ORDER BY publication.sort_order, p.name, p.id
-    `).all(businessId);
+    const rows = publishedOnlineProductRows(db, businessId);
     const products = rows.map((row) => {
       const price = resolveCommerceProductPriceInDatabase(db, businessId, { productId: String(row.id) }, false);
       const imageUrls = retailProductImageUrls(db, row, imageResolver);
