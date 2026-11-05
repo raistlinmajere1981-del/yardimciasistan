@@ -132,6 +132,14 @@ function generatePackage({ pack, outputRoot, workRoot }) {
     }
     for (const hook of ctx.commitHooks) hook();
 
+    // The original authors, Commons sources, licenses and crop notes accompany
+    // every downloadable demo ZIP, not only our website's collapsed credit footer.
+    if (pack.demoMenuPhotoManifestPath) {
+      const attributionDir = path.join(folderPath, "assets");
+      fs.mkdirSync(attributionDir, { recursive: true });
+      fs.copyFileSync(pack.demoMenuPhotoManifestPath, path.join(attributionDir, "MENU_IMAGE_ATTRIBUTION.json"));
+    }
+
     const media = addResourceMedia({
       folderPath,
       panoramas: pack.panoramaMedia ?? [],

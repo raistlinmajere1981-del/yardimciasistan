@@ -10,6 +10,23 @@ product names/SKUs, gross TRY prices and catalog photography. Packages contain
 no real customer, sale,
 credential, `sync_secret`, `web_module_url` or Android token.
 
+## Licensed QR menu photographs
+
+The Pansiyon + Restoran demo now bundles 14 real, locally stored sample food photographs
+instead of the old synthetic palette tiles. Every product thumbnail is tied to a
+verified SHA-256, Commons source, author, license and image-modification note in
+`scripts/demo-data/assets/menu-products/MENU_IMAGE_MANIFEST.json`. The downloadable
+backup also includes `assets/MENU_IMAGE_ATTRIBUTION.json` and the separate
+`qr-menu-images/` files; no image-host connection is required after installation.
+These photographs are **representative demo images**, not real photographs of
+Gündoğdu or any restaurant dishes. The associated Creative Commons/share-alike
+terms and attribution must be respected when displaying or redistributing them.
+
+Generating or uploading an updated ZIP never overwrites existing businesses or
+site publications. To replace previously published placeholder menu images,
+reimport the sample into a disposable desktop test profile and republish its
+QR menu (or update each product photo through the desktop UI).
+
 ## Output
 
 Running the generator writes only under `artifacts/demo-data/`:

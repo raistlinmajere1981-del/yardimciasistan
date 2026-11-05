@@ -1,5 +1,25 @@
-import { FIXED_NOW, isoAt, isoDate, json } from "../util.mjs";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { FIXED_NOW, isoAt, isoDate, json, sha256File } from "../util.mjs";
 import { DEMO_PALETTES } from "../png.mjs";
+
+const demoMenuPhotoRoot = new URL("../../assets/menu-products/", import.meta.url);
+const demoMenuPhotoManifestPath = fileURLToPath(new URL("MENU_IMAGE_MANIFEST.json", demoMenuPhotoRoot));
+const demoMenuPhotos = JSON.parse(readFileSync(demoMenuPhotoManifestPath, "utf8"));
+if (demoMenuPhotos.format !== "yardimci-asistan-demo-menu-photo-credits" || demoMenuPhotos.images?.length !== 14) {
+  throw new Error("Expected 14 licensed demo menu photos and their attribution manifest");
+}
+const photoByProduct = new Map(demoMenuPhotos.images.map(photo => {
+  if (!/^[a-z0-9-]{3,40}$/.test(photo.slug) || photo.filename !== photo.slug + ".jpg"
+    || !/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/.test(photo.source_url)
+    || !/^(?:CC BY(?:-SA)? (?:2\.0|3\.0|4\.0)|CC0|Public domain)$/.test(photo.license)
+    || !/^[a-f0-9]{64}$/.test(photo.sha256)) throw new Error("Unsafe licensed demo photo metadata");
+  const sourcePath = fileURLToPath(new URL(photo.filename, demoMenuPhotoRoot));
+  if (sha256File(sourcePath) !== photo.sha256) throw new Error("Demo menu photo hash mismatch: " + photo.filename);
+  return [photo.slug, { ...photo, sourcePath }];
+}));
+if (photoByProduct.size !== 14) throw new Error("Duplicate demo menu photo slug");
+
 
 const requireModule = (await import("node:module")).createRequire(import.meta.url);
 const finance = requireModule("../../../../apps/desktop-app/dist-electron/finance.js");
@@ -7,6 +27,7 @@ const benefitRules = requireModule("../../../../apps/desktop-app/dist-electron/c
 
 export const pensionRestaurantPack = {
   id: "a-pension-restaurant",
+  demoMenuPhotoManifestPath: demoMenuPhotoManifestPath,
   key: "pr",
   folderName: "yardimci-asistan-demo-a-pension-restaurant",
   title: "Pansiyon + Restoran",
@@ -113,6 +134,8 @@ export const pensionRestaurantPack = {
       ["kasarli-tost", "Kaşarlı Tost", categoryIds.breakfast, 110, 38, 10, DEMO_PALETTES.pasta, 13, 24],
       ["mevsim-meyvesi", "Mevsim Meyvesi", categoryIds.dessert, 75, 22, 10, DEMO_PALETTES.fruit, 14, 16]
     ].map(([key, name, categoryId, salePrice, purchasePrice, taxRate, palette, sortOrder, stock]) => {
+      if (!photoByProduct.has(key)) throw new Error("Missing licensed menu photo: " + key);
+      void palette; // Preserve fixture seed order without synthetic artwork.
       const product = ctx.addProduct({
         key,
         name,
@@ -121,8 +144,14 @@ export const pensionRestaurantPack = {
         purchasePrice,
         taxRate,
         sortOrder,
-        palette,
-        paletteVariant: sortOrder,
+        // Real open-license demo photograph replaces the old synthetic color tile.
+        originalAssets: [{ fileName: photoByProduct.get(key)?.filename,
+          sourcePath: photoByProduct.get(key)?.sourcePath,
+          hash: photoByProduct.get(key)?.sha256,
+          format: "jpeg" }],
+        imageSourceUrl: photoByProduct.get(key)?.source_url,
+        imageLicense: photoByProduct.get(key)?.license + " / " + photoByProduct.get(key)?.author,
+        dataLicense: "Synthetic product data; representative Commons photo, not actual business photography",
         sku: `DEMO-PR-${String(sortOrder).padStart(3, "0")}`,
         brand: "Demo Mutfak",
         description: `${name} — sentetik demo menü ürünü.`,
