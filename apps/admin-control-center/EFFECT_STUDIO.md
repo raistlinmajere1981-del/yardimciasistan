@@ -54,11 +54,13 @@ vendor/runtime/model/registry için ikinci bakım kopyası oluşturmaz.
 ## Kaydetme ve yayın sınırı
 
 - Düzenleme `EfektAtolyesi/.studio-drafts/` altında otomatik taslak kaydeder.
-- **BlackSea ve Gündoğdu hero hedefleri** kullanıcı onayından sonra yalnız
-  seçili sahne JSON aktarımı ve canlı HTTPS karşılaştırması yapar. Gündoğdu
-  eşlemesi kanonik kopyadaki değil, aktif site kökündeki
-  `assets/img/gideros-1-1818.webp` → `assets/effects/hero.scene.json`
-  yoludur. SSH aktarım hedefi site `scripts/deploy-site.sh` ile aynıdır.
+- **BlackSea hero** seçili JSON'u FTP ile yayımlar. **Gündoğdu hero**
+  `assets/site/img/gideros-1-1818.webp` fotoğrafına bağlıdır.
+  `gundogdu:hero` yayını sahne ve kanonik `effects-manifest.json`
+  dosyalarını `canonical/public/assets/site/scenes` ve
+  `assets/site/scenes` aynalarına yazar. Yalnız bu dört dosyayı
+  SSH ile gönderir ve canlı HTTPS üzerinden ikisini doğrular.
+  Eski eksik `www/assets/effects` dizinine istek gönderilmez.
   Admin release/deploy/test işlemleriyle aynı anda çalışamaz.
 - Diğer sabit görseller için hedefli deploy bağlantısı henüz
   tamamlanmadıysa **Siteye yayınla kapalıdır**. Dinamik ürün/galeri görsellerine
@@ -76,8 +78,8 @@ vendor/runtime/model/registry için ikinci bakım kopyası oluşturmaz.
 ### Tek aşamalı yayın ve doğrulanmış doğrudan bağlantı (2026-11-04)
 
 - Atölye'de her uygun görsel için aynı `Siteye yayınla` eylemi vardır.
-  `canPublish` olan mevcut BlackSea/Gündoğdu hero hedefleri yalnız seçili
-  JSON'u FTP veya SSH ile yükler, canlı JSON karşılaştırması yapar.
+  `canPublish` olan BlackSea hero JSON'u FTP ile, Gündoğdu ise
+  JSON + kanonik manifesti SSH ile yayımlar. HTTPS doğrulaması zorunludur.
 - İlk defa bağlanacak sabit görselde kullanıcıya **tam site deploy** etki
   açıklamasıyla tek bir onay gösterilir. Arka planda sırasıyla yerel
   `prepare`, mevcut Admin Deploy yürütücüsü üzerinden `preflight`,
