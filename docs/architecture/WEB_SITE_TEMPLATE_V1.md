@@ -39,6 +39,43 @@ seçilir. Runtime Node/derleme gerektirmez. Efekt opt-in'dir: sahne yoksa adapt�
 Canvas/scheduler yoktur. Sahne canonical parser/compiler/overlay ile çalışır; her hata
 statik görseli korur. Motor siteye özel fork edilmez.
 
+## Katalog sunumu ve ortak ticaret controller'ı
+
+Desktop veriyi yayımlar; Hosting API hesap/bayi yetkisi, fiyat, teslimat ve sipariş
+kabulünün sahibidir. Her site katalog HTML'ini ve tarayıcı sunumunu seçer.
+`site/views/pages/catalog.php` tam sayfa override'ıdır; core katalog sayfasını include
+etmek zorunda değildir. Ortak layout, varsa `public/assets/site/catalog.js` dosyasını
+`core/storefront.js` yerine yükler. İsteğe bağlı `site/catalog.css`, core CSS'ten sonra,
+site temasından önce yüklenir. Seçim sabit yerel dosya yollarıyla yapılır; query veya
+ziyaretçi girdisi çalıştırılacak dosyayı seçemez. Üç dosya site-owned güncelleme sınırındadır.
+
+`public/assets/core/commerce.js` içindeki `YaCommerce.create({apiBase})`, DOM bağımsız
+ortak istemcidir. Mevcut `YaAccount` ve `YaCartDraft` sahiplerini kullanır; yetkili
+public/bayi kataloğunu okur, ürün/miktarları doğrular, fiyatları bellekte yeniler,
+hesap kapsamlı ID/miktar ve favori taslaklarını yönetir. Sipariş payload'ı, belirsiz
+sonuçta aynı key/gövde, SHA-256 semantik eşleşme, Retry-After, receipt kurtarma ve
+geç cevap fencing burada kalır. Renderer bu kuralları veya HTTP mutasyonlarını kopyalamaz.
+İstemcinin doğrulaması Hosting yetki/fiyat denetiminin yerine geçmez.
+
+Site `subscribe((state, reason) => ...)` ile snapshot alır, sonra `start()` çağırır.
+`add`, `remove`, `setQuantity`, `clearCart`, `setDelivery`, `toggleFavorite`, `submit`,
+`reorder`, `refresh`, `newOrder` ortak komutlardır. `submit` alan hatalarını döndürür;
+site form, hata metni ve odak davranışını sunar. Snapshot değişikliği controller'ı
+değiştirmez; buyer/pending sipariş gövdesi snapshot'a açılmaz. `fence` bildirimi
+senkrondur: renderer özel fiyatları, karşılaştırmayı ve kişisel form taslaklarını aynı
+çağrıda temizlemelidir. `destroy()` abonelikleri/timer'ı bırakır ve geç cevapları kapatır.
+
+Teknikel'in üç sütunlu düzeni, checkbox kategori/marka seçicileri, kartlar, karşılaştırma,
+detay ve görselli sepeti yalnız Teknikel site sayfası ve `site/catalog.{js,css}` içindedir.
+Core `site.css` bu sunumu içermez. Site override'ı olmayan kurulumlar, ayrı
+`data-commerce-*` markup'ı kullanan basit tek akışlı katalog/checkout fallback'ini alır.
+Filtre widget'ı, sayfalama ve karşılaştırma fallback'in zorunlu ortak sözleşmesi değildir.
+
+Sınırlar: ortak PHP public projection/navigation kullanılabilirliği ve aynı-origin
+cookie/API kurulumu korunur. Özel renderer güvenilir site kodudur; controller siteye
+ait DOM'u kendisi silemez. JavaScript kapalıyken public SSR liste/navigasyon vardır,
+sipariş gönderimi yoktur. Kurulu diğer siteler bu sürüme otomatik taşınmaz.
+
 ## Sonraki aşama için API ve mimari ihtiyaçlar
 
 Aşağıdaki sınırlar frontend tahmini veya ikinci authority ile kapatılmaz:
@@ -57,8 +94,9 @@ Aşağıdaki sınırlar frontend tahmini veya ikinci authority ile kapatılmaz:
    Tarayıcı medya/işlemleri aynı origin'dedir. Çok origin'li kurulum ayrı
    güvenlik/sahiplik çalışmasıdır; ortak Hesabım/bayi/widget mevcut aynı-origin
    HTTP sahiplerini kullanır.
-4. Widget, public sepet/checkout ve müşteri/bayi hesabı ortak `public/assets/core/` ve
-   `core/views/pages/` üzerinden çalışır. Aynı kaynak kataloğu PHP ve etkileşim metinlerini
+4. Widget ve müşteri/bayi hesabının varsayılan sunumu ortak `public/assets/core/` ve
+   `core/views/pages/` üzerinden çalışır. Katalog/sepet/checkout sunumu siteye aittir;
+   ortak `commerce.js` veri/oturum/sipariş akışını sağlar. Aynı kaynak kataloğu PHP ve etkileşim metinlerini
    besler. İşlem kimliği/taslak, sunucu fiyatı, capability, hesap ve session authority'si
    mevcut HTTP sahiplerindedir. Kayıt parolası posta kutusu doğrulamasında belirlenir.
    Web hesabı tek Hesabım/profil ve sipariş liste/detayını kullanır; hesap içinde ayrı

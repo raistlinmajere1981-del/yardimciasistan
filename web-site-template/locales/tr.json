@@ -525,6 +525,8 @@
   "account.refresh_session": "Yeniden dene",
   "account.refresh_orders": "Siparişleri yenile",
   "catalog.search": "Ürün, parça veya stok kodu ara",
+  "catalog.search_short": "Ara…",
+  "catalog.filters": "Filtreler",
   "catalog.category": "Kategori",
   "catalog.categories_all": "Tüm kategoriler",
   "catalog.sku": "Stok kodu",

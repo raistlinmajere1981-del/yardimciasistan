@@ -42,7 +42,7 @@ export function inventory(root) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const path = join(templateRoot, 'template-manifest.json');
   if (process.argv[2] === '--write') {
-    writeFileSync(path, JSON.stringify({format: 1, template_version: '0.7.4',
+    writeFileSync(path, JSON.stringify({format: 1, template_version: '0.7.5',
       site_owned: ['site/', 'locales/', 'public/assets/site/'], common: inventory(templateRoot)}, null, 2) + '\n');
     console.log('template-manifest-written');
   } else {

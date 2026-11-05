@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.7.4
+# Ortak işletme sitesi şablonu 0.7.5
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
@@ -98,6 +98,42 @@ Tema veri kaynağı açmaz, gizlenmiş sayfayı açmaz, kayıtları uydurarak ta
 Projection veya hakları kurulum sahibinde olan siteye ait statik görseli sunar.
 Özel etkileşim `assets/site/theme.mjs` içindeki
 `mount({language, integrations, features})` fonksiyonuna yazılır.
+
+Katalog için `site/views/pages/catalog.php` sayfanın tamamını, `public/assets/site/catalog.js`
+etkileşim renderer'ını sahiplenir. Ortak layout bu sabit dosya varsa varsayılan
+`core/storefront.js` yerine onu seçer; isteğe bağlı `site/catalog.css` core CSS'ten sonra,
+temadan önce yüklenir. Her site kendi filtre/kart/sepet yerleşimini seçer.
+
+Katalog renderer'ından önce yüklenen `core/commerce.js`, DOM bağımsız ortak istemcidir:
+
+```js
+const commerce = window.YaCommerce.create({apiBase: document.currentScript.dataset.apiBase});
+const unsubscribe = commerce.subscribe((state, reason) => {
+  // Kendi HTML'inizi state.products/cart/totals ve canEdit/canCheckout/canSubmit ile sunun.
+  // reason === 'fence': özel DOM ve kişisel form taslağını senkron temizleyin.
+});
+commerce.start();
+// Kullanıcı eylemleri: commerce.add(productId), setQuantity(productId, quantity),
+// remove(productId), clearCart(), setDelivery(method), toggleFavorite(productId),
+// submit({name, phone, email, note, address}), reorder(orderId), refresh(), newOrder().
+// Sayfa/controller bırakılırken unsubscribe(); commerce.destroy();
+```
+
+`state` kopyalanmış snapshot'tır: `products`, `categories`, `cart` (ürün kimliği, güncel
+display ve 10000 ölçekli `q`), `totals`, `auth`, katalog/yüklenme/teslimat durumu,
+`pending` kilitleri, mesajlar ve `receipt` içerir. `submit()` alan bazlı `{errors}`
+döndürebilir; hatalar `name`, `phone`, `email`, `note`, `delivery-<addressKey>` anahtarlarını
+kullanır. Site olayları kendi form/odak/erişilebilirlik davranışına bağlar. `initial`,
+`owner`, `loading`, `catalog`, `change`, `fence`, `accepted`, `reorder`, `new-order`
+bildirimleri kullanılır; `products` yalnız `catalogStatus === 'ready'` iken sunulur.
+Controller yetkili endpoint, payload, idempotency ve receipt akışını sahiplenir;
+renderer fiyat/rol/kimlik seçmez ve yeni HTTP sipariş yolu açmaz.
+
+Override yoksa basit `data-commerce-*` katalog/checkout fallback'i çalışır. Üç sütun,
+checkbox filtreler, karşılaştırma, galeri ve sayfalama site tercihleridir. Özel sayfa
+kendi runtime'ıyla eşlenir; core hiçbir site DOM'unu zorunlu kılmaz. Controller mevcut
+aynı-origin `YaAccount` ve `YaCartDraft` sahiplerini kullanır. Özel DOM'un fencing anında
+silinmesi renderer sorumluluğudur; JavaScript kapalıyken yalnız public SSR liste vardır.
 
 ## Dil ve entegrasyon
 
@@ -294,14 +330,14 @@ altındadır. Kopya bütünlüğü bakım ortamında `node tools/manifest.mjs` i
 
 ## Ortak işlemler
 
-Web müşterisi ve bayi aynı Hesabım, ürün detay/katalog, sepet/checkout ve sipariş
-liste/detayını kullanır. Bayi için yalnız hesapta ibare ve backend'in yetkilendirdiği
+Web müşterisi ve bayi aynı Hesabım ve sipariş liste/detayını kullanır; her sitenin tek
+katalog/sepet sunumu ortak `commerce.js` controller'ını kullanır. Bayi için yalnız hesapta ibare ve backend'in yetkilendirdiği
 fiyatlar farklıdır; ayrı mod veya ikinci portal yoktur. `account-session.js` ortak
-oturum/doğrulama sahibidir. Arama, kategori, SKU ve marka filtreleri mevcut katalog
-alanlarını kullanır; QR Menü kategorileri mağazaya taşınmaz. `?page=catalog&id=…`
-aynı katalogdaki ürün detayını, `?page=account&order=…` yalnız kendi siparişini açar.
-Karşılaştırma aynı yetkili katalogdan en fazla iki ürün alır; cihaz fotoğrafı yalnız
-tarayıcıda kalır. Özel fiyatlar ve müşteri iletişim bilgileri browser storage'a yazılmaz.
+oturum/doğrulama sahibidir. Siteye ait arama/kategori/SKU/marka filtreleri yalnız yetkili
+katalog alanlarını kullanır; QR Menü kategorileri mağazaya taşınmaz. `?page=catalog&id=…`
+ürün bağlamını, `?page=account&order=…` yalnız kendi siparişini açar.
+Teknikel karşılaştırması aynı yetkili katalogdan en fazla iki ürün alır; cihaz fotoğrafı
+yalnız tarayıcıda kalır. Özel fiyatlar ve müşteri iletişim bilgileri browser storage'a yazılmaz.
 Belirsiz siparişte aynı key/gövde korunur; hesap receipt okuması yeni sipariş üretmez.
 
 `/katalog/`, `/magaza/`, `/urun/?id=…`, `/sepet/`, `/hesabim/` ve `/bayi/` sabit

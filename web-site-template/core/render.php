@@ -7,6 +7,11 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
 function e(mixed $value): string { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function json_html(mixed $value): string { return json_encode($value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
 function asset(array $site, string $path): string { return $site['base_path'] . '/assets/' . ltrim($path, '/'); }
+/** Fixed site-owned entrypoint; query/config input cannot select executable assets. */
+function catalog_runtime(array $site): string
+{
+    return asset($site, is_file($site['root'] . '/public/assets/site/catalog.js') ? 'site/catalog.js' : 'core/storefront.js');
+}
 function page_url(array $site, string $page, ?string $language = null): string
 {
     return $site['base_path'] . '/?' . http_build_query(['page' => $page, 'lang' => $language ?? $site['language']['code']]);
