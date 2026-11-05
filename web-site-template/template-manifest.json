@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.7.2",
+  "template_version": "0.7.3",
   "site_owned": [
     "site/",
     "locales/",
@@ -39,7 +39,7 @@
     "core/views/pages/restaurant.php": "0fbe9ddb99a7e514718f9caea2be834b1e3796b29970a8dcee72c84a6f3351e9",
     "core/views/pages/reviews.php": "f81959b2af2973202d93faf9f7e1d721010855b8f5dc59c1a1564af5c80f8be1",
     "core/views/pages/rooms.php": "342de9302229b5f085f921aff2ef0be0ecd31723968849ab9aca8d9cf3b35902",
-    "public/assets/core/account-session.js": "aff725693808740b585da08a1860e33e73533ee7cf8db2aee6bc422c37abea36",
+    "public/assets/core/account-session.js": "2f0bcc11d0b4ec08518ad3ca2eff1f1ed6318a52f957e6c8a98401e8c049cb51",
     "public/assets/core/assets/nexa/states/nexa-ready-256.webp": "c8f4bd7222065c359b040afcd3adcf08162d7e1b417dfc0851d9d23f193e3f89",
     "public/assets/core/assets/nexa/states/nexa-warning-48.webp": "0f44663e9efffd04c7abafa822105327b9f19d61cc3df4a52d8a7580220c7581",
     "public/assets/core/assets/nexa/web/nexa-web-compact-header.webp": "7a09913c80c5c24a303ff56d7224d89daf09c971290117827c5fd8e0abf60b82",
@@ -79,8 +79,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "c232f51700db8e487ad61ba0c1de0616ca35499808537f949a2d480be792323e",
-    "tools/manifest.mjs": "d6aaa9bbeba9e083ff25cb027e06fc9f3876982721904561bca6b6b3561ad65a",
+    "README.md": "8e0b2a1127c0cc57198239b689ee4365eccf039768ec7cca57d40149070097f2",
+    "tools/manifest.mjs": "c088fdcb0cd7c904b447218e6ddf638086455bd1f55f226ceef2d0fb568e1f95",
     "tools/sync-effect-engine.mjs": "1ea62825931112e2e6b566368da56d9a0d94c2f7995c322fb92b50a040607600",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

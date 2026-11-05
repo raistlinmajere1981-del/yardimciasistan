@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.7.2
+# Ortak işletme sitesi şablonu 0.7.3
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
