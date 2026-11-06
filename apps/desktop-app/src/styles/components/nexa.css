@@ -1,5 +1,13 @@
 .nexa-habitat {
   --nexa-character-size: 112px;
+  --nexa-deep: color-mix(in srgb, var(--slate-950) 88%, var(--blue-700));
+  --nexa-glass: color-mix(in srgb, var(--slate-900) 78%, var(--blue-700));
+  --nexa-glass-edge: color-mix(in srgb, var(--slate-500) 70%, var(--green-400));
+  --nexa-ice: var(--slate-50);
+  --nexa-energy: color-mix(in srgb, var(--blue-400) 65%, var(--green-400));
+  --nexa-core-opacity: .32;
+  --nexa-crystal-opacity: .28;
+  --nexa-inner-light: inset 0 1px 0 var(--nexa-glass-edge);
   --nexa-ground-space: var(--space-6);
   position: relative;
   display: grid;
@@ -31,11 +39,11 @@
   position: relative;
   max-width: calc(100% - var(--space-4));
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--nexa-glass-edge);
   border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
+  background: var(--nexa-glass);
+  color: var(--nexa-ice);
+  box-shadow: var(--nexa-inner-light);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
   text-align: center;
@@ -49,9 +57,9 @@
   height: var(--space-2);
   bottom: calc(var(--space-1) * -1 - 1px);
   left: calc(50% - var(--space-1));
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-surface);
+  border-right: 1px solid var(--nexa-glass-edge);
+  border-bottom: 1px solid var(--nexa-glass-edge);
+  background: var(--nexa-glass);
   transform: rotate(45deg);
 }
 .nexa-speech-dots { display: inline-flex; white-space: nowrap; }
@@ -62,3 +70,48 @@
 .nexa-habitat[data-motion-active="true"] .nexa-speech-dots i:nth-child(3) { animation-delay: calc(var(--motion-hover) * 2); }
 @keyframes nexa-speech-enter { from { opacity: 0; transform: translateY(var(--space-1)); } to { opacity: 1; transform: translateY(0); } }
 @keyframes nexa-speech-dot { 0%, 65%, 100% { transform: translateY(0); opacity: .6; } 30% { transform: translateY(-.15em); opacity: 1; } }
+
+/* A bounded elliptical scene shares its geometry with the native backdrop cutout. */
+.nexa-scene-back {
+  position: absolute;
+  width: 100%;
+  height: calc(var(--nexa-character-size) + var(--nexa-ground-space));
+  bottom: 0;
+  z-index: -1;
+  overflow: hidden;
+  clip-path: ellipse(50% 50% at 50% 50%);
+  background: radial-gradient(ellipse at 50% 58%, var(--nexa-glass), var(--nexa-deep) 72%);
+}
+.nexa-scene-core {
+  position: absolute;
+  inset: 4% 12% 12%;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(ellipse, var(--nexa-energy), transparent 70%);
+  opacity: var(--nexa-core-opacity);
+}
+.nexa-scene-crystals {
+  position: absolute;
+  inset: 8% 7% 12%;
+  opacity: var(--nexa-crystal-opacity);
+  background: linear-gradient(115deg, transparent 12%, var(--nexa-energy) 13%, transparent 28% 72%, var(--nexa-ice) 73%, transparent 86%), linear-gradient(65deg, transparent 18%, var(--nexa-energy) 19%, transparent 35% 80%, var(--nexa-energy) 81%, transparent 94%);
+  clip-path: polygon(0 28%, 18% 0, 37% 15%, 62% 5%, 83% 0, 100% 34%, 88% 100%, 12% 100%);
+}
+.nexa-scene-platform {
+  position: absolute;
+  inset: 78% 15% 6%;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(ellipse, var(--nexa-energy), var(--nexa-glass) 60%, transparent 72%);
+  opacity: .5;
+}
+.nexa-habitat[data-nexa-state="thinking"],
+.nexa-habitat[data-nexa-state="speaking"],
+.nexa-habitat[data-nexa-state="listening"] { --nexa-core-opacity: .48; --nexa-crystal-opacity: .4; }
+/* Native dialog state also covers workspaces; no extra observer or modal state. */
+:root:has(dialog[open]) .nexa-habitat {
+  --nexa-core-opacity: .65;
+  --nexa-crystal-opacity: .55;
+  --nexa-glass: color-mix(in srgb, var(--slate-950) 80%, var(--blue-700));
+  --nexa-glass-edge: var(--slate-300);
+}
+:root:has(dialog[open]) .nexa-character { filter: drop-shadow(0 0 3px var(--nexa-energy)); }
+.nexa-speech-slot { z-index: 1; }

@@ -7,10 +7,12 @@ export function useDocumentPrinterSettings(kinds: DocumentKind[], authority: str
   const [saving, setSaving] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [denied, setDenied] = useState<string | null>(null);
   const tenant = useRef<string | undefined>(undefined);
-  const latest = useRef(authority); latest.current = authority;
+  const latest = useRef(authority);
+  const authorityGeneration = useRef(0);
+  if (latest.current !== authority) authorityGeneration.current++;
+  latest.current = authority;
   const kindsKey = kinds.join(",");
   useEffect(() => {
     let cancelled = false;
@@ -42,31 +44,32 @@ export function useDocumentPrinterSettings(kinds: DocumentKind[], authority: str
       const next = { ...previous };
       if (ref === (baseline(kind)?.printerRef ?? null)) delete next[kind]; else next[kind] = ref;
       return next;
-    }); setNotice("");
+    });
   };
   const save = async () => {
-    if (!dirty || !canSave || saving) return;
+    if (!dirty || !canSave || saving) return false;
     const started = authority;
-    setSaving(true); setError(""); setNotice("");
+    const generation = authorityGeneration.current;
+    setSaving(true); setError("");
     try {
       for (const [kind, ref] of Object.entries(drafts)) {
-        if (latest.current !== started) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
+        if (latest.current !== started || authorityGeneration.current !== generation) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
         const result = await window.yardimciDesktop!.savePrinterBinding({ documentKind: kind as DocumentKind, printerRef: ref ?? null });
         if (!result.ok) {
           if (["DOCUMENT_SESSION_LOCKED", "DOCUMENT_CAPABILITY_DISABLED", "DOCUMENT_OWNER_REQUIRED"].includes(result.code)) setDenied(started);
           throw Error(result.message);
         }
-        if (latest.current !== started) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
+        if (latest.current !== started || authorityGeneration.current !== generation) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
         setLoaded(previous => previous && ({ ...previous, documents: [...previous.documents.filter(doc => doc.documentKind !== kind), result.value] }));
         setDrafts(previous => { const next = { ...previous }; delete next[kind as DocumentKind]; return next; });
       }
-      setNotice("Bu cihazın yazıcı ayarları kaydedildi. Yazdırma yapılmadı.");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Yazıcı ayarı kaydedilemedi."); }
+      return true;
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Yazıcı ayarı kaydedilemedi."); return false; }
     finally { setSaving(false); }
   };
-  return { ready, dirty, saving, canSave, stage, save, notice, printerRef,
+  return { ready, dirty, saving, canSave, stage, save, printerRef,
     printers: (kind: DocumentKind) => ready ? baseline(kind)?.printers ?? [] : [],
     error: tenantChanged ? "İşletme değişti. Önce yazıcı taslağından vazgeçin." : denied === authority ? "Yazıcı yetkisi değişti. Çalışma alanını yeniden açın." : error,
     refresh: () => { if (!saving) setRefresh(value => value + 1); },
-    discard: () => { if (!saving) { setDrafts({}); setError(""); setNotice(""); tenant.current = undefined; } } };
+    discard: () => { if (!saving) { setDrafts({}); setError(""); tenant.current = undefined; } } };
 }

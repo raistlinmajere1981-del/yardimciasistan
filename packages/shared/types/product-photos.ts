@@ -18,3 +18,11 @@ export interface ProductPhotoMutation {
 export interface AddProductPhotosInput extends ProductPhotoMutation { dataUrls: string[] }
 export interface SelectProductPhotoInput extends ProductPhotoMutation { photoId: string }
 export interface ReorderProductPhotosInput extends ProductPhotoMutation { photoIds: string[] }
+
+/** Ordered workspace draft. Existing photos carry only their hash; new bytes stay
+ * in the renderer until the product's single Save. Index zero is the cover. */
+export interface ProductPhotoDraftPhoto {
+  id: string;
+  format: string;
+  dataUrl?: string;
+}

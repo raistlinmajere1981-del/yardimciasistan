@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
@@ -9,7 +9,12 @@ import { chromium } from "@playwright/test";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const dist = resolve(here, "../dist-renderer");
 const studioRoot = resolve(here, "../../../../EfektAtolyesi");
-const fixture = JSON.parse(readFileSync(join(studioRoot, "examples/birdesengor-v2.scene.json"), "utf8"));
+const { siteSceneSource } = await import(join(studioRoot, "scripts/birdesengor-site.mjs"));
+const site = siteSceneSource();
+const siteState = await site.snapshot();
+const fixture = siteState.scene;
+const packet = { scene: fixture, source: "installed", siteSource: true, sourceHash: siteState.sourceHash,
+  previewImage: await site.preview(siteState), readiness: site.readiness(fixture, siteState) };
 const browserPath = "/usr/bin/brave";
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -25,7 +30,7 @@ const MIME = {
   ".woff2": "font/woff2"
 };
 
-test("local scene target switches iframe, edits and saves v2 without deploy UI", { timeout: 120_000 }, async () => {
+test("current site scene supports reviewed staging and explicitly confirmed live publication", { timeout: 120_000 }, async () => {
   assert.ok(existsSync(join(dist, "effect-studio/scene.html")), "run the admin build before this test");
   assert.ok(existsSync(browserPath), "Brave is required for the local renderer check");
 
@@ -46,7 +51,7 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
 
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
-    await page.addInitScript((sceneFixture) => {
+    await page.addInitScript((sitePacket) => {
       const imageScene = {
         format: "efekt-atolyesi", version: 1, name: "Kıyı", seed: "ui-test",
         photo: { src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/zXcAAAAASUVORK5CYII=", width: 1, height: 1, name: "Kıyı dalgası" },
@@ -54,12 +59,18 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
       };
       window.__savedScenes = [];
       window.__deployCalls = [];
+      window.__prepareCalls = [];
+      window.__birdesengorPreflightCalls = [];
+      window.__birdesengorLiveDeployCalls = [];
+      window.__birdesengorCancelCalls = 0;
       window.adminControlCenter = {
         getOverview: async () => ({ generatedAt: new Date().toISOString(), repo: { branch: "test", head: "abc1234", dirtyCount: 0 }, product: {}, installations: [], release: {}, verification: {}, counts: { installations: 0, healthy: 0, drift: 0, errors: 0 } }),
         getVerificationHistory: async () => [],
         listSupportReports: async () => [],
         getSystemEnvironment: async () => ({ androidDevices: [] }),
-        getDeploymentTargets: async () => [],
+        getDeploymentTargets: async () => [{ id: 'birdesengor-effects-v2', installationId: 'birdesengor',
+          title: 'BirDeSenGör V2 · Efekt sahnesi', available: true, availabilityNote: 'Yerel Natro mevcut',
+          description: '', confirmText: '', impact: [] }],
         getDeploymentRunState: async () => ({ running: false, targetId: "", action: "", stage: "", startedAt: null, finishedAt: null, result: "idle", exitCode: null, outputTail: [] }),
         startDeployment: async (request) => { window.__deployCalls.push(request); return { accepted: false, message: "UI test must not deploy." }; },
         cancelDeployment: async () => false,
@@ -76,27 +87,44 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
             }]
           },
           {
-            id: "birdesengor", name: "BirDeSenGör (yerel çalışma)", siteUrl: "",
+            id: "birdesengor", name: "BirDeSenGör", siteUrl: "",
             note: "Yerel V2 çalışma hedefi · kurulu site değil",
             images: [{
               id: "birdesengor:scene_v2", name: "BirDeSenGör V2 · çalışma sahnesi",
-              available: true, hasDraft: false, hasScene: true, canPublish: false, canPrepare: false,
+              available: true, hasDraft: false, hasScene: true, canPublish: false, canPrepare: true, siteSource: true,
               kind: "sceneObject", note: "Yerel V2 çalışma sahnesi; yayın hedefi değildir.",
-              sourcePath: "examples/birdesengor-v2.scene.json", width: 1600, height: 900
+              sourcePath: "src/effects/birdesengor-effects.v2.json", width: 1600, height: 900
             }]
           }
         ],
         loadEffectScene: async (id) => id === "birdesengor:scene_v2"
-          ? { scene: structuredClone(sceneFixture), source: "installed" }
+          ? structuredClone(sitePacket)
           : { scene: structuredClone(imageScene), source: "draft" },
-        saveEffectScene: async (id, scene) => {
-          window.__savedScenes.push({ id, scene: structuredClone(scene) });
-          return { ok: true, message: "saved", effectCount: scene.effects?.length ?? 0 };
+        saveEffectScene: async (id, scene, sourceHash) => {
+          window.__savedScenes.push({ id, scene: structuredClone(scene), sourceHash });
+          const enabledCount = scene.effects.filter(effect => effect.enabled).length;
+          return { ok: true, message: "saved", effectCount: scene.effects.length,
+            readiness: { ready: enabledCount === 0, effectCount: scene.effects.length, enabledCount, mountedCount: 0,
+              problems: enabledCount ? ["Etkin efektler sitede bağlı değil."] : [] } };
         },
-        prepareEffectScene: async () => ({ ok: true, message: "prepared", siteUrl: "https://demo.example.test" }),
-        publishEffectScene: async () => ({ ok: true, message: "published", siteUrl: "https://demo.example.test" })
+        prepareEffectScene: async (id) => {
+          window.__prepareCalls.push(id);
+          return { ok: true, message: "Yerel site kaynak dosyası hazırlandı. Canlı yayın ayrı.", siteUrl: "", sourceHash: "staged-revision",
+            readiness: { ready: true, effectCount: 6, enabledCount: 0, mountedCount: 0, problems: [] } };
+        },
+        publishEffectScene: async () => ({ ok: true, message: "published", siteUrl: "https://demo.example.test" }),
+        preflightBirdesengorEffect: async id => {
+          window.__birdesengorPreflightCalls.push(id);
+          return { ok: true, token: "reviewed-one-time-token", sourceHash: "revised-site-source", changed: true,
+            message: "Ön kontrol başarılı", readiness: { ready: true, effectCount: 6, enabledCount: 0, mountedCount: 6, problems: [] } };
+        },
+        cancelBirdesengorEffect: async () => { window.__birdesengorCancelCalls++; return true; },
+        deployBirdesengorEffect: async (id, token) => {
+          window.__birdesengorLiveDeployCalls.push([id, token]);
+          return { ok: true, message: "Canlı doğrulama başarılı", siteUrl: "https://birdesengorgizlievren.com/" };
+        }
       };
-    }, fixture);
+    }, packet);
 
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
     await page.locator("button.nav-item", { hasText: "Efekt Atölyesi" }).click();
@@ -108,8 +136,11 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
     await page.getByLabel("Efekt projesi").selectOption("birdesengor");
     await page.locator(".effects-local-only").waitFor();
     assert.match(await page.locator("iframe").getAttribute("src"), /scene\.html/);
-    assert.match(await page.locator(".effects-local-only").innerText(), /Yerel çalışma · yayın yok/);
-    assert.equal(await page.getByRole("button", { name: /Siteye yayınla/ }).count(), 0, "scene cannot publish");
+    assert.match(await page.locator(".effects-local-only").innerText(), /V2 site kaynak sahnesi · canlı yayın ayrı/);
+    assert.equal(await page.getByRole("button", { name: /Siteye yayınla/ }).count(), 1,
+      "the reviewed V2 scene alone offers a confirmed live deploy action");
+    assert.deepEqual(await page.evaluate(() => window.__birdesengorLiveDeployCalls), [],
+      "loading the site scene never causes a deployment");
     assert.equal(await page.getByRole("button", { name: /bağlamayı hazırla|sahneyi güncelle/ }).count(), 0, "scene cannot prepare");
     assert.equal(await page.locator(".effects-activation").count(), 0, "scene is not a staged deploy activation");
 
@@ -119,15 +150,39 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
     assert.ok(sceneFrame, "scene editor frame is loaded");
     await sceneFrame.waitForFunction(() => Boolean(window.__sceneEditor?.getScene?.()));
     assert.equal(await frame.locator('[data-scene-object="candle"]').count(), 1);
-    assert.equal(await frame.locator(".scene-marker").count(), 3);
+    assert.equal(await frame.locator(".scene-marker").count(), 6);
+    assert.equal(await frame.locator('[data-scene-object="vefk-stand"]').count(), 1);
+    assert.equal(await frame.locator('[data-scene-object="parchment"]').count(), 0);
+    const prepare = page.getByRole("button", { name: "Site dosyasına hazırla" });
+    assert.equal(await prepare.isDisabled(), true, "unsaved/unmounted effects cannot stage");
+    await sceneFrame.waitForFunction(() => document.querySelector("#scene-photo").naturalWidth > 0);
+    assert.equal(await frame.locator("#scene-photo").getAttribute("src"), packet.previewImage);
+    const alignment = await sceneFrame.evaluate(() => {
+      const stage = document.querySelector("#scene-viewport").getBoundingClientRect();
+      const photo = document.querySelector("#scene-photo").getBoundingClientRect();
+      const candle = document.querySelector('[data-scene-object="candle"]').getBoundingClientRect();
+      return { ratio: stage.width / stage.height, photoWidth: photo.width, stageWidth: stage.width,
+        candleX: (candle.x - stage.x - 1) / (stage.width - 2), candleWidth: candle.width / (stage.width - 2) };
+    });
+    assert.ok(Math.abs(alignment.ratio - 1600 / 900) < .01);
+    assert.ok(Math.abs(alignment.photoWidth - alignment.stageWidth) <= 2);
+    assert.ok(Math.abs(alignment.candleX - fixture.objects.find(o => o.id === "candle").pose.x) < .003);
+    assert.ok(Math.abs(alignment.candleWidth - fixture.objects.find(o => o.id === "candle").pose.width) < .003);
+    await frame.locator("#show-photo").click();
+    assert.equal(await frame.locator("#scene-photo").isHidden(), true);
+    await frame.locator("#show-photo").click();
+    await frame.locator("#show-guides").click();
+    assert.equal(await frame.locator("#show-guides").getAttribute("aria-pressed"), "false");
+    await frame.locator("#show-guides").click();
     assert.equal(await frame.locator("#scene-id-line").innerText(), "sceneId: birdesengor-study-v2 · 1600 × 900");
 
     // Select the candle's named anchor and exercise the real canonical overlay.
-    await frame.locator('[data-scene-object="candle"]').click();
+    await frame.locator("#object-list button", { hasText: "Mum" }).click();
+    assert.equal(await frame.locator('#object-inspector input[type="number"]').first().isDisabled(), true);
     await frame.locator("#effect-list button").first().waitFor();
     assert.equal(await frame.locator("#effect-list button").count(), 3);
     await frame.locator("#effect-list button", { hasText: "Alev" }).click();
-    await sceneFrame.waitForFunction(() => (window.__sceneEditor?.inspect()?.overlays?.[0]?.frames ?? 0) > 2);
+    await sceneFrame.waitForFunction(() => (window.__sceneEditor?.inspect()?.overlays?.find(o => o.objectId === "candle")?.frames ?? 0) > 2);
     const pixels = await sceneFrame.evaluate(() => [...document.querySelectorAll(".scene-object canvas")].map(canvas => {
       const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
       let count = 0;
@@ -184,6 +239,8 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
       entry.scene.effects?.find(effect => effect.id === "flame-1")?.params?.opacity === 0.42));
     const saved = await page.evaluate(() => window.__savedScenes.at(-1));
     assert.equal(saved.id, "birdesengor:scene_v2");
+    assert.equal(saved.sourceHash, packet.sourceHash);
+    assert.equal(saved.scene.previewImage, undefined);
     assert.equal(saved.scene.version, 2);
     assert.equal(saved.scene.kind, "objectScene");
     assert.equal(saved.scene.sceneId, "birdesengor-study-v2");
@@ -194,13 +251,46 @@ test("local scene target switches iframe, edits and saves v2 without deploy UI",
 
     // CSS-hidden candle and parent stop the ticker even while intersecting.
     await sceneFrame.evaluate(() => { document.querySelector('[data-scene-object="candle"]').style.visibility = "hidden"; });
-    await sceneFrame.waitForFunction(() => window.__sceneEditor.inspect().overlays.every(overlay => !overlay.running));
-    const hiddenFrames = await sceneFrame.evaluate(() => window.__sceneEditor.inspect().overlays.reduce((sum, overlay) => sum + overlay.frames, 0));
+    await sceneFrame.waitForFunction(() => window.__sceneEditor.inspect().overlays.filter(overlay => overlay.objectId === "candle").every(overlay => !overlay.running));
+    const hiddenFrames = await sceneFrame.evaluate(() => window.__sceneEditor.inspect().overlays.filter(overlay => overlay.objectId === "candle").reduce((sum, overlay) => sum + overlay.frames, 0));
     await page.waitForTimeout(400);
-    const stillHiddenFrames = await sceneFrame.evaluate(() => window.__sceneEditor.inspect().overlays.reduce((sum, overlay) => sum + overlay.frames, 0));
+    const stillHiddenFrames = await sceneFrame.evaluate(() => window.__sceneEditor.inspect().overlays.filter(overlay => overlay.objectId === "candle").reduce((sum, overlay) => sum + overlay.frames, 0));
     assert.equal(stillHiddenFrames, hiddenFrames, "hidden scene object stops frame updates");
     await sceneFrame.evaluate(() => { document.querySelector('[data-scene-object="candle"]').style.visibility = ""; });
     await sceneFrame.waitForFunction(() => window.__sceneEditor.inspect().overlays.some(overlay => overlay.running));
+
+    await page.screenshot({ path: "/tmp/birdesengor-effect-studio.png" });
+    // Only saved, valid drafts may use the separate prepare IPC; no publish.
+    for (const owner of ["candle", "incense-burner", "incense-holder"]) {
+      await sceneFrame.evaluate(id => window.__sceneEditor.selectObject(id), owner);
+      for (const checkbox of await frame.locator('#effect-list input[type="checkbox"]').all()) {
+        await checkbox.uncheck();
+      }
+    }
+    await page.getByRole("button", { name: "Kaydet", exact: true }).click();
+    await page.waitForFunction(() => ![...document.querySelectorAll(".effects-buttons button")].find(b => b.textContent.includes("Site dosyasına hazırla"))?.disabled);
+    await prepare.click();
+    await page.waitForFunction(() => window.__prepareCalls.length === 1);
+    assert.deepEqual(await page.evaluate(() => window.__prepareCalls), ["birdesengor:scene_v2"]);
+    assert.deepEqual(await page.evaluate(() => window.__deployCalls), []);
+    assert.deepEqual(await page.evaluate(() => window.__birdesengorLiveDeployCalls), []);
+
+    // Cancelling the live confirmation after a successful dry-run is safe.
+    page.once("dialog", dialog => dialog.dismiss());
+    await page.getByRole("button", { name: "Siteye yayınla", exact: true }).click();
+    await page.waitForFunction(() => window.__birdesengorCancelCalls === 1);
+    assert.deepEqual(await page.evaluate(() => window.__birdesengorLiveDeployCalls), []);
+
+    // Deliberate second click, dry-run and an accepted human confirmation.
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: "Siteye yayınla", exact: true }).click();
+    await page.waitForFunction(() => window.__birdesengorLiveDeployCalls.length === 1);
+    assert.deepEqual(await page.evaluate(() => window.__birdesengorPreflightCalls),
+      ["birdesengor:scene_v2", "birdesengor:scene_v2"]);
+    assert.deepEqual(await page.evaluate(() => window.__birdesengorLiveDeployCalls),
+      [["birdesengor:scene_v2", "reviewed-one-time-token"]]);
+    assert.deepEqual(await page.evaluate(() => window.__deployCalls), [],
+      "reviewed dedicated site workflow must not invoke generic deploy buttons");
 
     // Compact viewport must not overflow horizontally.
     await page.setViewportSize({ width: 390, height: 844 });

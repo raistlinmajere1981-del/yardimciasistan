@@ -216,23 +216,24 @@ try {
 
   // Real retail transaction through the shared storefront, including an uncertain response retry.
   await page.goto(`${base}/deneme/?page=catalog`);
-  await page.locator('#product-grid').getByRole('button',{name:'Sepete ekle',exact:true}).click();
-  await expect(page.locator('#cart-count')).toHaveText('1');
-  await page.locator('#open-checkout').click();
-  await page.locator('#buyer-name').fill('Demo Buyer');
-  await page.locator('#buyer-phone').fill('+905321234567');
-  await page.locator('#order-note').fill('Original demo order note');
+  await page.locator('[data-commerce-products]').getByRole('button',{name:'Sepete ekle',exact:true}).click();
+  await expect(page.locator('[data-commerce-lines] [data-commerce-quantity]')).toHaveCount(1);
+  await expect(page.locator('[data-commerce-lines] [data-commerce-quantity]')).toHaveValue('1');
+  await page.locator('[data-commerce-checkout]').click();
+  await page.locator('#commerce-name').fill('Demo Buyer');
+  await page.locator('#commerce-phone').fill('+905321234567');
+  await page.locator('#commerce-note').fill('Original demo order note');
   let attempt;
   await page.route(`${config.baseUrl}/api/order.php`,async route=>{attempt=route.request().postDataJSON();await route.fulfill({status:503,json:{ok:false}});},{times:1});
-  await page.locator('#submit-order').click();
-  await expect(page.locator('#submission-message')).toContainText('doğrulanamadı');
-  await expect(page.locator('#order-note')).toHaveValue('Original demo order note');
+  await page.locator('[data-commerce-submit]').click();
+  await expect(page.locator('[data-commerce-message]')).toContainText('doğrulanamadı');
+  await expect(page.locator('#commerce-note')).toHaveValue('Original demo order note');
   const accepted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/order.php`&&r.request().method()==='POST');
-  await page.locator('#submit-order').click();const receipt=await accepted;
+  await page.locator('[data-commerce-submit]').click();const receipt=await accepted;
   assert.equal(receipt.status(),201,await receipt.text());
   assert.deepEqual(receipt.request().postDataJSON(),attempt,'Retry must preserve the exact order intent and identity');
-  await expect(page.locator('#reference')).not.toHaveText('');
-  await expect(page.locator('#success')).toBeVisible();
+  await expect(page.locator('[data-commerce-reference]')).not.toHaveText('');
+  await expect(page.locator('[data-commerce-success]')).toBeVisible();
 
   console.log('7. Verifying Account Portal and Redirects...');
   await page.goto(`${base}/deneme/?page=account`);

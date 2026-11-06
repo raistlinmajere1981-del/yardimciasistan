@@ -5,7 +5,7 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { chooseSearchSelect } from './test-helpers/search-select.mjs';
-import { openSettingsService } from './test-helpers/settings-ui.mjs';
+import { expandSettingsStructure, openSettingsService } from './test-helpers/settings-ui.mjs';
 
 // Vite treats port 0 as its default port; reserve a real ephemeral port for this fixture.
 const port = await new Promise((resolvePort, reject) => {
@@ -105,7 +105,7 @@ try {
   await scenario('Settings ignores obsolete category state', 'settings-platform', 'category=removed-category', async page => {
     await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toHaveCount(0);
     await expect(page.getByLabel('Firma adı', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ })).toHaveAttribute('aria-expanded', 'false');
+    await expandSettingsStructure(page);
   });
   await scenario('Settings setup reset exposes sector', 'settings-platform', 'category=services', async page => {
     await page.evaluate(() => window.refreshSettings({ setupRequired: true }));

@@ -33,6 +33,7 @@ export function ProductFormFields({
   disabled = false,
   mode = "all",
   localImageDataUrl = "",
+  imageResetKey = 0,
   lookupSeed = null,
   onLookupSeedLoaded,
   onManualImageSelected,
@@ -56,6 +57,7 @@ export function ProductFormFields({
   disabled?: boolean;
   mode?: "all" | "details" | "media";
   localImageDataUrl?: string;
+  imageResetKey?: number;
   lookupSeed?: ProductLookupSeed | null;
   onLookupSeedLoaded?: (requestId: number) => void;
   onManualImageSelected?: (dataUrl: string) => void;
@@ -84,7 +86,7 @@ export function ProductFormFields({
 
   useEffect(() => {
     setPreviewDataUrl(localImageDataUrl);
-  }, [localImageDataUrl]);
+  }, [localImageDataUrl, imageResetKey]);
 
   const previewExternal = useCallback(async (candidate: ProductLookupCandidate) => {
     const isCurrent = beginPreviewRequest();

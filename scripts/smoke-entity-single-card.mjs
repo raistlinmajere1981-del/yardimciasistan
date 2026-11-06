@@ -12,6 +12,8 @@ import { createCompactUiFixture } from "./lib/desktop-renderer-fixtures.mjs";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { prepareProductDetailsSave, saveProductDetails } = require("../apps/desktop-app/dist-electron/commerce-product-save.js");
+const { listProductPhotos } = require("../apps/desktop-app/dist-electron/product-photo-store.js");
 const { saveCatalogCategory } = require("../apps/desktop-app/dist-electron/commerce-category-store.js");
 const root = mkdtempSync(join(tmpdir(), "ya-single-card-"));
 const database = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: root });
@@ -39,7 +41,12 @@ try {
   let failProduct = false, failCustomer = false, conflict = false;
   await page.exposeFunction("__cardCall", async (method, input) => {
     calls.push({ method, input });
-    if (method === "saveProduct") { if (failProduct) throw new Error("Ürün kayıt fixture hatası"); return runtime.saveRuntimeCatalogProduct(database.databasePath, input); }
+    if (method === "saveProduct") {
+      if (failProduct) throw new Error("Ürün kayıt fixture hatası");
+      if (conflict) { conflict = false; runtime.applyRuntimeInventoryMovement(database.databasePath, { productId: input.product.id, type: "adjust", quantityDelta: 1 }); }
+      return saveProductDetails(database.databasePath, await prepareProductDetailsSave(database.databasePath, input));
+    }
+    if (method === "photos") return listProductPhotos(database.databasePath, input);
     if (method === "products") return runtime.listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "balance") return runtime.getRuntimeInventoryBalance(database.databasePath, input);
     if (method === "movements") return runtime.listRuntimeInventoryMovements(database.databasePath, input);
@@ -59,7 +66,7 @@ try {
     window.__cards = initial;
     const call = (method, input) => window.__cardCall(method, input);
     window.yardimciDesktop = {
-      commerce: { listProducts: input => call("products", input), saveProduct: input => call("saveProduct", input), getInventoryBalance: id => call("balance", id), listInventoryMovements: input => call("movements", input), applyInventoryMovement: input => call("adjust", input), setInventoryCount: input => call("count", input), getProductPublication: id => call("publication", id), saveProductPublication: input => call("publish", input), getProductImageDataUrl: async () => "" },
+      commerce: { listProducts: input => call("products", input), saveProductDetails: input => call("saveProduct", input), listProductPhotos: id => call("photos", id), getInventoryBalance: id => call("balance", id), listInventoryMovements: input => call("movements", input), applyInventoryMovement: input => call("adjust", input), setInventoryCount: input => call("count", input), getProductPublication: id => call("publication", id), saveProductPublication: input => call("publish", input), getProductImageDataUrl: async () => "" },
       saveCustomer: input => call("saveCustomer", input), getCustomer: id => call("customer", id), assignTableCustomer: input => call("assign", input),
       getBusinessMessagingConfiguration: async () => ({ enabled: false, configured: false })
     };
@@ -70,14 +77,14 @@ try {
   const close = () => button("Çalışma alanını kapat").click();
   await page.getByRole("button", { name: "Yeni ürün", exact: true }).click();
   await expect(dialog.getByRole("complementary", { name: "Ürün işlemleri" })).toBeVisible();
-  await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toBeEnabled();
   await dialog.getByLabel("Ürün adı", { exact: true }).fill("Yeni tek kart");
   await page.keyboard.press("Escape"); await expect(dialog).toBeVisible();
   await dialog.getByLabel("Perakende fiyat", { exact: true }).fill("25");
   await dialog.getByLabel("Alış fiyatı", { exact: true }).fill("10");
   failProduct = true;
   await button("Ürünü Kaydet").click(); await expect(page.getByTestId("topbar-status")).toContainText("Ürün kayıt fixture hatası");
-  await expect(dialog.locator(".product-workspace-actions [role=status], .product-workspace-actions [role=alert]")).toHaveCount(0);
+  await expect(dialog.locator(".product-workspace-actions [role=alert]")).toContainText("Ürün kayıt fixture hatası");
   await expect(dialog.getByLabel("Ürün adı", { exact: true })).toHaveValue("Yeni tek kart");
   failProduct = false;
   await button("Ürünü Kaydet").click();
@@ -88,31 +95,44 @@ try {
   await expect(dialog.getByRole("heading", { name: "Yeni tek kart", exact: true })).toBeVisible();
   await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toBeEnabled();
   const created = calls.filter(call => call.method === "saveProduct").at(-1);
-  assert.equal(created.input.onlineSalesPublished, true);
+  assert.equal(created.input.isPublished, true);
+  const beforePublicationDraft = calls.length;
   await dialog.getByLabel("Web satışında yayınla", { exact: true }).uncheck();
-  await expect.poll(() => calls.filter(call => call.method === "publish").length).toBe(1);
   await expect(dialog.getByLabel("Aktif ürün", { exact: true })).toBeChecked();
+  assert.equal(calls.slice(beforePublicationDraft).filter(call => call.method === "publish").length, 0);
+  await expect(button("Çalışma alanını kapat")).toBeDisabled();
+  await button("Değişiklikleri Geri Al").click();
   await close(); await expect(page.locator(".market-catalog-products .market-list-row").filter({ hasText: "Yeni tek kart" })).toBeFocused();
-  await page.locator(`[data-sort-id="${product.id}"] .market-list-row`).click();
+  const openStock = () => page.locator(`[data-sort-id="${product.id}"] .market-list-row`).click();
+  await openStock();
   await expect(dialog.getByRole("button", { name: "Kategori", exact: true })).toContainText("Pasif gerçek kategori (Pasif)");
-  await dialog.getByLabel("Stok işlem miktarı").fill("3"); await expect(dialog.getByText("İşlem sonrası: 13 piece", { exact: true })).toBeVisible();
-  await button("Stok İşlemini Onayla").click(); await button("Stok Hareketini Kaydet").evaluate(element => { element.click(); element.click(); });
+  await dialog.getByLabel("Stok işlem miktarı").fill("3"); await expect(dialog.getByText("Kaydet sonrası stok: 13 piece", { exact: true })).toBeVisible();
+  const beforeStockSaves = calls.filter(call => call.method === "saveProduct").length;
+  await button("Ürünü Kaydet").evaluate(element => { element.click(); element.click(); });
+  await expect(dialog).toHaveCount(0); await openStock();
   await expect(dialog.getByText("Mevcut stok: 13 piece", { exact: true })).toBeVisible();
-  assert.equal(calls.filter(call => call.method === "adjust").length, 1);
+  assert.equal(calls.filter(call => call.method === "saveProduct").length, beforeStockSaves + 1);
   await dialog.getByLabel("Stok işlemi", { exact: true }).selectOption("remove");
-  await dialog.getByLabel("Stok işlem miktarı").fill("14"); await expect(button("Stok İşlemini Onayla")).toBeDisabled();
-  await dialog.getByLabel("Stok işlem miktarı").fill("0"); await expect(button("Stok İşlemini Onayla")).toBeDisabled();
-  await dialog.getByLabel("Stok işlem miktarı").fill("2"); await button("Stok İşlemini Onayla").click(); await button("Stok Hareketini Kaydet").click();
+  await dialog.getByLabel("Stok işlem miktarı").fill("14"); await button("Ürünü Kaydet").click();
+  await expect(dialog.locator(".product-workspace-actions [role=alert]")).toContainText("Stok miktarı negatif olamaz");
+  await dialog.getByLabel("Stok işlem miktarı").fill("0"); await button("Ürünü Kaydet").click();
+  await expect(dialog.locator(".product-workspace-actions [role=alert]")).toContainText("Sıfırdan büyük");
+  await dialog.getByLabel("Stok işlem miktarı").fill("2"); await button("Ürünü Kaydet").click();
+  await expect(dialog).toHaveCount(0); await openStock();
   await expect(dialog.getByText("Mevcut stok: 11 piece", { exact: true })).toBeVisible();
   await dialog.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
   await dialog.getByLabel("Stok işlem miktarı").fill("8"); conflict = true;
-  await button("Stok İşlemini Onayla").click(); await button("Stok Hareketini Kaydet").click();
+  await button("Ürünü Kaydet").click();
+  await expect(dialog.locator(".product-workspace-actions [role=alert]")).toContainText("Stok bu sayımdan sonra değişti");
   await expect(dialog.getByLabel("Stok işlem miktarı")).toHaveValue("8");
+  await button("Değişiklikleri Geri Al").click(); await close(); await openStock();
   await expect(dialog.getByText("Mevcut stok: 12 piece", { exact: true })).toBeVisible();
-  await button("Stok İşlemini Onayla").click(); await button("Stok Hareketini Kaydet").click();
+  await dialog.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
+  await dialog.getByLabel("Stok işlem miktarı").fill("8"); await button("Ürünü Kaydet").click();
+  await expect(dialog).toHaveCount(0); await openStock();
   await expect(dialog.getByText("Mevcut stok: 8 piece", { exact: true })).toBeVisible();
-  assert.deepEqual(calls.filter(call => call.method === "adjust").map(call => [call.input.type, call.input.quantityDelta]), [["adjust", 3], ["adjust", -2]]);
-  await dialog.getByLabel("Ürün adı", { exact: true }).fill("Kirli ürün"); await expect(dialog.getByLabel("Stok işlem miktarı")).toBeDisabled();
+  assert.equal(calls.filter(call => ["count", "adjust", "publish"].includes(call.method)).length, 0, "left rail uses only the atomic save");
+  await dialog.getByLabel("Ürün adı", { exact: true }).fill("Kirli ürün"); await expect(dialog.getByLabel("Stok işlem miktarı")).toBeEnabled();
   await button("Değişiklikleri Geri Al").click();
   await dialog.getByLabel("Stok takibi", { exact: true }).uncheck(); await expect(dialog.getByLabel("Stok işlemi", { exact: true })).toHaveCount(0);
   await button("Değişiklikleri Geri Al").click(); await close();

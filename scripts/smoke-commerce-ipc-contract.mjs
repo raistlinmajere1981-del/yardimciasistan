@@ -20,6 +20,7 @@ const channels = [
   "commerce:product:list",
   "commerce:product:activate",
   "commerce:product:save",
+  "commerce:product:saveDetails",
   "commerce:product:findByBarcode",
   "commerce:product:lookupExternal",
   "commerce:product:previewExternalImage",
@@ -67,6 +68,7 @@ const contractMethods = [
   "listProducts",
   "activateProduct",
   "saveProduct",
+  "saveProductDetails",
   "findProductByBarcode",
   "lookupExternalProductByBarcode",
   "previewExternalProductImage",
@@ -215,6 +217,9 @@ assert.doesNotMatch(
 
 // Exercise the compiled isolated bridge rather than parsing the subscription body.
 const listeners = new Map();
+const invocations = [];
+let locked = false;
+const savedDetails = { product: { id: "saved" }, photos: { photos: [] }, publication: null, balance: null, stock: null };
 let exposedBridge;
 runInNewContext(ts.transpileModule(preloadSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
@@ -223,10 +228,20 @@ runInNewContext(ts.transpileModule(preloadSource, {
     assert.equal(name, "electron");
     return { contextBridge: { exposeInMainWorld: (_key, bridge) => { exposedBridge = bridge; } }, webFrame: {}, ipcRenderer: {
       on: (channel, handler) => { const set = listeners.get(channel) ?? new Set(); set.add(handler); listeners.set(channel, set); },
-      removeListener: (channel, handler) => listeners.get(channel)?.delete(handler), invoke: async () => ({ locked: false })
+      removeListener: (channel, handler) => listeners.get(channel)?.delete(handler), invoke: async (channel, ...args) => {
+        invocations.push([channel, ...args]);
+        return channel === "appLock:getStatus" ? { locked } : savedDetails;
+      }
     } };
   }
 });
+const productDraft = { product: { name: "Draft", trackInventory: false }, sourcePhotoRevision: "", imageMode: "keep", photos: [] };
+assert.equal(await exposedBridge.commerce.saveProductDetails(productDraft), savedDetails);
+assert.deepEqual(invocations, [["appLock:getStatus"], ["commerce:product:saveDetails", productDraft]], "unified draft crosses exactly one mutation IPC after the unlock check");
+invocations.length = 0;
+locked = true;
+await assert.rejects(exposedBridge.commerce.saveProductDetails(productDraft), /Uygulama kilitli/);
+assert.deepEqual(invocations, [["appLock:getStatus"]], "locked preload never submits the draft");
 let notifications = 0;
 const unsubscribe = exposedBridge.commerce.onOrdersChanged(() => { notifications++; });
 const emitOrdersChanged = () => { for (const listener of listeners.get("commerce:ordersChanged") ?? []) listener({ sender: "electron-event" }); };

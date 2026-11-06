@@ -2,7 +2,7 @@ type Bounds = Pick<DOMRectReadOnly, "left" | "top" | "width" | "height">;
 type Point = [number, number];
 
 /** Closed subpaths joined by retraced bridges form independent evenodd holes. */
-export function nexaBackdropClip(character: Bounds | null, speech: Bounds | null, zoom = 1, speechRadius = 0, speechTail = 0): string {
+export function nexaBackdropClip(character: Bounds | null, speech: Bounds | null, zoom = 1, speechRadius = 0, speechTail = 0, scene = false): string {
   const origin = "0 var(--backdrop-cutout-top)";
   const points = [origin, "100% var(--backdrop-cutout-top)", "100% 100%", "0 100%", origin];
   function hole(path: Point[]) {
@@ -10,12 +10,12 @@ export function nexaBackdropClip(character: Bounds | null, speech: Bounds | null
     if (coordinates.length) points.push(...coordinates, coordinates[0]!, origin);
   }
   if (character && character.width > 0 && character.height > 0) {
-    // Follow artwork, excluding the stage's ground space and sidebar margins.
+    // The scene uses its exact elliptical boundary; legacy artwork keeps its margin.
     hole(Array.from({ length: 48 }, (_, i): Point => {
       const angle = i * Math.PI / 24;
       // A small proportional margin keeps the animated crown/fins undimmed.
-      return [character.left + character.width / 2 + character.width * .56 * Math.cos(angle),
-        character.top + character.height / 2 + character.height * .56 * Math.sin(angle)];
+      return [character.left + character.width / 2 + character.width * (scene ? .5 : .56) * Math.cos(angle),
+        character.top + character.height / 2 + character.height * (scene ? .5 : .56) * Math.sin(angle)];
     }));
   }
   if (speech && speech.width > 0 && speech.height > 0) {

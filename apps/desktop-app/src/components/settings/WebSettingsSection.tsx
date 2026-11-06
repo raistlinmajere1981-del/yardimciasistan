@@ -117,9 +117,9 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
     : displayState === "failed" ? "Bağlantı doğrulanamadı" : displayState === "testing" ? "Bağlantı kontrol ediliyor…" : "Bağlantı henüz kontrol edilmedi";
 
   return (
-    <section id="settings-web" tabIndex={-1} className="settings-web-bar" aria-label="Web bağlantısı">
-      <div className="settings-web-heading">
-        <strong>Web bağlantısı</strong>
+    <section id="settings-web" tabIndex={-1} className="settings-panel settings-web-panel" aria-label="Web bağlantısı">
+      <div className="settings-panel-header settings-web-heading">
+        <h2>Web bağlantısı</h2>
         {usesWeb && <StatusBadge className="settings-web-indicator" role="status"
           tone={displayState === "verified" ? "success" : displayState === "failed" ? "danger" : displayState === "testing" ? "info" : displayState === "draft" ? "warning" : "neutral"}>{status}</StatusBadge>}
         <label className="settings-web-choice settings-web-enable">
@@ -128,7 +128,8 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
           Etkin
         </label>
       </div>
-      {usesWeb && <div className="settings-web-fields">
+      {usesWeb && <div className="settings-panel-body settings-web-body">
+        <div className="settings-web-fields">
         <label className="form-field settings-web-url">
           Web eşitleme adresi
           <input value={web.webModuleUrl} disabled={busy} spellCheck={false}
@@ -149,20 +150,22 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
           </span>
         </label>
         <div className="settings-web-actions">
+          <ActionButton type="button" disabled={busy || !canConnect}
+            onClick={() => void connect()}>{connecting ? "Bağlanıyor…" : "Bağlan"}</ActionButton>
+        </div>
+        </div>
+        <div className="settings-web-controls">
           <label className="settings-web-choice">
             <input type="checkbox" checked={web.autoSyncEnabled} disabled={busy}
               onChange={event => updateWeb({ ...web, autoSyncEnabled: event.target.checked })} />
             Otomatik eşitle
           </label>
-          <ActionButton type="button" disabled={busy || !canConnect}
-            onClick={() => void connect()}>{connecting ? "Bağlanıyor…" : "Bağlan"}</ActionButton>
+          <label className="settings-web-choice">
+            <input type="checkbox" checked={trafficEnabled} disabled={busy}
+              onChange={event => onTrafficChange(event.target.checked)} />
+            Site trafiğini ölç
+          </label>
         </div>
-        <label className="settings-web-choice settings-web-traffic">
-          <input type="checkbox" checked={trafficEnabled} disabled={busy}
-            onChange={event => onTrafficChange(event.target.checked)} />
-          Site trafiğini ölç
-        </label>
-        <p className="settings-web-traffic-note">Yalnız anonim ve yaklaşık oturum, sayfa gösterimi ve iletişim tıklaması sayılır. IP adresi, e-posta ve tam URL saklanmaz; kapatıldığında site ziyaretleri kaydedilmez.</p>
       </div>}
     </section>
   );

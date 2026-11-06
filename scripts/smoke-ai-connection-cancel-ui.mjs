@@ -1,3 +1,4 @@
+import { expandSettingsStructure } from "./test-helpers/settings-ui.mjs";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
@@ -23,8 +24,7 @@ try {
         resolve("scripts/fixtures/settings-platform.tsx") + '"></script></body></html>')
     }));
   await page.goto(server.resolvedUrls.local[0] + "settings-cancel-fixture?profile=market");
-  const expand = page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ });
-  if (await expand.getAttribute("aria-expanded") === "false") await expand.click();
+  await expandSettingsStructure(page);
   await page.getByRole("button", { name: "AI Yardımcı ayarları" }).click();
   const dialog = page.getByRole("dialog", { name: "AI Yardımcı" });
   await expect(dialog).toBeVisible();

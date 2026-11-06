@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.7.5",
+  "template_version": "0.7.6",
   "site_owned": [
     "site/",
     "locales/",
@@ -13,7 +13,7 @@
     "core/i18n.php": "b0b933608ca2500d63705e1249e134e7bef4acfb7a7169e0280df7c40c7eca01",
     "core/legacy.php": "cfed861be701b52d75bcc53c8cb7624c6003435055d7cd68ead6068a81ecf076",
     "core/pages.php": "bc86b776688183405df65db63b1a43b892915eba6084e20db787525becfd7f6c",
-    "core/publication.php": "16772ee23b0a2f3f7179da8dda4b854351ab6ff5d3d0d40dcec60d5453639bcb",
+    "core/publication.php": "3682dec1bfa5ed451c21cf64d0a353f7ee61cb69b5e62db804ce3a8180ab8734",
     "core/render.php": "82cffa85faccb63f83966e5caa06fb27efbb52706fc0e1d372239250b7383380",
     "core/views/components/business-details.php": "7eb5671c830b0cbafde07883afdc84b143238f71bd2c6d9c24991fea47889065",
     "core/views/components/footer.php": "15aa1a5ba4f2200ca2461baad6097f752a343afb658d9b6057ee013572e4f405",
@@ -29,7 +29,7 @@
     "core/views/layout.php": "79170486f6ef92a93721824fa8a44aa8ddf1a3a310936af162d0b089686668ce",
     "core/views/pages/about.php": "7da2c6fcf9b2c0319b8b96633494beba488f4fd9250bf130a7a582736239b8c7",
     "core/views/pages/account.php": "e40dd77575429e7676f8934bfb670ab1c6c89a4cf9f177173b49e0476aed846e",
-    "core/views/pages/announcements.php": "78b8d4178466501032d13601ac1ff5385e10ec6cc07c0cf58a4ea26c87a68480",
+    "core/views/pages/announcements.php": "d1de30c472e52ac4d828f099e4282dcb4b76295138c9df77430004b276d9507b",
     "core/views/pages/catalog.php": "5051c821af8f5d4915898c0f7eae55cc85106d88ada78f828076a841e466bbe8",
     "core/views/pages/contact.php": "0d014ac6cae39afbaa8f23a450098d3c4597c8b721633ee5a8f0c38e29e4188c",
     "core/views/pages/gallery.php": "932b74d73d92e9ff3170a40f5c07a109cc318611e3dff78b2ab3050a04d1ad68",
@@ -80,8 +80,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "53beef143db39d922f359536d73877152b90e0b1cca72a9fc9d4439516fe623c",
-    "tools/manifest.mjs": "9d55be9da75fc7fb6229dcc61dfa0a27024bd467a207e19834160df7d65e9d89",
+    "README.md": "44833091511404c412460b8020c87280d5043e16d5aec3c8a99b183fd9d8ee57",
+    "tools/manifest.mjs": "e336b0886802c8ceb9912c8de18b22c05e46d11b0a2b480e057727ffcdb0bbf2",
     "tools/sync-effect-engine.mjs": "1ea62825931112e2e6b566368da56d9a0d94c2f7995c322fb92b50a040607600",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

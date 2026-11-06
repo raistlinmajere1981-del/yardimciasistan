@@ -1,3 +1,4 @@
+import { expandSettingsStructure } from "./test-helpers/settings-ui.mjs";
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
@@ -26,7 +27,7 @@ try {
   }));
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
   await page.goto(server.resolvedUrls.local[0] + "shipping-repair-test?profile=market&wholesale=on&web=off");
-  await page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ }).click();
+  await expandSettingsStructure(page);
   const card = page.locator("#settings-online-delivery");
   await expect(card).toHaveCount(0);
   await page.evaluate(() => window.refreshSettings({

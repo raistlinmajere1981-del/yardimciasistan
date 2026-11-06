@@ -39,8 +39,8 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test`);
 
   const visit = query => page.goto(`${server.resolvedUrls.local[0]}settings-platform-test${query}`);
-  const structure = page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ });
-  const expand = async () => { if (await structure.getAttribute('aria-expanded') === 'false') await structure.click(); };
+  const structure = page.getByRole('heading', { name: 'İşletme Yapısı ve Özellikler', exact: true });
+  const expand = async () => { await expect(structure).toBeVisible(); };
   const manage = async id => {
     await expand();
     await page.locator(`#${id}`).click();
@@ -58,8 +58,9 @@ try {
     await expect(page.getByRole('dialog', { name: overlayTitle, exact: true })).toBeVisible();
   };
   await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toHaveCount(0);
-  await expect(structure).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByLabel('Sektör tipi')).toBeHidden();
+  await expect(structure).toBeVisible();
+  await expect(page.getByLabel('Sektör tipi')).toBeVisible();
+  await expect(page.locator('#settings-structure-content')).toBeVisible();
   await expect(page.getByLabel('Firma adı', { exact: true })).toBeVisible();
   for (const label of ['Telefon', 'WhatsApp']) {
     await verifyPhoneInput(page, page.locator('#settings-public-profile').getByLabel(label, { exact: true }));
@@ -371,15 +372,16 @@ try {
   expect(geometry).toEqual({ fits: true, scrolls: true });
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
-  // Every normal visit starts collapsed; setup is always expanded, including without service capabilities.
+  // The business structure panel remains visible both during setup and afterwards.
   await visit('?profile=market&firstRun=on&missingRuntime');
-  await expect(structure).toHaveAttribute('aria-expanded', 'true');
+  await expect(structure).toBeVisible();
   await expect(page.getByLabel('Sektör tipi')).toBeVisible();
   await expect(page.locator('.settings-service-row')).toHaveCount(0);
   await expect(page.locator('#settings-web').getByLabel('Etkin', { exact: true })).not.toBeChecked();
   await businessSave();
   await expect.poll(() => page.evaluate(() => window.persistedSettings().setupRequired)).toBe(false);
-  await expect(structure).toHaveAttribute('aria-expanded', 'false');
+  await expect(structure).toBeVisible();
+  await expect(page.locator('#settings-structure-content')).toBeVisible();
   expect(await page.evaluate(() => window.persistedSettings().businessName)).toBe('');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'web-test').length)).toBe(0);
   // A restored demo may have an active but unconfigured shipping option before
@@ -407,6 +409,10 @@ try {
     overlay = await manage(id);
     await expect(overlay).toBeVisible();
     expect(await overlay.locator('.workspace-frame__body').evaluate(node => node.scrollWidth <= node.clientWidth + 1), `${id} content fits`).toBe(true);
+    if (id === 'settings-dealer-portal') {
+      await expect(overlay.getByLabel('Online Bayi Başvurusu')).toHaveCount(1);
+      await expect(overlay.getByRole('button', {name:'Başvuru bağlantısını kopyala'})).toHaveCount(0);
+    }
     await expect(overlay.getByRole('button', { name: 'Kaydet', exact: true })).toBeEnabled();
     await cancel();
   }

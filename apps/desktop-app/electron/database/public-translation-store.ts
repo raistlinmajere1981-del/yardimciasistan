@@ -1,11 +1,22 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { PUBLIC_LANGUAGES, PUBLIC_TRANSLATION_KINDS, type PublicSiteCatalog, type PublicLocalization, type SaveTranslationInput, type TranslationField, type TranslationFilter, type TranslationIdentity, type TranslationPage, type TranslationRecord, type TranslationSettings } from "@yardimci-asistan/shared";
+import { PUBLIC_LANGUAGES, PUBLIC_TRANSLATION_KINDS, type PublicSiteCatalog, type PublicLocalization, type SaveTranslationInput, type TranslationField, type TranslationFilter, type TranslationIdentity, type TranslationJob, type TranslateSelectionInput, type TranslationPage, type TranslationRecord, type TranslationSettings } from "@yardimci-asistan/shared";
 import { validateSiteCatalog } from "../public-site-catalog";
 import { queueSyncJob } from "./sync-runtime-store";
 
 const translationHash = (text: string) => createHash("sha256").update(text).digest("hex");
 export interface TranslationSource extends TranslationIdentity { fields: Record<string, string> }
+export interface TranslationTask { sourceHash: string; refs: Array<TranslationIdentity & {field: string}> }
+export interface TranslationWork {
+  job: TranslationJob; input: TranslateSelectionInput | null; bulk: boolean;
+  pending: TranslationTask[];
+  records: Array<TranslationIdentity & {remaining: number; changed: boolean; failed: boolean}>;
+}
+export interface TranslationRuntime {
+  work: TranslationWork | null; automaticPaused: boolean;
+  cooldown: {reason: "rate_limited" | "quota_exhausted"; until: string; attempts: number; retryAfterSeconds?: number} | null;
+}
+export interface AiTranslationWrite { identity: TranslationIdentity; expected: Pick<TranslationField,"field" | "sourceHash">; text: string; failure?: string }
 interface SourceRow { record_type: TranslationIdentity["kind"]; record_id: string; label: string; fields_json: string }
 interface StoredTranslation { record_type: TranslationIdentity["kind"]; record_id: string; field: string; target_language: string; source_text: string; source_hash: string; translated_text: string; status: string; origin: "manual" | "ai"; updated_at: string }
 const defaults = (): TranslationSettings => ({ enabled: false, sourceLanguage: "tr", targetLanguages: [], automatic: false });
@@ -13,6 +24,14 @@ const defaults = (): TranslationSettings => ({ enabled: false, sourceLanguage: "
 export class PublicTranslationStore {
   constructor(private readonly db: DatabaseSync, private readonly gallery: () => Array<{ id: string; title: string }> = () => [], private readonly targetUrl: () => string = () => "") {}
   businessId() { return String(this.db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1").get()?.id ?? ""); }
+  runtime(): TranslationRuntime {
+    const row = this.db.prepare("SELECT state_json FROM public_translation_runtime WHERE business_id=?").get(this.businessId());
+    return row ? JSON.parse(String(row.state_json)) as TranslationRuntime : {work:null, automaticPaused:false, cooldown:null};
+  }
+  saveRuntime(state: TranslationRuntime) {
+    this.db.prepare("INSERT INTO public_translation_runtime(business_id,state_json) VALUES (?,?) ON CONFLICT(business_id) DO UPDATE SET state_json=excluded.state_json")
+      .run(this.businessId(), JSON.stringify(state));
+  }
   settings(): TranslationSettings {
     const row = this.db.prepare("SELECT * FROM public_translation_settings WHERE business_id=?").get(this.businessId());
     return row ? { enabled: row.enabled === 1, sourceLanguage: "tr", targetLanguages: JSON.parse(String(row.target_languages_json)) as string[], automatic: row.automatic === 1 } : defaults();
@@ -41,7 +60,7 @@ export class PublicTranslationStore {
     return { sql: `WITH sources AS (SELECT record_type,record_id,label,fields_json FROM public_translation_sources WHERE business_id=?
       UNION ALL SELECT 'gallery', json_extract(value,'$.id'), json_extract(value,'$.title'), json_object('title',json_extract(value,'$.title')) FROM json_each(?)
       UNION ALL SELECT 'site_text', json_extract(value,'$.id'), json_extract(value,'$.label'), json_extract(value,'$.fields') FROM json_each(?))`,
-    args: [this.businessId(), JSON.stringify(this.gallery().map(({ id, title }) => ({ id, title }))), JSON.stringify(this.siteSources().map(s => ({id:s.id,label:s.id,fields:s.fields})))] };
+    args: [this.businessId(), JSON.stringify(this.gallery().map(({ id, title }) => ({ id, title }))), JSON.stringify(this.siteSources().map(s => ({id:s.id,label:s.fields.text,fields:s.fields})))] };
   }
   siteCatalog(): PublicSiteCatalog | undefined {
     const row = this.db.prepare("SELECT catalog_json FROM public_site_translation_catalogs WHERE business_id=? AND target_url=?").get(this.businessId(), this.targetUrl());
@@ -145,15 +164,26 @@ export class PublicTranslationStore {
   }
   /** Re-read canonical source and manual ownership after the asynchronous AI boundary. */
   acceptAi(identity: TranslationIdentity, language: string, expected: TranslationField, text: string, failure = "") {
+    return this.acceptAiBatch(language, [{identity,expected,text,failure}])[0]!;
+  }
+  /** One source/manual recheck and one outbox revision per affected publication section.
+   * The queue checkpoint participates in the same transaction as the accepted fields. */
+  acceptAiBatch(language: string, results: AiTranslationWrite[], checkpoint?: (accepted: boolean[]) => void) {
     return this.transaction(() => {
       this.language(language);
-      const row = this.source(identity);
-      if (!row) return false;
-      const field = this.record(row, language).fields.find(f => f.field === expected.field);
-      if (!field || field.sourceHash !== expected.sourceHash || field.origin === "manual" || field.state === "ready") return false;
-      this.write(identity, language, field, failure ? field.text : this.validText(text), "ai", failure ? "failed" : "ready", failure);
-      if (!failure) this.invalidate(identity.kind);
-      return true;
+      const jobs = new Set<Parameters<typeof queueSyncJob>[1]>();
+      const accepted = results.map(({identity,expected,text,failure = ""}) => {
+        const row = this.source(identity);
+        if (!row) return false;
+        const field = this.record(row, language).fields.find(f => f.field === expected.field);
+        if (!field || field.sourceHash !== expected.sourceHash || field.origin === "manual" || field.state === "ready") return false;
+        this.write(identity, language, field, failure ? field.text : this.validText(text), "ai", failure ? "failed" : "ready", failure);
+        if (!failure) for (const job of this.publicationJobs(identity.kind)) jobs.add(job);
+        return true;
+      });
+      for (const job of jobs) queueSyncJob(this.db, job);
+      checkpoint?.(accepted);
+      return accepted;
     });
   }
   private validText(value: string) {
@@ -167,12 +197,15 @@ export class PublicTranslationStore {
       source_text=excluded.source_text,source_hash=excluded.source_hash,translated_text=excluded.translated_text,status=excluded.status,origin=excluded.origin,failure_code=excluded.failure_code,updated_at=excluded.updated_at`)
       .run(this.businessId(), identity.kind, identity.id, field.field, language, field.source, field.sourceHash, text, status, origin, failure, now, now);
   }
-  private invalidate(kind?: TranslationIdentity["kind"]) {
+  private publicationJobs(kind?: TranslationIdentity["kind"]) {
     const jobs = kind === "room" ? ["room_catalog_publish"] : kind === "table" ? ["table_catalog_publish"]
       : kind?.startsWith("menu_") ? ["menu_publish"] : kind?.startsWith("catalog_") ? ["online_catalog_publish"]
       : kind === "marketing" ? ["marketing_website_publish"] : kind ? ["business_context_publish"]
       : ["room_catalog_publish", "table_catalog_publish", "menu_publish", "online_catalog_publish", "business_context_publish", "marketing_website_publish"];
-    for (const job of jobs) queueSyncJob(this.db, job as Parameters<typeof queueSyncJob>[1]);
+    return jobs as Array<Parameters<typeof queueSyncJob>[1]>;
+  }
+  private invalidate(kind?: TranslationIdentity["kind"]) {
+    for (const job of this.publicationJobs(kind)) queueSyncJob(this.db, job);
   }
   localization(sources: TranslationSource[], includeSite = false): PublicLocalization {
     const settings = this.settings();

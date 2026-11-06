@@ -100,6 +100,7 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
   return (
     <div ref={host} className={`nexa-habitat nexa-habitat--${size}`} data-nexa-state={state} data-motion-active={motionActive}>
       {size !== "hidden" && <>
+        <div className="nexa-scene-back" aria-hidden="true"><span className="nexa-scene-core" /><span className="nexa-scene-crystals" /><span className="nexa-scene-platform" /></div>
         {size === "wide" && <div className="nexa-speech-slot">
           {nexaStatusMessages[state] && <span className="nexa-habitat-speech" role="status" aria-atomic="true" aria-label={nexaStatusMessages[state]} key={state}>
             {state === "thinking" ? <>Düşünüyorum<span className="nexa-speech-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></> : nexaStatusMessages[state]}

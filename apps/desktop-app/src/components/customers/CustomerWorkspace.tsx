@@ -31,6 +31,7 @@ export interface CustomerWorkspaceProps {
   aiEnabled: boolean;
   whatsappEnabled: boolean;
   reservationsEnabled: boolean;
+  requestsEnabled?: boolean;
   staysEnabled: boolean;
   accommodationFolioEnabled?: boolean;
   customerCreditEnabled: boolean;
@@ -51,6 +52,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     aiEnabled,
     whatsappEnabled,
     reservationsEnabled,
+    requestsEnabled = false,
     staysEnabled,
     accommodationFolioEnabled = false,
     customerCreditEnabled,
@@ -122,14 +124,16 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [customerRequests, setCustomerRequests] = useState<{id: string; items: SyncedCustomerRequest[]} | null>(null);
   useEffect(() => {
     let active = true;
-    if (customer?.id && window.yardimciDesktop?.getCustomerRequests) {
+    if (requestsEnabled && customer?.id && window.yardimciDesktop?.getCustomerRequests) {
       window.yardimciDesktop.getCustomerRequests(customer.id).then(items => { if (active) setCustomerRequests({id: customer.id, items}); }).catch(() => undefined);
+    } else {
+      setCustomerRequests(null);
     }
     return () => { active = false; };
-  }, [customer?.id, data.requests]);
+  }, [requestsEnabled, customer?.id, data.requests]);
   const selectedRequests = useMemo<SyncedCustomerRequest[]>(
-    () => customerRequests && customerRequests.id === customer?.id ? customerRequests.items : customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [],
-    [customer, data.requests, customerRequests]
+    () => !requestsEnabled ? [] : customerRequests && customerRequests.id === customer?.id ? customerRequests.items : customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [],
+    [customer, data.requests, customerRequests, requestsEnabled]
   );
   const selectedReservations = useMemo(
     () => customer ? data.reservations.filter((reservation) => reservation.customerId === customer.id || reservation.customerPhone === customer.phone) : [],

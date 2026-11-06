@@ -134,10 +134,19 @@ try {
           products = products.map(product => product.id === saved.id ? saved : product);
           projectProducts(); return structuredClone(saved);
         },
+        saveProductDetails: async draft => {
+          const saved = await window.yardimciDesktop.commerce.saveProduct(draft.product);
+          if (draft.stock?.operation === "count") balances.set(saved.id, draft.stock.quantity);
+          const photos = await window.yardimciDesktop.commerce.listProductPhotos(saved.id);
+          return { product: saved, photos, publication: { productId: saved.id, isPublished: draft.isPublished ?? false },
+            balance: await window.yardimciDesktop.commerce.getInventoryBalance(saved.id), stock: draft.stock ? { movement: null } : null };
+        },
         getInventoryBalance: async productId => ({ productId, locationId: "fixture-primary", quantity: balances.get(productId) ?? 0,
           minimumQuantity: products.find(product => product.id === productId)?.minimumQuantity ?? 0, updatedAt: "fixture-count" }),
         listInventoryMovements: async () => [],
         getProductImageDataUrl: async id => products.find(product => product.id === id)?.imageSourceUrl ?? "",
+        // The product workspace loads the staged multi-photo collection before enabling editing.
+        listProductPhotos: async id => ({ productId: id, revision: "fixture", photos: [], sourceUrl: products.find(product => product.id === id)?.imageSourceUrl ?? "", sourceLicense: "" }),
         setInventoryCount: async input => {
           balances.set(input.productId, input.countedQuantity); projectProducts();
           return { balance: await window.yardimciDesktop.commerce.getInventoryBalance(input.productId), movement: null };
@@ -631,7 +640,7 @@ try {
   await expect(page.getByLabel("Servis sağlayıcı")).toBeDisabled();
   await page.locator('.settings-service-overlay').getByRole('switch').check();
   await expect(page.locator("#settings-web")).toBeVisible();
-  await expect(page.locator(".settings-workspace > #settings-web")).toHaveCount(1);
+  await expect(page.locator(".settings-workspace #settings-web")).toHaveCount(1);
   await expect(page.getByLabel("Web eşitleme adresi", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Web güvenlik anahtarı", { exact: true })).toBeVisible();
   await expect(page.locator("#settings-web-panel")).toHaveCount(0);
@@ -796,10 +805,10 @@ try {
   await menuItemWorkspace.getByLabel("Ürün adı", { exact: true }).fill("Canlı Serpme Kahvaltı");
   await expect(menuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
   await page.evaluate(() => {
-    const save = window.yardimciDesktop.commerce.saveProduct;
-    window.yardimciDesktop.commerce.saveProduct = async input => {
+    const save = window.yardimciDesktop.commerce.saveProductDetails;
+    window.yardimciDesktop.commerce.saveProductDetails = async input => {
       await new Promise(resolve => { window.__releaseProductSave = resolve; });
-      window.yardimciDesktop.commerce.saveProduct = save;
+      window.yardimciDesktop.commerce.saveProductDetails = save;
       return save(input);
     };
   });
@@ -824,9 +833,10 @@ try {
   await savedMenuItemWorkspace.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
   await savedMenuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true }).fill("21");
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
-  await savedMenuItemWorkspace.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
-  await savedMenuItemWorkspace.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
-  await expect(savedMenuItemWorkspace.getByText("Stok miktarı değişmedi.", { exact: true })).toBeVisible();
+  await expect(savedMenuItemWorkspace.getByRole("status").filter({ hasText: "Kaydet sonrası stok: 21" })).toBeVisible();
+  await savedMenuItemWorkspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(savedMenuItemWorkspace).toHaveCount(0);
+  await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Canlı Serpme Kahvaltı" }).first().click();
   await expect(savedMenuItemWorkspace.getByLabel("Stok işlem miktarı", { exact: true })).toHaveValue("");
   await savedMenuItemWorkspace.getByLabel("Menü fiyatı", { exact: true }).fill("600");
   await expect(savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
@@ -1820,7 +1830,12 @@ try {
       publication: { rooms: false, tables: false }
     };
     window.yardimciDesktop = {
-      commerce: { listProducts: async options => window.__catalogPageFixture(products, options), listCategories: async () => [] },
+      commerce: {
+        listProducts: async options => window.__catalogPageFixture(products, options),
+        listCategories: async () => [],
+        listProductPhotos: async productId => ({ productId, revision: "compact-fixture", photos: [], sourceUrl: "", sourceLicense: "" }),
+        getProductImageDataUrl: async id => products.find(product => product.id === id)?.imageSourceUrl ?? ""
+      },
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -2353,7 +2368,7 @@ try {
   await expect(compactPage.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(compactPage.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ })).toHaveAttribute("aria-expanded", "false");
+  await expandSettingsStructure(compactPage);
   // Revisiting Settings can remount its tab bar during the deferred page switch.
   // Dispatch once after the route is active, then assert the rendered section.
   await expect(compactPage.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);

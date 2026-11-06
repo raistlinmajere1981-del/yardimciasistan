@@ -85,7 +85,7 @@ test("sale receipt IPC requires trusted unlocked owner and persists one real rea
   store.saveDocumentOutputRule(f.db,{businessId:"b1",...rule({mode:"ASK_CONFIRMATION"})});
   const missingLines = invoke({saleId:"s"});
   assert.equal(missingLines.code,"DOCUMENT_SALE_JOB_LINES_MISSING");
-  assert.match(missingLines.message,/Baskı Yönetimi > Satış fişi > Düzenle > Ürün satırlarını ekle > Şablonları kaydet/);
+  assert.match(missingLines.message,/Baskı Yönetimi > Satış fişi > Düzenle > Yerleşim ve form > Ürün satırlarını ekle > Kaydet/);
   assert.equal(f.db.prepare("SELECT count(*) AS n FROM document_output_jobs").get().n,0);
   store.createDocumentTemplate(f.db,"b1","default:sale_receipt",2,"sale_receipt",{...receiptLayout,fields:[...receiptLayout.fields,{binding:"product.barcode",x:10,y:50,width:100,height:40}]});
   assert.equal(invoke({saleId:"s"}).code,"DOCUMENT_SALE_PREPARE_FAILED");

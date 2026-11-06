@@ -41,11 +41,16 @@ export class MarketingShareService {
           const variant = content.variants.find(v => v.channel === channel);
           const text = variant?.text.trim() || content.content.masterText;
           if (channel === "website" || channel === "instagram") {
-            if (!text.trim()) throw new MarketingError("missing_text", "Paylaşım metnini yazın.");
-            targets.push({contentId: id, channel, placement: "homepage_feature", title: variant?.title || content.content.title, text,
-              mediaAssetIds: channel === "instagram" ? [variant?.mediaAssetId || content.media[0]?.mediaAssetId].filter((v): v is string => Boolean(v)) : content.media.map(m => m.mediaAssetId)});
+            const mediaAssetIds = channel === "instagram"
+              ? [variant?.mediaAssetId || content.media[0]?.mediaAssetId].filter((v): v is string => Boolean(v))
+              : content.media.map(m => m.mediaAssetId);
+            const title = variant?.title || content.content.title;
+            if (channel === "website" && !title.trim() && !text.trim() && !mediaAssetIds.length)
+              throw new MarketingError("missing_content", "Web yayını için başlık, metin veya en az bir görsel ekleyin.");
+            targets.push({contentId: id, channel, placement: "homepage_feature", title, text, mediaAssetIds});
           } else {
-            const campaign: MessagingCampaignInput = {name: content.content.title.slice(0,120), purpose: "marketing", channel,
+            const campaignName = content.content.title || text.trim().slice(0,120) || (content.media.length ? "Görsel paylaşımı" : "Şablon paylaşımı");
+            const campaign: MessagingCampaignInput = {name: campaignName, purpose: "marketing", channel,
               providerId: channel === "sms" ? "iletimerkezi" : "whatsapp_cloud", contentId: id, contentRevision: revision,
               segmentId: options.audienceId, templateName: channel === "whatsapp" ? options.whatsapp.templateName : "",
               templateLanguage: channel === "whatsapp" ? options.whatsapp.templateLanguage : "", bindings: channel === "whatsapp" ? options.whatsapp.bindings : [],
@@ -79,7 +84,8 @@ export class MarketingShareService {
           if (preparationErrors.has(target.targetId)) throw preparationErrors.get(target.targetId);
           if (options.timing === "scheduled") {
             const existing = this.database().listMarketingSchedules().find(d => d.schedule.targetId === target.targetId);
-            const plan = existing ?? this.schedules.save({name: content.content.title, targetType: target.targetType, targetId: target.targetId, channel: target.channel,
+            const scheduleName = content.content.title || content.content.masterText.slice(0,120) || (content.media.length ? "Görsel paylaşımı" : "Şablon paylaşımı");
+            const plan = existing ?? this.schedules.save({name: scheduleName, targetType: target.targetType, targetId: target.targetId, channel: target.channel,
               ...(target.targetType === "public_publication" ? { expectedTargetRevision: this.database().getMarketingPublication(target.targetId).revision } : {}),
               scheduleType: "once", timezone: options.timezone, startsLocal: options.startsLocal, missedRunPolicy: "run_once_when_resumed"});
             if (plan.schedule.status !== "active") throw new MarketingError("schedule_stopped", plan.schedule.status === "completed" ? "Plan tamamlandı. Çalışma sonucunu ana Takvim’de inceleyin." : "Plan duraklatılmış veya iptal edilmiş. Ana Takvim’deki planı inceleyin.");

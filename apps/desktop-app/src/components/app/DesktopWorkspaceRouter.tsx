@@ -12,7 +12,7 @@ import { useWebAvailability } from "../../app/web-availability";
 import { useMarketingScheduleStatus } from "../../app/use-marketing-schedule-status";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
 import { useKbsNotificationController } from "../../app/use-kbs-notification-controller";
-import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
+import { buildNavigation, type DesktopPage, type CustomerWorkTab } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
 import {
@@ -52,6 +52,7 @@ const ReservationsWorkspace = lazy(() => import("../operations/OperationWorkspac
 const SettingsWorkspace = lazy(() => import("../settings/SettingsWorkspace").then(module => ({default: module.SettingsWorkspace})));
 const DashboardPage = lazy(() => import("../../pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const MarketPage = lazy(() => import("../../pages/MarketPage").then((module) => ({ default: module.MarketPage })));
+const BenefitsPage = lazy(() => import("../../pages/BenefitsPage").then((module) => ({ default: module.BenefitsPage })));
 const MarketingPage = lazy(() => import("../../pages/MarketingPage").then((module) => ({ default: module.MarketingPage })));
 const OperationCalendarPage = lazy(() => import("../../pages/OperationCalendarPage").then((module) => ({ default: module.OperationCalendarPage })));
 const PensionPage = lazy(() => import("../../pages/PensionPage").then((module) => ({ default: module.PensionPage })));
@@ -503,8 +504,10 @@ export function DesktopWorkspaceRouter({
           foodMenuEnabled={foodMenuEnabled}
           inventoryEnabled={inventoryEnabled}
         />
+      ) : activePage === "benefits" ? (
+        <BenefitsPage enabled={buildNavigation(businessCapabilities).some(item => item.id === "benefits")} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} />
       ) : activePage === "marketing" ? (
-        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} benefitsEnabled={enabledCapabilities.includes(C.COMMERCE_BENEFITS)} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} onCalendar={() => requestPageChange("calendar")} />
+        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} onCalendar={() => requestPageChange("calendar")} />
 
       ) : activePage === "market" ? (
         <MarketPage

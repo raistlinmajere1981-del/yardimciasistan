@@ -5,7 +5,6 @@ import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import type { WorkspacePresentation } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
 import { IconButton } from "../ui/IconButton";
-import { StatusChip } from "../ui/StatusChip";
 import { StatusBadge } from "../ui/StatusBadge";
 import { DataList, DataListButton } from "../ui/DataList";
 import { Panel } from "../ui/Panel";
@@ -14,6 +13,8 @@ const categories: Array<[NonNullable<TranslationFilter["category"]>, string]> = 
 const states: Array<[NonNullable<TranslationFilter["state"]>, string]> = [["all","Tümü"],["missing","Eksik"],["ready","Hazır"],["stale","Güncellenecek"],["manual","Manuel"],["failed","Başarısız"]];
 const fieldLabels: Record<string,string> = {name:"Ad",description:"Açıklama",about_text:"Hakkımızda",directions_note:"Yol tarifi",policy_note:"Kurallar",payment_note:"Ödeme açıklaması",title:"Başlık",text:"Metin",bed_info:"Yatak bilgisi",price_note:"Fiyat açıklaması",area:"Alan"};
 const keyOf = (r: {kind:string;id:string}) => `${r.kind}:${r.id}`;
+const preview = (r:TranslationRecord) => r.kind === "site_text" ? r.fields.find(f => f.field === "text")?.source ?? r.label : r.label;
+const jobLabels: Record<TranslationJob["state"],string> = {running:"Çevriliyor",waiting:"Sınırın açılması bekleniyor",paused:"Duraklatıldı",complete:"Tamamlandı",cancelled:"İptal edildi",unavailable:"AI kullanılamıyor"};
 
 export function LanguageManagementWorkspace({settings,onClose}:{settings:TranslationSettings;onClose:()=>void}) {
   const bridge = window.yardimciDesktop;
@@ -32,6 +33,9 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
   const reviewable = Boolean(record?.fields.some(f => f.state === "stale" && f.origin === "manual" && f.text));
   const blocked = busy || loading || dirty;
   const running = job?.state === "running";
+  const activeJob = job && ["running","waiting","paused"].includes(job.state);
+  const languageName = PUBLIC_LANGUAGES.find(l => l.code === filter.language)?.name ?? filter.language.toUpperCase();
+  const languageDirection = PUBLIC_LANGUAGES.find(l => l.code === filter.language)?.direction ?? "ltr";
   const singleIdentity = record ? JSON.stringify({kind:record.kind,id:record.id}) : "";
   useEffect(() => {
     let active = true;
@@ -101,14 +105,25 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
     finally { setBusy(false); }
   };
   const translate = async (allMissing:boolean) => {
-    if (!bridge || blocked || running || listError || !hasLoaded) return;
+    if (!bridge || blocked || activeJob || listError || !hasLoaded) return;
     setBusy(true); setError("");
     try {
       const result = await bridge.startTranslation({filter:{...filter,...(allMissing ? {state:"missing" as const} : {})},
-        ...(!allMissing ? {selection:[...selected.values()].map(({kind,id}) => ({kind,id}))} : {})});
+        mode:"bulk",...(!allMissing ? {selection:[...selected.values()].map(({kind,id}) => ({kind,id}))} : {})});
       if (!result.ok) setError(result.message); else setJob(result.value);
     } catch { setError("AI kullanılamıyor. Manuel çeviri ve Türkçe yayın devam ediyor."); }
     finally { setBusy(false); }
+  };
+  const controlJob = async (action:"pause"|"resume"|"cancel") => {
+    if (!bridge || busy) return;
+    setBusy(true); setError("");
+    try {
+      const result = action === "pause" ? await bridge.pauseTranslation() : action === "resume" ? await bridge.resumeTranslation() : await bridge.cancelTranslation();
+      if (!result.ok) {setError(result.message);return;}
+      const current = await bridge.getTranslationJob();
+      if (current.ok) setJob(current.value); else setError(current.message);
+    } catch {setError("Çeviri işlemi değiştirilemedi. Oturum kilidini kontrol edin.");}
+    finally {setBusy(false);}
   };
   const close = () => { if (!blocked) onClose(); };
   const pageCount = Math.max(1,Math.ceil(page.total/page.limit));
@@ -148,8 +163,15 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
             {(listError || hasLoaded) && <StatusBadge className="language-workspace__count">{listError ? "Kayıt sayısı alınamadı" : `${page.total} kayıt`}</StatusBadge>}
           </div>
           <div className="language-workspace__filter-group">
-            <div className="language-workspace__chip-row" role="group" aria-label="İçerik kategorileri">
-              {categories.map(([id,label]) => <StatusChip key={id} selected={filter.category===id} disabled={blocked} onClick={() => changeFilter({category:id})}>{label}</StatusChip>)}
+            <div className="language-workspace__filters">
+              <label className="form-field">İçerik kategorisi<select aria-label="İçerik kategorisi" value={filter.category} disabled={blocked}
+                onChange={e => changeFilter({category:e.target.value as NonNullable<TranslationFilter["category"]>})}>
+                {categories.map(([id,label]) => <option key={id} value={id}>{label}</option>)}
+              </select></label>
+              <label className="form-field">Çeviri durumu<select aria-label="Çeviri durumu" value={filter.state} disabled={blocked}
+                onChange={e => changeFilter({state:e.target.value as NonNullable<TranslationFilter["state"]>})}>
+                {states.map(([id,label]) => <option key={id} value={id}>{label}</option>)}
+              </select></label>
             </div>
             <label className="language-workspace__search">
               <Search size={17} aria-hidden="true"/>
@@ -157,9 +179,6 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
               <input type="search" aria-label="Kayıtlarda ara" placeholder="Kayıtlarda ara..." value={filter.query} disabled={busy || dirty}
                 onChange={e => setFilter(f=>({...f,query:e.target.value,offset:0}))}/>
             </label>
-            <div className="language-workspace__chip-row" role="group" aria-label="Çeviri durumu">
-              {states.map(([id,label]) => <StatusChip key={id} selected={filter.state===id} disabled={blocked} onClick={() => changeFilter({state:id})}>{label}</StatusChip>)}
-            </div>
           </div>
           <div className="language-workspace__selection-bar">
             <span className="language-workspace__selection-count">{selected.size} seçili</span>
@@ -175,14 +194,13 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
           <div className="language-workspace__records" aria-busy={loading}>
             <DataList className="language-workspace__rows">{page.records.map(r => <div key={keyOf(r)} className={`language-workspace__record${selected.has(keyOf(r))?" is-selected":""}`}>
               <label className="form-check">
-                <input type="checkbox" aria-label={`${r.label} seç`} disabled={blocked || Boolean(listError)}
+                <input type="checkbox" aria-label={`${preview(r)} seç`} disabled={blocked || Boolean(listError)}
                   checked={selected.has(keyOf(r))} onChange={() => choose(r,true)}/>
-                <span className="sr-only">{r.label} seç</span>
               </label>
               <DataListButton className="language-workspace__record-button" twoLine selected={selected.has(keyOf(r))}
-                title={r.label}
+                title={preview(r)}
                 meta={`${r.ready}/${r.total} hazır${r.stale ? ` · ${r.stale} güncellenecek` : ""}${r.manual ? ` · ${r.manual} manuel` : ""}${r.failed ? ` · ${r.failed} başarısız` : ""}`}
-                aria-label={r.label} aria-current={selected.size===1 && selected.has(keyOf(r)) ? "true" : undefined}
+                aria-label={preview(r)} aria-current={selected.size===1 && selected.has(keyOf(r)) ? "true" : undefined}
                 disabled={blocked || Boolean(listError)} onClick={() => choose(r,false)} />
             </div>)}</DataList>
             {!loading && !listError && hasLoaded && !page.records.length && <p role="status" className="language-workspace__list-message">{(filter.category === "all" && filter.state === "all" && !filter.query)
@@ -205,16 +223,16 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
           <div className="language-workspace__editor-scroll">
             {record ? <div className="language-workspace__detail">
               <div className="language-workspace__record-heading">
-                <strong>{record.label}</strong>
-                <span>{record.fields.length} alan · {filter.language.toUpperCase()}</span>
+                <strong>{preview(record)}</strong>
+                <span>{record.fields.length} alan · {languageName}</span>
               </div>
               {record.fields.map(f => <Panel as="div" padding="compact" key={f.field} className="language-workspace__field">
                 <div className="language-workspace__field-heading"><strong>{fieldLabels[f.field] ?? f.field}</strong>
-                  <StatusBadge tone={f.state==="ready"?"success":f.state==="failed"?"danger":"warning"}>{f.origin==="manual"?"Manuel · ":""}{states.find(([id])=>id===f.state)?.[1] ?? "Eksik"}</StatusBadge></div>
+                  <StatusBadge tone={f.state==="ready"?"success":f.state==="failed"?"danger":"warning"}>{f.origin==="manual"?"Manuel · ":f.origin==="ai"?"AI · ":""}{states.find(([id])=>id===f.state)?.[1] ?? "Eksik"}</StatusBadge></div>
                 <div className="language-workspace__field-pair">
-                  <label className="form-field">Türkçe<textarea aria-label={`${fieldLabels[f.field] ?? f.field} · Türkçe`} readOnly value={f.source}/></label>
-                  <label className="form-field">{filter.language.toUpperCase()} çeviri<textarea aria-label={`${fieldLabels[f.field] ?? f.field} · ${filter.language} çeviri`}
-                    value={draft[f.field] ?? f.text} maxLength={12000} disabled={busy || running || loading || Boolean(listError)}
+                  <label className="form-field">Türkçe<textarea aria-label={`${fieldLabels[f.field] ?? f.field} · Türkçe`} readOnly rows={f.source.length > 180 ? 4 : 2} value={f.source}/></label>
+                  <label className="form-field">{languageName} çeviri<textarea aria-label={`${fieldLabels[f.field] ?? f.field} · ${filter.language} çeviri`}
+                    value={draft[f.field] ?? f.text} dir={languageDirection} rows={f.source.length > 180 ? 4 : 2} maxLength={12000} disabled={busy || loading || Boolean(listError)}
                     onChange={e=>setDraft(d=>({...d,[f.field]:e.target.value}))}/></label>
                 </div>
               </Panel>)}
@@ -222,7 +240,7 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
               {dirty && <p role="status" className="language-workspace__hint">Kaydedilmemiş çeviri değişiklikleri</p>}
               <div className="language-workspace__save-actions">
                 <ActionButton variant="secondary" disabled={!dirty || busy} onClick={()=>setDraft({})}>Değişiklikleri Geri Al</ActionButton>
-                <ActionButton disabled={(!dirty && !reviewable) || busy || running || loading || Boolean(listError)} onClick={() => void save()}>Kaydet</ActionButton>
+                <ActionButton disabled={(!dirty && !reviewable) || busy || loading || Boolean(listError)} onClick={() => void save()}>{reviewable && !dirty ? "Çeviriyi Onayla ve Kaydet" : "Kaydet"}</ActionButton>
               </div>
             </div> : <div className="language-workspace__empty" role="status">
               <Languages size={28} aria-hidden="true"/>
@@ -236,16 +254,24 @@ export function LanguageManagementWorkspace({settings,onClose}:{settings:Transla
               <strong>AI İşlemleri</strong>
             </div>
             <div className="language-workspace__ai-actions">
-              <ActionButton variant="secondary" disabled={blocked || Boolean(listError) || !hasLoaded || running || !selected.size}
+              <ActionButton variant="secondary" disabled={blocked || Boolean(listError) || !hasLoaded || Boolean(activeJob) || !selected.size}
                 onClick={() => void translate(false)}>AI ile Çevir</ActionButton>
-              <ActionButton variant="secondary" disabled={blocked || Boolean(listError) || !hasLoaded || running || !page.total}
+              <ActionButton variant="secondary" disabled={blocked || Boolean(listError) || !hasLoaded || Boolean(activeJob) || !page.total}
                 onClick={() => void translate(true)}>Filtrelenen Eksikleri Tamamla</ActionButton>
             </div>
             {job && <div className="language-workspace__job" role="status">
+              <div className="language-workspace__job-heading"><StatusBadge tone={job.state==="complete"?"success":job.state==="waiting"||job.state==="paused"?"warning":"neutral"}>{jobLabels[job.state]}</StatusBadge>
+                <span>{PUBLIC_LANGUAGES.find(l=>l.code===job.language)?.name ?? job.language}{job.automatic ? " · Otomatik" : ""}</span></div>
               <span>{job.message}</span>
-              <progress max={Math.max(1,job.total)} value={job.completed+job.failed+job.skipped}/>
-              <div className="language-workspace__job-summary"><span>{job.completed} tamamlandı · {job.failed} hata · {job.skipped} atlandı / {job.total}</span>
-                {running && <ActionButton size="sm" variant="secondary" onClick={() => {void bridge?.cancelTranslation().catch(()=>setError("İşlem durdurulamadı."));}}>İşlemi Durdur</ActionButton>}</div>
+              <progress aria-label="Çeviri alanlarının ilerlemesi" max={Math.max(1,job.fieldTotal)} value={job.fieldsCompleted+job.fieldsFailed+job.fieldsSkipped}/>
+              <span>{job.fieldsCompleted} hazır · {job.fieldsFailed} hata · {job.fieldsSkipped} atlandı / {job.fieldTotal} alan</span>
+              <span>{job.completed+job.failed+job.skipped} / {job.total} kayıt · {job.requestCount} istek · {job.batchCount} toplu paket{job.currentBatchSize ? ` · Şimdi ${job.currentBatchSize} metin` : ""}</span>
+              {job.nextRetryAt && <span>{job.waitReason === "quota_exhausted" ? "Kota beklemesi" : "İstek sınırı"} · Sonraki deneme: <time dateTime={job.nextRetryAt}>{new Date(job.nextRetryAt).toLocaleString("tr-TR")}</time></span>}
+              {activeJob && <div className="language-workspace__job-actions">
+                {(running || job.state === "waiting") && <ActionButton size="sm" variant="secondary" disabled={busy} onClick={() => void controlJob("pause")}>Duraklat</ActionButton>}
+                {job.state === "paused" && <ActionButton size="sm" variant="secondary" disabled={busy} onClick={() => void controlJob("resume")}>Devam Et</ActionButton>}
+                <ActionButton size="sm" variant="quiet" disabled={busy} onClick={() => void controlJob("cancel")}>İşlemi İptal Et</ActionButton>
+              </div>}
             </div>}
           </div>
         </section>

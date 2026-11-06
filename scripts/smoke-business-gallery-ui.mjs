@@ -32,7 +32,7 @@ try {
         updatedAt:"2026-10-18",remoteUrl:"",previewDataUrl:"data:image/svg+xml,"+encodeURIComponent(
           `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="blue"/></svg>`)};
     };
-    window.galleryFixture={calls:[],getSaved:()=>saved};
+    window.galleryFixture={calls:[],getSaved:()=>saved,failNextSave:false};
     Object.assign(window.yardimciDesktop,{
       listBusinessGallery:async()=>structuredClone(draft??saved),
       getBusinessGalleryDraftState:async()=>({dirty:draft!==null}),
@@ -60,6 +60,7 @@ try {
         return {ok:true,message:"Silindi",media:structuredClone(draft),dirty:true};
       },
       commitBusinessGallery:async()=>{
+        if(window.galleryFixture.failNextSave) { window.galleryFixture.failNextSave=false;return {ok:false,message:"Galeri kayıt denemesi reddedildi.",dirty:true,changed:false}; }
         saved=structuredClone(draft??saved);draft=null;window.galleryFixture.calls.push("save");
         return {ok:true,message:"Kaydedildi",dirty:false,changed:true};
       },
@@ -130,17 +131,21 @@ try {
   expect(await dialog.evaluate(node=>node.getBoundingClientRect().bottom<=innerHeight)).toBe(true);
   await verifySettingsAppearanceParity(page, "gallery-narrow");
   await page.setViewportSize({ width:1440, height:900 });
+  await page.evaluate(()=>{window.galleryFixture.failNextSave=true;});
   await dialog.getByRole("button",{name:"Kaydet",exact:true}).click();
-  await expect(close).toBeEnabled();
-  await dialog.getByRole("button",{name:"Galeriyi kapat"}).click();
+  await expect(dialog).toBeVisible();
+  await expect(close).toBeDisabled();
+  assert.equal((await page.evaluate(()=>window.galleryFixture.getSaved())).length,0,"failed commit must preserve existing gallery");
+  await dialog.getByRole("button",{name:"Kaydet",exact:true}).click();
   await expect(dialog).toHaveCount(0);
   await page.locator("#settings-gallery-button").click();
   await expect(page.locator(".settings-gallery-item")).toHaveCount(1);
   await dialog.locator(".settings-gallery-item input").fill("Gün batımı");
   await expect(dialog.getByRole("button",{name:"Galeriyi kapat"})).toBeDisabled();
   await dialog.getByRole("button",{name:"Kaydet",exact:true}).click();
-  await expect(dialog.getByRole("button",{name:"Galeriyi kapat"})).toBeEnabled();
+  await expect(dialog).toHaveCount(0);
   assert.equal(await page.evaluate(()=>window.galleryFixture.getSaved()[0].title),"Gün batımı");
+  await page.locator("#settings-gallery-button").click();
   await dialog.getByRole("button",{name:"Fotoğraf Ekle"}).click();
   await expect(dialog.locator(".settings-gallery-item")).toHaveCount(2);
   await expect(dialog.getByRole("button",{name:"Galeriyi kapat"})).toBeDisabled();

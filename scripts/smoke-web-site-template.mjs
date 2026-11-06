@@ -108,6 +108,9 @@ try {
   writeFileSync(join(module, 'media/rooms/r/photo.png'), mediaPng);
   writeFileSync(join(module, 'media/tables/t/cover.png'), mediaPng);
   writeFileSync(join(module, 'media/tables/t/photo.png'), mediaPng);
+  const imageOnlyAsset = 'asset_visualonly', imageOnlyHash = 'a'.repeat(64);
+  mkdirSync(join(module, 'media/marketing/b'), {recursive: true});
+  writeFileSync(join(module, `media/marketing/b/${imageOnlyAsset}.${imageOnlyHash}.png`), mediaPng);
   const secret = 'isolated-template-fixture-secret';
   writeFileSync(join(module, 'config/business.json'), JSON.stringify({id: 'b', name: '', display_name: '', profile_id: 'market', sync_secret: secret, public_surfaces: [], allowed_origins: []}));
   writeFileSync(join(site, 'site.local.php'), "<?php return ['name'=>'LOCAL FAKE IDENTITY', 'phone'=>'5555555555'];");
@@ -183,6 +186,9 @@ try {
   ]}});
   await publish({action: 'publish_marketing_website', marketing: {version: 1, enabled: true, publications: [
     {id: 'm', channel: 'website', placement: 'homepage_feature', revision: 1, published: true, title: 'Yayınlanan duyuru', text: 'Yayınlanan duyuru metni', images: []},
+    {id: 'image-only', channel: 'website', placement: 'homepage_feature', revision: 1, published: true, title: '', text: '', images: [
+      {assetId: imageOnlyAsset, url: `/yardimci-asistan/media/marketing/b/${imageOnlyAsset}.${imageOnlyHash}.png`, altText: 'Kampanya afişi', width: 1, height: 1, sortOrder: 0}
+    ]},
     {id: 'off', channel: 'website', placement: 'homepage_feature', revision: 1, published: false, title: 'GİZLİ DUYURU', text: 'Kapalı', images: []},
   ]}});
   await page.goto(base + '/');
@@ -196,6 +202,11 @@ try {
     assert.ok(!(await page.content()).includes('GİZLİ MENÜ ÜRÜNÜ'));
     assert.ok(!(await page.content()).includes('GİZLİ DUYURU'));
   }
+  await page.goto(base + '/?page=announcements');
+  await expect(page.locator('.announcement-card')).toHaveCount(2);
+  const imageOnlyCard = page.locator('.announcement-card').filter({has: page.locator('img[alt="Kampanya afişi"]')});
+  await expect(imageOnlyCard.locator('img')).toHaveCount(1);
+  await expect(imageOnlyCard.locator('.announcement-body, h2, p')).toHaveCount(0);
   await page.goto(base + '/?page=gallery');
   assert.equal(await page.locator('.gallery img[data-effect-slot]').count(), 0, 'Dynamic gallery records never receive effect slots');
   await page.goto(base + '/?page=contact');

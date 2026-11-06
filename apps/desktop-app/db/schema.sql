@@ -3240,6 +3240,11 @@ CREATE TABLE public_site_translation_catalogs (
   catalog_json TEXT NOT NULL,
   PRIMARY KEY(business_id,target_url)
 );
+-- Durable queue/cooldown only; canonical source text stays with its publication owner.
+CREATE TABLE public_translation_runtime (
+  business_id TEXT PRIMARY KEY REFERENCES business(id) ON DELETE CASCADE,
+  state_json TEXT NOT NULL
+);
 CREATE TABLE public_translations (
   business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
   record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing','site_text')),

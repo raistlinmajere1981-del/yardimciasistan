@@ -77,6 +77,34 @@ try {
     if (method === "completeMarketSale") { sales.push(args[0]); return completeMarketSale(path, args[0]); }
     if (method === "reorderCatalog") { reorderCalls.push(args); return presentation.reorderCatalogRecords(path, ...args); }
     if (method === "setInventoryCount") { countCalls.push(args[0]); return runtime.setRuntimeInventoryCount(path, args[0]); }
+    if (method === "saveProductDetails") {
+      // Renderer fixture: preserve the atomic user contract across the product,
+      // photos, publication and stock drafts. Native transaction tests cover rollback.
+      const draft = args[0];
+      assert.equal(draft.sourcePhotoRevision, draft.product.id ? listPhotos(draft.product.id).revision : "");
+      const saved = runtime.saveRuntimeCatalogProduct(path, draft.product);
+      if (draft.isPublished !== undefined) database.saveCommerceProductPublication({ productId: saved.id, isPublished: draft.isPublished });
+      if (draft.photos) {
+        const current = listPhotos(saved.id);
+        const next = { ...current, revision: String(Number(current.revision) + 1),
+          photos: draft.photos.map(photo => ({ id: photo.id, format: photo.format })) };
+        for (const photo of draft.photos) if (photo.dataUrl) photoPreviews.set(photo.id, photo.dataUrl);
+        photoCollections.set(saved.id, next);
+      }
+      let stock = null;
+      if (draft.stock) {
+        const update = draft.stock.operation === "count"
+          ? { productId: saved.id, countedQuantity: draft.stock.quantity, note: draft.stock.note, actorSource: "desktop-product-workspace" }
+          : { productId: saved.id, type: "adjust", quantityDelta: draft.stock.operation === "remove" ? -draft.stock.quantity : draft.stock.quantity,
+              note: draft.stock.note, actorSource: "desktop-product-workspace" };
+        countCalls.push(update);
+        stock = draft.stock.operation === "count" ? runtime.setRuntimeInventoryCount(path, update)
+          : runtime.applyRuntimeInventoryMovement(path, update);
+      }
+      return { product: saved, photos: listPhotos(saved.id), publication: database.getCommerceProductPublication(saved.id),
+        balance: saved.trackInventory ? runtime.getRuntimeInventoryBalance(path, saved.id) : null,
+        stock: stock ? { movement: stock.movement ?? null, balance: stock.balance ?? null } : null };
+    }
     if (method === "getProductPublication") return database.getCommerceProductPublication(args[0]);
     if (method === "saveProductPublication") return database.saveCommerceProductPublication(args[0]);
     if (method === "getProductImageDataUrl") return `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="orange"/></svg>')}`;
@@ -104,7 +132,7 @@ try {
       if (method === "listProducts") window.__salesReadCompletions++;
       return method === "createOrder" ? { ok: true, value: result } : result;
     };
-    window.yardimciDesktop = { commerce: Object.fromEntries(["listOrders", "getOrder", "createOrder", "listProducts", "listCategories", "saveProduct", "saveCategory", "deleteCategory", "deleteProduct", "setProductQuickAccess", "activateProduct", "reorderCatalog", "getInventoryBalance", "listInventoryMovements", "setInventoryCount", "getProductPublication", "saveProductPublication", "getProductImageDataUrl", "listProductPhotos", "previewProductPhoto", "addProductPhotos", "getCustomerCreditAccount", "resolveProductPrice", "completeMarketSale", "findProductByBarcode"].map(method => [method, invoke(method)])) };
+    window.yardimciDesktop = { commerce: Object.fromEntries(["listOrders", "getOrder", "createOrder", "listProducts", "listCategories", "saveProduct", "saveProductDetails", "saveCategory", "deleteCategory", "deleteProduct", "setProductQuickAccess", "activateProduct", "reorderCatalog", "getInventoryBalance", "listInventoryMovements", "setInventoryCount", "getProductPublication", "saveProductPublication", "getProductImageDataUrl", "listProductPhotos", "previewProductPhoto", "addProductPhotos", "getCustomerCreditAccount", "resolveProductPrice", "completeMarketSale", "findProductByBarcode"].map(method => [method, invoke(method)])) };
     const dashboardListeners = new Set();
     window.yardimciDesktop.onDashboardDataChanged = listener => { dashboardListeners.add(listener); return () => dashboardListeners.delete(listener); };
     window.__emitSalesDashboard = data => { for (const listener of dashboardListeners) listener(structuredClone(data)); };
@@ -477,10 +505,11 @@ try {
   await expect(photo).toBeVisible();
   await expect.poll(() => photo.evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
   assert.equal(await photo.evaluate(image => getComputedStyle(image).objectFit), "contain");
-  assert.equal(listPhotos(kg.id).photos.length, 1);
+  assert.equal(listPhotos(kg.id).photos.length, 0, "New photo remains staged until Ürünü Kaydet");
   await expect(workspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("Elma kg taslak");
   await workspace.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
-  await expect(photo).toBeVisible();
+  await expect(photo).toHaveCount(0);
+  assert.equal(listPhotos(kg.id).photos.length, 0, "Discard must not persist staged photos");
   await expect(workspace.getByRole("checkbox", { name: "Aktif ürün" })).toBeVisible();
   const status = workspace.getByRole("region", { name: "Durum / Kullanım", exact: true });
   await expect(status.getByRole("checkbox", { name: "Stok takibi", exact: true })).toBeChecked();
@@ -499,7 +528,7 @@ try {
   await expect(published).toBeEnabled();
   const initiallyPublished = await published.isChecked();
   await published.click(); await expect(published).toBeChecked({ checked: !initiallyPublished });
-  assert.equal(database.getCommerceProductPublication(kg.id).isPublished, !initiallyPublished);
+  assert.equal(database.getCommerceProductPublication(kg.id).isPublished, initiallyPublished, "Publication preference must remain staged until Ürünü Kaydet");
   await published.click(); await expect(published).toBeChecked({ checked: initiallyPublished });
   await workspace.getByRole("checkbox", { name: "Aktif ürün" }).uncheck();
   await workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
@@ -514,10 +543,12 @@ try {
   await elmaRow.locator(".market-list-row").click();
   await workspace.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
   await workspace.getByLabel("Stok işlem miktarı", { exact: true }).fill("12,5"); await workspace.getByLabel("Kısa not", { exact: true }).fill("Canlı sayım");
-  await workspace.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
-  await workspace.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
-  await expect(workspace).toContainText("Fiziksel sayım kaydedildi."); assert.equal(countCalls[0].actorSource, "desktop-product-workspace");
+  await expect(workspace.getByText("Kaydet sonrası stok: 12.5 kg")).toBeVisible();
+  await workspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(workspace).toHaveCount(0);
+  assert.equal(countCalls[0].actorSource, "desktop-product-workspace");
   assert.equal(runtime.getRuntimeInventoryBalance(path, kg.id).quantity, 12.5);
+  await elmaRow.locator(".market-list-row").click();
   await workspace.getByRole("button", { name: "Stok Hareketleri", exact: true }).click();
   await expect(workspace.getByRole("region", { name: "Stok hareketleri", exact: true })).toContainText("Canlı sayım");
   await expect(page.getByRole("dialog")).toHaveCount(1);
@@ -870,8 +901,8 @@ try {
   console.log("sales-workspace-ui-smoke-ok");
 } catch (error) {
   if (page) {
-    console.error("sales-ui-failure", { errors, text: (await page.locator("body").innerText()).slice(0, 4000) });
-    await page.screenshot({ path: "artifacts/screenshots/sales-ui-failure.png" });
+    console.error("sales-ui-failure", error, { errors, text: (await page.locator("body").innerText().catch(() => "")).slice(0, 4000) });
+    try { await page.screenshot({ path: "artifacts/screenshots/sales-ui-failure.png", animations: "disabled", timeout: 3000 }); } catch { /* Diagnostics must not hide the original test error. */ }
   }
   throw error;
 } finally { await browser?.close(); await server?.close(); database.close(); rmSync(dir, { recursive: true, force: true }); }

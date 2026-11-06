@@ -323,6 +323,7 @@ function DesktopAppFrameContent({
             aiEnabled,
             whatsappEnabled,
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS) || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS),
+            requestsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.REQUESTS) && runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             accommodationFolioEnabled,
             customerCreditEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),

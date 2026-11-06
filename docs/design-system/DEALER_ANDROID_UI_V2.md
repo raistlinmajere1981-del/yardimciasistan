@@ -107,10 +107,12 @@ ACTION_VIEW ile açılan geçerli bağlantı alanı doldurur; token tüketimi ku
 bağlantı da ele alınır; mevcut hesaptan sessizce başka hesaba geçilmez. ACTION_SEND
 metin paylaşımı da aynı ayrıştırıcıdan geçer. Hostlar işletmeye göre değiştiği için
 HTTPS intent filter kullanıcıya uygulama seçimi sunabilir; doğrulanmış App Links
-garantisi verilmez. Başvuru bağlantısı masaüstünde Bayi Web Erişimi ayarlarından,
-kaydedilmiş modül adresi ve etkin servis tercihlerinden kopyalanır. Aynı HTTPS module bilgisini taşıyan
-`#application=dealer&module=...` biçimindedir; mevcut public request/multipart
-akışı, belge sınırları ve idempotency korunur.
+garantisi verilmez. Masaüstündeki eski “Başvuru bağlantısını kopyala”
+düğmesi ve `#application=dealer&module=...` üreticisi kaldırılmıştır.
+Bayi başvurusu güncel Android uygulamasında bağlantı adresi tanımlandıktan sonra
+“Bayi başvurusu” eyleminden açılır; mevcut public request/multipart akışı,
+belge sınırları ve idempotency korunur. Davet bağlantıları ayrı bir hesap
+erişim akışıdır ve bu değişiklikten etkilenmez.
 
 Hatalar alanın yanında kısa ve Türkçedir: geçersiz bağlantı; eksik bağlantı; süresi
 dolmuş veya kullanılmış davet için yeni davet isteme; ağ hatasında yeniden deneme.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloudUpload, RefreshCw, Save, Waves } from "lucide-react";
-import { effectSiteDeployTarget } from "../shared/contracts";
-import type { DeploymentTargetSnapshot, EffectScene, EffectStudioProject } from "../shared/contracts";
+import { BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID, effectSiteDeployTarget } from "../shared/contracts";
+import type { DeploymentTargetSnapshot, EffectScene, EffectStudioProject, EffectReadiness } from "../shared/contracts";
 import "./effect-studio.css";
 
 type StudioPacket = {
@@ -41,6 +41,9 @@ export function EffectStudio() {
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState("Projeler okunuyor…");
   const [error, setError] = useState("");
+  const [readiness, setReadiness] = useState<EffectReadiness>();
+  const [savedDraft, setSavedDraft] = useState(false);
+  const sourceHash = useRef<string | undefined>(undefined);
   const frame = useRef<HTMLIFrameElement>(null);
   const pending = useRef(new Map<number, Pending>());
   const counter = useRef(0);
@@ -144,11 +147,13 @@ export function EffectStudio() {
       try {
         const packet = await request("studio:get");
         if (!packet.scene) throw new Error("Düzenlenecek sahne bulunamadı.");
-        await window.adminControlCenter.saveEffectScene(targetId, packet.scene);
+        const result = await window.adminControlCenter.saveEffectScene(targetId, packet.scene, sourceHash.current);
         if (activeTarget.current === targetId) {
           savedCount.current = revision;
           setDirty(changeCount.current !== savedCount.current);
           setStatus("Yerel taslak kaydedildi.");
+          setSavedDraft(true);
+          setReadiness(result.readiness);
           setError("");
         }
       } catch (e) {
@@ -207,6 +212,9 @@ export function EffectStudio() {
     const token = ++loadToken.current;
     setLoaded(false);
     setDirty(false);
+    setSavedDraft(false);
+    setReadiness(undefined);
+    sourceHash.current = undefined;
     setError("");
     setStatus("Görsel ve sahne açılıyor…");
     changeCount.current = 0;
@@ -215,11 +223,14 @@ export function EffectStudio() {
       try {
         const data = await window.adminControlCenter.loadEffectScene(selected);
         if (token !== loadToken.current) return;
-        await request("studio:load", { scene: data.scene });
+        await request("studio:load", { scene: data.scene, previewImage: data.previewImage, siteSource: data.siteSource });
         if (token !== loadToken.current) return;
         activeTarget.current = selected;
         setLoaded(true);
-        setStatus(data.source === "draft" ? "Kayıtlı taslak açıldı." : data.source === "new" ? "Yeni sahne hazır." : "Site sahnesi açıldı.");
+        sourceHash.current = data.sourceHash;
+        setReadiness(data.readiness);
+        setSavedDraft(data.source === "draft");
+        setStatus(data.message || (data.source === "draft" ? "Kayıtlı taslak açıldı." : data.source === "new" ? "Yeni sahne hazır." : "Site sahnesi açıldı."));
       } catch (e) {
         if (token !== loadToken.current) return;
         activeTarget.current = "";
@@ -227,7 +238,7 @@ export function EffectStudio() {
         setStatus("Görsel açılamadı.");
       }
     })();
-  }, [ready, selected, request, editorKind]);
+  }, [ready, selected, request, editorKind, projects]);
 
   // Wait for an in-flight save and, if edits arrived meanwhile, save the latest
   // revision before switching targets or preparing/publishing a scene.
@@ -242,6 +253,7 @@ export function EffectStudio() {
   const selectedProject = useMemo(() => projects.find(project => project.id === siteId), [projects, siteId]);
   const mappedTargetId = selectedProject ? effectSiteDeployTarget(selectedProject.id) : null;
   const mappedDeployTarget = mappedTargetId ? deployTargets.find(item => item.id === mappedTargetId) : undefined;
+  const birdesengorDeployTarget = deployTargets.find(item => item.id === BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID);
 
   const choose = async (newId: string) => {
     if (!newId || newId === selected) return;
@@ -287,10 +299,72 @@ export function EffectStudio() {
     } finally { setWorking(false); }
   };
 
+  const prepareSiteSource = async () => {
+    if (!target?.siteSource || !target.canPrepare || !loaded || working || dirty || !savedDraft || !readiness?.ready) return;
+    const targetId = selected;
+    const token = loadToken.current;
+    try {
+      setWorking(true);
+      setStatus("Yerel site kaynak dosyası doğrulanıyor…");
+      const result = await window.adminControlCenter.prepareEffectScene(targetId);
+      if (activeTarget.current !== targetId || loadToken.current !== token) return;
+      sourceHash.current = result.sourceHash;
+      setReadiness(result.readiness);
+      setStatus(result.message);
+      setError("");
+    } catch (e) {
+      if (activeTarget.current !== targetId || loadToken.current !== token) return;
+      setError(e instanceof Error ? e.message : String(e));
+      setStatus("Site kaynağı hazırlanamadı.");
+    } finally { setWorking(false); }
+  };
+
+  const publishSiteSource = async () => {
+    if (!target?.siteSource || !target.canPrepare || !loaded || working || !birdesengorDeployTarget?.available) return;
+    const targetId = selected;
+    const token = loadToken.current;
+    try {
+      await flushSave();
+      if (activeTarget.current !== targetId || token !== loadToken.current) return;
+      setWorking(true);
+      setError("");
+      setStatus("BirDeSenGör sitesi için ön kontrol ve kuru deploy çalışıyor…");
+      const prepared = await window.adminControlCenter.preflightBirdesengorEffect(targetId);
+      if (activeTarget.current !== targetId || token !== loadToken.current) return;
+      sourceHash.current = prepared.sourceHash;
+      setReadiness(prepared.readiness);
+      setSavedDraft(true);
+      const confirmed = window.confirm(
+        "Ön kontrol başarılı. https://birdesengorgizlievren.com/ canlı sitesi şimdi güncellensin mi?\\n\\n" +
+        "Yalnız yönetilen statik dosyalar ve sahne görselleri temiz eşitlenir. " +
+        "Studio içerikleri, topluluk verileri ve sunucu ayarları korunur.\\n\\n" +
+        "Onay verirseniz deploy ve canlı doğrulama başlayacak."
+      );
+      if (!confirmed) {
+        await window.adminControlCenter.cancelBirdesengorEffect();
+        setStatus("Ön kontrol başarılı; canlı yayın kullanıcı tarafından iptal edildi.");
+        return;
+      }
+      setStatus("BirDeSenGör canlı deploy ve HTTPS doğrulaması çalışıyor…");
+      const result = await window.adminControlCenter.deployBirdesengorEffect(targetId, prepared.token);
+      if (activeTarget.current !== targetId || token !== loadToken.current) return;
+      setStatus(result.message);
+      setError("");
+      await refresh();
+    } catch (e) {
+      if (activeTarget.current !== targetId || token !== loadToken.current) return;
+      setError(e instanceof Error ? e.message : String(e));
+      setStatus("BirDeSenGör yayın işlemi tamamlanamadı.");
+    } finally { setWorking(false); }
+  };
+
   useEffect(() => {
     if (!working) return;
     return window.adminControlCenter.onDeploymentRunState?.(state => {
-      if (state.running) setStatus(`İlk yayın · ${state.stage || "Site deploy sürüyor…"}`);
+      if (!state.running) return;
+      if (state.targetId === BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID)
+        setStatus(`${state.action === "preflight" ? "Ön kontrol" : "Canlı yayın"} · ${state.stage || "İşlem sürüyor…"}`);
+      else setStatus(`İlk yayın · ${state.stage || "Site deploy sürüyor…"}`);
     });
   }, [working]);
 
@@ -325,12 +399,20 @@ export function EffectStudio() {
           </select>
         </label>
         <button className="effects-small" title="Projeleri ve görselleri yenile" aria-label="Siteleri ve görselleri yenile"
-          onClick={() => void refresh()}><RefreshCw size={15}/></button>
+          onClick={() => void (async () => { if (dirty || saving.current) await flushSave(); await refresh(); })().catch(() => {})}><RefreshCw size={15}/></button>
       </div>
-      {isLocalScene ? <span className="effects-local-only" title="Yerel V2 çalışma sahnesi; siteye yayınlanmaz.">Yerel çalışma · yayın yok</span>
+      {isLocalScene ? <span className="effects-local-only" title={target?.note}>{target?.siteSource ? "V2 site kaynak sahnesi · canlı yayın ayrı" : "Yerel çalışma · yayın yok"}</span>
         : target && <span className="effects-publication" title={publicationTitle}>{publicationLabel}</span>}
       <div className="effects-buttons">
         <button disabled={!loaded || working} title={saveTitle} onClick={() => void save().catch(() => {})}><Save size={15}/> {working ? "İşleniyor…" : "Kaydet"}</button>
+        {isLocalScene && target?.siteSource && <button disabled={!loaded || working || dirty || !savedDraft || !readiness?.ready || !target.canPrepare}
+          title={!savedDraft || dirty ? "Önce güncel taslağı kaydedin." : readiness?.problems.join("\n") || "Yalnız yerel site kaynak JSON dosyasını hazırlar. Canlı yayın ayrı."}
+          onClick={() => void prepareSiteSource()}>Site dosyasına hazırla</button>}
+        {isLocalScene && target?.siteSource && <button className="effects-publish"
+          disabled={!loaded || working || !readiness?.ready || !target.canPrepare || !birdesengorDeployTarget?.available}
+          title={!birdesengorDeployTarget?.available ? birdesengorDeployTarget?.availabilityNote || "Güvenli Natro yayın bağlantısı bulunamadı." :
+            "Taslağı kaydeder, ön kontrol ve kuru dağıtım yapar; canlı yayın öncesi ayrıca onay ister."}
+          onClick={() => void publishSiteSource()}><CloudUpload size={15}/> Siteye yayınla</button>}
         {!isLocalScene && target && <button className="effects-publish" disabled={Boolean(publishBlocked)} title={publishBlocked || publicationTitle}
           onClick={() => void publish()}><CloudUpload size={15}/> Siteye yayınla</button>}
       </div>
@@ -338,6 +420,9 @@ export function EffectStudio() {
     <div className={"effects-state" + (error ? " effects-error" : "")} role="status" aria-live="polite" aria-atomic="true" title={statusText}>
       {statusText}
     </div>
+    {isLocalScene && readiness && <div className="effects-state" role="status" title={readiness.problems.join("\n")}>
+      {readiness.effectCount} efekt · {readiness.enabledCount} etkin · {readiness.mountedCount} site bağlantısı · {dirty ? "Hazırlık için kaydedin." : readiness.ready ? "Site dosyasına hazırlık uygun. Canlı yayın ayrı." : readiness.problems.join(" ")}
+    </div>}
     <div className="effects-body">
       <section className="effects-stage" aria-label="Efekt düzenleyici" aria-busy={!loaded && Boolean(selected)}>
         <iframe key={editorKind} ref={frame} title={isLocalScene ? "Yerel V2 nesne sahnesi düzenleyici" : "Canlı efekt düzenleyici"}

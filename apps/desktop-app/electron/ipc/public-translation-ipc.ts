@@ -22,5 +22,7 @@ export function registerPublicTranslationIpc(options: {
   ipcMain.handle("translation:save", (_event, input: SaveTranslationInput) => operation(() => { options.database().translations().saveManual(input); options.onChanged(); }));
   ipcMain.handle("translation:start", (_event, input: TranslateSelectionInput) => operation(() => options.service.start(input)));
   ipcMain.handle("translation:job", () => operation(() => options.service.status()));
+  ipcMain.handle("translation:pause", () => operation(() => options.service.pause()));
+  ipcMain.handle("translation:resume", () => operation(() => options.service.resume()));
   ipcMain.handle("translation:cancel", () => operation(() => options.service.cancel()));
 }

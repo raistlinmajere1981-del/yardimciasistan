@@ -8,16 +8,17 @@ export function useDocumentOutputSettings(kinds: DocumentKind[], authority: stri
   const [saved, setSaved] = useState<Record<string, DocumentOutputRuleInput>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [deniedAuthority, setDeniedAuthority] = useState<string | null>(null);
   const latestAuthority = useRef(authority);
+  const authorityGeneration = useRef(0);
+  if (latestAuthority.current !== authority) authorityGeneration.current++;
   latestAuthority.current = authority;
   const stagedBusiness = useRef<string | undefined>(undefined);
   const kindsKey = kinds.join(",");
   useEffect(() => {
     let cancelled = false;
     if (!active || !kindsKey) return;
-    setError(""); setNotice("");
+    setError("");
     const bridge = window.yardimciDesktop;
     if (!bridge?.getDocumentOutputSettings || !bridge?.saveDocumentOutputRule) { setError("Belge ayarları bağlantısı kullanılamıyor."); return; }
     void Promise.all(kindsKey.split(",").map(documentKind => bridge.getDocumentOutputSettings({ documentKind: documentKind as DocumentKind })))
@@ -52,31 +53,31 @@ export function useDocumentOutputSettings(kinds: DocumentKind[], authority: stri
       else next[keyOf(rule)] = rule;
       return next;
     });
-    setNotice("");
   };
   const save = async () => {
-    if (!canSave || saving || !dirty || !window.yardimciDesktop?.saveDocumentOutputRule) return;
+    if (!canSave || saving || !dirty || !window.yardimciDesktop?.saveDocumentOutputRule) return false;
     const started = authority;
-    setSaving(true); setError(""); setNotice("");
+    const generation = authorityGeneration.current;
+    setSaving(true); setError("");
     try {
       for (const rule of dirtyRules) {
-        if (latestAuthority.current !== started) throw new Error("Yetki değişti. Ayarlar kaydedilmedi.");
+        if (latestAuthority.current !== started || authorityGeneration.current !== generation) throw new Error("Yetki değişti. Ayarlar kaydedilmedi.");
         const result = await window.yardimciDesktop.saveDocumentOutputRule(rule);
         if (!result.ok) {
           if (["DOCUMENT_SESSION_LOCKED", "DOCUMENT_CAPABILITY_DISABLED", "DOCUMENT_OWNER_REQUIRED"].includes(result.code)) setDeniedAuthority(started);
           throw new Error(result.message);
         }
-        if (latestAuthority.current !== started) throw new Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
+        if (latestAuthority.current !== started || authorityGeneration.current !== generation) throw new Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
         setSaved(previous => ({ ...previous, [keyOf(result.value)]: result.value }));
         setStaged(previous => { const next = { ...previous }; delete next[keyOf(rule)]; return next; });
       }
-      setNotice("Ayarlar kaydedildi. Otomasyon çalışmaz; çıktı işi oluşturulmadı.");
-    } catch { setError("Ayarların tamamı kaydedilemedi veya kayıt doğrulanamadı. Değişiklikleri kontrol edip tekrar deneyin."); }
+      return true;
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Ayarların tamamı kaydedilemedi. Değişiklikleri kontrol edip tekrar deneyin."); return false; }
     finally { setSaving(false); }
   };
   return { ready, canSave, saving, dirty, error: tenantChanged ? "İşletme değişti. Önce önceki işletmenin taslağından vazgeçin."
       : deniedAuthority === authority ? "Yetki değişti. Çalışma alanını kapatıp yeniden açın."
-        : dirty && ready && !canSave ? "Değiştirilen belge veya kanal artık etkin değil. Vazgeçerek devam edin." : error, notice, mode, change, save,
+        : dirty && ready && !canSave ? "Değiştirilen belge veya kanal artık etkin değil. Vazgeçerek devam edin." : error, mode, change, save,
     whatsappAvailable,
-    discard: () => { if (!saving) { stagedBusiness.current = undefined; setStaged({}); setError(""); setNotice(""); } } };
+    discard: () => { if (!saving) { stagedBusiness.current = undefined; setStaged({}); setError(""); } } };
 }

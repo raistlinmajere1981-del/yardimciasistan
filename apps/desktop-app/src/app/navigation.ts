@@ -5,6 +5,7 @@ import {
   Menu as MenuIcon,
   Settings,
   Store,
+  BadgePercent,
   Users,
   WalletCards,
   type LucideIcon
@@ -16,7 +17,7 @@ import { restaurantNavigationContribution } from "../components/restaurant/resta
 import { runtimeHasCapability } from "./capabilities";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "marketing" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "marketing" | "benefits" | "reports" | "settings";
 
 /** Customer-work subview id; a view state, not a DesktopPage route. */
 export type CustomerWorkTab = "requests" | "customers" | "kbs" | "prepared";
@@ -116,9 +117,13 @@ const navigationContributions = [
   marketContribution,
   {
     pageId: "marketing", icon: Megaphone, order: 64, contentScroll: "workspace",
-    condition: { anyOf: [C.MARKETING_STUDIO, { allOf: [C.COMMERCE_BENEFITS, C.SALES] }, { allOf: [C.COMMERCE_BENEFITS, C.ORDERS] }] },
-    presentation: (capabilities: BusinessCapabilitySnapshot | null | undefined) => runtimeHasCapability(capabilities, C.MARKETING_STUDIO)
-      ? { label: "Pazarlama", title: "Pazarlama" } : { label: "İndirim ve Puan", title: "İndirim ve Puan" }
+    condition: { allOf: [C.MARKETING_STUDIO] },
+    presentation: { label: "Pazarlama", title: "Pazarlama" }
+  },
+  {
+    pageId: "benefits", icon: BadgePercent, order: 65, contentScroll: "workspace",
+    condition: { anyOf: [{ allOf: [C.COMMERCE_BENEFITS, C.SALES] }, { allOf: [C.COMMERCE_BENEFITS, C.ORDERS] }] },
+    presentation: { label: "İndirim ve Puan", title: "İndirim ve Puan" }
   },
   menuContribution,
   reportsContribution,

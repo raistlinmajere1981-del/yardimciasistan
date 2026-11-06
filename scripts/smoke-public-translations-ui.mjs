@@ -1,13 +1,16 @@
+import { expandSettingsStructure } from "./test-helpers/settings-ui.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { createServer } from "vite";
 import { chromium, expect } from "@playwright/test";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 const require = createRequire(import.meta.url);
 const {PublicTranslationStore} = require("../apps/desktop-app/dist-electron/database/public-translation-store.js");
+const {PublicTranslationService} = require("../apps/desktop-app/dist-electron/public-translation-service.js");
 const db = new DatabaseSync(":memory:");
 db.exec(readFileSync("apps/desktop-app/db/schema.sql","utf8"));
 db.exec("INSERT INTO business(id,name,display_name,profile_id,created_at,updated_at) VALUES ('b','Market','Market','market','t','t'); INSERT INTO business_capabilities(business_id,capability_id,created_at,updated_at) VALUES ('b','channel.online_sales','t','t');");
@@ -17,6 +20,16 @@ const publish=db.prepare("INSERT INTO commerce_product_publications(product_id,b
 for(let n=0;n<10000;n++){insert.run(`p${n}`,`Ürün ${String(n).padStart(5,"0")}`);publish.run(`p${n}`);}
 db.exec("COMMIT");
 const store=new PublicTranslationStore(db);
+let aiMode="unavailable",answerMode="success",now=Date.now(),requestCount=0,releaseAnswer;
+const respond=async(items,batch)=>{
+  requestCount++;
+  if(answerMode==="quota")return {ok:false,provider:"openai_compatible",reason:"quota_exhausted",status:429,retryAfterSeconds:1200,message:"Fixture limit",fallbackAnswer:""};
+  const output=()=>batch?JSON.stringify(Object.fromEntries(items.map((item,n)=>[item.key,answerMode==="partial"&&(n===1||n===2)?{faithful:false}:{translation:item.source,faithful:true}]))):JSON.stringify({translation:items[0].source,faithful:true});
+  if(answerMode==="hold")return new Promise(resolve=>{releaseAnswer=()=>resolve(output());});
+  return output();
+};
+const worker=new PublicTranslationService(()=>({translations:()=>store}),{allowed:()=>true,onChanged:()=>{},now:()=>now,
+  translate:source=>respond([{key:"t0",source}],false),translateBatch:items=>respond(items,true)});
 const rawChange=()=>db.exec("UPDATE catalog_products SET name='Ürün 09999 yeni' WHERE id='p9999'");
 const server=await createServer({root:resolve("apps/desktop-app"),configFile:resolve("apps/desktop-app/vite.renderer.config.ts"),server:{port:0,strictPort:false}});
 await server.listen();
@@ -36,15 +49,16 @@ try {
       const input=route.request().postDataJSON(),method=new URL(route.request().url()).pathname.split("/").at(-1);
       if (method === "list" && listMode === "error") return route.fulfill({json:{ok:false,message:"Fixture: public kaynak okunamadı"}});
       if (method === "list" && listMode === "rejected") return route.fulfill({status:503,body:"fixture unavailable"});
-      const value=method==="settings"?store.settings():method==="saveSettings"?store.saveSettings(input):method==="get"?store.get(input.identity,input.language):method==="list"?(listMode === "empty" ? emptyStore : store).list(input):method==="save"?store.saveManual(input):null;
-      if(method==="start")throw Error("AI yapılandırılmamış. Manuel çeviri kullanabilirsiniz.");
+      if(method==="start"&&aiMode==="unavailable")throw Error("AI yapılandırılmamış. Manuel çeviri kullanabilirsiniz.");
+      const value=method==="settings"?store.settings():method==="saveSettings"?store.saveSettings(input):method==="get"?store.get(input.identity,input.language):method==="list"?(listMode === "empty" ? emptyStore : store).list(input):method==="save"?store.saveManual(input)
+        :method==="start"?await worker.start(input):method==="job"?worker.status():method==="pause"?worker.pause():method==="resume"?await worker.resume():method==="cancel"?worker.cancel():null;
       await route.fulfill({json:{ok:true,value}});
     } catch(error){await route.fulfill({json:{ok:false,message:error.message}});}
   });
   await page.route("**/translation-ui-test*",async route=>route.fulfill({contentType:"text/html",body:await server.transformIndexHtml("/translation-ui-test",`<html><body><div id="root"></div><script type="module" src="/@fs/${resolve("scripts/fixtures/settings-platform.tsx")}"></script></body></html>`)}));
   await page.goto(`${server.resolvedUrls.local[0]}translation-ui-test?profile=market&translations=on`);
   await expect(page.getByRole("button",{name:"Dil Yönetimi",exact:true})).toHaveCount(0);
-  await page.getByRole("button",{name:/^İşletme Yapısı ve Özellikler/}).click();
+  await expandSettingsStructure(page);
   await expect(page.locator("#settings-translation")).toBeDisabled();
   await page.evaluate(() => window.refreshSettings({ aiEnabled: true, aiModel: "fixture-model", aiApiKeyConfigured: true }));
   await page.getByRole("button",{name:"Çoklu Dil ayarları"}).click();
@@ -99,7 +113,7 @@ try {
   rawChange();
   await workspace.getByRole("button",{name:"Yenile",exact:true}).click();
   await expect(workspace).toContainText("Manuel çeviriyi yeni kaynakla karşılaştırın");
-  await workspace.getByRole("button",{name:"Kaydet",exact:true}).click();
+  await workspace.getByRole("button",{name:"Çeviriyi Onayla ve Kaydet",exact:true}).click();
   await expect(workspace).not.toContainText("Manuel çeviriyi yeni kaynakla karşılaştırın");
   assert.equal(store.get({kind:"catalog_product",id:"p9999"},"en").stale,0);
   await page.setViewportSize({width:600,height:850});
@@ -138,6 +152,69 @@ try {
   await workspace.getByRole("button",{name:"Yenile",exact:true}).click();
   await expect(workspace.locator(".list-row")).toHaveCount(50);
   await expect(workspace).toContainText("10000 kayıt");
+  // Real service + SQLite behind the browser bridge: compact filters, preview, partial
+  // acceptance, limit state, pause/resume and cancellation of a late provider response.
+  aiMode="enabled";store.saveSettings({...store.settings(),automatic:false});
+  const entries=Object.fromEntries(Array.from({length:10},(_,n)=>{
+    const text=n===9?"Uzun kaynak metni ".repeat(25):`Sitede görünen kaynak ${n}`;
+    return [`theme.customer-facing.very-long-technical-identifier.${n}`,{text,hash:createHash("sha256").update(text).digest("hex")}];
+  }));
+  const catalogRevision = sourceEntries => createHash("sha256").update(Object.entries(sourceEntries)
+    .sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,entry])=>`${key}:${entry.hash}\n`).join("")).digest("hex");
+  const catalog={version:1,id:"fixture-public-site",revision:catalogRevision(entries),source_language:"tr",entries};
+  store.replaceSiteCatalog(catalog);
+  await page.setViewportSize({width:1920,height:1080});
+  await workspace.getByRole("combobox",{name:"İçerik kategorisi",exact:true}).selectOption("site_text");
+  await expect(workspace).toContainText("10 kayıt");
+  await expect(workspace.getByRole("button",{name:"Sitede görünen kaynak 0",exact:true})).toBeVisible();
+  await expect(workspace).not.toContainText("theme.customer-facing");
+  for(const viewport of [{width:1920,height:1080},{width:1366,height:768}]) {
+    await page.setViewportSize(viewport);
+    assert.equal(await workspace.evaluate(n=>n.scrollWidth>n.clientWidth+1),false,`workspace overflow at ${viewport.width}`);
+    const overflow=await workspace.locator(".language-workspace__record-button").evaluateAll(nodes=>nodes.some(n=>n.scrollWidth>n.clientWidth+1));
+    assert.equal(overflow,false,`record overflow at ${viewport.width}`);
+    await expect(workspace.getByRole("button",{name:"Filtrelenen Eksikleri Tamamla"})).toBeInViewport();
+    await page.screenshot({path:`/tmp/yardimci-translations-${viewport.width}.png`});
+  }
+  answerMode="partial";
+  await workspace.getByRole("button",{name:"Filtrelenen Eksikleri Tamamla"}).click();
+  const job=workspace.locator(".language-workspace__job");
+  await expect(job).toContainText("Tamamlandı");await expect(job).toContainText("8 hazır · 2 hata");
+  assert.equal(requestCount,1,"ten different short sources use one provider request");
+  await expect(job).toContainText("1 istek · 1 toplu paket");
+  answerMode="quota";
+  await workspace.getByRole("button",{name:"Filtrelenen Eksikleri Tamamla"}).click();
+  await expect(job).toContainText("Sınırın açılması bekleniyor");await expect(job).toContainText("Kota beklemesi");
+  await expect(job.locator("time")).toHaveCount(1);await expect(job).toContainText("0 hazır · 0 hata");
+  const waiting=worker.status();assert.equal(waiting.waitReason,"quota_exhausted");
+  await workspace.getByRole("button",{name:"Duraklat",exact:true}).click();
+  await expect(workspace.getByRole("button",{name:"Devam Et",exact:true})).toBeVisible();
+  await workspace.getByRole("button",{name:"Devam Et",exact:true}).click();
+  await expect(job).toContainText("Sınırın açılması bekleniyor");assert.equal(requestCount,2,"resume respects provider deadline");
+  await workspace.getByRole("button",{name:"Duraklat",exact:true}).click();
+  now=Date.parse(waiting.nextRetryAt)+1;answerMode="success";
+  await workspace.getByRole("button",{name:"Devam Et",exact:true}).click();
+  await expect(job).toContainText("Tamamlandı");await expect(job).toContainText("2 hazır · 0 hata");
+  const siteKey=Object.keys(entries)[0],changedText="Sitede değişen kaynak 0";
+  catalog.entries[siteKey]={text:changedText,hash:createHash("sha256").update(changedText).digest("hex")};
+  catalog.revision=catalogRevision(catalog.entries);
+  store.replaceSiteCatalog(catalog);
+  await workspace.getByRole("button",{name:"Yenile",exact:true}).click();
+  await expect(workspace.getByRole("button",{name:changedText,exact:true})).toBeVisible();
+  answerMode="hold";
+  await workspace.getByRole("button",{name:"Filtrelenen Eksikleri Tamamla"}).click();
+  await expect.poll(()=>Boolean(releaseAnswer)).toBe(true);
+  await expect(job).toContainText("Çevriliyor");
+  await workspace.getByRole("button",{name:"Duraklat",exact:true}).click();
+  await expect(job).toContainText("Duraklatıldı");
+  releaseAnswer();releaseAnswer=undefined;
+  await workspace.getByRole("button",{name:"Devam Et",exact:true}).click();
+  await expect.poll(()=>Boolean(releaseAnswer)).toBe(true);
+  await workspace.getByRole("button",{name:"İşlemi İptal Et",exact:true}).click();
+  await expect(job).toContainText("İptal edildi");releaseAnswer();releaseAnswer=undefined;
+  const stale=store.get({kind:"site_text",id:`${catalog.id}:${siteKey}`},"en");
+  assert.equal(stale.stale,1,"paused/cancelled in-flight answers do not become current");
+  await expect(workspace.getByRole("button",{name:"Filtrelenen Eksikleri Tamamla"})).toBeEnabled();
   assert.deepEqual(errors,[]);
-  console.log("Translation UI: Market visibility, service drafts, 10000 records/50 DOM rows, search, manual save, unavailable AI, dirty close and responsive state, empty/full source fixtures and first-load/retry read errors OK.");
-} finally {await browser?.close();await server.close();db.close();emptyDb.close();}
+  console.log("Translation UI: 10000 records, manual/stale review, compact filters, real source previews, 1920/laptop/mobile overflow, bulk/partial progress, quota, pause/resume/cancel and read errors OK.");
+} finally {if(releaseAnswer)releaseAnswer();await worker.stopAndDrain();await browser?.close();await server.close();db.close();emptyDb.close();}

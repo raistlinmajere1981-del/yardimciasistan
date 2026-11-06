@@ -33,6 +33,16 @@ function collection(databasePath: string, row: Record<string, unknown>): Product
   return { productId, revision: revision(row), photos: readProductOriginalAssets(databasePath, productId, row).map(asset => ({ id: asset.hash, format: asset.format })), sourceUrl: publicImageUrl(row.image_source_url), sourceLicense: String(row.image_license ?? "") };
 }
 
+export function readProductPhotosInTransaction(databasePath: string, db: DatabaseSync, productId: string): ProductPhotoCollection {
+  return collection(databasePath, productRow(db, productId));
+}
+
+export function assertProductPhotoRevision(db: DatabaseSync, input: ProductPhotoMutation): void {
+  if (typeof input.expectedRevision !== "string" || input.expectedRevision !== revision(productRow(db, input.productId))) {
+    throw new Error("Ürün fotoğrafları değişti; galeriyi yenileyip tekrar deneyin.");
+  }
+}
+
 export function listProductPhotos(databasePath: string, productId: string): ProductPhotoCollection {
   const db = open(databasePath);
   try { return collection(databasePath, productRow(db, productId)); }
@@ -67,7 +77,8 @@ export async function prepareProductPhotoAddition(dataUrls: unknown): Promise<Bu
   return bytes;
 }
 
-type PhotoOperation = { kind: "add"; bytes: Buffer[] } | { kind: "remove" | "cover"; photoId: string } | { kind: "reorder"; photoIds: string[] };
+type PhotoOperation = { kind: "add"; bytes: Buffer[] } | { kind: "remove" | "cover"; photoId: string } | { kind: "reorder"; photoIds: string[] }
+  | { kind: "replace"; photoIds: string[]; additions: Buffer[]; source?: { url: string; license: string } };
 
 /** Sole multi-photo writer: the existing archive and product row remain authoritative.
  * Existing schema triggers invalidate retail/dealer/menu publications in this transaction.
@@ -76,53 +87,71 @@ export function mutateProductPhotos(databasePath: string, input: ProductPhotoMut
   const db = open(databasePath);
   try {
     db.exec("BEGIN IMMEDIATE");
-    const capabilities = readEnabledBusinessCapabilities(db);
-    if (!capabilities.includes(BUSINESS_CAPABILITIES.CATALOG) || !capabilities.includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Ürün fotoğraf yönetimi için Online Satış etkin olmalı.");
-    const row = productRow(db, input?.productId);
-    if (typeof input.expectedRevision !== "string" || input.expectedRevision !== revision(row)) throw new Error("Ürün fotoğrafları değişti; galeriyi yenileyip tekrar deneyin.");
-    const previous = readProductOriginalAssets(databasePath, input.productId, row);
-    let next = [...previous];
-    if (operation.kind === "add") {
-      if (!operation.bytes.length || operation.bytes.length > MAX_PRODUCT_PHOTOS) throw new Error("Bir seferde 1–12 ürün fotoğrafı seçin.");
-      const seen = new Set(previous.map(asset => asset.hash));
-      const additions = operation.bytes.filter(bytes => {
-        const hash = createHash("sha256").update(bytes).digest("hex");
-        if (seen.has(hash)) return false;
-        seen.add(hash); return true;
-      });
-      if (next.length + additions.length > MAX_PRODUCT_PHOTOS) throw new Error("Ürün başına en fazla 12 fotoğraf eklenebilir.");
-      next.push(...prepareOriginalProductImageAssets(databasePath, input.productId, additions.map(bytes => ({ bytes, format: productImageFormat(bytes) }))));
-    } else if (operation.kind === "reorder") {
-      if (!Array.isArray(operation.photoIds) || operation.photoIds.length !== previous.length || new Set(operation.photoIds).size !== previous.length) throw new Error("Fotoğraf sırası mevcut fotoğrafların tamamını birer kez içermeli.");
-      next = operation.photoIds.map(id => {
-        const asset = previous.find(item => item.hash === id);
-        if (!asset) throw new Error("Fotoğraf sırası bilinmeyen fotoğraf içeriyor.");
-        return asset;
-      });
-    } else {
-      const selected = previous.find(asset => asset.hash === operation.photoId);
-      if (!selected) throw new Error("Ürün fotoğrafı bulunamadı; galeriyi yenileyin.");
-      const remaining = previous.filter(asset => asset.hash !== selected.hash);
-      next = operation.kind === "cover" ? [selected, ...remaining] : remaining;
-    }
-    const coverChanged = next[0]?.hash !== previous[0]?.hash;
-    let coverUsable = false;
-    try {
-      const path = String(row.image_asset_path ?? "");
-      if (path.startsWith(`assets/products/${input.productId}/`)) { readProductImageBytes(databasePath, path); coverUsable = true; }
-    } catch { /* Repair a missing normalized cover from its verified first original. */ }
-    const coverPath = coverChanged || !coverUsable
-      ? next[0] ? writeProductImageAsset(databasePath, input.productId, normalizeProductImageBytes(verifiedBytes(databasePath, next[0]))) : ""
-      : String(row.image_asset_path ?? "");
-    db.prepare(`UPDATE catalog_products SET image_original_assets_json=?, image_asset_path=?,
-      image_source_url=?, image_license=?, updated_at=? WHERE id=? AND business_id=?`).run(
-      JSON.stringify(next), coverPath, coverChanged ? "" : String(row.image_source_url ?? ""), coverChanged ? "" : String(row.image_license ?? ""),
-      new Date().toISOString(), input.productId, String(row.business_id));
-    const result = collection(databasePath, productRow(db, input.productId));
+    const result = applyProductPhotosInTransaction(databasePath, db, input, operation);
     db.exec("COMMIT");
     return result;
   } finally {
     if (db.isTransaction) db.exec("ROLLBACK");
     db.close();
   }
+}
+
+/** Shared writer for immediate photo clients and the atomic product draft save.
+ * Caller owns commit/rollback and notifications; the capability and CAS guard is identical. */
+export function applyProductPhotosInTransaction(databasePath: string, db: DatabaseSync, input: ProductPhotoMutation, operation: PhotoOperation,
+  now = new Date().toISOString()): ProductPhotoCollection {
+  if (!db.isTransaction) throw new Error("Ürün fotoğrafları transaction içinde kaydedilmeli.");
+  const capabilities = readEnabledBusinessCapabilities(db);
+  if (!capabilities.includes(BUSINESS_CAPABILITIES.CATALOG) || !capabilities.includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Ürün fotoğraf yönetimi için Online Satış etkin olmalı.");
+  const row = productRow(db, input?.productId);
+  assertProductPhotoRevision(db, input);
+  const previous = readProductOriginalAssets(databasePath, input.productId, row);
+  let next = [...previous];
+  if (operation.kind === "replace") {
+    if (!Array.isArray(operation.photoIds) || operation.photoIds.length > MAX_PRODUCT_PHOTOS || new Set(operation.photoIds).size !== operation.photoIds.length) throw new Error("Fotoğraf taslağı en fazla 12 farklı fotoğraf içermeli.");
+    const additions = new Map(operation.additions.map(bytes => [createHash("sha256").update(bytes).digest("hex"), bytes]));
+    // Resolve and verify the complete plan before creating any immutable files.
+    for (const id of operation.photoIds) if (!previous.some(asset => asset.hash === id) && !additions.has(id)) throw new Error("Fotoğraf taslağı bilinmeyen fotoğraf içeriyor.");
+    const prepared = prepareOriginalProductImageAssets(databasePath, input.productId, operation.photoIds
+      .filter(id => !previous.some(asset => asset.hash === id)).map(id => ({ bytes: additions.get(id)!, format: productImageFormat(additions.get(id)!) })));
+    next = operation.photoIds.map(id => previous.find(asset => asset.hash === id) ?? prepared.find(asset => asset.hash === id)!);
+  } else if (operation.kind === "add") {
+    if (!operation.bytes.length || operation.bytes.length > MAX_PRODUCT_PHOTOS) throw new Error("Bir seferde 1–12 ürün fotoğrafı seçin.");
+    const seen = new Set(previous.map(asset => asset.hash));
+    const additions = operation.bytes.filter(bytes => {
+      const hash = createHash("sha256").update(bytes).digest("hex");
+      if (seen.has(hash)) return false;
+      seen.add(hash); return true;
+    });
+    if (next.length + additions.length > MAX_PRODUCT_PHOTOS) throw new Error("Ürün başına en fazla 12 fotoğraf eklenebilir.");
+    next.push(...prepareOriginalProductImageAssets(databasePath, input.productId, additions.map(bytes => ({ bytes, format: productImageFormat(bytes) }))));
+  } else if (operation.kind === "reorder") {
+    if (!Array.isArray(operation.photoIds) || operation.photoIds.length !== previous.length || new Set(operation.photoIds).size !== previous.length) throw new Error("Fotoğraf sırası mevcut fotoğrafların tamamını birer kez içermeli.");
+    next = operation.photoIds.map(id => {
+      const asset = previous.find(item => item.hash === id);
+      if (!asset) throw new Error("Fotoğraf sırası bilinmeyen fotoğraf içeriyor.");
+      return asset;
+    });
+  } else {
+    const selected = previous.find(asset => asset.hash === operation.photoId);
+    if (!selected) throw new Error("Ürün fotoğrafı bulunamadı; galeriyi yenileyin.");
+    const remaining = previous.filter(asset => asset.hash !== selected.hash);
+    next = operation.kind === "cover" ? [selected, ...remaining] : remaining;
+  }
+  const coverChanged = next[0]?.hash !== previous[0]?.hash;
+  let coverUsable = false;
+  try {
+    const path = String(row.image_asset_path ?? "");
+    if (path.startsWith(`assets/products/${input.productId}/`)) { readProductImageBytes(databasePath, path); coverUsable = true; }
+  } catch { /* Repair a missing normalized cover from its verified first original. */ }
+  const coverPath = coverChanged || !coverUsable
+    ? next[0] ? writeProductImageAsset(databasePath, input.productId, normalizeProductImageBytes(verifiedBytes(databasePath, next[0]))) : ""
+    : String(row.image_asset_path ?? "");
+  db.prepare(`UPDATE catalog_products SET image_original_assets_json=?, image_asset_path=?,
+    image_source_url=?, image_license=?, updated_at=? WHERE id=? AND business_id=?`).run(
+    JSON.stringify(next), coverPath,
+    operation.kind === "replace" && operation.source ? operation.source.url : coverChanged ? "" : String(row.image_source_url ?? ""),
+    operation.kind === "replace" && operation.source ? operation.source.license : coverChanged ? "" : String(row.image_license ?? ""),
+    now, input.productId, String(row.business_id));
+  return collection(databasePath, productRow(db, input.productId));
 }

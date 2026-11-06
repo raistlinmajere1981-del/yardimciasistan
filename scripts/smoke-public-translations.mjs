@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { performance } from "node:perf_hooks";
 const require = createRequire(import.meta.url);
@@ -105,6 +107,9 @@ const batch=new PublicTranslationService(()=>({translations:()=>store}),{allowed
   batchCalls++;return invalid?'{}':JSON.stringify({translation:source.startsWith('Ürün')?source.replace('Ürün','Product'):'Fresh product',faithful:true});
 }});
 const selection=[{kind:'catalog_product',id:'p4'},{kind:'catalog_product',id:'p5'}];
+// A previous worker was paused on shutdown. Explicitly cancel its durable queue
+// before starting the independent legacy fixture on the same disposable DB.
+batch.cancel();
 await batch.start({filter:{language:'en'},selection});await waitFor(()=>batch.status().state!=='running');
 assert.equal(batch.status().failed,2);assert.equal(store.get(selection[0],'en').failed,2);
 const beforeSuccessfulBatch=batchCalls;
@@ -117,6 +122,156 @@ assert.equal(batchCalls,beforeRetry,'current sources do not generate redundant A
 await batch.start({filter:{language:'en',query:'ürün 00006',state:'missing'}});await waitFor(()=>batch.status().state!=='running');
 assert.equal(batch.status().completed,1,'filtered missing selection uses the same operation');
 await batch.stopAndDrain();
+
+// Isolated current-schema fixtures exercise actual SQLite writes and the provider boundary.
+function fixture(count, {path=":memory:", automatic=false, description=""}={}) {
+  const database=new DatabaseSync(path);
+  database.exec(readFileSync("apps/desktop-app/db/schema.sql","utf8"));
+  database.exec("INSERT INTO business(id,name,display_name,profile_id,created_at,updated_at) VALUES ('b','Test','Test','market','t','t'); INSERT INTO business_capabilities(business_id,capability_id,created_at,updated_at) VALUES ('b','channel.online_sales','t','t')");
+  const owner=new PublicTranslationStore(database);
+  owner.saveSettings({enabled:true,sourceLanguage:"tr",targetLanguages:["en"],automatic});
+  const selection=[];
+  for(let n=0;n<count;n++) {
+    const id=`item-${n}`;
+    database.prepare("INSERT INTO catalog_products(id,business_id,name,description,created_at,updated_at) VALUES (?,'b',?,?,'t','t')").run(id,`Metin ${n}`,description);
+    database.prepare("INSERT INTO commerce_product_publications(product_id,business_id,channel,is_published,created_at,updated_at) VALUES (?,'b','online_sales',1,'t','t')").run(id);
+    selection.push({kind:"catalog_product",id});
+  }
+  return {database,owner,selection};
+}
+const answerFor = source => ({translation:source.replace(/^Metin/,"Text"),faithful:true});
+const keyedAnswer = items => JSON.stringify(Object.fromEntries(items.map(i=>[i.key,answerFor(i.source)])));
+const revision = database => database.prepare("SELECT source_revision FROM sync_outbox WHERE job_key='online_catalog'").get()?.source_revision ?? 0;
+{
+  const f=fixture(30,{description:"Ortak açıklama"}),requests=[];
+  let notifications=0;
+  const worker=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>notifications++,
+    translate:async source=>{requests.push([source]);return JSON.stringify(answerFor(source));},
+    translateBatch:async items=>{requests.push(items.map(i=>i.source));return keyedAnswer(items);}});
+  const before=revision(f.database);
+  await worker.start({filter:{language:"en"},selection:f.selection,mode:"bulk"});
+  await waitFor(()=>worker.status().state==="complete");
+  const job=worker.status();
+  assert.equal(job.completed,30);assert.equal(job.fieldsCompleted,60);assert.equal(job.fieldTotal,60);
+  assert.equal(job.requestCount,3);assert.equal(job.batchCount,2);assert.equal(notifications,3);
+  assert.deepEqual(requests.map(r=>r.length),[15,15,1]);
+  assert.equal(requests.flat().filter(s=>s==="Ortak açıklama").length,1,"identical sources dedupe across all fields and records");
+  assert.equal(revision(f.database)-before,3,"one outbox revision per successful request, rather than per field");
+  f.database.prepare("UPDATE catalog_products SET name='Metin 0' WHERE id='item-1'").run();
+  await worker.start({filter:{language:"en"},selection:[f.selection[1]]});
+  await waitFor(()=>worker.status().state==="complete");
+  assert.equal(worker.status().requestCount,0,"sourceHash reuse survives jobs");
+  const long="Uzun açıklama ".repeat(100);
+  f.database.prepare("UPDATE catalog_products SET description=? WHERE id='item-0'").run(long);
+  await worker.start({filter:{language:"en"},selection:[f.selection[0]],mode:"bulk"});
+  await waitFor(()=>worker.status().state==="complete");
+  assert.deepEqual(requests.at(-1),[long],"long text is sent alone");
+  await worker.stopAndDrain();f.database.close();
+}
+{
+  const f=fixture(10);let shape="partial",requests=0;
+  const worker=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>{},translateBatch:async items=>{
+    requests++;
+    if(shape==="extra")return JSON.stringify({...JSON.parse(keyedAnswer(items)),unexpected:answerFor("Ek metin")});
+    if(shape==="duplicate")return keyedAnswer(items).replace(/^\{/,`{"t0":{"translation":"Text 0","faithful":true},`);
+    if(shape==="escaped")return keyedAnswer(items).replace(/^\{/,`{"\\u00740":{"translation":"Text 0","faithful":true},`);
+    if(shape==="nested")return keyedAnswer(items).replace('"faithful":true','"faithful":false,"faithful":true');
+    const result=JSON.parse(keyedAnswer(items));result.t1={faithful:false};delete result.t2;result.t3={translation:"Wrong 999",faithful:true};
+    return JSON.stringify(result);
+  }});
+  await worker.start({filter:{language:"en"},selection:f.selection});await waitFor(()=>worker.status().state==="complete");
+  assert.equal(worker.status().fieldsCompleted,7);assert.equal(worker.status().fieldsFailed,3,"invalid or absent items do not poison valid siblings");
+  assert.equal(f.owner.get(f.selection[0],"en").ready,1);
+  for(const invalid of ["extra","duplicate","escaped","nested"]) {
+    shape=invalid;f.database.exec("DELETE FROM public_translations");
+    await worker.start({filter:{language:"en"},selection:f.selection});await waitFor(()=>worker.status().state==="complete");
+    assert.equal(worker.status().fieldsCompleted,0,invalid);assert.equal(worker.status().fieldsFailed,10,invalid);
+  }
+  assert.equal(requests,5,"ambiguous answers do not fan out into extra provider retries");
+  await worker.stopAndDrain();f.database.close();
+}
+{
+  const f=fixture(10);let release;
+  const worker=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>{},translateBatch:items=>new Promise(resolve=>{release=()=>resolve(keyedAnswer(items));})});
+  await worker.start({filter:{language:"en"},selection:f.selection});await waitFor(()=>Boolean(release));
+  const manual=f.owner.get(f.selection[0],"en");
+  f.owner.saveManual({...manual,language:"en",fields:manual.fields.map(field=>({field:field.field,sourceHash:field.sourceHash,text:"Owner's manual translation"}))});
+  f.database.exec("UPDATE catalog_products SET name='Yeni kaynak 1' WHERE id='item-1'; UPDATE commerce_product_publications SET is_published=0 WHERE product_id='item-2'; UPDATE catalog_products SET deleted_at='t' WHERE id='item-3'");
+  const before=revision(f.database);release();await waitFor(()=>worker.status().state==="complete");
+  assert.equal(worker.status().fieldsCompleted,6);assert.equal(worker.status().fieldsSkipped,4);
+  assert.equal(f.owner.get(f.selection[0],"en").fields[0].text,"Owner's manual translation");
+  assert.equal(f.owner.get(f.selection[1],"en").ready,0);assert.equal(revision(f.database),before+1);
+  assert.equal(f.owner.localization([{...f.selection[1],fields:{name:"Yeni kaynak 1"}}]).translations.catalog_product,undefined,"stale results retain Turkish fallback");
+  const writes=f.selection.slice(0,2).map(identity=>({identity,expected:f.owner.get(identity,"en").fields[0],text:"Accepted"}));
+  // Remove manual ownership only inside this disposable fixture to exercise transaction rollback.
+  f.database.exec("DELETE FROM public_translations");
+  const count=f.database.prepare("SELECT count(*) n FROM public_translations").get().n, rev=revision(f.database);
+  assert.throws(()=>f.owner.acceptAiBatch("en",[writes[0],{...writes[1],text:""}]),/geçersiz/);
+  assert.equal(f.database.prepare("SELECT count(*) n FROM public_translations").get().n,count);
+  assert.equal(revision(f.database),rev,"failed bulk write rolls back its outbox too");
+  assert.throws(()=>f.owner.acceptAiBatch("en",writes,()=>{throw Error("checkpoint failure");}),/checkpoint/);
+  assert.equal(f.database.prepare("SELECT count(*) n FROM public_translations").get().n,count);
+  await worker.stopAndDrain();f.database.close();
+}
+{
+  const directory=mkdtempSync(join(tmpdir(),"translation-cooldown-")),path=join(directory,"test.sqlite");
+  let f=fixture(10,{path,automatic:true}),now=Date.parse("2026-11-06T10:00:00Z"),calls=0;
+  let limited=true;
+  const options={allowed:()=>true,onChanged:()=>{},now:()=>now,translateBatch:async items=>{
+    calls++;
+    return limited?{ok:false,provider:"openai_compatible",reason:"quota_exhausted",status:429,retryAfterSeconds:1800,message:"PRIVATE_PROVIDER_ERROR",fallbackAnswer:""}:keyedAnswer(items);
+  }};
+  let worker=new PublicTranslationService(()=>({translations:()=>f.owner}),options);
+  try {
+    worker.reconcile();await waitFor(()=>worker.status()?.state==="waiting");
+    const waiting=worker.status();assert.equal(waiting.waitReason,"quota_exhausted");assert.equal(waiting.retryAfterSeconds,1800);
+    assert.equal(waiting.nextRetryAt,new Date(now+1800000).toISOString());assert.equal(waiting.fieldsFailed,0);
+    assert.equal(f.database.prepare("SELECT count(*) n FROM public_translations").get().n,0,"quota never marks untouched fields failed");
+    assert.ok(!JSON.stringify(f.owner.runtime()).includes("PRIVATE_PROVIDER_ERROR"));
+    await worker.resume();worker.reconcile();await new Promise(resolve=>setTimeout(resolve,20));assert.equal(calls,1);
+    await worker.stopAndDrain();f.database.close();
+    // Actual file reopen + a new service preserve the deadline and exact queue checkpoint.
+    const database=new DatabaseSync(path);f={...f,database,owner:new PublicTranslationStore(database)};
+    worker=new PublicTranslationService(()=>({translations:()=>f.owner}),options);
+    worker.reconcile();await waitFor(()=>worker.status()?.state==="waiting");assert.equal(calls,1);
+    assert.equal(worker.status().nextRetryAt,waiting.nextRetryAt);
+    worker.pause();now+=1800001;worker.reconcile();await new Promise(resolve=>setTimeout(resolve,20));
+    assert.equal(calls,1,"user pause survives cooldown expiry and automatic reconcile");
+    limited=false;await worker.resume();await waitFor(()=>worker.status().state==="complete");
+    assert.equal(calls,2);assert.equal(worker.status().fieldsCompleted,10);assert.equal(worker.status().requestCount,2);
+    assert.equal(f.owner.runtime().cooldown,null);
+  } finally {await worker.stopAndDrain();f.database.close();rmSync(directory,{recursive:true,force:true});}
+}
+{
+  const f=fixture(8);let now=0,calls=0;
+  const worker=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>{},now:()=>now,translateBatch:async()=>{
+    calls++;throw Object.assign(Error("rate"),{reason:"rate_limited",status:429});
+  }});
+  await worker.start({filter:{language:"en"},selection:f.selection});await waitFor(()=>worker.status().state==="waiting");
+  assert.equal(Date.parse(worker.status().nextRetryAt),30000);now=30001;
+  await worker.resume();await waitFor(()=>calls===2 && worker.status().state==="waiting");
+  assert.equal(Date.parse(worker.status().nextRetryAt),90001,"consecutive limits use exponential cooldown");
+  worker.cancel();assert.equal(worker.status().state,"cancelled");assert.equal(f.owner.runtime().automaticPaused,true);
+  await worker.stopAndDrain();
+  let resolveLate,lateCalls=0;
+  const paused=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>{},now:()=>100000,translateBatch:items=>{
+    lateCalls++;return new Promise(resolve=>{resolveLate=()=>resolve(keyedAnswer(items));});
+  }});
+  await paused.start({filter:{language:"en"},selection:f.selection});await waitFor(()=>Boolean(resolveLate));
+  paused.pause();resolveLate();await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(f.database.prepare("SELECT count(*) n FROM public_translations").get().n,0,"pause discards in-flight answers");
+  resolveLate=undefined;await paused.resume();await waitFor(()=>Boolean(resolveLate));
+  paused.cancel();resolveLate();await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(paused.status().state,"cancelled");assert.equal(lateCalls,2);
+  assert.equal(f.database.prepare("SELECT count(*) n FROM public_translations").get().n,0,"cancel discards late answers and does not silently resume");
+  await paused.stopAndDrain();
+  const restarted=new PublicTranslationService(()=>({translations:()=>f.owner}),{allowed:()=>true,onChanged:()=>{},translateBatch:async()=>{throw Error("must not run");}});
+  f.owner.saveSettings({...f.owner.settings(),automatic:true});restarted.reconcile();await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(restarted.status().state,"cancelled","cancel remains terminal after restart/reconcile");
+  await restarted.stopAndDrain();f.database.close();
+}
+
+console.log("Public translation bulk: bounded/deduped requests, per-item/duplicate validation, transactional outbox, manual/stale races, durable quota/restart, exponential retry, pause/resume/cancel OK.");
 
 // Execute the real IPC registration with Electron supplied by the harness.
 const {runInNewContext}=await import("node:vm");

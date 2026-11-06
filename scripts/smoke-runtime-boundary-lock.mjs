@@ -168,7 +168,9 @@ const addedProtectedChannels = [
   ...["benefitsState", "previewBenefits", "fullRefundMarketPreview", "fullRefundMarket", "marketHistory"].map(name => `commerce:sale:${name}`),
   // Reviewed additions: window-owned cancellation and native-picker-only backup import.
   "ai:cancelTestConnection", "dataMaintenance:importBackupZip",
-  "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits", "webTraffic:snapshot"
+  "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits", "webTraffic:snapshot",
+  // Guarded additions: product save and translation queue controls.
+  "commerce:product:saveDetails", "translation:pause", "translation:resume"
 ];
 assert.equal(handlers.size, 296 + addedProtectedChannels.length, "all production invoke registrations must execute");
 for (const channel of addedProtectedChannels) assert.ok(handlers.has(channel), `${channel}: protected registration must execute`);
@@ -188,7 +190,7 @@ for (const action of ["pick", "upload", "preview", "apply", "rows", "summary", "
   assert.ok(handlers.has(`dataTransfer:${action}`), `dataTransfer:${action}: included in the production lock sweep`);
 }
 for (const action of ["list", "get"]) assert.ok(handlers.has(`customer:${action}`), `customer:${action}: included in the production lock sweep`);
-for (const action of ["settings", "saveSettings", "get", "list", "save", "start", "job", "cancel"]) {
+for (const action of ["settings", "saveSettings", "get", "list", "save", "start", "job", "cancel", "pause", "resume"]) {
   assert.ok(handlers.has(`translation:${action}`), `translation:${action}: included in the production lock sweep`);
 }
 for (const [channel, module] of [

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import process from "node:process";
@@ -7,6 +8,7 @@ import type {
   DeploymentRunState,
   DeploymentTargetSnapshot
 } from "../../shared/contracts";
+import { BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID } from "../../shared/contracts";
 
 const MAX_TAIL_LINES = 260;
 
@@ -85,7 +87,48 @@ function blackSeaAvailability(repoRoot: string) {
   return { available: true, note: root };
 }
 
+function birdesengorSiteRoot(repoRoot: string) {
+  return resolve(repoRoot, "..", "..", "ChannelFoundry", "channels", "birdesengor", "web");
+}
+function birdesengorDeployCommand() {
+  return join(homedir(), ".local", "bin", "birdesengor-natro");
+}
+function birdesengorAvailability(repoRoot: string) {
+  const site = birdesengorSiteRoot(repoRoot), command = birdesengorDeployCommand();
+  const env = join(homedir(), ".config", "channel-foundry", "birdesengor-natro.env");
+  const ready = process.platform === "linux" && existsSync(command) &&
+    Boolean(statSync(command).mode & 0o111) &&
+    existsSync(env) && existsSync(join(site, "scripts", "deploy-natro.mjs"));
+  return { available: ready, note: ready
+    ? "Natro güvenli FTPS + canlı doğrulama hazır. content/ ve topluluk verileri korunur."
+    : "Yalnız yetkili Linux geliştirme makinesinde site kaynağı, Natro aracı ve özel FTPS ayarlarıyla kullanılabilir." };
+}
+
 const TARGETS: TargetDefinition[] = [
+  {
+    id: BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID,
+    installationId: "birdesengor",
+    title: "BirDeSenGör V2 · Efekt sahnesi",
+    description: "Yalnız doğrulanmış V2 sahnesini mevcut Natro temiz statik deploy ile canlıya alır.",
+    confirmText: "birdesengorgizlievren.com güncellenecek. content/, topluluk kayıtları ve sunucu ayarları korunacak.",
+    impact: [
+      "Kanonik V2 efekt kaynağı doğrulanır; önce kuru deneme çalışır.",
+      "Yalnız sürümlü statik dosyalar ve yönetilen scene-assets/ temiz eşitlenir.",
+      "Studio yayın içerikleri (content/), topluluk kayıtları ve sunucu ayarları korunur.",
+      "Canlı JavaScript ve yayın API doğrulaması tamamlanmadan başarı gösterilmez."
+    ],
+    preflight: (repoRoot) => [{
+      label: "BirDeSenGör: derleme, korumalı temiz deploy kuru denemesi",
+      command: birdesengorDeployCommand(), args: ["clean-dry-run"], cwd: birdesengorSiteRoot(repoRoot)
+    }],
+    deploy: (repoRoot) => [
+      { label: "BirDeSenGör: korumalı Natro statik deploy",
+        command: birdesengorDeployCommand(), args: ["clean-deploy"], cwd: birdesengorSiteRoot(repoRoot) },
+      { label: "BirDeSenGör: canlı JS özeti ve PHP/API doğrulaması",
+        command: npmCommand(), args: ["run", "verify:live"], cwd: birdesengorSiteRoot(repoRoot) }
+    ],
+    availability: birdesengorAvailability
+  },
   {
     id: "ya-web",
     installationId: "ya",

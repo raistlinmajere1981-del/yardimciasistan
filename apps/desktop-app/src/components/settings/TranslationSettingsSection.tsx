@@ -63,6 +63,6 @@ export function TranslationSettingsSection({ controller, disabled, aiAvailable, 
       <div className="action-row">{draft.targetLanguages.map(l => <ActionButton key={l} variant="secondary" aria-label={`${PUBLIC_LANGUAGES.find(v => v.code === l)?.name ?? l} dilini kaldır`}
         onClick={() => setDraft({...draft,targetLanguages:draft.targetLanguages.filter(v => v !== l)})}>{PUBLIC_LANGUAGES.find(v => v.code === l)?.name ?? l} ×</ActionButton>)}</div>
     </div>
-    <p role="status">{!aiAvailable ? "AI etkin değil. Çeviriler hazırlanamadı; Türkçe yayın devam ediyor." : controller.status || "Kaydettiğiniz diller için eksik çeviriler AI ile otomatik hazırlanır."}</p>
+    <p role="status">{!aiAvailable ? "AI etkin değil. Çeviriler hazırlanamadı; Türkçe yayın devam ediyor." : controller.status || "Kaydettiğiniz diller için eksik çeviriler AI ile otomatik ve paketler halinde hazırlanır. İşlemi Dil Yönetimi üzerinden duraklatabilir veya devam ettirebilirsiniz."}</p>
   </ServiceSettingsCard>;
 }

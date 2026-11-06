@@ -1,123 +1,49 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+// Debug and release APKs are both business-agnostic. Connection credentials
+// arrive through desktop QR pairing, never through a build-time shared key.
+// Keep the preflight as a fail-closed check of what the APK will compile.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const appDir = join(repoRoot, "apps", "android-app");
-const connectionConfigPath = join(appDir, "connection.local.json");
-const productionWebModuleUrl = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
-const releaseBuild = truthy(process.env.YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD);
-const allowEmbeddedSyncSecret = truthy(process.env.YARDIMCI_ASISTAN_ANDROID_ALLOW_EMBEDDED_SYNC_SECRET);
-const skipPreflight = truthy(process.env.YARDIMCI_ASISTAN_ANDROID_SKIP_CONNECTION_PREFLIGHT);
-
-let localConfig = {};
-if (existsSync(connectionConfigPath)) {
-  try {
-    localConfig = JSON.parse(readFileSync(connectionConfigPath, "utf8"));
-  } catch (error) {
-    throw new Error(
-      `Android bağlantı dosyası okunamadı: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
-    );
-  }
-}
-
-const webModuleUrl = normalizeWebModuleUrl(
-  firstNonEmpty(
-    process.env.YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL,
-    localConfig.web_module_url,
-    productionWebModuleUrl
-  )
+const generator = join(repoRoot, "scripts", "generate-android-connection-defaults.mjs");
+const output = join(
+  repoRoot, "apps", "android-app", "build", "generated", "source",
+  "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java"
 );
-const configuredSyncSecret = firstNonEmpty(
-  process.env.YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET,
-  localConfig.sync_secret
-);
-// Same embedding rule as scripts/generate-android-connection-defaults.mjs:
-// release builds do not embed the shared secret unless explicitly allowed.
-const embeddedSyncSecret = releaseBuild && !allowEmbeddedSyncSecret ? "" : configuredSyncSecret;
+const legacyConnection = join(repoRoot, "apps", "android-app", "connection.local.json");
 
-if (!embeddedSyncSecret) {
-  console.log("Android bağlantı preflight atlandı: gömülü sync anahtarı yok (release davranışı).");
-  process.exit(0);
+const generated = spawnSync(process.execPath, [generator], {
+  cwd: repoRoot,
+  encoding: "utf8"
+});
+
+if (generated.error || generated.status !== 0) {
+  console.error("Android bağlantı varsayılanları üretilemedi; derleme durduruldu.");
+  process.exit(1);
 }
 
-if (skipPreflight) {
-  console.warn(
-    "UYARI: Android bağlantı preflight atlandı " +
-    "(YARDIMCI_ASISTAN_ANDROID_SKIP_CONNECTION_PREFLIGHT ayarlı). " +
-    "APK içindeki bağlantı anahtarı doğrulanmadı."
-  );
-  process.exit(0);
-}
-
+let source = "";
 try {
-  await verifyEmbeddedSecret(webModuleUrl, embeddedSyncSecret);
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+  source = readFileSync(output, "utf8");
+} catch {
+  console.error("Android bağlantı varsayılanları okunamadı; derleme durduruldu.");
+  process.exit(1);
 }
 
-async function verifyEmbeddedSecret(baseUrl, secret) {
-  const endpoint = `${baseUrl.replace(/\/+$/, "")}/api/sync.php?action=capabilities`;
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: "GET",
-      headers: { "X-YA-Sync-Secret": secret },
-      signal: AbortSignal.timeout(15000)
-    });
-  } catch {
-    throw new Error(
-      "Android bağlantı anahtarı doğrulanamadı: " +
-      `web modülüne ulaşılamadı (${baseUrl}).\n` +
-      "Ağı kontrol edip tekrar deneyin veya çevrimdışı derleme için " +
-      "YARDIMCI_ASISTAN_ANDROID_SKIP_CONNECTION_PREFLIGHT=1 kullanın."
-    );
-  }
+const isCredentialFree = [
+  /static final String WEB_MODULE_URL = "";/,
+  /static final String SYNC_SECRET = "";/,
+  /static final boolean LOCK_EMBEDDED_CONNECTION = false;/
+].every(pattern => pattern.test(source));
 
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  if (response.ok && payload?.ok === true) {
-    console.log(`Android bağlantı preflight başarılı: ${baseUrl}`);
-    return;
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new Error(
-      "Android bağlantı anahtarı canlı web modülüyle eşleşmiyor.\n" +
-      "apps/android-app/connection.local.json dosyasını güncelleyin."
-    );
-  }
-
-  throw new Error(
-    "Android bağlantı anahtarı doğrulanamadı: " +
-    `web modülü beklenmedik yanıt verdi (HTTP ${response.status}).`
-  );
+if (!isCredentialFree) {
+  console.error("Android APK işletmeye özel bağlantı bilgileri içeriyor olabilir; derleme durduruldu.");
+  process.exit(1);
 }
 
-function firstNonEmpty(...values) {
-  for (const value of values) {
-    const normalized = String(value ?? "").trim();
-    if (normalized) {
-      return normalized;
-    }
-  }
-  return "";
+if (existsSync(legacyConnection)) {
+  console.warn("Eski connection.local.json yok sayıldı; Android bağlantısı QR eşleştirmesiyle kurulacak.");
 }
-
-function normalizeWebModuleUrl(value) {
-  return firstNonEmpty(value)
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/\/+$/, "");
-}
-
-function truthy(value) {
-  return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
-}
+console.log("Android bağlantı preflight başarılı: işletmeden bağımsız APK, gömülü anahtar yok.");

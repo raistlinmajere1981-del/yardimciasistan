@@ -308,9 +308,10 @@ try {
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[640,800],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
-    for (const name of ['Kapalı', 'Açık']) {
-      const toggle = page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ });
-      if (await toggle.getAttribute('aria-expanded') !== String(name === 'Açık')) await toggle.click();
+    for (const name of ['Yapı', 'İşletme Bilgileri']) {
+      await expandSettingsStructure(page);
+      const section = page.locator(name === 'Yapı' ? '.settings-structure' : '#settings-public-profile');
+      await section.getByRole('heading').first().scrollIntoViewIfNeeded();
       await expect(page.locator('.settings-page-workspace')).toHaveCount(1);
       const metrics = await page.evaluate(() => ({
         documentOverflow: document.documentElement.scrollWidth > innerWidth + 1 || document.documentElement.scrollHeight > innerHeight + 1,
@@ -319,7 +320,7 @@ try {
       observations.push({ width, height, category: name, ...metrics });
       expect(metrics.documentOverflow, `Document overflow at ${width}/${name}`).toBe(false);
       expect(metrics.overflows, `Content overflow at ${width}/${name}`).toEqual([]);
-      await expect(page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ })).toBeInViewport();
+      await expect(section.getByRole('heading').first()).toBeInViewport();
       await page.screenshot({ animations: 'disabled', path: `${output}/settings-${width}-${name}.png` });
     }
   }
@@ -485,7 +486,7 @@ try {
     await page.screenshot({ animations: "disabled", path: `${output}/settings-compact-${scheme}.png` });
   }
   // Focus ring remains visible with keyboard navigation.
-  await page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ }).focus();
+  await sectorType.focus();
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle)).not.toBe('none');
   // Simulate an app-level lock request while the native modal makes shell controls inert.

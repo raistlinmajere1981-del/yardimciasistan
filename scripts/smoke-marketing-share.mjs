@@ -3,7 +3,7 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {scheduleFixture} from './test-helpers/marketing-schedule-fixtures.mjs';
-import {editorialInput} from './test-helpers/marketing-fixtures.mjs';
+import {editorialInput, imageBytes} from './test-helpers/marketing-fixtures.mjs';
 import {createCustomer, preference} from './test-helpers/messaging-campaign-fixtures.mjs';
 const f=scheduleFixture();
 try {
@@ -31,6 +31,24 @@ try {
   assert.throws(()=>shares.save({...input(['website']),content:{...input(['website']).content,id:saved.content.content.id,expectedRevision:saved.content.content.revision}}),e=>e.code==='share_submitted');
   assert.throws(()=>f.service.saveContent({...input(['website']).content,id:saved.content.content.id,expectedRevision:saved.content.content.revision}),e=>e.code==='share_submitted');
   await assert.rejects(()=>shares.submit(saved.content.content.id,0),e=>e.code==='stale_revision');
+  // Text and title are optional: a single image must publish to Website unchanged.
+  const onlyImage=f.media.importBytes(imageBytes,'upload');
+  const visual=shares.save(input(['website'],{title:'',masterText:'',variants:[],mediaAssetIds:[onlyImage.id]}));
+  assert.equal(visual.content.content.title,'');
+  const visualResult=await shares.submit(visual.content.content.id,visual.content.content.revision);
+  assert.equal(visualResult[0].state,'accepted');
+  const visualPublication=f.db.listMarketingPublications().find(p=>p.contentId===visual.content.content.id);
+  assert.equal(visualPublication.title,'');assert.equal(visualPublication.text,'');
+  assert.deepEqual(Array.from(visualPublication.mediaAssetIds),[onlyImage.id]);
+  const textOnly=shares.save(input(['website'],{title:'',masterText:'Metinli başlıksız paylaşım',variants:[],mediaAssetIds:[]}));
+  assert.equal((await shares.submit(textOnly.content.content.id,textOnly.content.content.revision))[0].state,'accepted');
+  assert.equal(f.db.listMarketingPublications().find(p=>p.contentId===textOnly.content.content.id).title,'');
+  const nothing=shares.save(input(['website'],{title:'',masterText:'',variants:[],mediaAssetIds:[]}));
+  await assert.rejects(()=>shares.submit(nothing.content.content.id,nothing.content.content.revision),e=>e.code==='missing_content');
+  assert.equal(shares.get(nothing.content.content.id).targets.length,0,'empty publication is not created');
+  const instagramDraft=f.service.saveContent(editorialInput({title:'',masterText:'',variants:[],mediaAssetIds:[onlyImage.id]}));
+  const instagram=f.db.saveMarketingPublication({contentId:instagramDraft.content.id,channel:'instagram',placement:'homepage_feature',title:'',text:'',mediaAssetIds:[onlyImage.id]});
+  assert.equal(instagram.title,'');assert.equal(instagram.text,'');
   const invalid=shares.save(input(['website','instagram']));const before=f.db.listMarketingPublications().length;
   await assert.rejects(()=>shares.submit(invalid.content.content.id,invalid.content.content.revision),e=>e.code==='invalid_media');
   assert.equal(f.db.listMarketingPublications().length,before,'target preparation rolls back all channels');assert.equal(shares.get(invalid.content.content.id).targets.length,0);assert.equal(shares.get(invalid.content.content.id).content.content.status,'draft');

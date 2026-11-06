@@ -70,7 +70,6 @@ interface PendingTransition {
 
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const { registerPageLeaveGuard } = props;
-  const [structureExpanded, setStructureExpanded] = useState(props.setupData.setupRequired);
   const [serviceOpen, setServiceOpen] = useState<string | null>(null);
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
@@ -130,19 +129,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const profileRestartRequired = initialized && drafts.form.profileId !== drafts.canonical.profileId;
   const [webConnecting, setWebConnecting] = useState(false);
   const businessBusy = drafts.busy || profile.saving || webConnecting;
-  const allDirty = translations.dirty || businessDirty || drafts.dirty.services || googleReviews.dirty || kbs.dirty || tts.dirty || dictation.dirty || androidPermissions.dirty;
-  const wasSetupRequired = useRef(props.setupData.setupRequired);
-  const collapsePending = useRef(false);
-  useEffect(() => {
-    if (wasSetupRequired.current && initialized) collapsePending.current = true;
-    wasSetupRequired.current = !initialized;
-    if (!initialized) setStructureExpanded(true);
-    else if (collapsePending.current && !allDirty && !serviceOpen) {
-      setStructureExpanded(false);
-      collapsePending.current = false;
-    }
-  }, [initialized, allDirty, serviceOpen]);
-  const expanded = !initialized || structureExpanded;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities, webAvailable)
     .filter(result => initialized || result.category === "business" || result.id === "settings-web");
 
@@ -275,7 +261,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: "start", behavior: "instant" });
     setFocusTarget("");
-  }, [focusTarget, expanded, printingEnabled, webAvailable]);
+  }, [focusTarget, printingEnabled, webAvailable]);
 
   const pageScroll = usePageViewScroll("settings.scroll");
   return (
@@ -320,9 +306,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   setQuery("");
                   const id = result.serviceTarget ?? result.id;
                   if (result.category === "services") {
-                    setStructureExpanded(true); setServiceOpen(id);
+                    setServiceOpen(id);
                   } else {
-                    if (id === "settings-business" || id === "settings-options") setStructureExpanded(true);
                     setFocusTarget(id);
                   }
                 }}
@@ -334,23 +319,19 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         )}
       </div>
 
-      <WebSettingsSection canonical={drafts.canonical} web={drafts.form}
-        enabled={drafts.webEnabled} onEnabledChange={drafts.setWebActive}
-        trafficEnabled={drafts.form.trafficEnabled}
-        onTrafficChange={enabled => drafts.setDraft(form => ({ ...form, trafficEnabled: enabled }))}
-        resetVersion={drafts.webResetVersion}
-        onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
-        disabled={drafts.busy || guardBusy} initialized={initialized}
-        onChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
-
       <section className="settings-page-workspace" id="settings-panel-business" aria-label="İşletme ayarları">
         <div ref={pageScroll} className="settings-page-body">
+          <WebSettingsSection canonical={drafts.canonical} web={drafts.form}
+            enabled={drafts.webEnabled} onEnabledChange={drafts.setWebActive}
+            trafficEnabled={drafts.form.trafficEnabled}
+            onTrafficChange={enabled => drafts.setDraft(form => ({ ...form, trafficEnabled: enabled }))}
+            resetVersion={drafts.webResetVersion}
+            onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
+            disabled={drafts.busy || guardBusy} initialized={initialized}
+            onChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
           <section className="settings-panel settings-structure">
-            <div className="settings-panel-header"><ActionButton variant="ghost" aria-expanded={expanded} aria-controls="settings-structure-content"
-              onClick={() => { if (initialized && !(expanded && allDirty)) setStructureExpanded(!expanded); }}>
-              İşletme Yapısı ve Özellikler {expanded ? '▴' : '▾'}
-            </ActionButton></div>
-            <div id="settings-structure-content" hidden={!expanded}>
+            <div className="settings-panel-header"><h2>İşletme Yapısı ve Özellikler</h2></div>
+            <div id="settings-structure-content">
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
                 <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} persistedProfileId={drafts.canonical.profileId} />
               </fieldset>

@@ -47,7 +47,7 @@ export function saveMarketingContent(db: DatabaseSync, input: MarketingContentIn
       checkRevision(input.expectedRevision, old.content.revision);
       if (db.prepare("SELECT 1 FROM marketing_share_targets WHERE content_id=?").get(old.content.id)) throw new MarketingError("share_submitted", "İşleme alınmış paylaşımı değiştirmek için yeni paylaşım oluşturun.");
     }
-    const title = marketingText(input.title, 240, true), text = marketingText(input.masterText, 12000);
+    const title = marketingText(input.title, 240), text = marketingText(input.masterText, 12000);
     if (!["announcement", "promotion"].includes(input.purpose) || !["draft", "ready", "archived"].includes(input.status)) throw new MarketingError("invalid_input", "İçerik türü/durumu geçersiz.");
     if (!Array.isArray(input.variants) || input.variants.length > 4 || new Set(input.variants.map(v => v.channel)).size !== input.variants.length) throw new MarketingError("invalid_input", "Kanal varyantları geçersiz.");
     const variants = input.variants.map(v => ({ mediaAssetId: v.mediaAssetId ? marketingId(v.mediaAssetId) : undefined, channel: marketingChannel(v.channel), title: marketingText(v.title ?? "", 240), text: marketingText(v.text, 12000),
@@ -107,7 +107,9 @@ export function saveMarketingPublication(db: DatabaseSync, input: MarketingPubli
     if (old && old.contentId !== content.id) throw new MarketingError("invalid_input", "Yayının içerik kimliği değiştirilemez.");
     const ids = marketingAssetIds(input.mediaAssetIds); validateAssets(db,ids,[...(old?.mediaAssetIds??[]),...retainedMediaIds]);
     if (input.channel === "instagram" && ids.length !== 1) throw new MarketingError("invalid_media", "Instagram için bir görsel seçin.");
-    const title = marketingText(input.title,240,true), text = marketingText(input.text,input.channel === "instagram" ? 2200 : 12000,input.channel === "website");
+    const title = marketingText(input.title,240), text = marketingText(input.text,input.channel === "instagram" ? 2200 : 12000);
+    if (input.channel === "website" && !title && !text && ids.length === 0)
+      throw new MarketingError("missing_content", "Web yayını için başlık, metin veya en az bir görsel ekleyin.");
     const id = old?.id ?? `publication_${randomUUID()}`, now = new Date().toISOString();
     if (old) db.prepare("UPDATE marketing_publications SET title=?,text=?,revision=revision+1,status=?,updated_at=? WHERE id=?")
       .run(title,text,old.desiredPublished?"publishing":old.status,now,id);

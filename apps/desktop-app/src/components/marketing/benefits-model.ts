@@ -1,7 +1,11 @@
 import type { BenefitsFamily, BenefitsManagementResult, BenefitsRule } from "@yardimci-asistan/shared";
 
 export const benefitsFamilyLabels: Record<BenefitsFamily, string> = { coupon: "Kupon", points: "Puan", payment_modifier: "Ödeme Avantajı" };
-export const benefitsStatusLabels = { draft: "Taslak", active: "Etkin", disabled: "Devre dışı" };
+export const benefitsStatusLabels = { draft: "Taslak", active: "Etkin", disabled: "Pasif" };
+export function benefitsRuleStatus(rule: BenefitsRule, now = Date.now()) {
+  return rule.status === "active" && rule.endsAt !== null && rule.endsAt <= now ? "expired" : rule.status;
+}
+export const benefitsDisplayStatusLabels = { ...benefitsStatusLabels, expired: "Süresi dolmuş" };
 export function benefitsValue<T>(result: BenefitsManagementResult<T>): T {
   if (!result.ok) throw new Error(result.message);
   return result.value;

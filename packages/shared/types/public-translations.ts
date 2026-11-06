@@ -27,11 +27,18 @@ export interface SaveTranslationInput extends TranslationIdentity {
   language: string; fields: Array<{ field: string; sourceHash: string; text: string }>;
 }
 export interface TranslationJob {
-  id: string; state: "running" | "complete" | "cancelled" | "unavailable";
+  id: string; state: "running" | "waiting" | "paused" | "complete" | "cancelled" | "unavailable";
   total: number; completed: number; failed: number; skipped: number; message: string;
+  language: string; automatic: boolean;
+  fieldTotal: number; fieldsCompleted: number; fieldsFailed: number; fieldsSkipped: number;
+  requestCount: number; batchCount: number; currentBatchSize: number;
+  waitReason: "rate_limited" | "quota_exhausted" | null;
+  nextRetryAt: string; retryAfterSeconds?: number;
+  pauseReason: "user" | "locked" | "disabled" | "ai_unavailable" | "shutdown" | "error" | null;
 }
 export interface TranslateSelectionInput {
   filter: TranslationFilter; selection?: TranslationIdentity[];
+  mode?: "single" | "bulk";
 }
 export type TranslationResult<T> = { ok: true; value: T } | { ok: false; message: string };
 export interface TranslationBridge {
@@ -42,6 +49,8 @@ export interface TranslationBridge {
   saveTranslation(input: SaveTranslationInput): Promise<TranslationResult<void>>;
   startTranslation(input: TranslateSelectionInput): Promise<TranslationResult<TranslationJob>>;
   getTranslationJob(): Promise<TranslationResult<TranslationJob | null>>;
+  pauseTranslation(): Promise<TranslationResult<void>>;
+  resumeTranslation(): Promise<TranslationResult<TranslationJob>>;
   cancelTranslation(): Promise<TranslationResult<void>>;
 }
 /** Additive public data only. Source fields keep their existing names and Turkish values. */

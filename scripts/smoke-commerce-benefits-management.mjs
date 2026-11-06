@@ -129,7 +129,7 @@ test("SQLite rule CRUD is versioned; independent family switches survive connect
   assert.equal(f.db.prepare("SELECT COUNT(*) n FROM commerce_benefit_point_ledger").get().n, 0);
 });
 
-test("empty management reads do not create rules/settings/key; navigation exposes only the authorized existing page", t => {
+test("empty management reads do not create rules/settings/key; navigation independently exposes authorized marketing and benefits pages", t => {
   const f = useFixture(t);
   f.db.prepare("DELETE FROM commerce_benefit_settings WHERE business_id = 'b1'").run();
   assert.deepEqual(f.service.snapshot().families, { coupon: false, points: false, payment_modifier: false });
@@ -138,7 +138,7 @@ test("empty management reads do not create rules/settings/key; navigation expose
   assert.equal(f.db.prepare("SELECT COUNT(*) n FROM commerce_benefit_settings WHERE business_id = 'b1'").get().n, 0);
   const navigation = benefitsNavigationModule();
   const snapshot = values => ({ enabledCapabilities: values });
-  const rows = values => navigation.buildNavigation(snapshot(values)).filter(item => item.id === "marketing");
+  const rows = values => navigation.buildNavigation(snapshot(values)).filter(item => item.id === "benefits" || item.id === "marketing");
   assert.equal(rows([]).length, 0);
   assert.equal(rows(["commerce.benefits"]).length, 0);
   const base = ["commerce.benefits", "core.customers", "commerce.catalog"];
@@ -146,12 +146,17 @@ test("empty management reads do not create rules/settings/key; navigation expose
   for (const parent of ["commerce.sales", "commerce.orders"]) {
     assert.equal(rows([...base, parent]).length, 1);
     assert.equal(rows([...base, parent])[0].label, "İndirim ve Puan");
-    assert.equal(navigation.getPageMeta("marketing", snapshot([...base, parent])).title, "İndirim ve Puan");
+    assert.equal(navigation.getPageMeta("benefits", snapshot([...base, parent])).title, "İndirim ve Puan");
   }
   // Marketing Studio's persisted dependency closure is supplied by its canonical graph.
   const studio = capabilities.expandBusinessCapabilities([capabilities.BUSINESS_CAPABILITIES.MARKETING_STUDIO]);
-  assert.equal(rows([...base, "commerce.sales", ...studio]).length, 1);
-  assert.equal(rows([...base, "commerce.sales", ...studio])[0].label, "Pazarlama");
+  assert.equal(rows(studio).length, 1);
+  assert.equal(rows(studio)[0].id, "marketing");
+  assert.equal(rows(studio)[0].label, "Pazarlama");
+  const both = rows([...base, "commerce.sales", ...studio]);
+  assert.deepEqual(Array.from(both, item => [item.id, item.label]), [["marketing", "Pazarlama"], ["benefits", "İndirim ve Puan"]]);
+  assert.equal(navigation.getPageMeta("marketing", snapshot([])).title, "Pazarlama");
+  assert.equal(navigation.getPageMeta("benefits", snapshot([])).title, "İndirim ve Puan");
 });
 
 test("canonical DesktopDatabase facade passes its existing SQLite connection into the management owner", t => {

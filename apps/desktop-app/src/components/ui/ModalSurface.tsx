@@ -77,7 +77,7 @@ function ModalSurfaceContent({ children, labelledBy, describedBy, className = ""
       frame = 0;
       const zoom = Number(getComputedStyle(root).zoom) || 1;
       const habitat = sidebar.querySelector<HTMLElement>(".nexa-habitat");
-      const character = habitat?.querySelector<HTMLElement>(".nexa-character") ?? null;
+      const character = habitat?.querySelector<HTMLElement>(".nexa-scene-back") ?? null;
       const speech = habitat?.querySelector<HTMLElement>(".nexa-habitat-speech") ?? null;
       const nodes = [sidebar, ...Array.from(sidebar.children), habitat, character, speech].filter((node): node is HTMLElement => Boolean(node));
       for (const node of observed) if (!nodes.includes(node as HTMLElement)) { observer.unobserve(node); observed.delete(node); }
@@ -90,7 +90,7 @@ function ModalSurfaceContent({ children, labelledBy, describedBy, className = ""
       dialog.style.setProperty("--nexa-backdrop-clip", nexaBackdropClip(
         shown && visible(character) ? character.getBoundingClientRect() : null,
         shown && visible(speech) ? speech.getBoundingClientRect() : null, zoom,
-        (parseFloat(speechStyle?.borderTopLeftRadius ?? "0") || 0) * zoom, tailDepth));
+        (parseFloat(speechStyle?.borderTopLeftRadius ?? "0") || 0) * zoom, tailDepth, true));
       // Follow the balloon's brief entry translation without polling the rig.
       if (speech?.getAnimations().some(animation => animation.playState === "running")) schedule();
     };

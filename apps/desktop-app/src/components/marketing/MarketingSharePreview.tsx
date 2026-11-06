@@ -27,12 +27,12 @@ export function MarketingSharePreview({draft, snapshot, publication = false}: {d
       const ids = channel === "website" ? draft.content.mediaAssetIds : channel === "instagram" ? [variant?.mediaAssetId || draft.content.mediaAssetIds[0]].filter((id): id is string => Boolean(id)) : [];
       return <Panel as="article" key={channel} className="marketing-channel-preview form-stack" aria-label={`${channelNames[channel]} önizlemesi`}>
         <h3>{channelNames[channel]}</h3>
-        <strong>{variant?.title || draft.content.title}</strong>
+        {(variant?.title || draft.content.title) && <strong>{variant?.title || draft.content.title}</strong>}
         {channel === "instagram" && <div className="marketing-preview-gallery">{ids.map(id => {const asset = snapshot.assets.find(a => a.id === id); return asset && <img key={id} src={asset.previewUrl} alt={asset.altText || "Instagram görseli"}/>;})}{!ids.length && <p>Instagram için bir görsel seçin.</p>}</div>}
         {channel === "whatsapp" ? <><small>Onaylı şablon: {w.templateName || "Henüz seçilmedi"} · {w.templateLanguage}</small><p>{template ? template.components.map((component, ci) => component.text.replace(/\{\{(\d+)\}\}/g, (placeholder, number: string) => {
           const binding = w.bindings[ci]?.[Number(number) - 1];
           return binding?.type === "static_text" ? binding.value || placeholder : binding?.type === "customer_field" ? binding.field === "customer.fullName" ? "[Müşterinin adı]" : "[Ticari unvan]" : placeholder;
-        })).join("\n") : "Desteklenen onaylı şablon seçilmeden gönderim hazırlanamaz."}</p></> : <p>{text || "Metin girilmedi."}</p>}
+        })).join("\n") : "Desteklenen onaylı şablon seçilmeden gönderim hazırlanamaz."}</p></> : (text || channel === "sms") && <p>{text || "SMS için metin gerekli."}</p>}
         {channel === "website" && <div className="marketing-preview-gallery">{ids.map((id, index) => {const asset = snapshot.assets.find(a => a.id === id); return asset && <img key={id} src={asset.previewUrl} alt={asset.altText || `Web görseli ${index + 1}`}/>;})}</div>}
         {channel === "sms" && <small>{text.length}/160 karakter · Yalnız düz metin{ text.length > 160 ? " · Metni kısaltın" : ""}</small>}
         {(channel === "sms" || channel === "whatsapp") && <small>{counts[channel] ? `${counts[channel].eligibleCount} uygun / ${counts[channel].matchedCount} alıcı · İzni bilinmeyen: ${counts[channel].unknownConsentCount} · İzin vermeyen: ${counts[channel].optedOutCount} · Geçersiz telefon: ${counts[channel].missingRecipientCount}` : audienceId ? "Alıcı uygunluğu kontrol ediliyor…" : "Hedef kitle seçilmedi."}</small>}

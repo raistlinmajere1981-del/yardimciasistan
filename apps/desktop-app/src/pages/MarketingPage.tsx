@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileText, Globe, Plus, RefreshCw, Send } from "lucide-react";
 import type { MarketingAnalyticsRangeInput, MarketingChannel, MarketingPublication, MarketingScheduleInput, MarketingScheduleSnapshot, MarketingShareDetail, MarketingStudioSnapshot } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard } from "../app/page-navigation-guard";
@@ -14,26 +14,14 @@ import { MarketingAnalytics } from "../components/marketing/MarketingAnalytics";
 import { MarketingShareWorkspace } from "../components/marketing/MarketingShareWorkspace";
 import { MarketingRecordManager, MarketingThumbnail, publicationLabel } from "../components/marketing/MarketingRecordManager";
 import { MarketingDeliveryWorkspace, deliveryStatuses } from "../components/marketing/MarketingDeliveryWorkspace";
-import { channelNames, newShare, resultValue } from "../components/marketing/share-draft";
-import { CommerceBenefitsWorkspace } from "../components/marketing/CommerceBenefitsWorkspace";
+import { channelNames, marketingDisplayTitle, newShare, resultValue } from "../components/marketing/share-draft";
 
 interface MarketingPageProps {
-  enabled: boolean; benefitsEnabled?: boolean; registerPageLeaveGuard?: RegisterPageLeaveGuard;
+  enabled: boolean; registerPageLeaveGuard?: RegisterPageLeaveGuard;
   onMessage?: (message: string) => void; onCalendar?: () => void;
 }
-export function MarketingPage(props: MarketingPageProps) {
-  const [mode, setMode] = usePageViewState<"studio" | "benefits">("marketing.mode", "studio");
-  const benefits = Boolean(props.benefitsEnabled) && (!props.enabled || mode === "benefits");
-  const navigation = props.enabled && props.benefitsEnabled ? <FeatureViewSelector label="Pazarlama alanı" value={benefits ? "benefits" : "studio"}
-    items={[{ id: "studio", label: "Pazarlama" }, { id: "benefits", label: "İndirim ve Puan" }]} onChange={setMode} /> : null;
-  if (benefits) return <FeatureWorkspacePage label="İndirim ve Puan" bodyLabel="İndirim ve Puan çalışma alanı" layout="fill" toolbar={navigation}>
-    <CommerceBenefitsWorkspace {...(props.onMessage ? { onMessage: props.onMessage } : {})} {...(props.registerPageLeaveGuard ? { registerPageLeaveGuard: props.registerPageLeaveGuard } : {})} />
-  </FeatureWorkspacePage>;
-  return <MarketingStudioPage {...props} modeNavigation={navigation} />;
-}
-
 type Surface = {kind: "share"; initial?: MarketingShareDetail; publication?: MarketingPublication; initialChannel?: MarketingChannel; focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput} | {kind: "website" | "drafts" | "publications"} | {kind: "recent"} | {kind: "delivery"; id: string};
-function MarketingStudioPage({enabled, registerPageLeaveGuard, onMessage, modeNavigation}: MarketingPageProps & { modeNavigation: ReactNode }) {
+export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: MarketingPageProps) {
   const webAvailable = useWebAvailability();
   const [snapshot, setSnapshot] = useState<MarketingStudioSnapshot | null>(null), [plans, setPlans] = useState<MarketingScheduleSnapshot | null>(null);
   const [view, setView] = usePageViewState<"workspace" | "analytics">("marketing.view", "workspace");
@@ -80,9 +68,8 @@ function MarketingStudioPage({enabled, registerPageLeaveGuard, onMessage, modeNa
       label: plans?.schedules.some(s => s.schedule.targetId === d.campaign.id && ["active","paused"].includes(s.schedule.status)) ? "Planlandı" : deliveryStatuses[d.campaign.status], publication: undefined, campaign: true}))
   ].sort((a,b) => b.date.localeCompare(a.date));
   const openRecent = (row: typeof recent[number]) => row.campaign ? row.contentId && snapshot?.shares?.some(s => s.contentId === row.contentId && s.submitted) ? void openContent(row.contentId, undefined, row.channel) : openSurface({kind: "delivery", id: row.id}) : row.publication && void openContent(row.publication.contentId, row.publication);
-  const recentRow = (row: typeof recent[number]) => <button type="button" className="marketing-record" key={row.id} onClick={() => openRecent(row)}><MarketingThumbnail snapshot={snapshot!} ids={row.images}/><span><strong title={row.title}>{row.title}</strong><small>{channelNames[row.channel]} · {new Date(row.date).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone={row.label === "Yayında" || row.label === "Tamamlandı" ? "success" : row.label === "Planlandı" ? "info" : "neutral"}>{row.label}</StatusBadge></button>;
+  const recentRow = (row: typeof recent[number]) => <button type="button" className="marketing-record" key={row.id} onClick={() => openRecent(row)}><MarketingThumbnail snapshot={snapshot!} ids={row.images}/><span><strong title={row.title}>{marketingDisplayTitle(row.title, row.publication?.text ?? "", row.images.length)}</strong><small>{channelNames[row.channel]} · {new Date(row.date).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone={row.label === "Yayında" || row.label === "Tamamlandı" ? "success" : row.label === "Planlandı" ? "info" : "neutral"}>{row.label}</StatusBadge></button>;
   return <FeatureWorkspacePage label="Pazarlama" bodyLabel="Pazarlama çalışma alanı" layout="fill" toolbar={<>
-    {modeNavigation}
     <FeatureViewSelector label="Pazarlama görünümü" value={view} items={[{id: "workspace", label: "Çalışma Alanı"}, {id: "analytics", label: "Analitik"}]} onChange={setView}/>
     <div className="page-toolbar__actions"><ActionButton variant="quiet" disabled={loading} onClick={() => {setMessage(""); setLoading(true); void reload().catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Pazarlama verileri alınamadı.")).finally(() => setLoading(false));}}><RefreshCw size={16}/>Durumu yenile</ActionButton></div>
   </>}>
@@ -92,11 +79,11 @@ function MarketingStudioPage({enabled, registerPageLeaveGuard, onMessage, modeNa
         <Panel as="section" surfaceRole="communication" className="marketing-welcome"><div><h2>Merhaba!</h2><p>Markanızı daha görünür hale getirin. İçeriğinizi oluşturun,<br className="marketing-welcome-break"/> kanallarınızı seçin ve paylaşın.</p></div><Send className="marketing-welcome-icon" size={66} strokeWidth={1} aria-hidden="true"/><ActionButton disabled={loading || !snapshot} onClick={() => openSurface({kind: "share"})}><Plus size={18}/>Yeni paylaşım</ActionButton></Panel>
         <div className="marketing-dashboard">
           <Panel as="section" className="marketing-summary-card" aria-label="Taslaklar"><header><div><h3><FileText size={17}/>Taslaklar</h3><p>Tamamlanmayı bekleyen içerikleriniz.</p></div><ActionButton variant="quiet" size="sm" disabled={!snapshot} onClick={() => openSurface({kind: "drafts"})}>Tümünü gör</ActionButton></header><div className="marketing-card-list">
-            {drafts.slice(0,5).map(c => <button className="marketing-record" type="button" key={c.content.id} disabled={loading} onClick={() => void openContent(c.content.id)}><MarketingThumbnail snapshot={snapshot!} ids={c.media.map(m => m.mediaAssetId)}/><span><strong title={c.content.title}>{c.content.title}</strong><small>Son düzenleme: {new Date(c.content.updatedAt).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone="warning">Taslak</StatusBadge></button>)}
+            {drafts.slice(0,5).map(c => <button className="marketing-record" type="button" key={c.content.id} disabled={loading} onClick={() => void openContent(c.content.id)}><MarketingThumbnail snapshot={snapshot!} ids={c.media.map(m => m.mediaAssetId)}/><span><strong title={c.content.title}>{marketingDisplayTitle(c.content.title, c.content.masterText, c.media.length)}</strong><small>Son düzenleme: {new Date(c.content.updatedAt).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone="warning">Taslak</StatusBadge></button>)}
             {!drafts.length && <div className="marketing-card-empty"><FileText size={30}/><strong>Yeni fikirler için yer var.</strong><p>Yeni paylaşım oluşturup taslak olarak kaydedin.</p></div>}
           </div></Panel>
           <Panel as="section" className="marketing-summary-card" aria-label="Son paylaşımlar"><header><div><h3><Send size={17}/>Son paylaşımlar</h3><p>Yayınlanan ve planlanan paylaşımlarınız.</p></div><ActionButton variant="quiet" size="sm" disabled={!snapshot} onClick={() => openSurface({kind: "recent"})}>Tümünü gör</ActionButton></header><div className="marketing-card-list">{recent.slice(0,5).map(recentRow)}{!recent.length && <div className="marketing-card-empty"><Send size={30}/><strong>İlk paylaşımınızı hazırlayın.</strong><p>Yayın ve gönderim durumlarını burada izleyin.</p></div>}</div></Panel>
-          {webAvailable && <Panel as="section" className="marketing-summary-card" aria-label="Aktif web içerikleri"><header><div><h3><Globe size={17}/>Aktif web içerikleri</h3><p>Sitenizde yayında olan içerikler.</p></div><ActionButton variant="quiet" size="sm" disabled={!snapshot} onClick={() => openSurface({kind: "website"})}>Tümünü gör</ActionButton></header><div className="marketing-card-list">{activeWebsite.slice(0,5).map(p => <button className="marketing-record" type="button" key={p.id} onClick={() => void openContent(p.contentId, p)}><MarketingThumbnail snapshot={snapshot!} ids={p.mediaAssetIds}/><span><strong>{p.title}</strong><small>{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("tr-TR") : "Yayın onayı bekleniyor"}</small></span><StatusBadge tone={p.status === "published" ? "success" : "info"}>{publicationLabel(p)}</StatusBadge></button>)}{!activeWebsite.length && <div className="marketing-card-empty"><Globe size={30}/><strong>Henüz aktif içerik yok.</strong><p>Web sitesine gönderdiğiniz içerikleri buradan yönetin.</p></div>}</div></Panel>}
+          {webAvailable && <Panel as="section" className="marketing-summary-card" aria-label="Aktif web içerikleri"><header><div><h3><Globe size={17}/>Aktif web içerikleri</h3><p>Sitenizde yayında olan içerikler.</p></div><ActionButton variant="quiet" size="sm" disabled={!snapshot} onClick={() => openSurface({kind: "website"})}>Tümünü gör</ActionButton></header><div className="marketing-card-list">{activeWebsite.slice(0,5).map(p => <button className="marketing-record" type="button" key={p.id} onClick={() => void openContent(p.contentId, p)}><MarketingThumbnail snapshot={snapshot!} ids={p.mediaAssetIds}/><span><strong>{marketingDisplayTitle(p.title, p.text, p.mediaAssetIds.length)}</strong><small>{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("tr-TR") : "Yayın onayı bekleniyor"}</small></span><StatusBadge tone={p.status === "published" ? "success" : "info"}>{publicationLabel(p)}</StatusBadge></button>)}{!activeWebsite.length && <div className="marketing-card-empty"><Globe size={30}/><strong>Henüz aktif içerik yok.</strong><p>Web sitesine gönderdiğiniz içerikleri buradan yönetin.</p></div>}</div></Panel>}
         </div>
       </>}
     </div>

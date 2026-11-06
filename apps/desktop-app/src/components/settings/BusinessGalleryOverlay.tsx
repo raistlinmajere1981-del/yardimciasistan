@@ -58,7 +58,7 @@ export function BusinessGalleryOverlay({ onClose }: { onClose: () => void }) {
       if (!result.ok) { reportAppStatus("error", result.message); return; }
       setDirty(false); setTitles({});
       if (result.changed) reportAppStatus("success", "Galeri kaydedildi. Web eşitlemesinde yayınlanacak.");
-      setItems(await bridge!.listBusinessGallery());
+      onClose();
     } catch { reportAppStatus("error", "Galeri kaydedilemedi."); }
     finally { setBusy(false); }
   };

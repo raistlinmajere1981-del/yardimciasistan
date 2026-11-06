@@ -142,7 +142,7 @@ try {
   assert.deepEqual(receiptCalls[0], { saleId: f.db.prepare("SELECT id FROM commerce_sales").get().id });
   receiptResult = { ok: false, code: "DOCUMENT_SALE_JOB_LINES_MISSING", message: "safe code" };
   await receipt.click();
-  await expect(page.getByRole("status").filter({hasText:"Fiş şablonunda"})).toContainText("Baskı Yönetimi > Satış fişi > Düzenle > Ürün satırlarını ekle > Şablonları kaydet");
+  await expect(page.getByRole("status").filter({hasText:"Fiş şablonunda"})).toContainText("Baskı Yönetimi > Satış fişi > Düzenle > Yerleşim ve form > Ürün satırlarını ekle > Kaydet");
   await expect(page.getByTestId("topbar-status")).toContainText("Satış tamamlandı");
   await expect(page.getByRole("button",{name:"Yazdır",exact:true})).toHaveCount(0);
   receiptResult = { ok: true, value: { jobId: "same-job" } };

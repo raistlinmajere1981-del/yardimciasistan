@@ -142,8 +142,12 @@ function project_publication(array $business, array $sources, string $modulePath
     }
     $marketingPayload = $data('marketing'); $announcements = [];
     foreach (records(($marketingPayload['enabled'] ?? true) === false ? [] : ($marketingPayload['publications'] ?? [])) as $item) {
-        if (!published($item) || ($item['published'] ?? false) !== true || ($item['channel'] ?? '') !== 'website'
-            || text($item['title'] ?? '') === '') continue;
+        if (!published($item) || ($item['published'] ?? false) !== true || ($item['channel'] ?? '') !== 'website') continue;
+        $hasImage = false;
+        foreach (records($item['images'] ?? []) as $image) {
+            if (published($image) && media_url($image['url'] ?? '', $modulePath) !== '') { $hasImage = true; break; }
+        }
+        if (text($item['title'] ?? '') === '' && text($item['text'] ?? '') === '' && !$hasImage) continue;
         $announcements[] = translate_record($item, $marketingPayload, 'marketing', text($item['id'] ?? ''), $language, ['title', 'text']);
     }
     $reviewsPayload = $data('google-reviews');

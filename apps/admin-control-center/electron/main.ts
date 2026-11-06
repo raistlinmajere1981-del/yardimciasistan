@@ -10,6 +10,7 @@ import {
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
 import { runEffectStudio } from "./services/effect-studio-service";
 import { publishManagedEffect } from "./services/effect-publication-service";
+import { createBirdesengorEffectRelease } from "./services/birdesengor-effect-release-service";
 import { getOverviewSnapshot } from "./services/overview-service";
 import { ReleaseRunner } from "./services/release-runner";
 import {
@@ -33,6 +34,7 @@ const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
   : resolve(APP_ROOT, "../..");
 const verificationRunner = new VerificationRunner(REPO_ROOT);
 const deploymentRunner = new DeploymentRunner(REPO_ROOT);
+const birdesengorEffectRelease = createBirdesengorEffectRelease(REPO_ROOT, deploymentRunner);
 const releaseRunner = new ReleaseRunner(REPO_ROOT);
 let effectPublishBusy = false;
 
@@ -90,13 +92,34 @@ function createWindow() {
 
 ipcMain.handle("admin:effects-projects", () => runEffectStudio(REPO_ROOT, "list"));
 ipcMain.handle("admin:effects-load", (_event, id: string) => runEffectStudio(REPO_ROOT, "load", { id }));
-ipcMain.handle("admin:effects-save", (_event, id: string, scene: unknown) =>
-  runEffectStudio(REPO_ROOT, "save", { id, scene }));
+ipcMain.handle("admin:effects-save", (_event, id: string, scene: unknown, sourceHash?: string) => {
+  birdesengorEffectRelease.invalidate();
+  return runEffectStudio(REPO_ROOT, "save", { id, scene, sourceHash });
+});
 ipcMain.handle("admin:effects-prepare", async (_event, id: string) => {
   if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
       releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
   effectPublishBusy = true;
+  birdesengorEffectRelease.invalidate();
   try { return await runEffectStudio(REPO_ROOT, "prepare", { id }); }
+  finally { effectPublishBusy = false; }
+});
+ipcMain.handle("admin:effects-birdesengor-preflight", async (_event, id: unknown) => {
+  if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
+      releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
+  effectPublishBusy = true;
+  try { return await birdesengorEffectRelease.preflight(id); }
+  finally { effectPublishBusy = false; }
+});
+ipcMain.handle("admin:effects-birdesengor-cancel", () => {
+  birdesengorEffectRelease.invalidate();
+  return true;
+});
+ipcMain.handle("admin:effects-birdesengor-deploy", async (_event, id: unknown, token: unknown) => {
+  if (effectPublishBusy || verificationRunner.getState().running || deploymentRunner.getState().running ||
+      releaseRunner.getState().running) throw new Error("Başka bir işlem devam ediyor.");
+  effectPublishBusy = true;
+  try { return await birdesengorEffectRelease.deploy(id, token); }
   finally { effectPublishBusy = false; }
 });
 ipcMain.handle("admin:effects-publish", async (_event, id: string) => {

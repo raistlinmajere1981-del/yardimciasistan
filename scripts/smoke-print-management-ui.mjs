@@ -1,12 +1,14 @@
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const domOnly = process.argv.includes("--dom-only");
+const screenshots = process.argv.includes("--screenshots");
 const server = await createServer({ root: resolve("apps/desktop-app"), configFile: resolve("apps/desktop-app/vite.renderer.config.ts"), server: domOnly ? { middlewareMode: true, hmr: false, ws: false } : { port: 0, strictPort: false } });
 let browser;
 try {
@@ -35,13 +37,16 @@ try {
     assert.doesNotMatch(market, /Adisyon|Kargo etiketi/);
     const combined = render([C.PRINTING, C.SALES, C.RETAIL_LABELS, C.CUSTOMER_CREDIT, C.ORDERS, C.FOOD_ORDERS, C.ACCOMMODATION_STAYS, C.WHATSAPP], { whatsappEnabled: true });
     for (const title of ["Satış fişi", "Adisyon", "Konaklama dökümü", "Ürün etiketi", "Borç dökümü", "Kargo etiketi", "Mutfak siparişi"]) assert.ok(combined.includes(title));
-    assert.equal((combined.match(/aria-pressed=/g) ?? []).length, 7);
+    assert.equal((combined.match(/aria-controls="print-document-preview"/g) ?? []).length, 7);
+    assert.match(combined, /workspace-frame--centered/);
+    assert.equal((combined.match(/>Kaydet<\/button>/g) ?? []).length, 1);
+    assert.equal((combined.match(/>Değişiklikleri geri al<\/button>/g) ?? []).length, 1);
     assert.match(combined, /MALİ BELGE DEĞİLDİR/);
     assert.match(combined, /Yazdırma politikası/);
-    assert.match(combined, /Yazıcı seçimi bu cihaza kaydedilir/);
-    assert.match(combined, /Sistem yazıcıları okunuyor/);
+    assert.match(combined, /Bu cihazın yazıcısı/);
+    assert.doesNotMatch(combined, /Politikalar yalnız|Yazıcı seçimi bu cihaza|Şablon revizyonu/);
     assert.doesNotMatch(combined, /aria-label="Bu cihazın yazıcısı"/);
-    assert.doesNotMatch(combined, />Kaydet<|>Yazdır<|>Gönder<|Fatura/);
+    assert.doesNotMatch(combined, />Yazdır<|>Gönder<|Fatura/);
     assert.doesNotMatch(combined, /aria-label="WhatsApp politikası"/); // SSR cannot claim backend activation.
     assert.doesNotMatch(render([C.PRINTING, C.SALES, C.WHATSAPP]), /<strong>WhatsApp<\/strong>/);
     assert.doesNotMatch(render([C.PRINTING, C.SALES], { whatsappEnabled: true }), /<strong>WhatsApp<\/strong>/);
@@ -75,9 +80,9 @@ try {
     assert.equal(repairedReceipt.pageWidth,800);assert.equal(repairedReceipt.pageHeight,1600);
     assert.ok(defaultDocumentLayout("sale_receipt",legacyReceipt).lineBlock);
     const missingHtml=renderToStaticMarkup(createElement(DocumentTemplateCanvas,{documentKind:"sale_receipt",layout:legacyReceipt,editing:true,enabled:true,onChange(){},onPreset(){}}));
-    assert.match(missingHtml,/Ürün satırlarını ekle/);assert.match(missingHtml,/Bu şablonda ürün satırları yok/);assert.match(missingHtml,/Şablonları kaydet/);
+    assert.match(missingHtml,/Ürün satırlarını ekle/);assert.match(missingHtml,/Bu şablonda ürün satırları yok/);assert.match(missingHtml,/Kaydet/);
     const rowHtml=renderToStaticMarkup(createElement(DocumentTemplateCanvas,{documentKind:"sale_receipt",layout:receipt,editing:false,enabled:true,onChange(){},onPreset(){}}));
-    assert.match(rowHtml,/print-management__row-field/);assert.match(rowHtml,/Satır miktarı/);assert.match(rowHtml,/Ürün satırı kapasitesi/);
+    assert.match(rowHtml,/print-management__row-field/);assert.match(rowHtml,/Örnek ürün/);assert.doesNotMatch(rowHtml,/Seçili alan türü/);
     assert.equal(saleReceiptLineBlock({...receipt,fields:[{binding:"totals.total",x:0,y:1500,width:100,height:60}]}),null);
     const { FormImagePreparation } = await server.ssrLoadModule("/src/components/settings/FormImagePreparation.tsx");
     const preparationProps={documentKind:"sale_receipt",originalRef:"original",pageWidth:800,pageHeight:1600,enabled:true,onApply:async()=>false,onBack(){}};
@@ -105,10 +110,14 @@ try {
   const base = server.resolvedUrls.local[0];
   const launcher = page.getByRole("button", { name: "Baskı Yönetimi", exact: true });
   const dialog = page.getByRole("dialog", { name: "Baskı Yönetimi", exact: true });
+  const openTools = async () => {
+    const menu = dialog.locator(".print-management__tools-menu");
+    if (!await menu.evaluate(node => node.open)) await menu.locator("summary").click();
+  };
   await page.goto(`${base}print-settings-test?profile=market`);
   await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
   await expect(launcher).toHaveCount(0);
-  await page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ }).click();
+  await expect(page.getByRole("heading", { name: "İşletme Yapısı ve Özellikler", exact: true })).toBeVisible();
   await page.getByLabel("Baskı ve Belge Paylaşımı", { exact: true }).check();
   await expect(launcher).toHaveCount(0); // Unsaved form is never runtime authority.
   await page.evaluate(() => window.refreshSettings({ profileOptions: ["document.printing", "retail.labels"] }));
@@ -141,12 +150,12 @@ try {
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
-  await dialog.getByRole("button", { name: "Kurallardan vazgeç", exact: true }).click();
+  await dialog.getByRole("button", { name: "Değişiklikleri geri al", exact: true }).click();
   await dialog.getByRole("button", {name:"Düzenle",exact:true}).click();
   await dialog.getByLabel("X (mm)",{exact:true}).fill("4.2");
   expect(await page.evaluate(() => window.requestSettingsPageLeave())).toBe(false);
   await page.keyboard.press("Escape"); await expect(dialog).toBeVisible();
-  await dialog.getByRole("button",{name:"Şablonlardan vazgeç",exact:true}).click();
+  await dialog.getByRole("button",{name:"Değişiklikleri geri al",exact:true}).click();
   await page.keyboard.press("Escape");
   await expect(launcher).toBeFocused();
   await page.getByRole("searchbox", { name: "Ayarlarda ara" }).fill("baskı");
@@ -182,21 +191,27 @@ try {
   const documentButtons = dialog.getByRole("navigation").getByRole("button");
   await expect(documentButtons).toHaveCount(7);
   const originalBounds = await dialog.locator(".print-management__preview").boundingBox();
-  for (const button of await documentButtons.all()) {
+  const documentRatios = [.5, .5, 210/297, 210/297, 100/150, .5, 60/40];
+  for (const [index,button] of (await documentButtons.all()).entries()) {
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(dialog.locator(".print-management__paper")).toContainText("MALİ BELGE DEĞİLDİR");
-    expect(await dialog.locator(".print-management__preview").boundingBox()).toEqual(originalBounds);
+    const bounds = await dialog.locator(".print-management__preview").boundingBox();
+    expect(Math.abs(bounds.width - originalBounds.width)).toBeLessThan(2);
+    expect(Math.abs(bounds.height - originalBounds.height)).toBeLessThan(2);
+    expect(Math.abs(bounds.x - originalBounds.x)).toBeLessThan(5);
+    await expect.poll(async()=>{ const paper=await dialog.locator(".print-management__paper").boundingBox();return paper.width/paper.height; }).toBeCloseTo(documentRatios[index],2);
   }
-  await expect(dialog.getByRole("button", { name: /Kaydet|Yazdır|Gönder|Fatura/ })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Kaydet", exact: true })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: /Yazdır|Gönder|Fatura/ })).toHaveCount(0);
   await expect(dialog.getByLabel("Yazdırma politikası", { exact: true })).toBeEnabled();
   await expect(dialog.locator("input,textarea,[contenteditable=true]")).toHaveCount(0);
   await expect(dialog.locator(".print-management__channel")).toHaveCount(2);
-  await expect(dialog).toContainText("WhatsApp Web gönderimi kullanıcı onayı gerektirir");
+  await expect(dialog).toContainText("Gönderim kullanıcı onayı gerektirir");
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   const editTemplate = dialog.getByRole("button", {name:"Düzenle",exact:true});
-  const saveTemplate = dialog.getByRole("button", {name:"Şablonları kaydet",exact:true});
-  const discardTemplate = dialog.getByRole("button", {name:"Şablonlardan vazgeç",exact:true});
+  const saveTemplate = dialog.getByRole("button", {name:"Kaydet",exact:true});
+  const discardTemplate = dialog.getByRole("button", {name:"Değişiklikleri geri al",exact:true});
   await dialog.getByRole("button", { name: /Satış fişi/ }).click();
   await editTemplate.click();
   await expect(dialog.getByLabel("Alan seç",{exact:true}).locator("option")).toHaveCount(4);
@@ -207,9 +222,9 @@ try {
   await dialog.getByLabel("Y (mm)",{exact:true}).fill("9.1");
   await expect(saveTemplate).toBeVisible();
   await dialog.getByLabel("Yazdırma politikası",{exact:true}).selectOption("ASK_CONFIRMATION");
-  await expect(dialog.getByRole("button",{name:"Kuralları kaydet",exact:true})).toBeVisible();
-  await dialog.getByRole("button",{name:"Kurallardan vazgeç",exact:true}).click();
-  await expect(saveTemplate).toBeVisible();
+  await expect(dialog.getByRole("button",{name:"Kaydet",exact:true})).toBeVisible();
+  await expect(dialog.locator(".workspace-frame__footer button")).toHaveCount(2);
+  await expect(saveTemplate).toBeEnabled();
   await page.keyboard.press("Escape"); await expect(dialog).toBeVisible();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await dialog.getByLabel("Alan seç", {exact:true}).selectOption("1");
@@ -220,8 +235,8 @@ try {
   await expect(dialog.getByLabel("Alan seç", {exact:true})).toHaveValue("0");
   await expect(dialog.getByLabel("X (mm)",{exact:true})).toHaveValue("7.3");
   await saveTemplate.click();
-  await expect(saveTemplate).toHaveCount(0);
-  await expect(dialog).toContainText("Şablonlar kaydedildi");
+  await expect(saveTemplate).toBeDisabled();
+  await expect(dialog).toContainText("Ayarlar kaydedildi.");
   expect((await page.evaluate(() => window.printFixture.templates())).map(value=>value.revision)).toEqual([1,1]);
   await page.keyboard.press("Escape");
   await page.getByRole("button",{name:"Önizlemeyi aç"}).click();
@@ -232,11 +247,11 @@ try {
   const fieldSelector = dialog.getByLabel("Alan seç", { exact: true });
   const field = dialog.getByRole("button", { name: "İşletme adı alanı 1", exact: true });
   await field.scrollIntoViewIfNeeded();
-  // Confirm the original red test was pressing the overlapping second field.
+  // Selected field stays on top so even overlapping document fields remain draggable.
   expect(await field.evaluate(node => {
     const bounds = node.getBoundingClientRect();
     return document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)?.getAttribute("aria-label");
-  })).toBe("Belge numarası alanı 2");
+  })).toBe("İşletme adı alanı 1");
   let pointerEvents = [];
   await page.exposeFunction("recordTemplatePointer", data => pointerEvents.push(data));
   const dragFirstField = async () => {
@@ -251,7 +266,7 @@ try {
           if (document.elementFromPoint(x, y) === node) return { x, y };
         }
       }
-      throw Error("First template field has no exposed drag point");
+      throw Error("First template field has no exposed drag point: " + JSON.stringify({bounds: bounds.toJSON(), paper:node.closest(".print-management__paper")?.getBoundingClientRect().toJSON(), parent:node.closest(".print-management__canvas")?.getBoundingClientRect().toJSON(), atCenter:document.elementFromPoint(bounds.left + bounds.width/2,bounds.top + bounds.height/2)?.outerHTML?.slice(0,200)}));
     });
     const before = { x: await xInput.inputValue(), y: await yInput.inputValue(), selected: await fieldSelector.inputValue() };
     const paperBounds = await dialog.locator(".print-management__paper").boundingBox();
@@ -290,7 +305,7 @@ try {
   await expect(xInput).toHaveValue("0");
   await xInput.fill("7.3");
   await xInput.press("Tab");
-  await expect(discardTemplate).toHaveCount(0);
+  await expect(discardTemplate).toBeDisabled();
   // Keep keyboard editing available independently of pointer dragging.
   await dialog.getByRole("button", { name: "Sağa", exact: true }).focus();
   await page.keyboard.press("Enter");
@@ -328,7 +343,7 @@ try {
   await dialog.getByRole("button",{name:"Alan ekle",exact:true}).click();
   await expect(dialog.getByLabel("Alan seç",{exact:true}).locator("option")).toHaveCount(5);
   await dialog.getByRole("button",{name:"Alanı kaldır",exact:true}).click();
-  await expect(discardTemplate).toHaveCount(0);
+  await expect(discardTemplate).toBeDisabled();
   await dialog.getByLabel("X (mm)",{exact:true}).fill("12");
   await page.evaluate(()=>window.printFixture.failSave(true));
   await saveTemplate.click(); await expect(dialog.getByRole("alert")).toContainText("Şablon kaydedilemedi");
@@ -358,10 +373,10 @@ try {
   await expect(pickImage).toHaveCount(0);
   await editTemplate.click();
   await page.evaluate(()=>window.printFixture.cancelImage(true));
-  await pickImage.click();
-  await expect(saveTemplate).toHaveCount(0);
+  await openTools(); await pickImage.click();
+  await expect(saveTemplate).toBeDisabled();
   await page.evaluate(()=>window.printFixture.cancelImage(false));
-  await pickImage.click();
+  await openTools(); await pickImage.click();
   await expect(originalImage).toBeVisible();
   await expect(originalImage).toHaveJSProperty("naturalWidth",120);
   await expect(saveTemplate).toBeVisible();
@@ -369,14 +384,14 @@ try {
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await discardTemplate.click();
   await expect(originalImage).toHaveCount(0);
-  await pickImage.click();await saveTemplate.click();
+  await openTools(); await pickImage.click();await saveTemplate.click();
   const savedScan = await page.evaluate(()=>window.printFixture.templates().find(value=>value.documentKind==="sale_receipt").layout.scan);
   expect(savedScan.foreground).toBe(false);expect(savedScan.processedImageRef).toBeNull();
-  await pickImage.click();
+  await openTools(); await pickImage.click();
   await discardTemplate.click();
   await expect(originalImage).toBeVisible();
   expect(await page.evaluate(()=>window.printFixture.templates().find(value=>value.documentKind==="sale_receipt").layout.scan)).toEqual(savedScan);
-  await dialog.getByRole("button",{name:"Görseli kaldır",exact:true}).click();
+  await openTools(); await dialog.getByRole("button",{name:"Görseli kaldır",exact:true}).click();
   await expect(originalImage).toHaveCount(0);
   await discardTemplate.click();await expect(originalImage).toBeVisible();
   await page.keyboard.press("Escape");
@@ -390,7 +405,7 @@ try {
   const preparation = dialog.getByLabel("Görsel hazırlama", {exact:true});
   const preparedImage = dialog.getByRole("img", {name:"Boş form hazırlanmış görseli",exact:true});
   const processedBefore = savedScan.processedImageRef;
-  await prepare.click();
+  await openTools(); await prepare.click();
   await expect(preparation).toBeVisible();
   await expect(dialog.getByLabel("Alan seç",{exact:true})).toHaveCount(0);
   await expect(page.locator("dialog[open]")).toHaveCount(1);
@@ -446,7 +461,7 @@ try {
   await discardTemplate.click(); await expect(originalImage).toBeVisible();
   await expect(preparedImage).toHaveCount(0);
   // Numeric fallback and footer stay reachable at narrow width and 125% zoom.
-  await prepare.click();
+  await openTools(); await prepare.click();
   await page.setViewportSize({width:390,height:900});
   await page.evaluate(()=>window.printFixture.scale(1.25));
   await cornerX.fill("3");await cornerY.fill("3");
@@ -464,18 +479,18 @@ try {
   await page.keyboard.press("Escape");await page.getByRole("button",{name:"Önizlemeyi aç"}).click();
   await expect(preparedImage).toBeVisible();await expect(prepare).toHaveCount(0);
   await editTemplate.click();
-  await dialog.getByRole("button",{name:"Orijinali göster",exact:true}).click();
+  await openTools(); await dialog.getByRole("button",{name:"Orijinali göster",exact:true}).click();
   await expect(originalImage).toBeVisible();
   await discardTemplate.click();await expect(preparedImage).toBeVisible();
   // Invalid geometry remains in preparation and never creates an asset.
-  await prepare.click();await cornerX.fill("100");
+  await openTools(); await prepare.click();await cornerX.fill("100");
   const callsBeforeInvalid=(await page.evaluate(()=>window.printFixture.processedCalls())).length;
   await dialog.getByRole("button",{name:"Önizle",exact:true}).click();
   await expect(preparation.getByRole("alert")).toContainText("Köşeleri");
   expect((await page.evaluate(()=>window.printFixture.processedCalls())).length).toBe(callsBeforeInvalid);
   await dialog.getByRole("button",{name:"Yerleşime dön",exact:true}).click();
   // Cleanup is explicit: grayscale/threshold never run the worker on slider changes.
-  await prepare.click();
+  await openTools(); await prepare.click();
   await dialog.getByLabel("Gri ton",{exact:true}).check();
   await dialog.getByLabel("Siyah/Beyaz",{exact:true}).check();
   await dialog.getByLabel("Eşik",{exact:true}).focus();
@@ -498,7 +513,7 @@ try {
   expect(monochrome).toBe(true);
   await dialog.getByRole("button",{name:"Yerleşime dön",exact:true}).click();
   // A delayed Apply cannot stage after lock/revoke, even if the same authority returns.
-  await prepare.click();
+  await openTools(); await prepare.click();
   await page.evaluate(()=>window.printFixture.delayProcessed(true));
   const callsBeforeDelayed=(await page.evaluate(()=>window.printFixture.processedCalls())).length;
   await dialog.getByRole("button",{name:"Uygula",exact:true}).click();
@@ -508,29 +523,30 @@ try {
   await page.evaluate(()=>window.printFixture.lock());
   await expect(preparation).toHaveCount(0);
   await page.evaluate(()=>window.printFixture.restore());
-  await expect(prepare).toBeVisible();
+  await openTools(); await expect(prepare).toBeVisible();
   await page.evaluate(()=>{window.printFixture.releaseReads();window.printFixture.delayProcessed(false);});
-  await expect(prepare).toBeEnabled();await expect(saveTemplate).toHaveCount(0);
+  await openTools(); await expect(prepare).toBeEnabled();await expect(saveTemplate).toBeDisabled();
+  await dialog.locator(".print-management__tools-menu summary").click();
   await expect(preparedImage).toBeVisible();
   expect(await page.evaluate(()=>window.printFixture.templates().find(value=>value.documentKind==="sale_receipt").layout.scan)).toEqual(processedScan);
   // Tenant changes while a processed asset is pending also reject late staging.
-  await prepare.click();await page.evaluate(()=>window.printFixture.delayProcessed(true));
+  await openTools(); await prepare.click();await page.evaluate(()=>window.printFixture.delayProcessed(true));
   const callsBeforeTenant=(await page.evaluate(()=>window.printFixture.processedCalls())).length;
   await dialog.getByRole("button",{name:"Uygula",exact:true}).click();
   await expect.poll(async()=>(await page.evaluate(()=>window.printFixture.processedCalls())).length).toBe(callsBeforeTenant+1);
   await page.evaluate(()=>window.printFixture.business("preparation-other-business"));
   await expect(preparation).toHaveCount(0);
   await page.evaluate(()=>{window.printFixture.releaseReads();window.printFixture.delayProcessed(false);});
-  await expect(saveTemplate).toHaveCount(0);
+  await expect(saveTemplate).toBeDisabled();
   await page.evaluate(()=>window.printFixture.business("sample"));
-  await expect(preparedImage).toBeVisible();await expect(saveTemplate).toHaveCount(0);
+  await expect(preparedImage).toBeVisible();await expect(saveTemplate).toBeDisabled();
   await dialog.getByRole("button",{name:"Önizlemeye dön",exact:true}).click();
   const policy = dialog.getByLabel("Yazdırma politikası", { exact: true });
   const event = dialog.getByLabel("Uygulanacak olay", { exact: true });
-  const save = dialog.getByRole("button", { name: "Kuralları kaydet", exact: true });
-  const discard = dialog.getByRole("button", { name: "Kurallardan vazgeç", exact: true });
+  const save = dialog.getByRole("button", { name: "Kaydet", exact: true });
+  const discard = dialog.getByRole("button", { name: "Değişiklikleri geri al", exact: true });
   await dialog.getByRole("button", { name: /Satış fişi/ }).click();
-  await expect(policy).toHaveValue("OFF");
+  await expect(policy).toHaveValue("ASK_CONFIRMATION");
   await event.selectOption("sale_completed");
   await policy.selectOption("AUTOMATIC");
   await expect(save).toBeVisible(); // Dirty state must reach React before close guard is exercised.
@@ -546,11 +562,11 @@ try {
   await expect(policy).toHaveValue("AUTOMATIC");
   await discard.click();
   await expect(policy).toHaveValue("OFF");
-  await expect(save).toHaveCount(0);
+  await expect(save).toBeDisabled();
   await policy.selectOption("AUTOMATIC");
   await save.click();
-  await expect(dialog).toContainText("Ayarlar kaydedildi. Otomasyon çalışmaz");
-  expect(await page.evaluate(() => window.printFixture.saved())).toEqual([{ documentKind: "sale_receipt", trigger: "sale_completed", channel: "print", mode: "AUTOMATIC", adapter: "native_print" }]);
+  await expect(dialog).toContainText("Ayarlar kaydedildi.");
+  expect((await page.evaluate(() => window.printFixture.saved())).filter(rule => rule.trigger === "sale_completed")).toEqual([{ documentKind: "sale_receipt", trigger: "sale_completed", channel: "print", mode: "AUTOMATIC", adapter: "native_print" }]);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Önizlemeyi aç" }).click();
   await event.selectOption("sale_completed");
@@ -558,7 +574,7 @@ try {
   await policy.selectOption("ASK_CONFIRMATION");
   await page.evaluate(() => window.printFixture.failSave(true));
   await save.click();
-  await expect(dialog.getByRole("alert")).toContainText("kaydedilemedi");
+  await expect(dialog.getByRole("alert")).toContainText("Test kayıt hatası");
   await expect(policy).toHaveValue("ASK_CONFIRMATION");
   await expect(save).toBeEnabled();
   await page.evaluate(() => window.printFixture.revoke());
@@ -583,7 +599,9 @@ try {
   await expect(policy).toHaveCount(0); // Late response cannot restore revoked controls.
   await page.evaluate(() => { window.printFixture.delayReads(false); window.printFixture.restore(); });
   await expect(policy).toBeEnabled();
-  await policy.selectOption("ASK_CONFIRMATION");
+  const baselineMode = await policy.inputValue();
+  await policy.selectOption(baselineMode === "OFF" ? "ASK_CONFIRMATION" : "OFF");
+  await expect(save).toBeEnabled();
   const callsBeforeBusinessChange = await page.evaluate(() => window.printFixture.calls().length);
   await page.evaluate(() => window.printFixture.business("other-business"));
   await expect(save).toBeDisabled();
@@ -609,8 +627,8 @@ try {
   await page.goto(`${base}print-shell-test?caps=document.printing,commerce.sales,food_service.orders`);
   await page.getByRole("button",{name:"Önizlemeyi aç"}).click();
   const printerSelect=dialog.getByLabel("Bu cihazın yazıcısı",{exact:true});
-  const savePrinter=dialog.getByRole("button",{name:"Yazıcı ayarlarını kaydet",exact:true});
-  const discardPrinter=dialog.getByRole("button",{name:"Yazıcı ayarlarından vazgeç",exact:true});
+  const savePrinter=dialog.getByRole("button",{name:"Kaydet",exact:true});
+  const discardPrinter=dialog.getByRole("button",{name:"Değişiklikleri geri al",exact:true});
   const refreshPrinters=dialog.getByRole("button",{name:"Yazıcıları yenile",exact:true});
   await expect(printerSelect).toBeEnabled();
   await expect(printerSelect).toHaveValue(""); // Default OS printer is never silently selected.
@@ -622,8 +640,8 @@ try {
   await dialog.getByRole("button",{name:/Satış fişi/}).click();
   await expect(printerSelect).toHaveValue("fixture-desk");
   await dialog.getByLabel("Yazdırma politikası",{exact:true}).selectOption("ASK_CONFIRMATION");
-  await dialog.getByRole("button",{name:"Kuralları ve yazıcıyı kaydet",exact:true}).click();
-  await expect(savePrinter).toHaveCount(0);
+  await dialog.getByRole("button",{name:"Kaydet",exact:true}).click();
+  await expect(savePrinter).toBeDisabled();
   expect((await page.evaluate(()=>window.printFixture.bindings())).length).toBe(2);
   await page.keyboard.press("Escape");
   await page.getByRole("button",{name:"Önizlemeyi aç"}).click();
@@ -669,19 +687,153 @@ try {
   const legacy = await page.evaluate(()=>window.printFixture.templates()[0]);
   expect(legacy.revision).toBe(2);expect(legacy.layout.lineBlock).toBeNull();
   await editTemplate.click();
-  await dialog.getByRole("button",{name:"Ürün satırlarını ekle",exact:true}).click();
+  await openTools(); await dialog.getByRole("button",{name:"Ürün satırlarını ekle",exact:true}).click();
   await expect(dialog.locator(".print-management__row-field")).toHaveCount(9);
   expect((await page.evaluate(()=>window.printFixture.templates()[0])).revision).toBe(2);
   await discardTemplate.click();
   await expect(dialog).toContainText("Bu şablonda ürün satırları yok");
-  await dialog.getByRole("button",{name:"Ürün satırlarını ekle",exact:true}).click();
+  await openTools(); await dialog.getByRole("button",{name:"Ürün satırlarını ekle",exact:true}).click();
   await saveTemplate.click();
-  await expect(saveTemplate).toHaveCount(0);
+  await expect(saveTemplate).toBeDisabled();
   const repaired = await page.evaluate(()=>window.printFixture.templates()[0]);
   expect(repaired.revision).toBe(3);expect(repaired.layout.lineBlock.fields.map(field=>field.binding)).toEqual(["line.description","line.quantity","line.total"]);
   expect({...repaired.layout,lineBlock:null}).toEqual(legacy.layout);
+  // Unified footer: all three owners participate, failure retains only the
+  // unacknowledged drafts, and a retry cannot create duplicate template revisions.
+  await page.goto(`${base}print-shell-test?caps=document.printing,commerce.sales,service.whatsapp&readyJob=1`);
+  await page.getByRole("button", {name:"Önizlemeyi aç"}).click();
+  const footer = dialog.locator(".workspace-frame__footer");
+  const commonSave = footer.getByRole("button", {name:"Kaydet",exact:true});
+  const commonDiscard = footer.getByRole("button", {name:"Değişiklikleri geri al",exact:true});
+  const close = dialog.getByRole("button", {name:"Çalışma alanını kapat",exact:true});
+  await expect(footer.locator("button")).toHaveCount(2);
+  await expect(commonSave).toBeDisabled();
+  await expect(commonDiscard).toBeDisabled();
+  await expect(close).toBeEnabled();
+  await editTemplate.click();
+  await dialog.getByLabel("X (mm)",{exact:true}).fill("6");
+  await policy.selectOption("ASK_CONFIRMATION");
+  await printerSelect.selectOption("fixture-desk");
+  await expect(commonSave).toBeEnabled();
+  await expect(close).toBeDisabled();
+  expect(await page.evaluate(()=>window.printFixture.mutations())).toEqual([]);
+  await commonDiscard.click();
+  await expect(dialog.getByLabel("X (mm)",{exact:true})).toHaveValue("3");
+  await expect(policy).toHaveValue("OFF");
+  await expect(printerSelect).toHaveValue("");
+  await expect(close).toBeEnabled();
+  expect(await page.evaluate(()=>window.printFixture.mutations())).toEqual([]);
+  await dialog.getByLabel("X (mm)",{exact:true}).fill("6");
+  await policy.selectOption("ASK_CONFIRMATION");
+  await printerSelect.selectOption("fixture-desk");
+  await page.evaluate(()=>window.printFixture.failOwner("printer"));
+  await commonSave.click();
+  await expect(footer.getByRole("alert")).toContainText("Yazıcı ayarı kaydedilemedi");
+  await expect(footer).toContainText("kalan taslakları kontrol edin");
+  await expect(commonSave).toBeEnabled();
+  await expect(close).toBeDisabled();
+  expect((await page.evaluate(()=>window.printFixture.templates()))[0].revision).toBe(1);
+  expect(await page.evaluate(()=>window.printFixture.saved())).toHaveLength(1);
+  expect(await page.evaluate(()=>window.printFixture.bindings())).toEqual([]);
+  await expect(printerSelect).toHaveValue("fixture-desk");
+  await page.evaluate(()=>window.printFixture.failOwner(null));
+  await commonSave.click();
+  await expect(commonSave).toBeDisabled();
+  await expect(commonDiscard).toBeDisabled();
+  await expect(close).toBeEnabled();
+  expect((await page.evaluate(()=>window.printFixture.templates()))[0].revision).toBe(1);
+  expect(await page.evaluate(()=>window.printFixture.mutations())).toEqual(["template","rule","printer","printer"]);
+  expect(await page.evaluate(()=>window.printFixture.outputCalls())).toEqual({printCalls:0,previewCalls:0});
+  // Busy guards and duplicate click: only one awaited request per owner.
+  await dialog.getByLabel("Alan seç",{exact:true}).selectOption("0");
+  // First field already spans the page width, so its X coordinate is
+  // correctly clamped. Move Y instead to stage a real layout change.
+  const yBeforeQueuedSave = Number(await dialog.getByLabel("Y (mm)",{exact:true}).inputValue());
+  const targetY = yBeforeQueuedSave === 8 ? 9 : 8;
+  await dialog.getByLabel("Y (mm)",{exact:true}).fill(String(targetY));
+  await expect.poll(async()=>dialog.locator(".print-management__field").first().evaluate(node=>parseFloat(node.style.top))).toBeCloseTo(targetY / 160 * 100,1);
+  await policy.selectOption("AUTOMATIC");
+  await printerSelect.selectOption("fixture-kitchen");
+  await page.evaluate(()=>window.printFixture.delayWrites(true));
+  await commonSave.click();
+  await expect(footer.locator('button[aria-busy="true"]')).toBeDisabled();
+  await expect(commonDiscard).toBeDisabled();
+  await expect(close).toBeDisabled();
+  await expect(policy).toBeDisabled();
+  await expect(dialog.getByLabel("X (mm)",{exact:true})).toBeDisabled();
+  await page.keyboard.press("Escape");await expect(dialog).toBeVisible();
+  await footer.locator('button[aria-busy="true"]').evaluate(node=>node.click());
+  for (const count of [6,7]) {
+    await page.evaluate(()=>window.printFixture.releaseWrite());
+    await expect.poll(async()=>(await page.evaluate(()=>window.printFixture.mutations())).length).toBe(count);
+  }
+  await page.evaluate(()=>{window.printFixture.delayWrites(false);window.printFixture.releaseWrite();});
+  await expect(commonSave).toBeDisabled();
+  await expect(close).toBeEnabled();
+  expect((await page.evaluate(()=>window.printFixture.templates()))[0].revision).toBe(2);
+  expect(await page.evaluate(()=>window.printFixture.mutations())).toEqual(["template","rule","printer","printer","template","rule","printer"]);
+  // Save remains configuration-only; only an explicit ready-job action prints.
+  const jobs = dialog.getByRole("region", {name:"Hazır belgeler"});
+  await jobs.getByRole("button",{name:"Önizle",exact:true}).click();
+  expect(await page.evaluate(()=>window.printFixture.outputCalls())).toEqual({printCalls:0,previewCalls:1});
+  await jobs.getByRole("button",{name:"Yazdır",exact:true}).click();
+  await expect(dialog).toContainText("yazdırma kuyruğuna alındı");
+  await expect(jobs).toHaveCount(0);
+  expect(await page.evaluate(()=>window.printFixture.outputCalls())).toEqual({printCalls:1,previewCalls:1});
+  await dialog.getByRole("button",{name:"Önizlemeye dön",exact:true}).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button",{name:"Önizlemeyi aç"}).click();
+  await expect(policy).toHaveValue("AUTOMATIC");
+  await expect(printerSelect).toHaveValue("fixture-kitchen");
+  await expect(dialog.locator(".print-management__preview input, .print-management__preview select")).toHaveCount(0);
+  // Measured layout/fit and footer reachability at desktop, laptop, mobile and UI zoom.
+  for (const [width,height,zoom] of [[1920,1080,1],[1366,768,1],[1366,768,1.25],[768,768,1],[390,768,1],[390,768,1.25]]) {
+    await page.setViewportSize({width,height});
+    await page.evaluate(value=>window.printFixture.scale(value),zoom);
+    await expect(dialog).toHaveClass(/workspace-frame--centered/);
+    await expect(commonSave).toBeInViewport({ratio:1});
+    await expect(commonDiscard).toBeInViewport({ratio:1});
+    await expect.poll(async()=>dialog.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const bounds = await dialog.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x+bounds.width).toBeLessThanOrEqual(width+1);
+    expect(bounds.y+bounds.height).toBeLessThanOrEqual(height+1);
+    if (zoom === 1 && width >= 1366) {
+      expect(bounds.width).toBeGreaterThanOrEqual(1200);
+      expect(bounds.width).toBeLessThanOrEqual(1300);
+      const [list,preview,config] = await Promise.all(["documents","preview","configuration"].map(part=>dialog.locator(`.print-management__${part}`).boundingBox()));
+      expect(Math.abs(list.y-preview.y)).toBeLessThan(2);
+      expect(Math.abs(config.y-preview.y)).toBeLessThan(2);
+      expect(list.x+list.width).toBeLessThanOrEqual(preview.x+1);
+      expect(preview.x+preview.width).toBeLessThanOrEqual(config.x+1);
+    }
+    for (const editing of [false,true]) {
+      if (editing) await editTemplate.click();
+      await dialog.getByRole("button",{name:"Sığdır",exact:true}).click();
+      await expect.poll(async()=>dialog.locator(".print-management__editor-body > .print-management__canvas").evaluate(node=>node.scrollHeight<=node.clientHeight+2 && node.scrollWidth<=node.clientWidth+2)).toBe(true);
+      const paper = await dialog.locator(".print-management__paper").boundingBox();
+      expect(paper.width/paper.height).toBeCloseTo(.5,2);
+      if (editing) {
+        // For overlapping fields, the inspector selects the intended layer
+        // before its document target is brought forward for direct interaction.
+        await dialog.getByLabel("Alan seç",{exact:true}).selectOption("1");
+        const second=dialog.getByRole("button",{name:"Belge numarası alanı 2",exact:true});
+        await second.click();
+        await expect(dialog.getByLabel("Seçili alan türü",{exact:true})).toHaveValue("document.number");
+        await expect(dialog.getByLabel("Alan seç",{exact:true})).toHaveValue("1");
+      }
+      if (screenshots) {
+        const directory=resolve("artifacts/print-management");await mkdir(directory,{recursive:true});
+        await page.screenshot({path:resolve(directory,`${width}x${height}-${zoom}-${editing?"edit":"preview"}.png`)});
+      }
+      if (editing) await dialog.getByRole("button",{name:"Önizlemeye dön",exact:true}).click();
+    }
+  }
+  await expect(dialog).not.toContainText("Politikalar yalnız gelecekteki");
+  await expect(dialog).not.toContainText("Yazıcı seçimi bu cihaza kaydedilir");
   expect(errors).toEqual([]);
-  console.log("Print management UI: Settings persistence/search/focus, filtering, revocation, sample switching, rule persistence/discard/failure, lock/revocation/stale reads and responsive checks passed.");
+  console.log("Print management UI: Settings/search/focus, capabilities, selected geometry/pointer/mm buffer, scans/worker, unified draft save/discard/partial failure/retry/busy guard, explicit print queue, centered three panels, fit and responsive zoom passed.");
   }
 } finally {
   await browser?.close();

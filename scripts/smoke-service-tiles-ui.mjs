@@ -3,7 +3,7 @@ import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
-import { openSettingsService, cancelSettingsService } from "./test-helpers/settings-ui.mjs";
+import { expandSettingsStructure, openSettingsService, cancelSettingsService } from "./test-helpers/settings-ui.mjs";
 
 const server = await createServer({ root: resolve("apps/desktop-app"), configFile: resolve("apps/desktop-app/vite.renderer.config.ts"),
   server: { port: 0, strictPort: false }, logLevel: "error" });
@@ -21,7 +21,7 @@ try {
   }
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
   await page.goto(`${server.resolvedUrls.local[0]}service-tiles-test?profile=market&webVisibility=on`);
-  await page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ }).click();
+  await expandSettingsStructure(page);
   const tile = id => page.locator(`#settings-${id}`);
   const dialog = page.locator(".settings-service-overlay");
   for (const id of ["translation", "dictation", "whatsapp"]) {

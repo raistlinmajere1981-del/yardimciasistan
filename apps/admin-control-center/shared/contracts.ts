@@ -324,6 +324,7 @@ export type EffectImageTarget = {
   hasScene: boolean;
   canPublish: boolean;
   canPrepare?: boolean;
+  siteSource?: boolean;
   kind?: EffectTargetKind;
   note: string;
   bindingStatus?: "linked" | "needs-setup" | "staged";
@@ -369,6 +370,13 @@ export function deployTargetScopeNote(targetId: string): string {
   return DEPLOY_TARGET_SCOPE_NOTES[targetId] ?? "";
 }
 
+/** Explicit, reviewed V2 source and existing deployment target. This is not
+ * a general image-site publish mapping; only the dedicated V2 flow may use it. */
+export const BIRDESENGOR_EFFECT_SCENE_ID = "birdesengor:scene_v2";
+export const BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID = "birdesengor-effects-v2";
+export type BirdesengorEffectPreflight = { ok: true; token: string; sourceHash: string;
+  changed: boolean; message: string; readiness: EffectReadiness };
+
 export type EffectImageScene = {
   format: string;
   version: number;
@@ -390,16 +398,21 @@ export type EffectObjectScene = {
   effects: unknown[];
 };
 export type EffectScene = EffectImageScene | EffectObjectScene;
-export type EffectStudioLoad = { scene: EffectScene; source: "draft" | "installed" | "new" };
-export type EffectStudioSave = { ok: boolean; message: string; effectCount: number };
-export type EffectStudioPublish = { ok: boolean; message: string; siteUrl: string };
+export type EffectReadiness = { ready: boolean; effectCount: number; enabledCount: number; mountedCount: number; problems: string[] };
+export type EffectStudioLoad = { scene: EffectScene; source: "draft" | "installed" | "new"; message?: string;
+  sourceHash?: string; previewImage?: string; siteSource?: boolean; readiness?: EffectReadiness };
+export type EffectStudioSave = { ok: boolean; message: string; effectCount: number; readiness?: EffectReadiness };
+export type EffectStudioPublish = { ok: boolean; message: string; siteUrl: string; sourceHash?: string; readiness?: EffectReadiness };
 
 export type AdminBridge = {
   listEffectProjects(): Promise<EffectStudioProject[]>;
   loadEffectScene(id: string): Promise<EffectStudioLoad>;
-  saveEffectScene(id: string, scene: EffectScene): Promise<EffectStudioSave>;
+  saveEffectScene(id: string, scene: EffectScene, sourceHash?: string): Promise<EffectStudioSave>;
   publishEffectScene(id: string): Promise<EffectStudioPublish>;
   prepareEffectScene(id: string): Promise<EffectStudioPublish>;
+  preflightBirdesengorEffect(id: string): Promise<BirdesengorEffectPreflight>;
+  cancelBirdesengorEffect(): Promise<boolean>;
+  deployBirdesengorEffect(id: string, token: string): Promise<{ ok: true; siteUrl: string; message: string }>;
   getOverview(): Promise<OverviewSnapshot>;
   getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
   syncInstallationCredential(installationId: string): Promise<{ ok: boolean; changed: boolean; verifiedLive: boolean; message: string }>;

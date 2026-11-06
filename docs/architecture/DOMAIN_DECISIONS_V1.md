@@ -1718,6 +1718,14 @@ presentation. OFF retains translations and withdraws language metadata through t
 same ordered publication lifecycle. Current schema only; no historical upgrade path.
 
 Normal Settings saves opt into automatic preparation with language selection only.
+The desktop translation worker groups the initial backlog into bounded, deduplicated
+multi-text AI requests; later small edits remain sequential. Each returned field is
+validated separately before hash/manual ownership checks and a transactional batch
+write. Provider rate limits and quota exhaustion suspend work without marking
+untouched fields failed; the per-business queue, retry deadline and pause state
+persist in SQLite and may be resumed safely after restart. Batch writes coalesce
+publication outbox invalidation by publication type; publication and sites remain
+unaware of translation request grouping.
 The shared language registry owns names, locale and writing direction; sites consume
 its published projection. The source manifest is scoped to business/publication target;
 per-key hash agreement is required before a site applies a translated catalog entry.

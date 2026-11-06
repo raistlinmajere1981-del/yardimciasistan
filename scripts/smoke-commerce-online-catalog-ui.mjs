@@ -11,6 +11,8 @@ import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts, getRuntimeInventoryBalance, listRuntimeInventoryMovements, setRuntimeInventoryCount } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { prepareProductDetailsSave, saveProductDetails } = require("../apps/desktop-app/dist-electron/commerce-product-save.js");
+const { listProductPhotos } = require("../apps/desktop-app/dist-electron/product-photo-store.js");
 const { applyBusinessProfileCapabilities } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const { toggleBusinessProfileOption } = require("../packages/shared/dist");
 const root = mkdtempSync(join(tmpdir(), "ya-online-catalog-ui-"));
@@ -52,7 +54,15 @@ try {
   let publicationReads = 0;
   const createdProducts = [];
   let failSave = false;
-  await page.exposeFunction("__publicationCall", (method, input) => {
+  await page.exposeFunction("__publicationCall", async (method, input) => {
+    if (method === "photos") return listProductPhotos(database.databasePath, input);
+    if (method === "details") {
+      saves++;
+      if (failSave) throw new Error("Fixture publication failure");
+      const result = saveProductDetails(database.databasePath, await prepareProductDetailsSave(database.databasePath, input));
+      if (!input.product.id) createdProducts.push(result.product);
+      return result;
+    }
     if (method === "create") { const saved = saveRuntimeCatalogProduct(database.databasePath, input); createdProducts.push(saved); return saved; }
     if (method === "list") return listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "get") { publicationReads++; return database.getCommerceProductPublication(input); }
@@ -69,6 +79,8 @@ try {
     window.yardimciDesktop = { commerce: {
       listProducts: input => window.__publicationCall("list", input),
       saveProduct: (input) => window.__publicationCall("create", input),
+      saveProductDetails: input => window.__publicationCall("details", input),
+      listProductPhotos: id => window.__publicationCall("photos", id),
       getProductPublication: (id) => window.__publicationCall("get", id),
       saveProductPublication: (input) => window.__publicationCall("save", input)
     } };
@@ -88,14 +100,20 @@ try {
   await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   await expect(checkbox).toBeChecked();
   failSave = true;
-  await checkbox.click();
-  await expect(page.getByRole("status").filter({ hasText: "Web yayın tercihi kaydedilemedi" })).toBeVisible();
-  await expect(checkbox).toBeChecked();
-  assert.equal(database.getCommerceProductPublication(product.id).isPublished, true);
-  failSave = false;
+  const beforePublicationDraft = saves;
   await checkbox.click();
   await expect(checkbox).not.toBeChecked();
-  await expect.poll(() => database.getCommerceProductPublication(product.id).isPublished).toBe(false);
+  assert.equal(saves, beforePublicationDraft, "publication checkbox stages locally");
+  await page.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Fixture publication failure");
+  await expect(checkbox).not.toBeChecked();
+  assert.equal(database.getCommerceProductPublication(product.id).isPublished, true);
+  failSave = false;
+  await page.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(checkbox).toHaveCount(0);
+  await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
+  await expect(checkbox).not.toBeChecked();
+  assert.equal(database.getCommerceProductPublication(product.id).isPublished, false);
   // Persisted online-sales selection alone must not expose publication controls.
   const beforeWebOff = { saves, publicationReads };
   const disconnected = database.saveInitialSetup(createSmokeSetupInput({ ...database.getSetupData(), webModuleUrl: "", syncSecret: "", autoSyncEnabled: false }));
@@ -162,7 +180,7 @@ try {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Exercise the real detail editor against the same temporary database. Counting
-  // inventory and saving a product remain independent operations after regrouping.
+  // inventory and product edits commit together through the footer Save.
   selectOnlineSales(true);
   const stockProduct = saveRuntimeCatalogProduct(database.databasePath, {
     name: "Hybrid stock product", salePrice: 25, purchasePrice: 10, trackInventory: true,
@@ -173,9 +191,10 @@ try {
   const detailPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await detailPage.addInitScript(setup => { window.__setup = setup; }, database.getSetupData());
   detailPage.on("pageerror", error => errors.push(error.message));
-  await detailPage.exposeFunction("__detailCall", (method, input) => {
+  await detailPage.exposeFunction("__detailCall", async (method, input) => {
     detailCalls.push(method);
-    if (method === "save") return saveRuntimeCatalogProduct(database.databasePath, input);
+    if (method === "save") return saveProductDetails(database.databasePath, await prepareProductDetailsSave(database.databasePath, input));
+    if (method === "photos") return { ...listProductPhotos(database.databasePath, input), sourceUrl: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>') };
     if (method === "list") return listRuntimeCatalogProducts(database.databasePath, input);
     if (method === "balance") return getRuntimeInventoryBalance(database.databasePath, input);
     if (method === "movements") return listRuntimeInventoryMovements(database.databasePath, input);
@@ -189,13 +208,13 @@ try {
     window.__inventoryEnabled = true;
     window.yardimciDesktop = { commerce: {
       listProducts: input => window.__detailCall("list", input),
-      saveProduct: input => window.__detailCall("save", input),
+      saveProductDetails: input => window.__detailCall("save", input),
       getInventoryBalance: id => window.__detailCall("balance", id),
       listInventoryMovements: input => window.__detailCall("movements", input),
       setInventoryCount: input => window.__detailCall("count", input),
       getProductPublication: id => window.__detailCall("publication", id),
       saveProductPublication: input => window.__detailCall("publish", input),
-      listProductPhotos: async id => ({productId:id,revision:"fixture-photo-revision",photos:[{id:"fixture-photo",format:"image/png"}],sourceUrl:"",sourceLicense:""}),
+      listProductPhotos: id => window.__detailCall("photos", id),
       previewProductPhoto: async () => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>'),
       getProductImageDataUrl: async () => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>')
     } };
@@ -214,8 +233,8 @@ try {
   const railScroll = await rail.evaluate(element => element.scrollTop);
   await fields.getByRole("textbox", { name: "Açıklama", exact: true }).scrollIntoViewIfNeeded();
   assert.equal(await rail.evaluate(element => element.scrollTop), railScroll, "Product fields scroll independently of operations.");
-  await rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).scrollIntoViewIfNeeded();
-  await expect(rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true })).toBeInViewport();
+  await rail.getByRole("button", { name: "Stok taslağını temizle", exact: true }).scrollIntoViewIfNeeded();
+  await expect(rail.getByRole("button", { name: "Stok taslağını temizle", exact: true })).toBeInViewport();
   for (const name of ["Aktif ürün", "Stok takibi", "Hızlı erişim", "Web satışında yayınla"]) {
     await rail.getByRole("checkbox", { name, exact: true }).scrollIntoViewIfNeeded();
     await expect(rail.getByRole("checkbox", { name, exact: true })).toBeInViewport();
@@ -236,18 +255,14 @@ try {
   }
   await rail.getByLabel("Stok işlemi", { exact: true }).selectOption("count");
   await rail.getByLabel("Stok işlem miktarı", { exact: true }).fill("12");
-  await expect(fields.getByLabel("Ürün adı", { exact: true })).toBeDisabled();
-  await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
+  await expect(fields.getByLabel("Ürün adı", { exact: true })).toBeEnabled();
+  await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeEnabled();
   await expect(detail.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
-  await rail.getByRole("button", { name: "Stok İşlemini Onayla", exact: true }).click();
-  await expect(detailPage.getByRole("dialog")).toHaveCount(1);
-  await rail.getByRole("button", { name: "Stok Hareketini Kaydet", exact: true }).click();
-  await expect(rail.getByRole("status").filter({ hasText: "Fiziksel sayım kaydedildi." })).toBeVisible();
-  assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 10);
   assert.equal(detailCalls.filter(method => method === "save").length, 0);
   await fields.getByLabel("Ürün adı", { exact: true }).fill("Hybrid saved product");
-  await expect(rail.getByLabel("Stok işlem miktarı", { exact: true })).toBeDisabled();
-  await expect(detail.getByRole("button", { name: "Stok Hareketleri", exact: true })).toBeDisabled();
+  await expect(rail.getByLabel("Stok işlem miktarı", { exact: true })).toBeEnabled();
+  await expect(detail.getByRole("button", { name: "Stok Hareketleri", exact: true })).toBeEnabled();
   await detail.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(detail).toHaveCount(0);
   await detailPage.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
@@ -255,7 +270,8 @@ try {
   await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
   assert.equal(listRuntimeCatalogProducts(database.databasePath).items.find(product => product.id === stockProduct.id).name, "Hybrid saved product");
   assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
-  assert.equal(detailCalls.filter(method => method === "count").length, 1);
+  assert.equal(detailCalls.filter(method => method === "count").length, 0);
+  assert.equal(detailCalls.filter(method => method === "save").length, 1);
   await fields.getByLabel("Ürün adı", { exact: true }).fill("Discard this draft");
   await detail.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
   await expect(fields.getByLabel("Ürün adı", { exact: true })).toHaveValue("Hybrid saved product");
@@ -289,6 +305,9 @@ try {
   await expect(checkbox).toBeEnabled();
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();
+  assert.equal(database.getCommerceProductPublication(menuProductId).isPublished, false);
+  await page.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect.poll(() => database.createCommerceOnlineCatalog().products.some(item => item.productId === menuProductId)).toBe(true);
   assert.equal(listRuntimeCatalogProducts(database.databasePath).items.length, countBeforePublish, "Menu publication must not insert another product row");
   selectOnlineSales(false);

@@ -297,32 +297,19 @@ git-ignored Gradle properties ister. Keystore kurulumu, sürüm artırma, USB
 debugging gerektirmeyen APK kurulumu ve Play checklist'i
 [`docs/ANDROID_DISTRIBUTION.md`](../../docs/ANDROID_DISTRIBUTION.md) içindedir.
 
-Canlı bağlantı değerlerini her APK güncellemesinde yeniden girmemek için bir kez
-yerel derleme yapılandırmasını oluşturun:
+Android debug ve release APK'ları işletmeden bağımsız derlenir. Web modülü adresi
+ve paylaşılan güvenlik anahtarı APK içine gömülmez. Masaüstü uygulamasında
+**Ayarlar → Android → Telefon eşleştir · QR göster** ile Companion'ı eşleştirin.
+Telefon QR üzerinden bağlantı bilgilerini ve cihaz yetkilerini güvenli olarak edinir.
 
-```bash
-YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL="https://yardimciasistan.alwaysdata.net/yardimci-asistan" \
-YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET="üretim-sync-anahtarı" \
-npm run configure:android:connection
-```
+Önceki sürümlerden kalma `apps/android-app/connection.local.json` ve
+`YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET` derleme ayarları artık kullanılmaz.
+`npm run android:install` kurulum öncesinde anahtarın canlı hostla eşleşmesini
+değil, üretilen APK'nın işletme anahtarı ve adresi içermediğini doğrular.
+Genel dağıtım ve geliştirme için aynı kimlikten bağımsız APK kullanılır.
 
-Komut `apps/android-app/connection.local.json` dosyasını `0600` izinle oluşturur.
-Dosya git tarafından yok sayılır; sonraki derlemeler URL ve anahtarı APK içine sabit
-olarak gömer. Tasarım süresince hem URL hem anahtar gömülüyse APK `embedded connection
-locked` modunda üretilir. Bu mod her normal uygulama açılışında gömülü değerleri yeniden
-uygular; eski geliştirme adresleri ve normal APK güncellemelerinden kalan ayarlar bağlantıyı
-değiştiremez. Ayarlar ekranı bağlantının APK içinde hazır olduğunu salt okunur gösterir.
-ADB smoke testleri açıkça işaretlenmiş geçici debug bağlantısıyla çalışır ve test sonunda
-gömülü bağlantıyı geri yükler. UI testi temiz başlangıç hazırlarken uygulama önbelleğini
-ve test verilerini sıfırlar ancak kalıcı telefon kimliğini korur. Test kurucusu imza
-uyumsuzluğu görürse uygulamayı otomatik kaldırmaz; veri kaybını önlemek için hata verir.
-
-Web'e dağıtılacak son APK hazırlanırken `connection.local.json` kaldırılmalı, bağlantı
-ortam değişkenleri temizlenmeli ve APK yeniden üretilmelidir. Build çıktısında
-`android-connection-mode: editable connection` görülmeden genel dağıtım yapılmamalıdır.
-
-APK içine gömülen bir anahtar tersine mühendislikle çıkarılabilir. APK işletme dışına
-dağıtılırsa hosting anahtarını döndürün ve yeni APK yayınlayın.
+Test sırasında telefonun mevcut eşleşmesi korunur; sıfırdan başlamak için
+masaüstünde yeni QR eşleştirmesi başlatılabilir.
 
 Çıktılar:
 

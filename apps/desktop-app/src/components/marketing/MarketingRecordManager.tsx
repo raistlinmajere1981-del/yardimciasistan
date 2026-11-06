@@ -2,7 +2,7 @@ import { Image } from "lucide-react";
 import type { MarketingContentDetail, MarketingPublication, MarketingStudioSnapshot } from "@yardimci-asistan/shared";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { ActionButton } from "../ui/ActionButton";
-import { channelNames } from "./share-draft";
+import { channelNames, marketingDisplayTitle } from "./share-draft";
 
 export function publicationLabel(p: MarketingPublication) {
   if (p.channel === "website" && p.status === "publishing") return p.desiredPublished ? p.publishedAt ? "Güncelleme onayı bekleniyor" : "Yayın onayı bekleniyor" : "Kaldırma onayı bekleniyor";
@@ -22,8 +22,8 @@ export function MarketingRecordManager({kind, snapshot, publications, contents, 
     className="marketing-workspace-frame marketing-records-workspace" presentation="centered" onClose={onClose}
     footer={<ActionButton variant="secondary" onClick={onClose}>Kapat</ActionButton>}>
     <section className="marketing-records-list" aria-label="Kayıtlar">
-      {publications.map(item => <button className="marketing-record" key={item.id} type="button" onClick={() => onEditPublication(item)}><MarketingThumbnail snapshot={snapshot} ids={item.mediaAssetIds}/><span><strong>{item.title}</strong><small>{channelNames[item.channel]} · {publicationLabel(item)}</small></span></button>)}
-      {contents.map(item => <button className="marketing-record" key={item.content.id} type="button" onClick={() => onEditContent(item.content.id)}><MarketingThumbnail snapshot={snapshot} ids={item.media.map(m => m.mediaAssetId)}/><span><strong>{item.content.title}</strong><small>Son düzenleme: {new Date(item.content.updatedAt).toLocaleDateString("tr-TR")}</small></span></button>)}
+      {publications.map(item => <button className="marketing-record" key={item.id} type="button" onClick={() => onEditPublication(item)}><MarketingThumbnail snapshot={snapshot} ids={item.mediaAssetIds}/><span><strong>{marketingDisplayTitle(item.title, item.text, item.mediaAssetIds.length)}</strong><small>{channelNames[item.channel]} · {publicationLabel(item)}</small></span></button>)}
+      {contents.map(item => <button className="marketing-record" key={item.content.id} type="button" onClick={() => onEditContent(item.content.id)}><MarketingThumbnail snapshot={snapshot} ids={item.media.map(m => m.mediaAssetId)}/><span><strong>{marketingDisplayTitle(item.content.title, item.content.masterText, item.media.length)}</strong><small>Son düzenleme: {new Date(item.content.updatedAt).toLocaleDateString("tr-TR")}</small></span></button>)}
       {!publications.length && !contents.length && <p className="muted">Henüz içerik yok.</p>}
     </section>
   </WorkspaceFrame>;

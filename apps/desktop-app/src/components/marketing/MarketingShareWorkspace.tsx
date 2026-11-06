@@ -186,8 +186,15 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     await onReload();
   });}
   const textFor = (channel: MarketingChannel) => editingPublication ? draft.content.masterText : draft.content.variants.find(v => v.channel === channel)?.text.trim() || draft.content.masterText;
+  const channelHasContent = (channel: MarketingChannel) => {
+    if (channel === "sms") return Boolean(textFor(channel).trim());
+    if (channel === "whatsapp") return Boolean(draft.options.whatsapp.templateName.trim());
+    const variant = draft.content.variants.find(v => v.channel === channel);
+    const hasImage = channel === "instagram" ? Boolean(variant?.mediaAssetId || draft.content.mediaAssetIds[0]) : draft.content.mediaAssetIds.length > 0;
+    return Boolean(draft.content.title.trim() || variant?.title?.trim() || textFor(channel).trim() || hasImage);
+  };
   const readiness = [
-    {label: "Başlık ve metin", ready: Boolean(draft.content.title.trim()) && draft.options.channels.every(c => c === "whatsapp" || Boolean(textFor(c).trim()))},
+    {label: "Paylaşım içeriği", ready: draft.options.channels.length > 0 && draft.options.channels.every(channelHasContent)},
     {label: "Kanal seçimi", ready: draft.options.channels.length > 0 && draft.options.channels.every(id => channels.some(c => c.id === id))},
     {label: "Instagram görseli / metni", ready: !draft.options.channels.includes("instagram") || Boolean(draft.content.variants.find(v => v.channel === "instagram")?.mediaAssetId || draft.content.mediaAssetIds[0]) && textFor("instagram").length <= 2200},
     {label: "SMS metni · 160 karakter", ready: !draft.options.channels.includes("sms") || Boolean(textFor("sms").trim()) && textFor("sms").length <= 160},
@@ -211,7 +218,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   return <WorkspaceFrame {...(returnFocusRef === undefined ? {} : {returnFocusRef})} presentation="centered" className="marketing-workspace-frame detail-workspace-frame marketing-share-workspace" title={pub ? editingPublication ? "Web içeriğini düzenle" : "Paylaşım detayı" : readOnly ? "Paylaşım detayı" : initial ? "Paylaşımı düzenle" : "Yeni paylaşım oluştur"}
     context={readOnly ? <span className="marketing-actions">{channelNames[selectedChannel]}<StatusBadge tone={statusTone(selectedChannel)}>{statusFor(selectedChannel)}</StatusBadge></span> : pub ? "Web içeriğini düzenle" : "İçeriği hazırlayın · araçlar gerektiğinde açılır"} onClose={() => close()} closeBlocked={busy}
     footer={<><span className="muted">{busy ? "İşlem sürüyor…" : planDirty ? "Kaydedilmemiş plan değişiklikleri" : readOnly ? "Salt okunur" : dirty ? "Kaydedilmemiş değişiklikler" : "Taslak"}</span><div className="marketing-actions">
-      {!readOnly && <ActionButton variant="secondary" disabled={locked || !draft.content.title.trim()} onClick={() => void saveDraft()}>{pub ? "Değişiklikleri kaydet" : "Taslak kaydet"}</ActionButton>}
+      {!readOnly && <ActionButton variant="secondary" disabled={locked} onClick={() => void saveDraft()}>{pub ? "Değişiklikleri kaydet" : "Taslak kaydet"}</ActionButton>}
       {!readOnly && <ActionButton disabled={busy || Boolean(pane) || (!submitted && !readiness.every(r => r.ready)) || (!webAvailable && draft.options.channels.includes("website")) || Boolean(pub && !pub.desiredPublished && dirty)} onClick={() => void (pub?.desiredPublished ? saveDraft() : submit())}><Send size={16}/>{primary}</ActionButton>}
       {editingPublication && <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => close(() => {setDraft(displayedPublicationDraft()); setBaseline(JSON.stringify(displayedPublicationDraft())); setEditingPublication(false);})}>Vazgeç</ActionButton>}
       {readOnly && <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => close()}>Kapat</ActionButton>}
@@ -236,15 +243,15 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
       <div className="marketing-share-columns">
       <div className="form-stack">
         {readOnly ? <>
-          <Panel as="section" className="form-stack marketing-share-section" aria-label="İçerik"><h3>İçerik</h3><div className="marketing-detail-overview"><div className="marketing-detail-cover"><MarketingCover snapshot={snapshot} ids={displayedDraft.content.mediaAssetIds}/></div><div className="marketing-detail-identity"><strong className="marketing-detail-title">{displayedDraft.content.title}</strong><small>{channelNames[selectedChannel]}</small></div></div>
+          <Panel as="section" className="form-stack marketing-share-section" aria-label="İçerik"><h3>İçerik</h3><div className="marketing-detail-overview"><div className="marketing-detail-cover"><MarketingCover snapshot={snapshot} ids={displayedDraft.content.mediaAssetIds}/></div><div className="marketing-detail-identity">{displayedDraft.content.title && <strong className="marketing-detail-title">{displayedDraft.content.title}</strong>}<small>{channelNames[selectedChannel]}</small></div></div>
             {displayedDraft.content.mediaAssetIds.length > 1 && <div className="marketing-detail-gallery" aria-label="Paylaşım görsel galerisi">{displayedDraft.content.mediaAssetIds.slice(1).map(id => {const asset = snapshot.assets.find(a => a.id === id); return asset && <img key={id} src={asset.previewUrl} alt={asset.altText || "Paylaşım görseli"}/>;})}</div>}
-            <p className="marketing-detail-text">{selectedChannel === "whatsapp" && campaignDetail ? `Onaylı şablon: ${campaignDetail.campaign.templateName} · ${campaignDetail.campaign.templateLanguage}` : displayedDraft.content.masterText || "Metin girilmedi."}</p>
+            {(selectedChannel === "whatsapp" && campaignDetail || displayedDraft.content.masterText) && <p className="marketing-detail-text">{selectedChannel === "whatsapp" && campaignDetail ? `Onaylı şablon: ${campaignDetail.campaign.templateName} · ${campaignDetail.campaign.templateLanguage}` : displayedDraft.content.masterText}</p>}
             <ReadAloudButton key={selectedChannel} text={displayedDraft.content.masterText} disabled={busy || Boolean(pane)} />
             <ActionButton variant="secondary" disabled={busy || Boolean(pane)} onClick={() => openTool("preview")}><Eye size={16}/>Seçili kanal önizlemesi</ActionButton>
           </Panel>
         </> : <>
           <Panel as="section" surfaceRole="communication" className="form-stack marketing-share-section" aria-label="Paylaşım içeriği"><div className="marketing-options-row"><h3>Paylaşılacak içerik</h3><ActionButton variant="secondary" disabled={locked || !snapshot.aiCapabilities.some(c => c === "text_generation" || c === "rewrite" || c === "channel_adaptation")} onClick={() => openTool("ai")}><Sparkles size={16}/>AI ile metin oluştur / yeniden yaz</ActionButton></div>
-            <label className="form-field form-field--fluid"><span>Başlık *</span><input aria-label="Başlık" required value={draft.content.title} maxLength={240} disabled={locked} onChange={e => change({...draft, content: {...draft.content, title: e.target.value}})}/></label>
+            <label className="form-field form-field--fluid"><span>Başlık (isteğe bağlı)</span><input aria-label="Başlık" value={draft.content.title} maxLength={240} disabled={locked} onChange={e => change({...draft, content: {...draft.content, title: e.target.value}})}/></label>
             <SpeechTextField label="Paylaşım metni" value={draft.content.masterText} rows={6} maxLength={12000} disabled={locked} showRecordingHint={false} onChange={text => change({...draft, content: {...draft.content, masterText: text}})} />
           </Panel>
           <Panel as="section" className="form-stack marketing-share-section" aria-label="Seçilen paylaşım görselleri"><h3>Paylaşım görselleri</h3><div className="marketing-image-summary"><div className="marketing-image-cover"><MarketingCover snapshot={snapshot} ids={draft.content.mediaAssetIds}/></div><div><strong>{draft.content.mediaAssetIds.length} görsel seçili</strong><small>İlk görsel kapak ve Instagram görselidir.</small><div className="marketing-actions"><ActionButton variant="secondary" disabled={locked} onClick={() => openTool("images")}>Görsel seç / yükle</ActionButton><ActionButton variant="secondary" disabled={locked || !snapshot.aiCapabilities.includes("image_generation")} onClick={() => openTool("images", true)}><Sparkles size={15}/>AI ile görsel oluştur</ActionButton></div></div></div></Panel>

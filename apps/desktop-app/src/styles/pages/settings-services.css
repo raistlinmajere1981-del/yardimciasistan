@@ -141,26 +141,12 @@
   background: var(--color-bg-panel);
 }
 
-.settings-web-bar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-}
-
 .settings-web-heading {
-  display: flex;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 24px;
 }
 
-.settings-web-heading strong { flex-shrink: 0; white-space: nowrap; font-size: var(--text-sm); }
+.settings-web-enable { margin-left: auto; }
+.settings-web-body .settings-web-controls { margin-top: var(--space-3); }
 
 .settings-web-choice {
   display: inline-flex;
@@ -172,7 +158,6 @@
   cursor: pointer;
 }
 
-.settings-web-enable { margin-left: auto; }
 .settings-web-indicator { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-web-fields {
@@ -211,10 +196,13 @@
 .settings-web-actions .action-button {
   white-space: nowrap;
 }
-.settings-web-traffic { grid-column: 1 / -1; display: grid; gap: var(--space-1); justify-items: start; white-space: normal; }
-.settings-web-traffic-note { margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); max-width: 72ch; }
-.settings-web-traffic { grid-column: 1 / -1; flex-wrap: wrap; }
-.settings-web-traffic-note { grid-column: 1 / -1; margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); }
+.settings-web-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+  flex-wrap: nowrap;
+}
 
 @media (max-width: 1240px) {
   .settings-web-fields { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
@@ -225,6 +213,7 @@
   .settings-web-fields { grid-template-columns: minmax(0, 1fr); }
   .settings-web-actions { grid-column: auto; flex-wrap: wrap; justify-content: stretch; }
   .settings-web-actions .action-button { flex: 1 1 150px; }
+  .settings-web-controls { flex-wrap: wrap; row-gap: var(--space-2); }
 }
 .settings-services-list { padding: var(--space-4); min-width: 0; }
 .settings-services-panel { min-width: 0; }

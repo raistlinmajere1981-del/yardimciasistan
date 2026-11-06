@@ -21,7 +21,7 @@ import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/Wor
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { ProductFormFields } from "./ProductFormFields";
 import { ProductPhotoGallery } from "./ProductPhotoGallery";
-import type { ProductPhotoCollection } from "@yardimci-asistan/shared";
+import type { ProductPhotoCollection, ProductPhotoDraftPhoto } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { MenuProductEntryFields } from "../menu/MenuProductEntryFields";
 import { toItemForm, type ItemFormState } from "../menu/menu-model";
@@ -29,6 +29,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useWebAvailability } from "../../app/web-availability";
 
 type WorkspaceState = "idle" | "loading" | "success" | "error";
+const EMPTY_PHOTOS: ProductPhotoCollection = { productId: "", revision: "", photos: [], sourceUrl: "", sourceLicense: "" };
 
 export function ProductWorkspace({
   intent,
@@ -82,6 +83,7 @@ export function ProductWorkspace({
   const [localImageDataUrl, setLocalImageDataUrl] = useState("");
   const [imageDraftMode, setImageDraftMode] = useState<"keep" | "manual" | "clear" | "external">("keep");
   const [manualImageDataUrl, setManualImageDataUrl] = useState("");
+  const [imageResetKey, setImageResetKey] = useState(0);
   const [balance, setBalance] = useState<InventoryBalance | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [loadedProductId, setLoadedProductId] = useState("");
@@ -94,20 +96,20 @@ export function ProductWorkspace({
   const [fieldsBusy, setFieldsBusy] = useState(false);
   const [photosBusy, setPhotosBusy] = useState(false);
   const [stockBusy, setStockBusy] = useState(false);
-  const stockLock = useRef(false);
+  const stockOperationId = useRef(crypto.randomUUID());
   const saveLock = useRef(false);
   const [stockOperation, setStockOperation] = useState<"add" | "remove" | "count">("add");
-  const [stockConfirm, setStockConfirm] = useState(false);
-  const [stockMessage, setStockMessage] = useState("");
   const [historyError, setHistoryError] = useState("");
   const beginStockRequest = useRequestGeneration();
   const [isPublished, setIsPublished] = useState(onlineSalesEnabled);
+  const [publicationBaseline, setPublicationBaseline] = useState(onlineSalesEnabled);
+  const [photoBaseline, setPhotoBaseline] = useState<ProductPhotoCollection>(EMPTY_PHOTOS);
+  const [photoDraft, setPhotoDraft] = useState<ProductPhotoDraftPhoto[]>([]);
   const [publicationBusy, setPublicationBusy] = useState(false);
   const [publicationLoaded, setPublicationLoaded] = useState(false);
   const [publicationMessage, setPublicationMessage] = useState("");
   const beginPublicationRequest = useRequestGeneration();
   const beginResourceRequest = useRequestGeneration();
-  const beginPhotoChangeRequest = useRequestGeneration();
   const beginSaveRequest = useRequestGeneration();
   const beginMenuRequest = useRequestGeneration();
   const menuEntry = menuData?.menu.items.find(item => item.product_id === intent.entityId && (!intent.menuEntryId || item.id === intent.menuEntryId));
@@ -117,10 +119,11 @@ export function ProductWorkspace({
   const [menuMessage, setMenuMessage] = useState("");
   const [removeMenuConfirm, setRemoveMenuConfirm] = useState(false);
   const menuDirty = JSON.stringify(menuForm) !== JSON.stringify(menuBaseline);
-  const [createPublished, setCreatePublished] = useState(onlineSalesEnabled);
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || (creating && onlineSalesEnabled && createPublished !== onlineSalesEnabled);
-  const showPhotoGallery = onlineSalesCapability && Boolean(productId) && imageDraftMode === "keep" && resourceState === "success";
-  const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockConfirm);
+  const photosDirty = JSON.stringify(photoDraft.map(photo => photo.id)) !== JSON.stringify(photoBaseline.photos.map(photo => photo.id));
+  const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockOperation !== "add");
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || photosDirty
+    || isPublished !== publicationBaseline || stockDraftDirty;
+  const showPhotoGallery = onlineSalesCapability && imageDraftMode === "keep" && resourceState === "success";
   const mutationBusy = busy || fieldsBusy || photosBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"
     ? manualImageDataUrl
@@ -129,26 +132,32 @@ export function ProductWorkspace({
       : "";
   const closeBlocked = useWorkspaceCloseGuard({
     busy: mutationBusy || resourceState === "loading",
-    dirty: dirty || menuDirty || stockDraftDirty
+    dirty: dirty || menuDirty
   });
   useEffect(() => {
     if (!pendingSavedId || closeBlocked) return;
-    navigation.closeWorkspace(
+    const closed = navigation.closeWorkspace(
       { entityType: "product", entityId: intent.entityId },
       intent.mode === "create" ? { createdEntityId: pendingSavedId } : undefined
     );
+    // The product list may rerender when the saved card is inserted. Restore
+    // keyboard focus after the dialog and refreshed toolbar have settled.
+    if (closed) {
+      const restore = () => {
+        const active = document.activeElement;
+        if (active !== document.body && !active?.hasAttribute("data-workspace-return-focus")) return;
+        const previous = navigation.returnFocusRef.current;
+        const target = previous?.isConnected && !previous.matches(":disabled")
+          ? previous : document.querySelector<HTMLElement>("button[data-workspace-return-focus]:not(:disabled)")
+            ?? document.querySelector<HTMLElement>("[data-workspace-return-focus]:not(:disabled)");
+        target?.focus({ preventScroll: true });
+      };
+      requestAnimationFrame(restore);
+      // A refreshed catalog may briefly disable its toolbar after the dialog
+      // closes. Do not strand keyboard focus on the body when it becomes ready.
+      window.setTimeout(restore, 200);
+    }
   }, [closeBlocked, intent.entityId, intent.mode, navigation, pendingSavedId]);
-  useEffect(() => { beginPhotoChangeRequest(); }, [beginPhotoChangeRequest, productId]);
-  const photosChanged = useCallback(async (collection: ProductPhotoCollection) => {
-    const isCurrent = beginPhotoChangeRequest();
-    // Only image provenance changes. Keep all unsaved product metadata and its baseline.
-    setForm(current => ({ ...current, imageSourceUrl: collection.sourceUrl, imageLicense: collection.sourceLicense }));
-    setBaseline(current => ({ ...current, imageSourceUrl: collection.sourceUrl, imageLicense: collection.sourceLicense }));
-    const preview = await bridge!.getProductImageDataUrl(collection.productId);
-    if (!isCurrent()) return;
-    setLocalImageDataUrl(preview);
-    await onReload();
-  }, [beginPhotoChangeRequest, bridge, onReload]);
   useEffect(() => {
     if (menuDirty || menuBusy) return;
     const next = toItemForm(menuEntry, menuData?.menu.categories[0]?.id ?? "");
@@ -158,36 +167,24 @@ export function ProductWorkspace({
   useEffect(() => {
     const isCurrent = beginPublicationRequest();
     setPublicationLoaded(false);
-    setIsPublished(false);
+    setIsPublished(creating && onlineSalesEnabled);
+    setPublicationBaseline(creating && onlineSalesEnabled);
     setPublicationMessage("");
     if (!onlineSalesEnabled || !productId || !bridge) {
       setPublicationBusy(false);
+      setPublicationLoaded(creating);
       return;
     }
     setPublicationBusy(true);
     void bridge.getProductPublication(productId).then((publication) => {
       if (!isCurrent()) return;
       setIsPublished(publication?.isPublished ?? false);
+      setPublicationBaseline(publication?.isPublished ?? false);
       setPublicationLoaded(true);
     }).catch(() => {
       if (isCurrent()) setPublicationMessage("Web yayın tercihi okunamadı. Ürün kartını yeniden açıp deneyin.");
     }).finally(() => { if (isCurrent()) setPublicationBusy(false); });
-  }, [beginPublicationRequest, bridge, onlineSalesEnabled, productId]);
-
-  async function savePublication(published: boolean) {
-    if (!bridge || !product || !onlineSalesEnabled || mutationBusy || !publicationLoaded) return;
-    const isCurrent = beginPublicationRequest();
-    setPublicationBusy(true);
-    setPublicationMessage("");
-    try {
-      const saved = await bridge.saveProductPublication({ productId: product.id, isPublished: published });
-      if (!isCurrent()) return;
-      setIsPublished(saved.isPublished);
-      setPublicationMessage("Web yayın tercihi kaydedildi.");
-    } catch {
-      if (isCurrent()) setPublicationMessage("Web yayın tercihi kaydedilemedi. Tekrar deneyin.");
-    } finally { if (isCurrent()) setPublicationBusy(false); }
-  }
+  }, [beginPublicationRequest, bridge, creating, onlineSalesEnabled, productId]);
 
   async function saveMenuPresentation() {
     if (!menuEntry || !onSaveMenuEntry || mutationBusy) return;
@@ -269,7 +266,17 @@ export function ProductWorkspace({
       }
     }
 
+    let nextPhotos: ProductPhotoCollection;
+    try { nextPhotos = await bridge.listProductPhotos(product.id); }
+    catch (error) {
+      if (!isCurrent()) return;
+      setResourceState("error");
+      setSaveMessage(error instanceof Error ? error.message : "Ürün fotoğrafları okunamadı.");
+      return;
+    }
     if (!isCurrent()) return;
+    setPhotoBaseline(nextPhotos);
+    setPhotoDraft(nextPhotos.photos);
     const nextForm = toProductForm(product, minimumQuantity, inventoryEnabled);
     setForm(nextForm);
     setBaseline(nextForm);
@@ -284,7 +291,8 @@ export function ProductWorkspace({
     setSaveMessage("");
     setCountedQuantity("");
     setCountNote("");
-    setStockMessage("");
+    setStockOperation("add");
+    stockOperationId.current = crypto.randomUUID();
   }, [beginResourceRequest, bridge, inventoryEnabled, onStateChange, product]);
 
   useEffect(() => {
@@ -292,94 +300,63 @@ export function ProductWorkspace({
     void loadProductResources();
   }, [loadProductResources, loadedProductId, product]);
 
+  function clearStockDraft() {
+    setCountedQuantity(""); setCountNote(""); setStockOperation("add");
+    stockOperationId.current = crypto.randomUUID();
+  }
+
   async function saveProduct() {
-    if (!bridge || (!product && !creating) || saveLock.current || mutationBusy || stockDraftDirty || resourceState !== "success") return;
-    if (!form.name.trim()) { onStateChange("error", "Ürün adı girin."); setSaveState("error"); return; }
-    const priceError = validateProductFormPrices(form);
-    if (priceError) {
-      setSaveState("error");
-      onStateChange("error", priceError);
-      return;
+    if (!bridge || (!product && !creating) || saveLock.current || mutationBusy || resourceState !== "success") return;
+    const validation = !form.name.trim() ? "Ürün adı girin." : validateProductFormPrices(form)
+      || (stockDraftDirty ? !form.trackInventory ? "Bekleyen stok işlemi için stok takibini açın veya stok taslağını temizleyin." : stockValidation : "");
+    if (validation) {
+      setSaveState("error"); setSaveMessage(validation); onStateChange("error", validation); return;
     }
     const isCurrent = beginSaveRequest();
-    saveLock.current = true;
-    setSaveState("loading");
-    setSaveMessage("");
-    let saved: CatalogProduct;
+    saveLock.current = true; setSaveState("loading"); setSaveMessage("");
+    let result: Awaited<ReturnType<typeof bridge.saveProductDetails>>;
     try {
-      const { id: productId, ...productFields } = productFormToSaveInput(form);
-      saved = await bridge.saveProduct({
-        ...productFields,
-        ...(productId ? { id: productId } : {}),
-        ...(creating && onlineSalesEnabled ? { onlineSalesPublished: createPublished } : {}),
-        ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
-        ...(imageDraftMode === "clear" ? { clearImage: true } : {})
+      const { id, ...productFields } = productFormToSaveInput(form);
+      result = await bridge.saveProductDetails({
+        product: { ...productFields, ...(id ? { id } : {}),
+          ...(imageDraftMode === "manual" ? { manualImageDataUrl } : {}) },
+        sourcePhotoRevision: photoBaseline.revision, imageMode: imageDraftMode,
+        ...(onlineSalesCapability && photosDirty ? { photos: photoDraft } : {}),
+        ...(onlineSalesEnabled && publicationLoaded ? { isPublished } : {}),
+        ...(stockDraftDirty ? { stock: { operation: stockOperation, quantity: stockQuantity, note: countNote,
+          ...(balance?.locationId ? { locationId: balance.locationId } : {}), expectedUpdatedAt: balance?.updatedAt ?? "",
+          operationId: stockOperationId.current } } : {})
       });
-      if (!isCurrent()) return;
     } catch (error) {
       if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
-      setSaveState("error");
-      setSaveMessage(message);
-      saveLock.current = false;
-      onStateChange("error", message);
-      return;
+      setSaveState("error"); setSaveMessage(message); saveLock.current = false;
+      onStateChange("error", message); return;
     }
-
-    let nextImage = "";
-    if (saved.imageAssetPath) {
-      try {
-        nextImage = await bridge.getProductImageDataUrl(saved.id);
-      } catch {
-        nextImage = "";
-      }
-    }
-
     if (!isCurrent()) return;
-    setSavedProduct(saved);
-    setLoadedProductId(saved.id);
-    onProductSaved(saved);
-    let catalogReloadFailed = false;
+    // Commit succeeded. Clear every committed draft before refreshing projections;
+    // a failed read must never leave a stock action available for resubmission.
+    const saved = result.product;
+    const nextForm = toProductForm(saved, saved.minimumQuantity, inventoryEnabled);
+    setSavedProduct(saved); setLoadedProductId(saved.id);
+    setForm(nextForm); setBaseline(nextForm);
+    setPhotoBaseline(result.photos); setPhotoDraft(result.photos.photos);
+    setIsPublished(result.publication?.isPublished ?? false);
+    setPublicationBaseline(result.publication?.isPublished ?? false);
+    setImageDraftMode("keep"); setManualImageDataUrl(""); clearStockDraft();
+    setBalance(result.balance);
+    if (result.stock) {
+      if (result.stock.movement) setMovements(current => [result.stock!.movement!, ...current]);
+    } else if (!saved.trackInventory) setMovements([]);
+    let refreshFailed = false;
+    try { onProductSaved(saved); await onReload(); } catch { refreshFailed = true; }
     try {
-      await onReload();
-    } catch {
-      catalogReloadFailed = true;
-    }
+      const preview = saved.imageAssetPath ? await bridge.getProductImageDataUrl(saved.id) : "";
+      if (isCurrent()) setLocalImageDataUrl(preview);
+    } catch { refreshFailed = true; }
     if (!isCurrent()) return;
-
-    const nextForm = toProductForm(saved, form.minimumQuantity, inventoryEnabled);
-    setForm(nextForm);
-    setBaseline(nextForm);
-    setLocalImageDataUrl(nextImage);
-    setImageDraftMode("keep");
-    setManualImageDataUrl("");
-
-    if (inventoryEnabled && saved.trackInventory) {
-      try {
-        const [nextBalance, nextMovements] = await Promise.all([
-          bridge.getInventoryBalance(saved.id),
-          bridge.listInventoryMovements({ productId: saved.id, limit: 20 })
-        ]);
-        if (isCurrent()) {
-          setBalance(nextBalance);
-          setMovements(nextMovements);
-        }
-      } catch {
-        if (isCurrent()) {
-          setBalance(null);
-          setMovements([]);
-        }
-      }
-    } else {
-      setBalance(null);
-      setMovements([]);
-    }
-
-    if (!isCurrent()) return;
-    const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
-    saveLock.current = false;
-    setSaveState("success");
-    onStateChange("success", message);
+    saveLock.current = false; setSaveState("success");
+    onStateChange("success", `${saved.name} kaydedildi.${refreshFailed ? " Görünüm yenilenemedi; ürün kartını yeniden açın." : ""}`);
     setPendingSavedId(saved.id);
   }
 
@@ -387,7 +364,7 @@ export function ProductWorkspace({
   const presentation = navigation.current?.presentation ?? "centered";
 
   async function refreshStockHistory() {
-    if (!bridge || !product || stockLock.current || mutationBusy) return;
+    if (!bridge || !product || mutationBusy) return;
     const isCurrent = beginStockRequest();
     setStockBusy(true);
     try {
@@ -398,56 +375,11 @@ export function ProductWorkspace({
   }
 
   const stockQuantity = Number(countedQuantity.trim().replace(",", "."));
-  const stockPreview = !countedQuantity.trim() || !Number.isFinite(stockQuantity) || !balance ? null
-    : stockOperation === "count" ? stockQuantity : balance.quantity + (stockOperation === "remove" ? -stockQuantity : stockQuantity);
-  const stockValidation = !countedQuantity.trim() || !Number.isFinite(stockQuantity) || stockQuantity <= 0
-    ? "Sıfırdan büyük, geçerli bir miktar girin."
+  const stockPreview = !countedQuantity.trim() || !Number.isFinite(stockQuantity) ? null
+    : stockOperation === "count" ? stockQuantity : (balance?.quantity ?? 0) + (stockOperation === "remove" ? -stockQuantity : stockQuantity);
+  const stockValidation = !countedQuantity.trim() || !Number.isFinite(stockQuantity) || stockQuantity < 0 || (stockOperation !== "count" && Math.round(stockQuantity * 10000) <= 0)
+    ? stockOperation === "count" ? "Sıfır veya daha büyük, geçerli bir miktar girin." : "Sıfırdan büyük, geçerli bir miktar girin."
     : stockPreview !== null && stockPreview < 0 ? "Stok miktarı negatif olamaz." : "";
-
-  async function updateStock() {
-    if (!bridge || !product || !product.trackInventory || !form.trackInventory || !inventoryEnabled || !balance || dirty || menuDirty || mutationBusy || stockLock.current || stockValidation) return;
-    const isCurrent = beginStockRequest();
-    stockLock.current = true;
-    setStockBusy(true); setStockMessage("");
-    let committed = false;
-    try {
-      if (stockOperation === "count") {
-        const result = await bridge.setInventoryCount({ productId: product.id, locationId: balance.locationId,
-          countedQuantity: stockQuantity, expectedUpdatedAt: balance.updatedAt, note: countNote,
-          referenceType: "product_workspace_count", referenceId: product.id, actorSource: "desktop-product-workspace" });
-        committed = true;
-        if (!isCurrent()) return;
-        setBalance(result.balance);
-        if (result.movement) setMovements(current => [result.movement!, ...current]);
-        setStockMessage(result.movement ? "Fiziksel sayım kaydedildi." : "Stok miktarı değişmedi.");
-      } else {
-        const movement = await bridge.applyInventoryMovement({ productId: product.id, locationId: balance.locationId,
-          type: "adjust", quantityDelta: stockOperation === "remove" ? -stockQuantity : stockQuantity,
-          note: countNote, referenceType: "product_workspace_adjust", referenceId: product.id, actorSource: "desktop-product-workspace" });
-        committed = true;
-        if (!isCurrent()) return;
-        setBalance(current => current ? { ...current, quantity: movement.quantityAfter, updatedAt: movement.createdAt } : current);
-        setMovements(current => [movement, ...current]);
-        setStockMessage("Stok hareketi kaydedildi.");
-      }
-      setCountedQuantity(""); setCountNote(""); setStockConfirm(false);
-      const [balanceResult, historyResult, reloadResult] = await Promise.allSettled([
-        bridge.getInventoryBalance(product.id), bridge.listInventoryMovements({ productId: product.id, limit: 20 }), onReload()
-      ]);
-      if (!isCurrent()) return;
-      if (balanceResult.status === "fulfilled") setBalance(balanceResult.value);
-      else { setBalance(null); setStockMessage("Stok kaydedildi; güncel miktar okunamadı. Kartı yeniden açın."); }
-      if (historyResult.status === "fulfilled") { setMovements(historyResult.value); setHistoryError(""); }
-      else setHistoryError("Stok kaydedildi; hareket listesi yenilenemedi.");
-      if (reloadResult.status === "rejected") setStockMessage("Stok kaydedildi; katalog görünümü yenilenemedi.");
-    } catch (error) {
-      if (!isCurrent()) return;
-      setStockConfirm(false);
-      setStockMessage(committed ? "Stok kaydedildi; görünüm yenilenemedi." : error instanceof Error ? error.message : "Stok güncellenemedi.");
-      try { const current = await bridge.getInventoryBalance(product.id); if (isCurrent()) setBalance(current); }
-      catch { if (isCurrent()) setBalance(null); }
-    } finally { stockLock.current = false; if (isCurrent()) setStockBusy(false); }
-  }
 
   if (!product && !creating) {
     return <WorkspaceFrame
@@ -468,28 +400,22 @@ export function ProductWorkspace({
     </WorkspaceFrame>;
   }
 
-  const stockDisabled = dirty || menuDirty || mutationBusy || !balance || stockConfirm;
+  const stockDisabled = mutationBusy || resourceState !== "success";
   const stockPanel = inventoryEnabled && form.trackInventory && <DetailSectionCard title="Stok" className="market-product-stock-update">
-    <strong>Mevcut stok: {balance?.quantity ?? "—"} {form.unit}</strong>
-    <label className="form-field form-field--fluid form-field--span">Minimum stok<input type="number" min="0" step="0.0001" value={form.minimumQuantity} disabled={mutationBusy || stockDraftDirty} onChange={event => setForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
-    {product?.trackInventory ? <>
-      <label className="form-field form-field--fluid form-field--span">İşlem<select aria-label="Stok işlemi" value={stockOperation} disabled={stockDisabled} onChange={event => setStockOperation(event.target.value as typeof stockOperation)}>
-        <option value="add">Ekle</option><option value="remove">Çıkar</option><option value="count">Fiziksel Sayım</option>
-      </select></label>
-      <label className="form-field form-field--fluid">Miktar<input inputMode="decimal" aria-label="Stok işlem miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={stockDisabled} /></label>
-      <label className="form-field form-field--fluid">Kısa not<input maxLength={240} value={countNote} onChange={event => setCountNote(event.target.value)} disabled={stockDisabled} /></label>
-      {stockPreview !== null && <p role="status">İşlem sonrası: {stockPreview} {form.unit}</p>}
-      {countedQuantity && stockValidation && <p role="alert">{stockValidation}</p>}
-      <ActionButton variant="secondary" disabled={stockDisabled || Boolean(stockValidation)} onClick={() => setStockConfirm(true)}>Stok İşlemini Onayla</ActionButton>
-      <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); setStockConfirm(false); }}>Stok taslağını temizle</ActionButton>
-      {stockConfirm && <ConfirmDialog embedded title="Stok işlemini kaydet" description={`Yeni toplam ${stockPreview} ${form.unit}. Hareket stok geçmişine kaydedilecek.`} confirmLabel="Stok Hareketini Kaydet" busy={stockBusy} onCancel={() => setStockConfirm(false)} onConfirm={() => void updateStock()} />}
-      <ActionButton variant="secondary" disabled={dirty || menuDirty || stockDraftDirty || mutationBusy || resourceState !== "success"} onClick={() => {
-        navigation.updateWorkspaceMode({ entityType: "product", mode: "history" });
-        void refreshStockHistory();
-      }}><History size={16} aria-hidden="true" />Stok Hareketleri</ActionButton>
-      {(dirty || menuDirty) && <small>Stok işleminden önce kart değişikliklerini kaydedin veya geri alın.</small>}
-    </> : <small>Stok işlemleri için önce ürünü stok takibi açık olarak kaydedin.</small>}
-    {stockMessage && <p role="status">{stockMessage}</p>}
+    <strong>Mevcut stok: {balance?.quantity ?? (creating || !product?.trackInventory ? 0 : "—")} {form.unit}</strong>
+    <label className="form-field form-field--fluid form-field--span">Minimum stok<input type="number" min="0" step="0.0001" value={form.minimumQuantity} disabled={mutationBusy} onChange={event => setForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
+    <label className="form-field form-field--fluid form-field--span">İşlem<select aria-label="Stok işlemi" value={stockOperation} disabled={stockDisabled} onChange={event => { setStockOperation(event.target.value as typeof stockOperation); stockOperationId.current = crypto.randomUUID(); }}>
+      <option value="add">Ekle</option><option value="remove">Çıkar</option><option value="count">Fiziksel Sayım</option>
+    </select></label>
+    <label className="form-field form-field--fluid">Miktar<input inputMode="decimal" aria-label="Stok işlem miktarı" value={countedQuantity} onChange={event => { setCountedQuantity(event.target.value); stockOperationId.current = crypto.randomUUID(); }} disabled={stockDisabled} /></label>
+    <label className="form-field form-field--fluid">Kısa not<input maxLength={240} value={countNote} onChange={event => { setCountNote(event.target.value); stockOperationId.current = crypto.randomUUID(); }} disabled={stockDisabled} /></label>
+    {stockPreview !== null && <p role="status">Kaydet sonrası stok: {stockPreview} {form.unit}</p>}
+    {stockDraftDirty && stockValidation && <p role="alert">{stockValidation}</p>}
+    <small>Stok işlemi Ürünü Kaydet ile bir kez geçmişe işlenir. Geri Al yalnız bekleyen işlemi iptal eder; kayıtlı hareketler değişmez.</small>
+    <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={clearStockDraft}>Stok taslağını temizle</ActionButton>
+    {product?.trackInventory && <ActionButton variant="secondary" disabled={mutationBusy || resourceState !== "success"} onClick={() => {
+      navigation.updateWorkspaceMode({ entityType: "product", mode: "history" }); void refreshStockHistory();
+    }}><History size={16} aria-hidden="true" />Stok Hareketleri</ActionButton>}
     {historyError && <p role="alert">{historyError}</p>}
   </DetailSectionCard>;
 
@@ -522,16 +448,21 @@ export function ProductWorkspace({
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop
       footer={!history && <div className="panel product-workspace-actions" data-surface-role="configuration">
+        {saveMessage && <p role="alert">{saveMessage}</p>}
         <div className="action-row">
           <ActionButton variant="secondary" type="button" disabled={mutationBusy || !dirty} onClick={() => {
             setForm(baseline);
             setImageDraftMode("keep");
             setManualImageDataUrl("");
+            setImageResetKey(current => current + 1);
             setSaveState("idle");
             setSaveMessage("");
-            setCreatePublished(onlineSalesEnabled);
+            setIsPublished(publicationBaseline);
+            setPhotoDraft(photoBaseline.photos);
+            setPhotoBaseline(current => ({ ...current }));
+            clearStockDraft();
           }}>Değişiklikleri Geri Al</ActionButton>
-          <ActionButton type="button" disabled={mutationBusy || stockDraftDirty || resourceState !== "success" || !dirty || !form.name.trim()} onClick={() => void saveProduct()}>
+          <ActionButton type="button" disabled={mutationBusy || resourceState !== "success" || !dirty || !form.name.trim()} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
@@ -542,12 +473,9 @@ export function ProductWorkspace({
           <ProductFormFields
             renderSections={({ status, details, media }) => <DetailWorkspaceLayout
               railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>
-                {showPhotoGallery ? <ProductPhotoGallery key={productId} productId={productId}
-                  disabled={busy || fieldsBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading" || stockDraftDirty || resourceState !== "success"}
-                  onBusyChange={setPhotosBusy} onChanged={photosChanged} /> : <>{media}
-                    {onlineSalesEnabled && creating && <small>İlk kayıttan sonra en fazla 12 fotoğrafı sıralayıp kapak seçebilirsiniz.</small>}
-                    {onlineSalesEnabled && productId && imageDraftMode !== "keep" && <small>Galeriyi açmak için seçili kapak değişikliğini kaydedin veya geri alın.</small>}
-                  </>}
+                {showPhotoGallery ? <ProductPhotoGallery productId={productId} collection={photoBaseline} photos={photoDraft}
+                  disabled={mutationBusy || resourceState !== "success"}
+                  onBusyChange={setPhotosBusy} onChange={setPhotoDraft} /> : media}
                 {status}{stockPanel}</>}
             >{details}{menuPanel}</DetailWorkspaceLayout>}
             {...(creating && intent.lookupSeed ? { lookupSeed: intent.lookupSeed } : {})}
@@ -559,13 +487,15 @@ export function ProductWorkspace({
             wholesaleEnabled={wholesaleEnabled}
             retailFieldsEnabled={retailFieldsEnabled}
             purchasingEnabled={purchasingEnabled}
-            disabled={mutationBusy || stockDraftDirty || resourceState !== "success"}
+            disabled={mutationBusy || resourceState !== "success"}
             mode="all"
             statusFields={onlineSalesEnabled ? <>
-              <label className="form-check"><input type="checkbox" checked={creating ? createPublished : isPublished} disabled={mutationBusy || (!creating && !publicationLoaded)} onChange={event => { if (creating) setCreatePublished(event.target.checked); else void savePublication(event.target.checked); }} /> Web satışında yayınla</label>
+              <label className="form-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || (!creating && !publicationLoaded)} onChange={event => setIsPublished(event.target.checked)} /> Web satışında yayınla</label>
+              {isPublished !== publicationBaseline && <small>Web yayın tercihi Ürünü Kaydet ile uygulanacak.</small>}
               {publicationMessage && <p role="status">{publicationMessage}</p>}
             </> : null}
             localImageDataUrl={effectiveImageDataUrl}
+            imageResetKey={imageResetKey}
             onManualImageSelected={(dataUrl) => {
               setManualImageDataUrl(dataUrl);
               setImageDraftMode("manual");
@@ -575,12 +505,10 @@ export function ProductWorkspace({
               setImageDraftMode("clear");
             }}
             onExternalImageSelected={() => {
-              if (showPhotoGallery) return;
               setManualImageDataUrl("");
               setImageDraftMode("external");
             }}
-            onChange={next => setForm(current => showPhotoGallery
-              ? { ...next, imageSourceUrl: current.imageSourceUrl, imageLicense: current.imageLicense } : next)}
+            onChange={setForm}
             onStateChange={onStateChange}
           />}
       </> : <section className="form-stack" aria-label="Stok hareketleri">

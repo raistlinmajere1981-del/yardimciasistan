@@ -19,6 +19,17 @@ const templates = new Map<string, DocumentOutputTemplateReadResult>();
 if (query.has("legacyTemplate")) templates.set("sample:sale_receipt", {documentKind:"sale_receipt",revision:2,layout:{...defaultDocumentLayout("sale_receipt"),lineBlock:null}});
 const rules = new Map<string, DocumentOutputRuleInput>();
 let failSave = false;
+let failOwner: "template" | "rule" | "printer" | null = null;
+let delayWrites = false;
+const pendingWrites: Array<() => void> = [];
+const mutations: string[] = [];
+const beforeWrite = async (owner: string) => {
+  mutations.push(owner);
+  if (delayWrites) await new Promise<void>(resolve => pendingWrites.push(resolve));
+};
+let printCalls = 0;
+let previewCalls = 0;
+let readyJob = query.has("readyJob");
 let delayed = false;
 const pending: Array<() => void> = [];
 const calls: DocumentOutputRuleInput[] = [];
@@ -41,6 +52,9 @@ let delayProcessed = false;
 const processedCalls: Array<{ originalImageRef: string; imageRef: string; dataUrl: string }> = [];
 const images = new Map<string, string>();
 const mock: DocumentOutputManagementBridge = {
+  listReadyDocuments: async ({documentKind}) => ({ok:true,value:readyJob && documentKind === "sale_receipt" ? [{jobId:"a".repeat(64),createdAt:"2026-11-06"}] : []}),
+  previewReadyDocument: async () => { previewCalls++; return {ok:true,value:null}; },
+  printReadyDocument: async () => { printCalls++; readyJob = false; return {ok:true,value:"accepted"}; },
   saveProcessedFormImage: async ({documentKind,originalImageRef,pngBase64}) => {
     if (failProcessed) return {ok:false,code:"DOCUMENT_IMAGE_FAILED",message:"Görsel kaydedilemedi."};
     const scope = `${currentBusiness}:${documentKind}`;
@@ -69,7 +83,8 @@ const mock: DocumentOutputManagementBridge = {
   },
   readPrinterBinding: async ({documentKind}) => ({ok:true,value:printerSettings(documentKind)}),
   savePrinterBinding: async ({documentKind,printerRef}) => {
-    if (failSave) return {ok:false,code:"TEST_FAILED",message:"Yazıcı ayarı kaydedilemedi."};
+    await beforeWrite("printer");
+    if (failSave || failOwner === "printer") return {ok:false,code:"TEST_FAILED",message:"Yazıcı ayarı kaydedilemedi."};
     if (printerRef !== null && !printers.some(printer => printer.name === printerRef)) return {ok:false,code:"DOCUMENT_PRINTER_INVALID",message:"Yazıcı bulunamıyor."};
     const key = `${currentBusiness}:${documentKind}`;
     if (printerRef === null) printerBindings.delete(key); else printerBindings.set(key,printerRef);
@@ -81,7 +96,8 @@ const mock: DocumentOutputManagementBridge = {
     return {ok:true,value};
   },
   saveDocumentOutputTemplate: async input => {
-    if (failSave) return {ok:false,code:"TEST_FAILED",message:"Şablon kaydedilemedi."};
+    await beforeWrite("template");
+    if (failSave || failOwner === "template") return {ok:false,code:"TEST_FAILED",message:"Şablon kaydedilemedi."};
     const key = `${currentBusiness}:${input.documentKind}`;
     const previous = templates.get(key);
     if ((previous?.revision ?? null) !== input.expectedRevision) return {ok:false,code:"DOCUMENT_TEMPLATE_CONFLICT",message:"Şablon değişti."};
@@ -95,17 +111,23 @@ const mock: DocumentOutputManagementBridge = {
     return result;
   },
   saveDocumentOutputRule: async rule => {
-    if (failSave) return { ok: false, code: "TEST_FAILED", message: "Test kayıt hatası" };
+    await beforeWrite("rule");
+    if (failSave || failOwner === "rule") return { ok: false, code: "TEST_FAILED", message: "Test kayıt hatası" };
     calls.push(rule); rules.set(key(rule), rule);
     return { ok: true, value: rule };
   }
 };
 Object.assign(window, { yardimciDesktop: mock, printFixture: {
   business: (id: string) => { currentBusiness = id; setBusinessRuntime(id); },
-  scale: (value: number) => { document.documentElement.style.zoom = String(value); setScale(value); },
+  scale: (value: number) => { document.documentElement.style.zoom = String(value); document.documentElement.style.setProperty("--ui-scale", String(value)); setScale(value); },
   revoke: () => setRuntime([]), lock: () => setRuntime(null),
   restore: () => setRuntime(initialCapabilities),
   failSave: (value: boolean) => { failSave = value; },
+  failOwner: (value: typeof failOwner) => { failOwner = value; },
+  delayWrites: (value: boolean) => { delayWrites = value; },
+  releaseWrite: () => { pendingWrites.shift()?.(); },
+  mutations: () => [...mutations],
+  outputCalls: () => ({printCalls, previewCalls}),
   delayReads: (value: boolean) => { delayed = value; },
   releaseReads: () => { for (const release of pending.splice(0)) release(); },
   setPrinters: (value: DocumentPrinter[]) => { printers = value; },

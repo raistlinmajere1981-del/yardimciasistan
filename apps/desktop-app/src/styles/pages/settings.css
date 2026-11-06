@@ -126,6 +126,7 @@
   scrollbar-gutter: stable;
   padding: var(--space-2);
 }
+.settings-page-body > .settings-panel > .settings-panel-header { min-height: 2.75rem; }
 .settings-page-body > * + *,
 .settings-page-body .settings-resource-fields > * + * { margin-top: var(--space-4); }
 .settings-resource-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
@@ -152,5 +153,3 @@
   .settings-profile-option-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-page-actions > div { flex-basis: 100%; }
 }
-
-.settings-structure [hidden] { display: none; }

@@ -9,7 +9,6 @@ export function useDocumentTemplateSettings(kinds: DocumentKind[], authority: st
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [denied, setDenied] = useState<string | null>(null);
   const tenant = useRef<string | undefined>(undefined);
   const latest = useRef(authority);
@@ -44,26 +43,26 @@ export function useDocumentTemplateSettings(kinds: DocumentKind[], authority: st
       else next[kind] = { expectedRevision: previous[kind] ? previous[kind].expectedRevision : baseline(kind)?.revision ?? null, layout };
       return next;
     });
-    setNotice("");
   };
   const save = async () => {
-    if (!dirty || !canSave || saving) return;
+    if (!dirty || !canSave || saving) return false;
     const started = authority;
-    setSaving(true); setError(""); setNotice("");
+    const generation = authorityGeneration.current;
+    setSaving(true); setError("");
     try {
       for (const [kind, draft] of Object.entries(drafts)) {
-        if (!draft || latest.current !== started) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
+        if (!draft || (latest.current !== started || authorityGeneration.current !== generation)) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
         const result = await window.yardimciDesktop!.saveDocumentOutputTemplate({ documentKind: kind as DocumentKind, ...draft });
         if (!result.ok) {
           if (["DOCUMENT_SESSION_LOCKED", "DOCUMENT_CAPABILITY_DISABLED", "DOCUMENT_OWNER_REQUIRED"].includes(result.code)) setDenied(started);
           throw Error(result.message);
         }
-        if (latest.current !== started) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
+        if (latest.current !== started || authorityGeneration.current !== generation) throw Error("Yetki değişti. Kayıt durumunu yeniden kontrol edin.");
         setLoaded(previous => previous && ({ ...previous, documents: [...previous.documents.filter(doc => doc.documentKind !== kind), result.value] }));
         setDrafts(previous => { const next = { ...previous }; delete next[kind as DocumentKind]; return next; });
       }
-      setNotice("Şablonlar kaydedildi. Çıktı işi oluşturulmadı.");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Şablon kaydedilemedi."); }
+      return true;
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Şablon kaydedilemedi."); return false; }
     finally { setSaving(false); }
   };
   const pickFormImage = async (kind: DocumentKind, layout: DocumentTemplateLayout) => {
@@ -104,9 +103,9 @@ export function useDocumentTemplateSettings(kinds: DocumentKind[], authority: st
       return false;
     } finally { if (mounted.current) setPicking(false); }
   };
-  return { ready, dirty, saving: saving || picking, canSave, stage, save, notice, pickFormImage, saveProcessedImage,
+  return { ready, dirty, saving: saving || picking, canSave, stage, save, pickFormImage, saveProcessedImage,
     error: tenantChanged ? "İşletme değişti. Önce şablon taslağından vazgeçin." : denied === authority ? "Şablon yetkisi değişti. Çalışma alanını yeniden açın." : dirty && ready && !canSave ? "Değiştirilen belge artık etkin değil. Şablon taslaklarından vazgeçerek devam edin." : error,
     layout: (kind: DocumentKind) => tenantChanged ? null : drafts[kind]?.layout ?? baseline(kind)?.layout ?? null,
     revision: (kind: DocumentKind) => baseline(kind)?.revision ?? null,
-    discard: () => { if (!saving && !picking) { setDrafts({}); setError(""); setNotice(""); tenant.current = undefined; } } };
+    discard: () => { if (!saving && !picking) { setDrafts({}); setError(""); tenant.current = undefined; } } };
 }

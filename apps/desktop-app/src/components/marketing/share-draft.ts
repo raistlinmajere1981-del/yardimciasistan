@@ -1,6 +1,10 @@
 import { MARKETING_CHANNELS, type MarketingContentDetail, type MarketingContentInput, type MarketingShareInput, type MarketingShareOptions } from "@yardimci-asistan/shared";
 
 export const channelNames = {website: "Web sitesi", instagram: "Instagram", whatsapp: "WhatsApp Business", sms: "SMS"};
+/** Management label only. Never insert a synthetic title into the published content. */
+export function marketingDisplayTitle(title: string, text: string, imageCount: number): string {
+  return title.trim() || text.trim().slice(0, 80) || (imageCount ? "Görsel paylaşımı" : "Başlıksız taslak");
+}
 export function newShare(channels: MarketingShareOptions["channels"] = []): MarketingShareInput {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const later = new Date(Date.now() + 3600000);

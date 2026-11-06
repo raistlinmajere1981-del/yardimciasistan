@@ -14,7 +14,7 @@ export function MarketProductToolbar({ search, onSearch, view, onViewChange, onC
     <div className="market-product-search-actions">
       <label className="market-search-field"><Search size={16} aria-hidden="true" /><input aria-label="Ürün ara" value={search} onChange={event => onSearch(event.target.value)} placeholder="Ürün adı, marka, SKU veya barkod ara" /></label>
       <ActionButton variant="secondary" size="sm" type="button" disabled={!search} onClick={() => onSearch("")}>Temizle</ActionButton>
-      <ActionButton size="sm" type="button" disabled={disabled} onClick={onCreate}><Plus size={16} aria-hidden="true" /> Yeni ürün</ActionButton>
+      <ActionButton data-workspace-return-focus size="sm" type="button" disabled={disabled} onClick={onCreate}><Plus size={16} aria-hidden="true" /> Yeni ürün</ActionButton>
     </div>
     <div className="market-product-view-controls">
       <label className="form-check"><input type="checkbox" checked={view.showImages} onChange={event => onViewChange({ ...view, showImages: event.target.checked })} /> Resimleri göster</label>

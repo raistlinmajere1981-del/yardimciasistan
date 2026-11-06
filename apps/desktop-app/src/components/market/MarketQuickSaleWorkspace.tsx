@@ -530,7 +530,7 @@ export function MarketQuickSaleWorkspace({
       if (result.ok) setReceiptJob({ jobId: result.value.jobId, saleId: receiptSale.id, generation, terminal: false });
       setReceiptMessage(result.ok ? "Fiş hazır."
         : result.code === "DOCUMENT_SALE_JOB_LINES_MISSING"
-          ? "Fiş şablonunda ürün satırları eksik veya kapasitesi yetersiz. Baskı Yönetimi > Satış fişi > Düzenle > Ürün satırlarını ekle > Şablonları kaydet. Satır kapasitesini aşan satışlar hazırlanamaz."
+          ? "Fiş şablonunda ürün satırları eksik veya kapasitesi yetersiz. Baskı Yönetimi > Satış fişi > Düzenle > Yerleşim ve form > Ürün satırlarını ekle > Kaydet. Satır kapasitesini aşan satışlar hazırlanamaz."
         : result.code === "DOCUMENT_SALE_JOB_CONFIGURATION_MISSING"
           ? "Fiş hazırlanamadı. Baskı Yönetimi'nde fiş şablonunu, yazıcıyı ve yazdırma onayı kuralını kontrol edin."
           : "Fiş hazırlanamadı. Baskı Yönetimi ayarlarını kontrol edip yeniden deneyin.");

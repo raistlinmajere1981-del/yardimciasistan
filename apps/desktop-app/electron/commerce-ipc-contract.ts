@@ -100,6 +100,7 @@ export interface DesktopCommerceBridge {
   getProductPublication: (productId: string) => Promise<CommerceProductPublication | null>;
   saveProductPublication: (input: SaveCommerceProductPublicationInput) => Promise<CommerceProductPublication>;
   saveProduct: (input: SaveCatalogProductInput) => Promise<CatalogProduct>;
+  saveProductDetails: (input: import("./commerce-product-save").SaveProductDetailsInput) => Promise<import("./commerce-product-save").SaveProductDetailsResult>;
   findProductByBarcode: (barcode: string) => Promise<CatalogProduct | null>;
   lookupExternalProductByBarcode: (barcode: string, mode?: ProductLookupMode) => Promise<ProductLookupResponse>;
   previewExternalProductImage: (provider: string, imageUrl: string) => Promise<string>;

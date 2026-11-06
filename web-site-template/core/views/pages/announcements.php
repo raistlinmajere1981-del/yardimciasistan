@@ -7,10 +7,12 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <?php foreach (records($item['images'] ?? []) as $image): $url = media_url($image['url'] ?? '', $site['module_path']); if ($url === '' || !published($image)) continue; ?>
     <img src="<?= e($url) ?>" alt="<?= e(text($image['altText'] ?? '')) ?>" loading="lazy" decoding="async">
     <?php endforeach; ?>
+    <?php if (text($item['title'] ?? '') !== '' || text($item['text'] ?? '') !== ''): ?>
     <div class="announcement-body">
-      <h2><?= e($item['title']) ?></h2>
-      <p><?= nl2br(e($item['text'])) ?></p>
+      <?php if (text($item['title'] ?? '') !== ''): ?><h2><?= e($item['title']) ?></h2><?php endif; ?>
+      <?php if (text($item['text'] ?? '') !== ''): ?><p><?= nl2br(e($item['text'])) ?></p><?php endif; ?>
     </div>
+    <?php endif; ?>
   </article>
   <?php endforeach; ?>
 </div>

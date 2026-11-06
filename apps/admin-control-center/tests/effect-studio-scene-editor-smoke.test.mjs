@@ -44,7 +44,7 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
     assert.equal(await page.evaluate(()=>window.__sceneEditor.getScene().sceneId),"birdesengor-study-v2");
     assert.equal(await page.locator(".scene-object").count(),6);
     assert.equal(await page.locator(".scene-marker").count(),3);
-    assert.match(await page.locator(".scene-local-warning").innerText(),/gerçek V2 bağlantısı değil/i);
+    assert.match(await page.locator(".scene-local-warning").innerText(),/Yerel önizleme · canlı yayın ayrı/i);
 
     // Choose the candle and its named wick anchor.
     await page.locator("#object-list .scene-row-select",{hasText:"Mum"}).click();

@@ -12,6 +12,7 @@ const { Transformer } = require("@napi-rs/image");
 const photos = require("../../dist-electron/product-photo-store.js");
 const media = require("../../dist-electron/product-data-service.js");
 const store = require("../../dist-electron/commerce-store.js");
+const productSave = require("../../dist-electron/commerce-product-save.js");
 const { transferImageOwner } = require("../../dist-electron/data-transfer-images.js");
 const transfer = require("../../dist-electron/data-transfer-service.js");
 const format = require("../../dist-electron/data-transfer-format.js");
@@ -30,6 +31,135 @@ function fixture(name) {
   db.exec("PRAGMA foreign_keys=ON; INSERT INTO business(id,name,display_name,profile_id,created_at,updated_at) VALUES('b','Test','Test','market','t','t')");
   for (const c of ["commerce.catalog", "channel.online_sales"]) db.prepare("INSERT INTO business_capabilities(business_id,capability_id,is_enabled,created_at,updated_at) VALUES('b',?,1,'t','t')").run(c);
   databases.push(db); return { databasePath, db };
+}
+
+async function verifyUnifiedSave() {
+  const { databasePath, db } = fixture("unified");
+  db.exec("INSERT INTO business_capabilities(business_id,capability_id,is_enabled,created_at,updated_at) VALUES('b','commerce.inventory',1,'t','t')");
+  const product = store.saveCatalogProduct(databasePath, { name: "Atomic product", salePrice: 25, purchasePrice: 10, trackInventory: true, minimumQuantity: 2 });
+  store.setInventoryCount(databasePath, { productId: product.id, countedQuantity: 10 });
+  const snapshot = () => JSON.stringify(["catalog_products", "commerce_product_publications", "inventory_locations", "inventory_balances", "inventory_movements", "sync_outbox", "sync_outbox_revisions", "sync_publication_payloads"].map(table => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()));
+  const photo = bytes => ({ id: hash(bytes), format: "image/png", dataUrl: url(bytes) });
+  const input = () => ({ product: { id: product.id, name: "Together", salePrice: 30, purchasePrice: 12, minimumQuantity: 4, trackInventory: true, isActive: false, quickAccessEnabled: true },
+    sourcePhotoRevision: photos.listProductPhotos(databasePath, product.id).revision, imageMode: "keep", isPublished: false,
+    photos: [photo(png(155)), photo(png(156))], stock: { operation: "add", quantity: 4, note: "Unified stock", expectedUpdatedAt: store.getInventoryBalance(databasePath, product.id).updatedAt, operationId: "unified-add" } });
+  const save = async draft => productSave.saveProductDetails(databasePath, await productSave.prepareProductDetailsSave(databasePath, draft));
+  const before = snapshot(), draft = input();
+  const prepared = await productSave.prepareProductDetailsSave(databasePath, draft);
+  assert.equal(snapshot(), before, "preparation/discard performs no DB or outbox write");
+  const result = productSave.saveProductDetails(databasePath, prepared);
+  assert.equal(result.product.name, "Together"); assert.equal(result.product.minimumQuantity, 4);
+  assert.equal(result.product.isActive, false); assert.equal(result.product.quickAccessEnabled, true);
+  assert.equal(result.publication.isPublished, false); assert.equal(result.photos.photos.length, 2);
+  assert.equal(result.stock.balance.quantity, 14); assert.equal(result.balance.quantity, 14); assert.equal(result.stock.movement.quantityDelta, 4);
+  assert.equal(store.listInventoryMovements(databasePath, { productId: product.id }).length, 2);
+  const committed = snapshot();
+  await assert.rejects(save(draft), /değişti|zaten kaydedildi/);
+  assert.equal(snapshot(), committed, "an exact replay cannot append stock twice");
+
+  // Fail late, after product, photos and publication have all been written.
+  const rollbackDraft = input(); rollbackDraft.stock.operationId = "rollback";
+  rollbackDraft.product.name = "Must roll back"; rollbackDraft.isPublished = true;
+  rollbackDraft.photos = [photo(png(157))];
+  const pending = await productSave.prepareProductDetailsSave(databasePath, rollbackDraft);
+  db.exec("CREATE TRIGGER unified_fail BEFORE INSERT ON inventory_movements BEGIN SELECT RAISE(ABORT,'late_inventory_failure'); END");
+  assert.throws(() => productSave.saveProductDetails(databasePath, pending), /late_inventory_failure/);
+  assert.equal(snapshot(), committed, "late failure rolls back metadata, publication, photos, stock AND all outbox revisions");
+  db.exec("DROP TRIGGER unified_fail");
+
+  const stale = await productSave.prepareProductDetailsSave(databasePath, { ...input(), stock: undefined });
+  const current = photos.listProductPhotos(databasePath, product.id);
+  photos.mutateProductPhotos(databasePath, { productId: product.id, expectedRevision: current.revision }, { kind: "cover", photoId: current.photos[1].id });
+  const afterConcurrentPhoto = snapshot();
+  assert.throws(() => productSave.saveProductDetails(databasePath, stale), /fotoğrafları değişti/);
+  assert.equal(snapshot(), afterConcurrentPhoto);
+  const stockStale = await productSave.prepareProductDetailsSave(databasePath, { ...input(), photos: undefined, stock: { ...input().stock, operationId: "stale-stock", operation: "count", quantity: 0 } });
+  store.applyInventoryMovement(databasePath, { productId: product.id, type: "adjust", quantityDelta: 1 });
+  const afterConcurrentStock = snapshot();
+  assert.throws(() => productSave.saveProductDetails(databasePath, stockStale), /Stok bu sayımdan sonra değişti/);
+  assert.equal(snapshot(), afterConcurrentStock);
+  const count = input(); count.photos = undefined; count.stock = { ...count.stock, operation: "count", quantity: 0, operationId: "count-zero" };
+  const counted = await save(count);
+  assert.equal(counted.stock.balance.quantity, 0); assert.equal(counted.stock.movement.type, "count");
+  assert.equal(store.listInventoryMovements(databasePath, { productId: product.id }).length, 4, "count creates only one additional immutable movement");
+  const afterCount = snapshot(); await assert.rejects(save(count), /zaten kaydedildi/); assert.equal(snapshot(), afterCount);
+
+  const invalids = [
+    { ...input(), photos: [photo(png(160)), { ...photo(png(161)), dataUrl: url(Buffer.from("invalid")) }] },
+    { ...input(), photos: [photo(png(160)), photo(png(160))] },
+    { ...input(), photos: Array.from({ length: 13 }, (_, i) => photo(png(170 + i))) },
+    { ...input(), photos: [{ ...photo(png(160)), id: "0".repeat(64) }] },
+    { ...input(), photos: [photo(Buffer.alloc(5 * 1024 * 1024 + 1))] },
+    { ...input(), imageMode: "manual", photos: undefined, product: { ...input().product, manualImageDataUrl: "invalid" } }
+  ];
+  for (const invalid of invalids) { const beforeInvalid = snapshot(); await assert.rejects(save({ ...invalid, stock: undefined }), /fotoğraf|görsel|JPEG|5 MB/); assert.equal(snapshot(), beforeInvalid); }
+  // Gate changes after decoding must also roll back everything.
+  const gated = await productSave.prepareProductDetailsSave(databasePath, { ...input(), stock: undefined });
+  db.exec("UPDATE business_capabilities SET is_enabled=0 WHERE capability_id='channel.online_sales'");
+  const disabled = snapshot(); assert.throws(() => productSave.saveProductDetails(databasePath, gated), /Online Satış/); assert.equal(snapshot(), disabled);
+  // Cover-only editing is still supported when the multi-photo capability is off.
+  const manual = { product: { id: product.id, name: "Manual cover", trackInventory: true, manualImageDataUrl: url(png(200)) }, imageMode: "manual", sourcePhotoRevision: photos.listProductPhotos(databasePath, product.id).revision };
+  const manualResult = await save(manual); assert.equal(manualResult.photos.photos[0].id, hash(png(200)));
+  assert.equal(manualResult.photos.photos.length, 2, "manual cover keeps the other originals");
+  const clearResult = await save({ ...manual, imageMode: "clear", sourcePhotoRevision: manualResult.photos.revision });
+  assert.equal(clearResult.photos.photos.length, 1, "cover clear promotes the next photo");
+  // Automatic/external image acquisition is optional when the service/images mode is off.
+  const external = await save({ product: { id: product.id, name: "Auto mode off", trackInventory: true, imageSourceUrl: "https://images.openfoodfacts.org/images/products/123/front_en.jpg", dataSource: "open_food_facts" }, imageMode: "external", sourcePhotoRevision: clearResult.photos.revision });
+  assert.equal(external.product.imageAssetPath, clearResult.product.imageAssetPath);
+  db.exec("INSERT INTO settings(id,business_id,product_data_enabled,product_data_include_images,created_at,updated_at) VALUES('s','b',1,1,'t','t')");
+  const fetchImpl = globalThis.fetch;
+  try {
+    let imageFetches = 0;
+    globalThis.fetch = async () => { imageFetches++; return new Response(png(205), { headers: { "content-type": "image/png" } }); };
+    const externalUrl = "https://images.openfoodfacts.org/images/products/123/front.jpg";
+    const automatic = await save({ product: { id: product.id, name: "Auto image", trackInventory: true, dataSource: "open_food_facts", imageSourceUrl: externalUrl, imageLicense: "CC BY-SA" }, imageMode: "external", sourcePhotoRevision: external.photos.revision });
+    assert.equal(imageFetches, 1); assert.ok(automatic.product.imageAssetPath); assert.equal(automatic.photos.sourceUrl, externalUrl);
+    db.exec("UPDATE settings SET product_data_include_images=0");
+    const noAutoImage = await save({ product: { name: "No auto image", trackInventory: false, dataSource: "open_food_facts", imageSourceUrl: externalUrl }, imageMode: "external", sourcePhotoRevision: "" });
+    assert.equal(noAutoImage.product.imageAssetPath, ""); assert.equal(imageFetches, 1);
+    db.exec("UPDATE settings SET product_data_include_images=1");
+    db.exec("UPDATE business_capabilities SET is_enabled=1 WHERE capability_id='channel.online_sales'");
+    const combined = await save({ product: { name: "External and gallery draft", trackInventory: false, dataSource: "open_food_facts", imageSourceUrl: externalUrl }, imageMode: "external", sourcePhotoRevision: "", photos: [photo(png(207)), photo(png(208))] });
+    assert.equal(combined.photos.photos.length, 2); assert.equal(combined.photos.photos[1].id, hash(png(208)), "external cover preserves other staged gallery additions");
+    assert.equal(combined.photos.sourceUrl, externalUrl);
+  } finally { globalThis.fetch = fetchImpl; }
+  db.exec("UPDATE business_capabilities SET is_enabled=1 WHERE capability_id='channel.online_sales'");
+  const created = await save({ product: { name: "Create together", trackInventory: true }, sourcePhotoRevision: "", imageMode: "keep", isPublished: false,
+    photos: [photo(png(210)), photo(png(211))], stock: { operation: "add", quantity: 3, note: "Initial stock", expectedUpdatedAt: "", operationId: "create-stock" } });
+  assert.equal(created.photos.photos.length, 2); assert.equal(created.stock.balance.quantity, 3); assert.equal(created.publication.isPublished, false);
+  assert.equal(store.listInventoryMovements(databasePath, { productId: created.product.id }).length, 1);
+  const removed = await save({ product: { id: created.product.id, name: created.product.name, trackInventory: true }, sourcePhotoRevision: created.photos.revision, imageMode: "keep",
+    stock: { operation: "remove", quantity: 1, note: "Remove once", expectedUpdatedAt: created.balance.updatedAt, operationId: "remove-once" } });
+  assert.equal(removed.balance.quantity, 2); assert.equal(removed.stock.movement.quantityDelta, -1);
+  const unchangedCount = await save({ product: { id: created.product.id, name: created.product.name, trackInventory: true }, sourcePhotoRevision: removed.photos.revision, imageMode: "keep",
+    stock: { operation: "count", quantity: 2, note: "Unchanged count", expectedUpdatedAt: removed.balance.updatedAt, operationId: "count-no-change" } });
+  assert.equal(unchangedCount.stock.movement, null);
+  assert.equal(store.listInventoryMovements(databasePath, { productId: created.product.id }).length, 2, "a no-op count does not invent an audit movement");
+  // Actual new IPC: async acquisition must recheck unlock and database identity;
+  // notifications run only after the full commit and cannot turn it into a failure.
+  const ipcFile = path.resolve("apps/desktop-app/dist-electron/commerce-ipc.js"), compiledRequire = createRequire(ipcFile);
+  const handlers = new Map(), ipcExports = {};
+  runInNewContext(fs.readFileSync(ipcFile, "utf8"), { exports: ipcExports, Error, require: name => name === "electron"
+    ? { ipcMain: { handle: (channel, fn) => handlers.set(channel, fn) } }
+    : name === "./ipc/product-photo-ipc" ? { registerProductPhotoIpcHandlers() {} } : compiledRequire(name) });
+  let unlocked = true, activePath = databasePath, notifications = 0;
+  ipcExports.registerCommerceIpcHandlers({ databasePath: () => activePath, assertUnlocked: () => { if (!unlocked) throw new Error("session locked"); }, onMutation: () => {
+    notifications++; assert.equal(store.getInventoryBalance(databasePath, product.id).quantity, 4); throw new Error("notification fixture failure");
+  } });
+  const call = draft => handlers.get("commerce:product:saveDetails")({}, draft);
+  for (const gate of ["lock", "path"]) {
+    const draft = { ...input(), stock: undefined };
+    const beforeGate = snapshot(), request = call(draft);
+    if (gate === "lock") unlocked = false; else activePath = "changed.sqlite";
+    await assert.rejects(request, /locked|veritabanı/);
+    unlocked = true; activePath = databasePath;
+    assert.equal(snapshot(), beforeGate); assert.equal(notifications, 0);
+  }
+  const viaIpc = input(); viaIpc.stock.operationId = "ipc-once";
+  const ipcResult = await call(viaIpc);
+  assert.equal(ipcResult.stock.balance.quantity, 4); assert.equal(notifications, 1);
+  const afterIpc = snapshot(); await assert.rejects(call(viaIpc), /değişti|zaten kaydedildi/); assert.equal(snapshot(), afterIpc);
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 }
 
 app.whenReady().then(async () => {
@@ -165,7 +295,8 @@ app.whenReady().then(async () => {
     store.saveCatalogProduct(databasePath, clear, await media.prepareProductImageForSave(databasePath, clear));
     assert.deepEqual(JSON.parse(row().image_original_assets_json).map(a => a.hash), hashes.slice(1));
     assert.ok(row().image_asset_path);
-    console.log(`${process.env.PRODUCT_PHOTO_NODE_CODEC === "1" ? "product-photos-node-codec-service-ok (Electron encoder unproved)" : "product-photos-smoke-ok"}: PNG/JPEG/WebP, legacy, append/dedup, cover/reorder/remove, lock/capability/path recheck, durable invalidation, 12-photo ZIP roundtrip, offline cover editor`);
+    await verifyUnifiedSave();
+    console.log(`${process.env.PRODUCT_PHOTO_NODE_CODEC === "1" ? "product-photos-node-codec-service-ok (Electron encoder unproved)" : "product-photos-smoke-ok"}: PNG/JPEG/WebP, legacy, append/dedup, cover/reorder/remove, lock/capability/path recheck, durable invalidation, 12-photo ZIP roundtrip, offline cover editor, unified atomic save/discard, rollback/outbox, stale photo/stock, one movement, create and manual/auto modes`);
   } finally {
     for (const db of databases) db.close();
     fs.rmSync(root, { recursive: true, force: true });

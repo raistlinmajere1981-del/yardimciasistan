@@ -42,8 +42,8 @@ try {
   await expect(backupPanel.locator(".backup-row")).toHaveCount(1);
   await visit("");
   const expandStructure = async () => {
-    const toggle = page.getByRole("button", { name: /^İşletme Yapısı ve Özellikler/ });
-    if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
+    await expect(page.getByRole("heading", { name: "İşletme Yapısı ve Özellikler", exact: true })).toBeVisible();
+    await expect(page.locator("#settings-structure-content")).toBeVisible();
   };
   const reopenSettings = async () => {
     const previousContent = await page.locator("#settings-structure-content").elementHandle();
@@ -55,6 +55,32 @@ try {
   for (const profile of ["restaurant", "market"]) {
     await visit(`?profile=${profile}&webVisibility=on`);
     await expandStructure();
+    const webPanel = page.locator("#settings-web");
+    const webControls = webPanel.locator(".settings-web-controls");
+    await expect(webControls.locator('input[type="checkbox"]')).toHaveCount(2);
+    await expect(webControls.locator("label")).toHaveText(["Otomatik eşitle", "Site trafiğini ölç"]);
+    await expect(webPanel.locator(".settings-web-heading").getByLabel("Etkin", { exact: true })).toHaveCount(1);
+    await expect(webPanel.locator(".settings-web-traffic-note")).toHaveCount(0);
+    const webLayout = await webPanel.evaluate(panel => {
+      const boxes = Array.from(panel.querySelectorAll(".settings-web-controls label"), element => element.getBoundingClientRect());
+      const fields = panel.querySelector(".settings-web-fields").getBoundingClientRect();
+      return { sameLine: boxes.every(box => Math.abs(box.top - boxes[0].top) < 2), belowFields: boxes[0].top >= fields.bottom };
+    });
+    expect(webLayout.sameLine).toBe(true);
+    expect(webLayout.belowFields).toBe(true);
+    const panelLayout = await page.evaluate(() => {
+      const selectors = ["#settings-web", ".settings-structure", "#settings-public-profile"];
+      const panels = selectors.map(selector => document.querySelector(selector));
+      const heights = panels.map(panel => panel.querySelector(".settings-panel-header").getBoundingClientRect().height);
+      return {
+        heights,
+        sameScrollableParent: panels.every(panel => panel.parentElement?.classList.contains("settings-page-body")),
+        structureToggleAbsent: panels[1].querySelector('.settings-panel-header [aria-expanded]') === null
+      };
+    });
+    expect(panelLayout.heights.every(height => Math.abs(height - panelLayout.heights[0]) < 2), JSON.stringify(panelLayout.heights)).toBe(true);
+    expect(panelLayout.sameScrollableParent).toBe(true);
+    expect(panelLayout.structureToggleAbsent).toBe(true);
     const labels = profile === "restaurant" ? ["Talepler", "QR Menü", "Online Satış"] : ["Talepler", "Online Satış"];
     const options = page.locator("#settings-options");
     const assertWebOptions = async available => {

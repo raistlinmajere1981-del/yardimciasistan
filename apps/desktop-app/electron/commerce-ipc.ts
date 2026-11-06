@@ -4,6 +4,7 @@ import { CommerceBenefitsError } from "./commerce-benefits-engine";
 import { benefitsManagementFailure, assertBenefitsManagementSender } from "./ipc/commerce-benefits-ipc";
 import { createTrustedDesktopRendererUrlPredicate } from "./desktop-runtime";
 import { registerProductPhotoIpcHandlers } from "./ipc/product-photo-ipc";
+import { prepareProductDetailsSave, saveProductDetails } from "./commerce-product-save";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
@@ -158,6 +159,18 @@ export function registerCommerceIpcHandlers(options: {
       if (databasePath() !== productDatabasePath) throw new Error("Ürün veritabanı değişti; yeniden yükleyin.");
       return saveRuntimeCatalogProduct(productDatabasePath, input, image);
     });
+  });
+  ipcMain.handle("commerce:product:saveDetails", async (_event, input: Parameters<DesktopCommerceBridge["saveProductDetails"]>[0]) => {
+    options.assertUnlocked();
+    const path = databasePath();
+    const prepared = await prepareProductDetailsSave(path, input);
+    options.assertUnlocked();
+    if (databasePath() !== path) throw new Error("Ürün veritabanı değişti; yeniden yükleyin.");
+    const result = saveProductDetails(path, prepared);
+    // A projection failure after commit must not invite a second stock action.
+    try { options.onMutation?.(); }
+    catch (error) { desktopLog.warn({ scope: "commerce", event: "commerce.product.refresh.failed", message: "Ürün kaydedildi; görünüm bildirimi tamamlanamadı.", error }); }
+    return result;
   });
   ipcMain.handle("commerce:product:findByBarcode", (_event, barcode: string) =>
     read(() => findRuntimeProductByBarcode(databasePath(), barcode))

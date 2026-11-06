@@ -152,6 +152,8 @@ window.yardimciDesktop = {
   saveTranslation: input => translationFixture("save",input),
   startTranslation: input => translationFixture("start",input),
   getTranslationJob: () => translationFixture("job"),
+  pauseTranslation: () => translationFixture("pause"),
+  resumeTranslation: () => translationFixture("resume"),
   cancelTranslation: () => translationFixture("cancel"),
   getDictationStatus: dictationStatus,
   saveDictationEnabled: async enabled => {

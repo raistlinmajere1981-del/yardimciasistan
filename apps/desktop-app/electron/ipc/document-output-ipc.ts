@@ -56,7 +56,7 @@ export function registerDocumentOutputIpcHandlers(options: Options): void {
       const known = error instanceof DocumentOutputManagementError ? error.message : error instanceof Error ? error.message : "";
       const code = ["DOCUMENT_INPUT_INVALID", "DOCUMENT_OWNER_REQUIRED", "DOCUMENT_SESSION_LOCKED", "DOCUMENT_TENANT_REQUIRED", "DOCUMENT_CAPABILITY_DISABLED", "DOCUMENT_SALE_JOB_CONFIGURATION_MISSING", "DOCUMENT_SALE_JOB_LINES_MISSING", "DOCUMENT_SALE_SOURCE_INVALID"].includes(known) ? known : "DOCUMENT_SALE_PREPARE_FAILED";
       return { ok: false, code, message: code === "DOCUMENT_SALE_JOB_LINES_MISSING"
-        ? "Fiş şablonunda ürün satırları eksik veya kapasitesi yetersiz. Baskı Yönetimi > Satış fişi > Düzenle > Ürün satırlarını ekle > Şablonları kaydet. Satır kapasitesini aşan satışlar hazırlanamaz."
+        ? "Fiş şablonunda ürün satırları eksik veya kapasitesi yetersiz. Baskı Yönetimi > Satış fişi > Düzenle > Yerleşim ve form > Ürün satırlarını ekle > Kaydet. Satır kapasitesini aşan satışlar hazırlanamaz."
         : code === "DOCUMENT_SALE_JOB_CONFIGURATION_MISSING"
         ? "Fiş için Baskı Yönetimi'nde şablon, yerel yazıcı ve manuel yazdırma onayı ayarlayın."
         : "Fiş hazırlanamadı. Satış kaydı korunuyor; yetki ve baskı ayarlarını kontrol edin." };

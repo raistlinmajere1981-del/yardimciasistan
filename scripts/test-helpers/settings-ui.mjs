@@ -1,7 +1,10 @@
+import { expect } from '@playwright/test';
+
 /** Shared user interactions for the single-page Settings surface. */
 export async function expandSettingsStructure(page) {
-  const toggle = page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ });
-  if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+  // Structure and services are always rendered; there is no disclosure toggle.
+  await expect(page.getByRole('heading', { name: 'İşletme Yapısı ve Özellikler', exact: true })).toBeVisible();
+  await expect(page.locator('#settings-structure-content')).toBeVisible();
 }
 export async function openSettingsService(page, id) {
   await expandSettingsStructure(page);
