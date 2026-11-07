@@ -1,0 +1,21 @@
+{
+  "table_order.add": "Sepete ekle",
+  "table_order.cart_title": "Masa siparişi",
+  "table_order.note": "Sipariş notu",
+  "table_order.submit": "Sipariş talebi gönder",
+  "table_order.wait": "Masa doğrulanıyor…",
+  "table_order.ready": "{name} için sipariş hazırlanıyor.",
+  "table_order.invalid": "Masa QR kodu geçersiz veya sipariş kapalı.",
+  "table_order.sent": "Sipariş talebiniz alındı. İşletme onayı bekleniyor. Referans: {id}",
+  "table_order.sending": "Sipariş gönderiliyor…",
+  "table_order.retry": "Sipariş gönderilemedi. Tekrar deneyin.",
+  "table_order.empty": "Henüz ürün eklenmedi.",
+  "table_order.remove": "Sil",
+  "table_order.quantity": "Adet",
+  "table_order.item_note": "Ürün notu",
+  "table_order.total": "Toplam",
+  "table_order.currency_error": "Aynı siparişte farklı para birimleri kullanılamaz.",
+  "table_order.demo_ready": "Demo Masa B3 · Sipariş simülasyonu",
+  "table_order.demo_send": "Simülasyonu tamamla",
+  "table_order.demo_done": "Demo tamamlandı. Gerçek sipariş veya talep gönderilmedi."
+}

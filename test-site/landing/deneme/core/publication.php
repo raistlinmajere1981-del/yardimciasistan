@@ -166,6 +166,7 @@ function project_publication(array $business, array $sources, string $modulePath
             'traffic' => ($info['traffic_enabled'] ?? false) === true,
             'room_requests' => $rooms !== [] && in_array('pension_reservation', $requestTypes, true),
             'table_requests' => $tables !== [] && in_array('restaurant_reservation', $requestTypes, true),
+            'table_orders' => $menu !== [] && ($menuPayload['table_orders_enabled'] ?? false) === true,
             'dealer_application' => in_array('dealer_application', $requestTypes, true) && ($info['dealer_application_enabled'] ?? false) === true,
             'account' => ($data('account/config')['enabled'] ?? false) === true,
             'orders' => $products !== [] && ($catalogPayload['delivery_methods'] ?? []) !== [],

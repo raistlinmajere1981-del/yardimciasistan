@@ -8,6 +8,11 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
 function source_catalog(string $root): array
 {
     $source = json_decode((string) file_get_contents($root . '/locales/tr.json'), true, 512, JSON_THROW_ON_ERROR);
+    // Shared QR ordering UI phrases must be available on every site after a common
+    // template update, without overwriting site-owned locales/tr.json.
+    $qrSource = json_decode((string) file_get_contents(__DIR__ . '/locales/qr-table-order-tr.json'), true, 512, JSON_THROW_ON_ERROR);
+    if (!is_array($source) || !is_array($qrSource)) throw new \RuntimeException('Invalid source catalog');
+    $source = array_replace($source, $qrSource);
     $entries = [];
     foreach ($source as $key => $value) {
         if ($key === '_meta') continue;
