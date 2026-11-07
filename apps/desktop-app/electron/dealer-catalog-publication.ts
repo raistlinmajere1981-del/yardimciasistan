@@ -27,7 +27,8 @@ export function createDealerCatalogs(db: DatabaseSync, access: DealerAccessProje
       return { product_id: String(row.id), name: String(row.title_override || row.name), description: String(row.description_override || row.description), sku: String(row.sku),
         category_id: String(row.category_id), category_name: String(row.category_name), brand: String(row.brand),
         unit: String(row.unit) as CommerceUnit, price: resolved.unitPrice, currency: resolved.currency,
-        tax_rate: Number(row.tax_rate), image_url: publicImageUrl(row.image_source_url), availability: "available" as const };
+        tax_rate: Number(row.tax_rate), image_url: publicImageUrl(row.image_source_url), availability: "available" as const,
+        is_featured: Number(row.is_featured) === 1, featured_order: Number(row.featured_order) };
     });
     // Every invalidation renews the hint, including profile changes with identical prices.
     const content = { access_id: dealer.access_id, access_revision: dealer.access_revision, delivery_methods: deliveryMethods, products };

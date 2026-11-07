@@ -26,7 +26,7 @@ function php(args) {
  assert.equal(result.stderr,'','Unexpected PHP diagnostics'); return result.stdout;
 }
 test('canonical + Admin + actual EfektAtolyesi provenance and independent themes', async()=>{
- assert.equal(manifest.template_version,'0.7.6'); assert.equal(Object.keys(manifest.common).length,77);
+ assert.equal(manifest.template_version,'0.7.7'); assert.equal(Object.keys(manifest.common).length,77);
  assert.equal(hash(join(template,'public/assets/core/widget.js')),widgetSha);
  const provenance=await canonicalProvenance(join(workspace,'EfektAtolyesi'));
  assert.equal(Object.keys(provenance.files).length,19);

@@ -26,6 +26,16 @@
 - SMTP kabulü, gelen kutusuna teslim kanıtı değildir. `sent` SMTP sunucusunun DATA kabulünü ifade eder. Normal olay tekrarları mükerrer gönderim üretmez. SMTP'nin kabulünden sonra bağlantı/DB kaybında mutlak tek-gönderim garantisi yoktur; sabit Message-ID bu sınırlamayı ortadan kaldırmaz. Kesin sağlayıcı idempotency'si için gelecekte sağlayıcı API adaptörü gerekir.
 - Hesap doğrulama/sıfırlama tokenları bu kuyruğa düz metin yazılmaz. Bu iletileri kuyruğa almak için süre/iptal denetimi ve sunucu anahtarıyla şifrelenmiş içerik tasarımı gereklidir.
 
+## Vitrin ürünü — yerel hazırlık (V2 kabulü değildir)
+
+- Masaüstü `commerce_product_publications`: `is_featured` ve `featured_order` alanları eklenmiştir. Bunlar satış ekranının `quick_access_enabled` alanından bağımsızdır; kategori/sipariş/fiyat bilgisini değiştirmez.
+- Ürün detayındaki **Vitrinde göster** / **Vitrin sırası** kontrolleri Ürünü Kaydet ile tek işlemde kaydedilir. Yalnız yayınlanan ve aktif ürünler siteye ulaşır.
+- Online katalog yayın sözleşmesi ve sunucu `ya_online_catalog_projection` doğrulaması işaret/sırayı korur. Aynı halka açık alanlar bayi katalog sunumunda da taşınır; perakende ve bayi fiyat ayrımı değişmez.
+- Teknikel ana sayfası işaretli ürünleri `featured_order` ile gösterir; hiç işaretli ürün yoksa mevcut ilk dört ürün gösterimi korunur. Tek ürün kartı / sepet / karşılaştırma motoru kullanılmaya devam eder.
+- DEMO Teknikel veri üretimi ilk dört küratörlü ürünü vitrin ürünü olarak işaretler. Yeni verilerle test yapılabilir; mevcut canlı veriyi değiştirmedik.
+- Ortak web şablonu `0.7.7`, BlackSea/Teknikel/Gündoğdu/demo yerel kopyaları uyumluluk için eşitlendi. **Canlı deploy, uygulama paketi üretimi ve uzak veritabanı güncellemesi yapılmadı.**
+- Masaüstü tam şema imzası korundu: eski demo SQLite dosyası yeni `schema.sql` ile uyumsuz sayılır. V2 temiz kurulum aşamasında veriler sıfırlanmalı; otomatik / gölge migration eklenmedi. Önceden paylaşılan `0.7.6` site/API kurulumlarının birlikte güncellenmesi gerekir.
+
 ## Aşamaların gerçek durumu
 
 | Aşama | Durum |

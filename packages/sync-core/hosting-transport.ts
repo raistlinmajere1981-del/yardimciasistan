@@ -216,7 +216,8 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
         sku: product.sku, unit: product.unit, price: product.price, currency: product.currency,
         tax_rate: product.taxRate, image_url: product.imageUrls === undefined ? product.imageUrl : product.imageUrls[0] ?? "",
         image_urls: product.imageUrls ?? (product.imageUrl ? [product.imageUrl] : []),
-        availability: product.availability, sort_order: product.sortOrder
+        availability: product.availability, sort_order: product.sortOrder,
+        is_featured: product.isFeatured === true, featured_order: product.featuredOrder ?? 0
       }))
     }
   });

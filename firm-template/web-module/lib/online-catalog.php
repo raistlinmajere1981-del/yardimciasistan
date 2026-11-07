@@ -62,6 +62,14 @@ function ya_online_catalog_projection(array $candidate): array
                 || ($raw['availability'] ?? '') !== 'available' || isset($products[$id])) {
                 throw new InvalidArgumentException('invalid_online_product');
             }
+            // Public storefront placement is independent of the product category and
+            // the desktop's cash-register quick-access marker.
+            $isFeatured = $raw['is_featured'] ?? false;
+            $featuredOrder = $raw['featured_order'] ?? 0;
+            if (!is_bool($isFeatured) || !is_int($featuredOrder)
+                || $featuredOrder < 0 || $featuredOrder > 1000000) {
+                throw new InvalidArgumentException('invalid_featured_product');
+            }
             $imageUrl = ya_online_product_image_url($raw['image_url'] ?? '');
             $imageUrls = ya_online_product_image_urls($raw, $imageUrl);
             $products[$id] = [
@@ -71,7 +79,8 @@ function ya_online_catalog_projection(array $candidate): array
                 'sku' => mb_substr(is_string($raw['sku'] ?? null) ? $raw['sku'] : '', 0, 80),
                 'unit' => $unit, 'price' => $price, 'currency' => $currency, 'tax_rate' => $taxRate,
                 'image_url' => $imageUrl, 'image_urls' => $imageUrls, 'availability' => 'available',
-                'sort_order' => max(0, (int)($raw['sort_order'] ?? 0))
+                'sort_order' => max(0, (int)($raw['sort_order'] ?? 0)),
+                'is_featured' => $isFeatured, 'featured_order' => $featuredOrder
             ];
         }
     }

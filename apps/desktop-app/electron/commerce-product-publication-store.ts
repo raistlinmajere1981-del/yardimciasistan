@@ -11,6 +11,8 @@ function mapPublication(row: Record<string, unknown>): CommerceProductPublicatio
   return {
     productId: String(row.product_id), businessId: String(row.business_id), channel: "online_sales",
     isPublished: Number(row.is_published) === 1,
+    isFeatured: Number(row.is_featured) === 1,
+    featuredOrder: Number(row.featured_order),
     titleOverride: String(row.title_override), descriptionOverride: String(row.description_override),
     sortOrder: Number(row.sort_order), createdAt: String(row.created_at), updatedAt: String(row.updated_at)
   };
@@ -40,20 +42,25 @@ export function saveCommerceProductPublication(db: DatabaseSync, input: SaveComm
   const title = input.titleOverride === undefined ? existing?.titleOverride ?? "" : String(input.titleOverride).trim();
   const description = input.descriptionOverride === undefined ? existing?.descriptionOverride ?? "" : String(input.descriptionOverride).trim();
   const sortOrder = input.sortOrder ?? existing?.sortOrder ?? 0;
-  if (title.length > 180 || description.length > 2000 || !Number.isSafeInteger(sortOrder) || sortOrder < 0) {
+  const isFeatured = input.isFeatured ?? existing?.isFeatured ?? false;
+  const featuredOrder = input.featuredOrder ?? existing?.featuredOrder ?? 0;
+  if (typeof isFeatured !== "boolean" || !Number.isSafeInteger(featuredOrder) || featuredOrder < 0
+    || featuredOrder > 1_000_000 || title.length > 180 || description.length > 2000 || !Number.isSafeInteger(sortOrder) || sortOrder < 0) {
     throw new Error("Ürün yayın alanları geçersiz.");
   }
-  if (existing && existing.isPublished === input.isPublished && existing.titleOverride === title
+  if (existing && existing.isPublished === input.isPublished && existing.isFeatured === isFeatured
+      && existing.featuredOrder === featuredOrder && existing.titleOverride === title
       && existing.descriptionOverride === description && existing.sortOrder === sortOrder) return existing;
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO commerce_product_publications (product_id, business_id, channel, is_published,
-      title_override, description_override, sort_order, created_at, updated_at)
-    VALUES (?, ?, 'online_sales', ?, ?, ?, ?, ?, ?)
+      is_featured, featured_order, title_override, description_override, sort_order, created_at, updated_at)
+    VALUES (?, ?, 'online_sales', ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(product_id, channel) DO UPDATE SET is_published = excluded.is_published,
+      is_featured = excluded.is_featured, featured_order = excluded.featured_order,
       title_override = excluded.title_override, description_override = excluded.description_override,
       sort_order = excluded.sort_order, updated_at = excluded.updated_at
-  `).run(productId, businessId, input.isPublished ? 1 : 0, title, description, sortOrder, now, now);
+  `).run(productId, businessId, input.isPublished ? 1 : 0, isFeatured ? 1 : 0, featuredOrder, title, description, sortOrder, now, now);
   return getCommerceProductPublication(db, productId)!;
 }
 

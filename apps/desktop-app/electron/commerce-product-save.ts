@@ -17,6 +17,8 @@ export interface SaveProductDetailsInput {
   imageMode: "keep" | "manual" | "clear" | "external";
   photos?: ProductPhotoDraftPhoto[];
   isPublished?: boolean;
+  isFeatured?: boolean;
+  featuredOrder?: number;
   stock?: {
     operation: "add" | "remove" | "count";
     quantity: number;
@@ -47,8 +49,12 @@ function validate(databasePath: string, db: DatabaseSync, input: SaveProductDeta
   const capabilities = readEnabledBusinessCapabilities(db);
   if (!capabilities.includes(BUSINESS_CAPABILITIES.CATALOG)) throw new Error("Ürün kataloğu bu işletmede etkin değil.");
   if ((input.product.trackInventory !== false || input.stock) && !capabilities.includes(BUSINESS_CAPABILITIES.INVENTORY)) throw new Error("Stok takibi bu işletmede etkin değil.");
-  if ((input.photos !== undefined || input.isPublished !== undefined) && !capabilities.includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Ürün fotoğraf yönetimi ve web yayını için Online Satış etkin olmalı.");
+  if ((input.photos !== undefined || input.isPublished !== undefined || input.isFeatured !== undefined || input.featuredOrder !== undefined) && !capabilities.includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Ürün fotoğraf yönetimi ve web yayını için Online Satış etkin olmalı.");
   if (input.isPublished !== undefined && typeof input.isPublished !== "boolean") throw new Error("Ürün yayın bilgisi geçersiz.");
+  if ((input.isFeatured !== undefined && typeof input.isFeatured !== "boolean")
+    || (input.featuredOrder !== undefined && (!Number.isSafeInteger(input.featuredOrder) || input.featuredOrder < 0 || input.featuredOrder > 1_000_000))) {
+    throw new Error("Vitrin ürün bilgisi geçersiz.");
+  }
   const business = db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at ASC LIMIT 1").get();
   if (!business) throw new Error("Aktif işletme bulunamadı.");
   const businessId = String(business.id);
@@ -159,8 +165,15 @@ export function saveProductDetails(databasePath: string, prepared: PreparedProdu
         { kind: "replace", photoIds, additions: finalAdditions,
           ...(image ? { source: { url: image.sourceUrl, license: image.license } } : {}) }, now);
     }
-    const publication = input.isPublished === undefined ? getCommerceProductPublication(db, saved.id)
-      : saveCommerceProductPublication(db, { productId: saved.id, isPublished: input.isPublished });
+    const existingPublication = getCommerceProductPublication(db, saved.id);
+    const publication = input.isPublished === undefined && input.isFeatured === undefined && input.featuredOrder === undefined
+      ? existingPublication
+      : saveCommerceProductPublication(db, {
+          productId: saved.id,
+          isPublished: input.isPublished ?? existingPublication?.isPublished ?? false,
+          ...(input.isFeatured !== undefined ? { isFeatured: input.isFeatured } : {}),
+          ...(input.featuredOrder !== undefined ? { featuredOrder: input.featuredOrder } : {})
+        });
     let stock: InventoryCountResult | null = null;
     if (input.stock) {
       const draft = input.stock;

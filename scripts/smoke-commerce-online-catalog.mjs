@@ -85,9 +85,18 @@ try {
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM catalog_products WHERE name = 'Atomic failure'").get().n, 0);
   assert.equal(raw.prepare("SELECT source_revision FROM sync_outbox WHERE job_key = 'online_catalog'").get().source_revision, revisionBeforeFailure);
   raw.exec("DROP TRIGGER reject_auto_publication");
-  const publication = database.saveCommerceProductPublication({ productId: product.id, isPublished: true, titleOverride: "Public title", sortOrder: 2 });
+  const publication = database.saveCommerceProductPublication({ productId: product.id, isPublished: true, isFeatured: true, featuredOrder: 7, titleOverride: "Public title", sortOrder: 2 });
+  assert.equal(publication.isFeatured, true);
+  assert.equal(publication.featuredOrder, 7);
   const updated = database.saveCommerceProductPublication({ productId: product.id, isPublished: true, descriptionOverride: "Public override" });
   assert.equal(updated.titleOverride, publication.titleOverride);
+  assert.equal(updated.isFeatured, true, "editing descriptions preserves vitrin state");
+  assert.equal(updated.featuredOrder, 7, "editing descriptions preserves vitrin order");
+  assert.equal(raw.prepare("SELECT is_featured, featured_order FROM commerce_product_publications WHERE product_id = ?").get(product.id).is_featured, 1);
+  assert.throws(() => database.saveCommerceProductPublication({productId: product.id,isPublished:true,featuredOrder:-1}), /geçersiz/);
+  assert.throws(() => database.saveCommerceProductPublication({productId: product.id,isPublished:true,featuredOrder:1.5}), /geçersiz/);
+  assert.throws(() => database.saveCommerceProductPublication({productId: product.id,isPublished:true,isFeatured:"yes"}), /geçersiz/);
+
   assert.equal(updated.createdAt, publication.createdAt);
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_product_publications WHERE product_id = ?").get(product.id).n, 1);
   assert.throws(() => raw.prepare("INSERT INTO commerce_product_publications SELECT * FROM commerce_product_publications WHERE product_id = ?").run(product.id), /UNIQUE/);
@@ -99,9 +108,11 @@ try {
   const catalog = database.createCommerceOnlineCatalog();
   assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
-  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "brand", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "imageUrls", "availability", "sortOrder"].sort());
+  assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "categoryId", "brand", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "imageUrls", "availability", "sortOrder", "isFeatured", "featuredOrder"].sort());
   assert.equal(catalog.products[0].brand, "Teknikel Marka");
   assert.equal(catalog.products[0].price, 25, "resolved retail price, never dealer/cost");
+  assert.equal(catalog.products[0].isFeatured, true);
+  assert.equal(catalog.products[0].featuredOrder, 7);
   assert.equal(catalog.products[0].name, "Public title");
   assert.equal(catalog.products[0].description, "Public override");
   assert.equal(catalog.products[0].imageUrl, "https://images.example.com/product.jpg");
@@ -118,6 +129,8 @@ try {
     } });
   assert.equal(transportResult.ok, true);
   assert.deepEqual(multiImageRequest.online_catalog.products[0].image_urls, projected.products[0].imageUrls);
+  assert.equal(multiImageRequest.online_catalog.products[0].is_featured, true);
+  assert.equal(multiImageRequest.online_catalog.products[0].featured_order, 7);
   assert.equal(multiImageRequest.online_catalog.products[0].image_url, projected.products[0].imageUrls[0]);
   const pendingCover = createCommerceOnlineCatalog(raw, ["channel.online_sales"], () => ["", "https://images.example.com/second.webp"]);
   assert.deepEqual(pendingCover.products[0].imageUrls, [catalog.products[0].imageUrl], "source-only product retains safe remote fallback");
@@ -143,6 +156,8 @@ try {
   assert.deepEqual(published.delivery_methods, ["pickup"]);
   assert.equal(published.products.length, 1);
   assert.equal(published.products[0].brand, "Teknikel Marka");
+  assert.equal(published.products[0].is_featured, true);
+  assert.equal(published.products[0].featured_order, 7);
   assert.equal(published.products[0].price, 25);
   assert.equal(published.products[0].product_id, product.id);
   const request = calls.find((call) => call.action === "publish_online_catalog");
@@ -155,6 +170,12 @@ try {
   assert.deepEqual(JSON.parse(manyImages.stdout).products[0].image_urls, [coverUrl, secondUrl]);
   const twelveUrls = [coverUrl, ...Array.from({ length: 11 }, (_, i) => `https://images.example.com/${i}.png`)];
   assert.equal(validateImages({ image_urls: twelveUrls }).status, 0);
+  assert.equal(validateImages({is_featured: false, featured_order: 0}).status, 0);
+  for (const payload of [{is_featured:1},{is_featured:"yes"},{featured_order:-1},{featured_order:1.5},{featured_order:"7"},{featured_order:1000001}]) {
+    const invalid=validateImages(payload);
+    assert.equal(invalid.status, 42, invalid.stderr);
+    assert.match(invalid.stdout,/invalid_featured_product/);
+  }
   for (const images of [[secondUrl, coverUrl], [], [...twelveUrls, secondUrl], "not-an-array", [coverUrl, "http://images.example.com/a.jpg"], [coverUrl, "file:///etc/passwd"], [coverUrl, "https://127.0.0.1/a.jpg"], [coverUrl, "https://user:secret@images.example.com/a.jpg"], [coverUrl, "https://images.example.com/a.jpg?token=secret"], [coverUrl, "https://images.internal/a.jpg"], [coverUrl, "https://images.local./a.jpg"], [coverUrl, 42]]) {
     const invalid = validateImages({ image_urls: images });
     assert.equal(invalid.status, 42, invalid.stdout + invalid.stderr);

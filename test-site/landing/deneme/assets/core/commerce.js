@@ -64,12 +64,18 @@
       if (!Array.isArray(urls) || urls.length > 12 || urls.some(url => !safeImage(url))) throw new Error('invalid_product_images');
       const images = [...new Set(urls.map(safeImage))];
       if ((images[0] || '') !== cover) throw new Error('invalid_product_image_cover');
+      if (raw.is_featured !== undefined && typeof raw.is_featured !== 'boolean') throw new Error('invalid_featured_product');
+      if (raw.featured_order !== undefined && (!Number.isSafeInteger(raw.featured_order)
+        || raw.featured_order < 0 || raw.featured_order > 1000000)) throw new Error('invalid_featured_product');
+
       return { product_id: raw.product_id, name: raw.name, description: typeof raw.description === 'string' ? raw.description.slice(0, 2000) : '',
         sku: typeof raw.sku === 'string' ? raw.sku.slice(0,80) : '',
         brand: typeof raw.brand === 'string' ? raw.brand.slice(0,180) : '',
         category_id: typeof raw.category_id === 'string' ? raw.category_id.slice(0,180) : '',
         category_name: typeof raw.category_name === 'string' ? raw.category_name.slice(0,180) : '',
-        price: raw.price, currency: raw.currency, unit: raw.unit, image_url: cover, image_urls: images, availability: 'available' };
+        price: raw.price, currency: raw.currency, unit: raw.unit, image_url: cover, image_urls: images,
+        availability: 'available', is_featured: raw.is_featured === true,
+        featured_order: raw.featured_order ?? 0 };
     }
     function quantity(value, unit) {
       if (!/^\d+(?:[.,]\d{1,4})?$/.test(String(value))) return null;

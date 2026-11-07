@@ -457,6 +457,8 @@ export interface CommerceProductPublication {
   businessId: string;
   channel: "online_sales";
   isPublished: boolean;
+  isFeatured: boolean;
+  featuredOrder: number;
   titleOverride: string;
   descriptionOverride: string;
   sortOrder: number;
@@ -468,6 +470,8 @@ export interface SaveCommerceProductPublicationInput {
   productId: string;
   channel?: "online_sales";
   isPublished: boolean;
+  isFeatured?: boolean;
+  featuredOrder?: number;
   titleOverride?: string;
   descriptionOverride?: string;
   sortOrder?: number;
@@ -492,6 +496,9 @@ export interface PublishedCommerceProduct {
   /** Listing eligibility only; does not promise stock or reserve inventory. */
   availability: "available";
   sortOrder: number;
+  /** Public storefront placement intent. Unset values mean not featured. */
+  isFeatured?: boolean;
+  featuredOrder?: number;
 }
 
 export interface CommerceOnlineCatalog {

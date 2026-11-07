@@ -103,6 +103,10 @@ export function ProductWorkspace({
   const beginStockRequest = useRequestGeneration();
   const [isPublished, setIsPublished] = useState(onlineSalesEnabled);
   const [publicationBaseline, setPublicationBaseline] = useState(onlineSalesEnabled);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [featuredBaseline, setFeaturedBaseline] = useState(false);
+  const [featuredOrder, setFeaturedOrder] = useState(0);
+  const [featuredOrderBaseline, setFeaturedOrderBaseline] = useState(0);
   const [photoBaseline, setPhotoBaseline] = useState<ProductPhotoCollection>(EMPTY_PHOTOS);
   const [photoDraft, setPhotoDraft] = useState<ProductPhotoDraftPhoto[]>([]);
   const [publicationBusy, setPublicationBusy] = useState(false);
@@ -122,7 +126,8 @@ export function ProductWorkspace({
   const photosDirty = JSON.stringify(photoDraft.map(photo => photo.id)) !== JSON.stringify(photoBaseline.photos.map(photo => photo.id));
   const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim() || stockOperation !== "add");
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep" || photosDirty
-    || isPublished !== publicationBaseline || stockDraftDirty;
+    || isPublished !== publicationBaseline || isFeatured !== featuredBaseline
+    || featuredOrder !== featuredOrderBaseline || stockDraftDirty;
   const showPhotoGallery = onlineSalesCapability && imageDraftMode === "keep" && resourceState === "success";
   const mutationBusy = busy || fieldsBusy || photosBusy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"
@@ -169,6 +174,8 @@ export function ProductWorkspace({
     setPublicationLoaded(false);
     setIsPublished(creating && onlineSalesEnabled);
     setPublicationBaseline(creating && onlineSalesEnabled);
+    setIsFeatured(false); setFeaturedBaseline(false);
+    setFeaturedOrder(0); setFeaturedOrderBaseline(0);
     setPublicationMessage("");
     if (!onlineSalesEnabled || !productId || !bridge) {
       setPublicationBusy(false);
@@ -180,6 +187,10 @@ export function ProductWorkspace({
       if (!isCurrent()) return;
       setIsPublished(publication?.isPublished ?? false);
       setPublicationBaseline(publication?.isPublished ?? false);
+      setIsFeatured(publication?.isFeatured ?? false);
+      setFeaturedBaseline(publication?.isFeatured ?? false);
+      setFeaturedOrder(publication?.featuredOrder ?? 0);
+      setFeaturedOrderBaseline(publication?.featuredOrder ?? 0);
       setPublicationLoaded(true);
     }).catch(() => {
       if (isCurrent()) setPublicationMessage("Web yayın tercihi okunamadı. Ürün kartını yeniden açıp deneyin.");
@@ -322,7 +333,7 @@ export function ProductWorkspace({
           ...(imageDraftMode === "manual" ? { manualImageDataUrl } : {}) },
         sourcePhotoRevision: photoBaseline.revision, imageMode: imageDraftMode,
         ...(onlineSalesCapability && photosDirty ? { photos: photoDraft } : {}),
-        ...(onlineSalesEnabled && publicationLoaded ? { isPublished } : {}),
+        ...(onlineSalesEnabled && publicationLoaded ? { isPublished, isFeatured, featuredOrder } : {}),
         ...(stockDraftDirty ? { stock: { operation: stockOperation, quantity: stockQuantity, note: countNote,
           ...(balance?.locationId ? { locationId: balance.locationId } : {}), expectedUpdatedAt: balance?.updatedAt ?? "",
           operationId: stockOperationId.current } } : {})
@@ -343,6 +354,10 @@ export function ProductWorkspace({
     setPhotoBaseline(result.photos); setPhotoDraft(result.photos.photos);
     setIsPublished(result.publication?.isPublished ?? false);
     setPublicationBaseline(result.publication?.isPublished ?? false);
+    setIsFeatured(result.publication?.isFeatured ?? false);
+    setFeaturedBaseline(result.publication?.isFeatured ?? false);
+    setFeaturedOrder(result.publication?.featuredOrder ?? 0);
+    setFeaturedOrderBaseline(result.publication?.featuredOrder ?? 0);
     setImageDraftMode("keep"); setManualImageDataUrl(""); clearStockDraft();
     setBalance(result.balance);
     if (result.stock) {
@@ -491,7 +506,14 @@ export function ProductWorkspace({
             mode="all"
             statusFields={onlineSalesEnabled ? <>
               <label className="form-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || (!creating && !publicationLoaded)} onChange={event => setIsPublished(event.target.checked)} /> Web satışında yayınla</label>
-              {isPublished !== publicationBaseline && <small>Web yayın tercihi Ürünü Kaydet ile uygulanacak.</small>}
+              <label className="form-check"><input type="checkbox" checked={isFeatured} disabled={mutationBusy || !publicationLoaded || !isPublished} onChange={event => setIsFeatured(event.target.checked)} /> Vitrinde göster</label>
+              <label>Vitrin sırası
+                <input type="number" min={0} max={1000000} step={1} value={featuredOrder} disabled={mutationBusy || !publicationLoaded || !isPublished || !isFeatured}
+                  onChange={event => setFeaturedOrder(Number(event.target.value))} />
+              </label>
+              <small>Vitrin işareti Hızlı Erişim'den bağımsızdır. Değişiklikler Ürünü Kaydet ile yayın ayarına yazılır.</small>
+              {(isPublished !== publicationBaseline || isFeatured !== featuredBaseline || featuredOrder !== featuredOrderBaseline)
+                && <small>Web yayın ve vitrin tercihleri Ürünü Kaydet ile uygulanacak.</small>}
               {publicationMessage && <p role="status">{publicationMessage}</p>}
             </> : null}
             localImageDataUrl={effectiveImageDataUrl}

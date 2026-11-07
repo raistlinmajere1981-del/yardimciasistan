@@ -116,6 +116,7 @@ export function createTeknikelPack(options) {
       const categories = new Map(source.catalog.categories.map((category, index) => [category.source_category_id,
         ctx.addCategory({ id: `cat_tk_${category.source_category_id === "__OTHER__" ? "other" : category.source_category_id}`, name: category.name, code: category.source_category_id, sortOrder: (index + 1) * 10 })]));
       const originals = [];
+      let featuredCount = 0;
       const products = source.catalog.products.map((input, index) => {
         const salePrice = Number(input.sale_price_gross_try);
         const purchasePrice = money(salePrice * 0.6), dealerPriceA = money(salePrice * 0.9), dealerPriceB = money(salePrice * 0.85);
@@ -133,10 +134,16 @@ export function createTeknikelPack(options) {
         });
         ctx.addInventory(product, stock, purchasePrice);
         for (const asset of originalAssets) originals.push({ productId: product.id, sku: input.sku, assetPath: `assets/products/${product.id}/${asset.fileName}`, hash: asset.hash, format: asset.format, sourceUrl: asset.sourceUrl });
-        if (curated) insertRow(ctx.db, "commerce_product_publications", {
-          product_id: product.id, business_id: ctx.pack.business.id, channel: "online_sales", is_published: 1,
-          sort_order: (index + 1) * 10, created_at: FIXED_NOW, updated_at: FIXED_NOW
-        });
+        if (curated) {
+          const featured = featuredCount < 4;
+          insertRow(ctx.db, "commerce_product_publications", {
+            product_id: product.id, business_id: ctx.pack.business.id, channel: "online_sales", is_published: 1,
+            sort_order: (index + 1) * 10,
+            is_featured: featured ? 1 : 0, featured_order: featured ? featuredCount * 10 : 0,
+            created_at: FIXED_NOW, updated_at: FIXED_NOW
+          });
+          featuredCount++;
+        }
         return { ...product, sku: input.sku, dealerPriceA, dealerPriceB, purchasePrice, stock, curated };
       });
       const customers = source.customers.map((input, index) => {

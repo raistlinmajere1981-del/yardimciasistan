@@ -331,6 +331,8 @@ function checkTeknikel({ db, dbPath, folderPath, pack }) {
   check("online.deliveryMethods", () => online.deliveryMethods, ["pickup"]);
   check("settings.shippingDisabledUntilConfigured", () => db.prepare("SELECT online_sales_delivery_enabled AS delivery, online_sales_pickup_enabled AS pickup, online_sales_shipping_enabled AS shipping FROM settings").get(), { delivery: 1, pickup: 1, shipping: 0 });
   check("online.curated", () => [online.products.length, online.categories.length, online.products.every(p => p.categoryId !== "cat_tk_other")], [28, 24, true]);
+  check("online.featured", () => online.products.filter(p => p.isFeatured).map(p => p.featuredOrder).sort((a,b)=>a-b), [0, 10, 20, 30]);
+  check("online.featuredSeparated", () => online.products.filter(p => p.isFeatured).every(p => p.categoryId !== "cat_tk_other"), true);
   check("online.noUnacknowledgedImages", () => online.products.every(p => !p.imageUrl && p.imageUrls.length === 0), true);
   check("customers.count", () => count("customers"), 30);
   check("customers.sourceIdentities", () => sha256Text(json(db.prepare("SELECT full_name, phone, email FROM customers ORDER BY id").all().map(c => [c.full_name, c.phone, c.email]))), expected.customerIdentitySha256);

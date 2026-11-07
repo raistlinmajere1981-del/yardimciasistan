@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "template_version": "0.7.6",
+  "template_version": "0.7.7",
   "site_owned": [
     "site/",
     "locales/",
@@ -47,7 +47,7 @@
     "public/assets/core/assets/nexa/web/nexa-web-speaking-header.webp": "4f430efa94d60e20f121e24d0604331691c6ced4dd1e24f65584bbf3f2780ef0",
     "public/assets/core/assets/nexa/web/nexa-web-thinking-header.webp": "7cc28fa304d87f26411de3a2442ddd1e878025ece77cd358e5d3cacf4e430611",
     "public/assets/core/cart-draft.js": "baa5fa30069445cb57ea50662eee0789e8aabc313ac2afe9ef61bf11ff6d527c",
-    "public/assets/core/commerce.js": "121f742ef902c33001bc024b4208ded3760a22cf777f20d0c1a177dd649c5c49",
+    "public/assets/core/commerce.js": "43e9bfccd4f84d7010dcbaef4a6f0ffb95096ca88ff1cc107a43109b774917d4",
     "public/assets/core/effects.mjs": "a71be7d95f287a1760ebe3b8981e88ee8dbd0870c7ffde2a8d78b269406d8f3e",
     "public/assets/core/interaction-language.js": "b93f542fdb9edcbc729449372ad86831dc880d6d9491ee1f90a574507a379537",
     "public/assets/core/language.mjs": "542ef2fcd4a7b452f2080f9b0afb4feb828e2c5d6be956a21b552c8248c15c9d",
@@ -80,8 +80,8 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "44833091511404c412460b8020c87280d5043e16d5aec3c8a99b183fd9d8ee57",
-    "tools/manifest.mjs": "e336b0886802c8ceb9912c8de18b22c05e46d11b0a2b480e057727ffcdb0bbf2",
+    "README.md": "19033aa7bc1f42534cd1cce361a4ca35ed62ef940868f5b79767009b33bfaa23",
+    "tools/manifest.mjs": "1c0ba36059c480ba39432d4ea700f7db7753b8e7fe7dcc2a75cd0c02e26f202d",
     "tools/sync-effect-engine.mjs": "1ea62825931112e2e6b566368da56d9a0d94c2f7995c322fb92b50a040607600",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }

@@ -634,6 +634,8 @@ CREATE TABLE commerce_product_publications (
   business_id TEXT NOT NULL REFERENCES business(id),
   channel TEXT NOT NULL DEFAULT 'online_sales' CHECK (channel = 'online_sales'),
   is_published INTEGER NOT NULL DEFAULT 0 CHECK (is_published IN (0, 1)),
+  is_featured INTEGER NOT NULL DEFAULT 0 CHECK (is_featured IN (0, 1)),
+  featured_order INTEGER NOT NULL DEFAULT 0 CHECK (featured_order >= 0),
   title_override TEXT NOT NULL DEFAULT '',
   description_override TEXT NOT NULL DEFAULT '',
   sort_order INTEGER NOT NULL DEFAULT 0,

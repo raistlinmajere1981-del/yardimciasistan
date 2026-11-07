@@ -14,7 +14,7 @@ export function publishedOnlineProductRows(db: DatabaseSync, businessId: string)
       SELECT p.id, p.category_id, p.brand, p.name, p.description, p.sku, p.unit, p.tax_rate,
              p.image_source_url, p.image_asset_path, p.image_original_assets_json,
              p.updated_at AS product_updated_at, publication.title_override,
-             publication.description_override, publication.sort_order, publication.updated_at,
+             publication.description_override, publication.sort_order, publication.is_featured, publication.featured_order, publication.updated_at,
              COALESCE(c.name, '') AS category_name
       FROM commerce_product_publications publication
       JOIN catalog_products p ON p.id = publication.product_id AND p.business_id = publication.business_id
@@ -49,7 +49,8 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
         description: String(row.description_override || row.description), sku: String(row.sku),
         unit: String(row.unit) as CommerceUnit, price: price.unitPrice, currency: price.currency,
         taxRate: Number(row.tax_rate), imageUrl: imageUrls[0] ?? "", imageUrls,
-        availability: "available" as const, sortOrder: Number(row.sort_order)
+        availability: "available" as const, sortOrder: Number(row.sort_order),
+        isFeatured: Number(row.is_featured) === 1, featuredOrder: Number(row.featured_order)
       };
     });
     // Include unpublished/inactive changes too, so removing the last product has a stable timestamp.
