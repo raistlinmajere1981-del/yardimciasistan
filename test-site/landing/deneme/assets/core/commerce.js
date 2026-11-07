@@ -27,6 +27,7 @@
     function state() {
       const totals = new Map();
       for (const item of cart) {
+        if (!catalog.has(item.productId)) continue;
         const price = BigInt(item.display.price.toFixed(4).replace('.', ''));
         const cents = (price * BigInt(item.q) + 500000n) / 1000000n;
         totals.set(item.display.currency,(totals.get(item.display.currency) || 0n) + cents);
@@ -100,8 +101,10 @@
         const seen = new Set();
         for (const item of saved.items) {
           const product = catalog.get(item.productId);
-          const q = product ? quantity(item.quantity, product.unit) : null;
-          if (q && !seen.has(item.productId)) { cart.push({productId:item.productId,display:product,q}); seen.add(item.productId); }
+          const q = quantity(item.quantity, product?.unit || 'other');
+          if (q && typeof item.productId === 'string' && item.productId.length <= 180 && !seen.has(item.productId)) {
+            cart.push({productId:item.productId,display:product || {product_id:item.productId,name:ui('Ürün artık satışta değil'),price:0,currency:'TRY',unit:'other',image_url:''},q}); seen.add(item.productId);
+          }
         }
         if (cart.reduce((sum,item) => sum + item.q,0) > 10000 * scale) cart = [];
       }
@@ -160,7 +163,7 @@
       }
     }
     function accepted(result) {
-      forgetAttempt(); cart = []; persistCart(); receipt = {order_id:result.order_id}; message(''); emit('accepted');
+      forgetAttempt(); cart = []; persistCart(); receipt = structuredClone(result); message(''); emit('accepted');
     }
     function restoreFavorites() {
       const saved = read('localStorage', favoritesKey);
@@ -362,6 +365,7 @@
           const key = pending?.key || newKey();
           const endpoint = pending?.endpoint || (isPrivate() ? 'dealer/order.php' : 'order.php');
           const payload = {idempotencyKey:key,items:cart.map(item => ({productId:item.productId,quantity:item.q / scale})),delivery,
+            paymentMethod:input?.paymentMethod, quoteId:input?.quoteId, consent:input?.consent,
             ...(endpoint === 'dealer/order.php' ? {note:contact.note || '',catalogRevision:pending?.catalogRevision || catalogRevision} : contact)};
           const semantic = {...payload,items:[...payload.items].sort((a,b) => a.productId.localeCompare(b.productId))};
           delete semantic.idempotencyKey; delete semantic.catalogRevision;
@@ -389,6 +393,8 @@
         if (!current(stamp)) return;
         if (response.status === 201 && result.ok === true && typeof result.order_id === 'string') {
           accepted(result);
+        } else if (response.status === 409 && ['quote_changed','checkout_unconfigured','shipping_fee_unconfigured'].includes(result.code)) {
+          forgetAttempt(); message(result.message || ui('Sipariş özetini yeniden inceleyin.')); emit('quote-changed');
         } else if (response.status === 409 && result.code === 'idempotency_conflict') {
           // No automatic new key: the original order may already have been accepted.
           message(ui("Tekrar deneme bilgileri önceki siparişle eşleşmiyor. Yeni sipariş göndermeyin; önceki bilgileri kontrol edin veya işletmeyle iletişime geçin."));
@@ -430,12 +436,29 @@
         else setOwner(auth);
       },
       async refresh() { if (destroyed) return; if (accountOwner) await accountOwner.refresh(); await loadCatalog(); },
-      add,remove,clearCart,setQuantity,setDelivery,toggleFavorite,submit,
+      add,remove,clearCart,setQuantity,setDelivery,toggleFavorite,submit,validate,
+      async quote(input) {
+        if (!validCart() || auth.status === 'unavailable') throw new Error(ui('Sepetinizi kontrol edin.'));
+        const stamp = generation, {delivery, errors} = validate(input);
+        if (Object.keys(errors).some(key => key.startsWith('delivery-'))) throw new Error(ui('Teslimat adresini kontrol edin.'));
+        const response = await fetch(new URL(isPrivate() ? 'dealer/checkout-quote.php' : 'checkout-quote.php',apiBase), {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-YA-Account':'1'},
+          body:JSON.stringify({items:cart.map(item => ({productId:item.productId,quantity:item.q / scale})),delivery}),signal:AbortSignal.timeout(15000)});
+        if ([401,403].includes(response.status) && auth.account) {accountOwner?.clear('unavailable');throw new Error(ui('Oturum değişti.'));}
+        const result = await response.json();
+        if (!current(stamp)) throw new Error(ui('Oturum değişti.'));
+        if (!response.ok || result.ok !== true) throw new Error(result.message || ui('Sipariş toplamı doğrulanamadı.'));
+        return result.quote;
+      },
       reorder(id) { return prepareReorder(id); },
       newOrder() { if (!receipt || pending || busy) return; receipt = null; reorderBlocked = false; emit('new-order'); void loadCatalog(); },
       destroy() { if (destroyed) return; closePrivate(true); destroyed = true; unsubscribe?.(); listeners.clear(); window.removeEventListener('storage',onStorage); window.removeEventListener('beforeunload',beforeUnload); },
       quantity,discrete,safeImage
     });
   }
-  window.YaCommerce = Object.freeze({create});
+  const shared = new Map();
+  window.YaCommerce = Object.freeze({create, shared(options = {}) {
+    const key = new URL(options.apiBase || '/yardimci-asistan/api/',location.href).href;
+    if (!shared.has(key)) shared.set(key,create(options));
+    return shared.get(key);
+  }});
 })();

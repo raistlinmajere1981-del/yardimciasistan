@@ -11,19 +11,24 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <p id="portal-message" role="status" aria-live="polite"><?= e(t($site, 'account.status_checking')) ?></p>
 
   <div id="account-forms" hidden>
+    <nav class="account-auth-nav" aria-label="<?= e(t($site, 'page.account')) ?>">
+      <button type="button" data-account-mode="login" aria-pressed="true"><?= e(t($site, 'account.login')) ?></button>
+      <button type="button" data-account-mode="register" aria-pressed="false"><?= e(t($site, 'account.register')) ?></button>
+      <button type="button" data-account-mode="recover" aria-pressed="false"><?= e(t($site, 'account.forgot_password')) ?></button>
+    </nav>
     <form id="account-login" class="account-card">
       <h2><?= e(t($site, 'account.login')) ?></h2>
       <label><?= e(t($site, 'account.email')) ?><input name="email" type="email" autocomplete="email" required></label>
       <label><?= e(t($site, 'account.password')) ?><input name="password" type="password" autocomplete="current-password" required></label>
       <button class="button"><?= e(t($site, 'account.login')) ?></button>
     </form>
-    <form id="account-register" class="account-card">
+    <form id="account-register" class="account-card" hidden>
       <h2><?= e(t($site, 'account.register')) ?></h2>
       <label><?= e(t($site, 'account.name')) ?><input name="fullName" autocomplete="name" required maxlength="160"></label>
       <label><?= e(t($site, 'account.email')) ?><input name="email" type="email" autocomplete="email" required></label>
       <button class="button"><?= e(t($site, 'account.register')) ?></button>
     </form>
-    <form id="account-recover" class="account-card">
+    <form id="account-recover" class="account-card" hidden>
       <h2><?= e(t($site, 'account.forgot_password')) ?></h2>
       <label><?= e(t($site, 'account.email')) ?><input name="email" type="email" autocomplete="email" required></label>
       <button class="button secondary"><?= e(t($site, 'account.send_link')) ?></button>
@@ -53,9 +58,6 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   </section>
 
   <div class="account-actions">
-    <?php if (isset($view['pages']['catalog'])): ?>
-      <a class="button" href="<?= e(page_url($site, 'catalog')) ?>"><?= e(t($site, 'account.browse_catalog')) ?></a>
-    <?php endif; ?>
     <button id="account-refresh" class="button secondary" type="button" hidden><?= e(t($site, 'account.refresh_session')) ?></button>
     <button id="account-logout-all" class="button secondary" type="button" hidden><?= e(t($site, 'account.logout_all')) ?></button>
     <button id="logout" class="button secondary" type="button" hidden><?= e(t($site, 'account.logout')) ?></button>

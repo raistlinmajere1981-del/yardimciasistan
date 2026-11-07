@@ -18,6 +18,12 @@ function page_registry(): array
         'announcements' => ['key' => 'page.announcements', 'data' => 'announcements'],
         'reviews' => ['key' => 'page.reviews', 'data' => 'reviews'],
         'contact' => ['key' => 'page.contact', 'data' => 'contact'],
+        'cart' => ['key' => 'cart.title', 'data' => null, 'internal' => true],
+        'checkout-customer' => ['key' => 'checkout.customer', 'data' => null, 'internal' => true],
+        'checkout-delivery' => ['key' => 'checkout.delivery', 'data' => null, 'internal' => true],
+        'checkout-payment' => ['key' => 'checkout.payment', 'data' => null, 'internal' => true],
+        'checkout-review' => ['key' => 'checkout.review', 'data' => null, 'internal' => true],
+        'checkout-result' => ['key' => 'checkout.result', 'data' => null, 'internal' => true],
         'account' => ['key' => 'page.account', 'data' => null],
     ];
 }
@@ -41,6 +47,8 @@ function available_pages(array $publication, array $config, ?string $root = null
         $definition = $registry[$id];
         if ($id === 'home' || !empty($definition['editorial'])) {
             $available = true;
+        } elseif (!empty($definition['internal'])) {
+            $available = true; // Cart/result routes retain empty and accepted-order states after catalog closure.
         } elseif ($id === 'account') {
             $available = ($publication['features']['account'] ?? false) === true;
         } elseif ($id === 'contact') {

@@ -11,7 +11,7 @@ function legacy_route(string $basePath): void
     $path = substr($path, strlen($basePath));
     $aliases = [
         '/katalog/' => 'catalog', '/magaza/' => 'catalog', '/urun/' => 'catalog',
-        '/sepet/' => 'catalog', '/markalar/' => 'catalog', '/kategori/' => 'catalog',
+        '/sepet/' => 'cart', '/markalar/' => 'catalog', '/kategori/' => 'catalog',
         '/hesabim/' => 'account', '/bayi/' => 'account', '/hakkimizda/' => 'about',
         '/iletisim/' => 'contact', '/galeri/' => 'gallery', '/duyurular/' => 'announcements',
         '/yorumlar/' => 'reviews', '/odalar/' => 'rooms', '/odalar/oda/' => 'rooms',
@@ -34,7 +34,6 @@ function legacy_route(string $basePath): void
         if (is_string($value) && strlen($value) <= 2048 && !preg_match('/[\x00-\x1f\x7f]/', $value)) $parameters[$key] = $value;
     }
     $target = $basePath . '/?' . http_build_query($parameters);
-    if ($alias === '/sepet/') $target .= '#cart';
     header('Cache-Control: private, no-store'); header('Referrer-Policy: no-referrer');
     // No fragment on account aliases: browsers retain the mailbox token fragment.
     header('Location: ' . $target, true, 302);
