@@ -153,6 +153,40 @@ final class DealerImages {
       return decode(destination, edge, r);
     }, callback);
   }
+  // The WebView adapter can only request already-selected catalog URLs. It never receives a URL from JS.
+  Request inspectorRequest() {
+    Request r = new Request();
+    requests.add(r);
+    if (closed) r.cancel();
+    return r;
+  }
+  void inspectorImage(String source, File local, File destination, int edge, Request r)
+      throws Exception {
+    Bitmap bitmap = null;
+    try {
+      r.check();
+      File file = local == null ? download(source, r) : local;
+      try {
+        bitmap = decode(file, edge, r); // Native bounded decode + EXIF; shared JS owns every filter.
+      } catch (InterruptedIOException cancelled) {
+        throw cancelled;
+      } catch (Exception corrupt) {
+        if (local == null && !r.cancelled) file.delete();
+        throw corrupt;
+      }
+      r.check();
+      try (OutputStream out = new FileOutputStream(destination)) {
+        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) throw new IOException();
+      }
+      r.check();
+    } catch (Exception | OutOfMemoryError error) {
+      destination.delete();
+      throw error;
+    } finally {
+      release(bitmap);
+      requests.remove(r);
+    }
+  }
   private Request request(Decode operation, Callback callback) {
     Request request = new Request();
     if (closed) {
@@ -255,8 +289,16 @@ final class DealerImages {
     BitmapFactory.Options bounds = new BitmapFactory.Options();
     bounds.inJustDecodeBounds = true;
     BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+    if (!Arrays.asList("image/jpeg", "image/png", "image/webp").contains(bounds.outMimeType))
+      throw new IOException("Desteklenmeyen fotoğraf biçimi.");
     BitmapFactory.Options options = new BitmapFactory.Options();
-    options.inSampleSize = DealerPhotoPixels.sample(bounds.outWidth, bounds.outHeight, edge);
+    if (bounds.outWidth < 1 || bounds.outHeight < 1
+        || (long) bounds.outWidth * bounds.outHeight > 100_000_000L)
+      throw new IOException("Fotoğraf boyutu desteklenmiyor.");
+    options.inSampleSize = 1;
+    while ((bounds.outWidth + options.inSampleSize - 1) / options.inSampleSize > edge
+        || (bounds.outHeight + options.inSampleSize - 1) / options.inSampleSize > edge)
+      options.inSampleSize *= 2;
     options.inPreferredConfig = Bitmap.Config.ARGB_8888;
     int orientation = ExifInterface.ORIENTATION_NORMAL;
     try {

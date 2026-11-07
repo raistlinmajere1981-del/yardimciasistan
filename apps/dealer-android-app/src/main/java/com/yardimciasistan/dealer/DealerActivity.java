@@ -318,6 +318,7 @@ public final class DealerActivity extends ComponentActivity {
         -> {
           accessVerified = true;
           state.data.put("cookie", result.getString("cookie"));
+          String previousAccess = state.object("dealer").optString("access_id");
           JSONObject old = state.object("catalog");
           String previousProducts =
               old.optJSONArray("products") == null ? "" : old.optJSONArray("products").toString();
@@ -344,6 +345,10 @@ public final class DealerActivity extends ComponentActivity {
               !previousProducts.equals(String.valueOf(next.optJSONArray("products")));
           boolean methodsChanged =
               !previousMethods.equals(String.valueOf(next.optJSONArray("delivery_methods")));
+          // Revoke cached pixels/personal sources when the authorized catalog or owner changes.
+          if (photos.active() && (productsChanged
+              || !previousAccess.equals(state.object("dealer").optString("access_id"))))
+            photos.close();
           if (result.has("catalog_error") && tab.equals("Katalog")) {
             if (photos.active())
               photos.close();

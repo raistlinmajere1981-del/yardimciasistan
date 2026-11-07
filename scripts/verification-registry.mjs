@@ -348,6 +348,21 @@ const BASE_CHECKS = [
   check("account-order-receipt", "Hesap kapsamında salt okunur sipariş sonucu kurtarma", "node", ["scripts/test-account-order-receipt.mjs"], {
     phase: 50, presets: ["full"], domains: ["web", "commerce", "dealer-access"]
   }),
+  check("image-inspector-core", "Ortak fotoğraf motoru: native golden pikseller ve durum kuralları", "node", ["--test", "packages/image-inspector/test/core.test.mjs"], {
+    phase: 5, domains: ["android", "web", "commerce"]
+  }),
+  check("image-inspector-browser", "Ortak fotoğraf motoru: responsive tarayıcı, Worker ve gizlilik", "node", ["packages/image-inspector/test/browser.mjs"], {
+    phase: 50, domains: ["android", "web", "commerce"]
+  }),
+  check("image-inspector-device-build", "Ortak fotoğraf motoru: Android cihaz test APK derlemesi", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "assembleDebug", "assembleDebugAndroidTest"], {
+    phase: 27, domains: ["android"]
+  }),
+  check("image-inspector-distribution", "Ortak fotoğraf motoru: kaynak, Teknikel ve APK byte eşitliği", "node", ["packages/image-inspector/test/distribution.mjs", "../teknikel_web", "apps/dealer-android-app/build/outputs/apk/debug/yardimci-asistan-bayi-debug.apk"], {
+    phase: 50, manual: true, domains: ["android", "web"], requires: ["image-inspector-device-build"]
+  }),
+  check("image-inspector-device", "Ortak fotoğraf motoru: bağlı cihazda native WebView testi", "node", ["packages/image-inspector/test/device.mjs"], {
+    phase: 50, manual: true, domains: ["android"], requires: ["image-inspector-device-build"]
+  }),
   check("dealer-android-tests", "Bayi Android birim testleri ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "lintDebug"], {
     phase: 27, domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
   }),

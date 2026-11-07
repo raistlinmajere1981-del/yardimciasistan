@@ -13,7 +13,11 @@ android {
     versionName = productVersion.version
   }
   sourceSets {
-    main { java.srcDirs += ["../android-update-core/src/main/java"] }
+    androidTest { assets.srcDirs += ["../../packages/image-inspector/test"] }
+    main {
+      java.srcDirs += ["../android-update-core/src/main/java"]
+      assets.srcDirs += ["../../packages/image-inspector/runtime"]
+    }
   }
   buildTypes {
     debug { versionNameSuffix = "-debug" }

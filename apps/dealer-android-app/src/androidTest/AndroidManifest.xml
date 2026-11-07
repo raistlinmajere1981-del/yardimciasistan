@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"><instrumentation android:name="com.yardimciasistan.dealer.InspectorInstrumentation" android:targetPackage="com.yardimciasistan.dealer" android:label="Shared inspector device verification" /></manifest>
