@@ -10,7 +10,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <?php $favicon = favicon_url($site, $site['favicon'] ?? ''); if ($favicon !== ''): ?><link rel="icon" href="<?= e($favicon) ?>"><?php endif; ?>
   <?php if ($publication['description'] !== ''): ?><meta name="description" content="<?= e($publication['description']) ?>"><?php endif; ?>
   <?php if ($view['canonical'] !== ''): ?><link rel="canonical" href="<?= e($view['canonical']) ?>"><?php endif; ?>
-  <?php if ((in_array($view['page'], ['missing','account'], true) || !empty($view['pages'][$view['page']]['internal']))): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+  <?php if ((in_array($view['page'], ['missing','account'], true) || !empty($view['pages'][$view['page']]['internal']) || ($view['page'] === 'menu' && ($view['table_token'] ?? '') !== ''))): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+  <?php if ($view['page'] === 'menu' && ($view['table_token'] ?? '') !== ''): ?><meta name="referrer" content="no-referrer"><?php endif; ?>
   <?php $structured = structured_data($site, $view); if ($structured !== []): ?><script type="application/ld+json"><?= json_html($structured) ?></script><?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'core/site.css')) ?>">
   <?php if ($view['page'] === 'catalog' && is_file($site['root'] . '/public/assets/site/catalog.css')): ?>
@@ -18,6 +19,9 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'site/theme.css')) ?>">
   <?php if (isset($view['pages']['cart'])): ?><link rel="stylesheet" href="<?= e(asset($site, 'core/shopping.css')) ?>"><?php endif; ?>
+  <?php if ($view['page'] === 'menu' && !empty($publication['features']['table_orders'])): ?>
+    <link rel="stylesheet" href="<?= e(asset($site, 'core/table-orders.css')) ?>">
+  <?php endif; ?>
 </head>
 <body>
   <a class="skip-link" href="#content"><?= e(t($site, 'nav.skip')) ?></a>
@@ -48,6 +52,9 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <?php if (isset($view['pages']['cart'])): ?>
     <script src="<?= e(asset($site, 'core/commerce.js')) ?>" defer></script>
     <script src="<?= e(asset($site, 'core/shopping.js')) ?>" data-api-base="<?= e($site['module_path']) ?>/api/" defer></script>
+  <?php endif; ?>
+  <?php if ($view['page'] === 'menu' && !empty($publication['features']['table_orders']) && $view['table_token'] !== ''): ?>
+    <script src="<?= e(asset($site, 'core/table-orders.js')) ?>" defer></script>
   <?php endif; ?>
   <?php if ($view['page'] === 'catalog'): ?>
     <script src="<?= e(catalog_runtime($site)) ?>" data-api-base="<?= e($site['module_path']) ?>/api/" defer></script>

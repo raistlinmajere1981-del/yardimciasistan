@@ -26,7 +26,7 @@ function legacy_route(string $basePath): void
     $page = $aliases[$alias]; $parameters = ['page' => $page];
     $keys = ['lang'];
     if ($page === 'catalog') $keys = array_merge($keys, ['q', 'category', 'sku', 'brand']);
-    if ($page === 'menu') $keys[] = 'category';
+    if ($page === 'menu') $keys = array_merge($keys, ['category', 'table']);
     if ($alias === '/urun/' || $alias === '/odalar/oda/' || $alias === '/restoran/masa/') $keys[] = 'id';
     if ($page === 'account') $keys = array_merge($keys, ['action', 'order', 'account_error']);
     foreach ($keys as $key) {

@@ -31,7 +31,7 @@ function language_query_fields(array $view): array
     if ($id !== null && in_array($page, ['rooms', 'restaurant', 'catalog'], true)) $fields['id'] = $id;
     $keys = match ($page) {
         'catalog' => ['q' => 180, 'sku' => 80, 'category' => 180, 'brand' => 180, 'reorder' => 180],
-        'menu' => ['category' => 128],
+        'menu' => ['category' => 128, 'table' => 24],
         'account' => ['order' => 180],
         default => [],
     };

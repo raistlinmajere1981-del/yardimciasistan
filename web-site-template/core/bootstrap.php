@@ -42,11 +42,13 @@ function bootstrap(string $root): array
     }
     $menuCategories = array_values(array_filter($publication['categories'], static fn (array $category): bool => in_array($category['id'], array_column($publication['menu'], 'category_id'), true)));
     $category = $page === 'menu' ? ($_GET['category'] ?? '') : '';
+    $orderTableToken = $page === 'menu' && is_string($_GET['table'] ?? null)
+        && preg_match('/^[A-Za-z0-9_-]{24}$/D', $_GET['table']) ? $_GET['table'] : '';
     if (!is_string($category) || ($category !== '' && !in_array($category, array_column($menuCategories, 'id'), true))) { $page = 'missing'; $category = ''; }
     $site = ['public_origin' => public_origin($config['public_origin'] ?? ''), 'root' => $root, 'base_path' => $basePath, 'module_path' => $modulePath, 'favicon' => $config['favicon'] ?? '', 'language_cookie_path' => root_path($config['language_cookie_path'] ?? $basePath) . '/', 'language' => $language];
     $view = ['publication' => $publication, 'pages' => $pages, 'page' => $page,
         'title' => $page === 'missing' ? t($site, 'state.missing.title') : t($site, $pages[$page]['key']),
-        'room' => $room, 'table' => $table, 'menu_category' => $category, 'menu_categories' => $menuCategories, 'status' => $business['status'], 'effects' => effect_bindings($root, $config, $basePath),
+        'room' => $room, 'table' => $table, 'table_token' => $orderTableToken, 'menu_category' => $category, 'menu_categories' => $menuCategories, 'status' => $business['status'], 'effects' => effect_bindings($root, $config, $basePath),
         'demo_widget_visible' => !empty($config['demo_widget_visible'])];
     if ($room !== null || $table !== null) $view['title'] = ($room ?? $table)['name'];
     $view['canonical'] = canonical_url($site, $view);

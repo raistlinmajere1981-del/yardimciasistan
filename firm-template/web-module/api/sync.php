@@ -1144,6 +1144,7 @@ function ya_sync_publish_menu(array $payload): void
 
     $publishedMenu = [
         'enabled' => ya_sync_bool($menu['enabled'] ?? true),
+        'table_orders_enabled' => ya_sync_bool($menu['table_orders_enabled'] ?? false),
         'categories' => $categories,
         'items' => $items,
         'updated_at' => $now
@@ -1441,6 +1442,7 @@ function ya_sync_publish_table_catalog(array $payload): void
     ];
     $allowedSmokingPolicies = ['unspecified', 'non_smoking', 'smoking_allowed', 'outdoor_only'];
     $tables = [];
+    $orderEnabled = ya_sync_bool($candidate['orderEnabled'] ?? false);
 
     foreach (($candidate['tables'] ?? []) as $rawTable) {
         if (!is_array($rawTable)) continue;
@@ -1483,7 +1485,10 @@ function ya_sync_publish_table_catalog(array $payload): void
             'features' => $features,
             'smoking_policy' => $smokingPolicy,
             'sort_order' => max(0, ya_sync_int($rawTable['sort_order'] ?? 0, 0)),
-            'media' => $media
+            'media' => $media,
+            ...($orderEnabled && is_string($rawTable['orderTokenHash'] ?? null)
+                && preg_match('/^[a-f0-9]{64}$/D', $rawTable['orderTokenHash'])
+                ? ['orderTokenHash' => $rawTable['orderTokenHash']] : [])
         ];
     }
 
@@ -1497,6 +1502,7 @@ function ya_sync_publish_table_catalog(array $payload): void
     $catalog = [
         'version' => 1,
         'enabled' => ya_sync_bool($candidate['enabled'] ?? false),
+        'orderEnabled' => $orderEnabled,
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'tables' => $tables
     ];
@@ -1978,6 +1984,8 @@ function ya_sync_public_request(array $record): array
         'customer_id',
         'source',
         'request_type',
+        'table_id',
+        'order_items',
         'status',
         'customer_name',
         'customer_phone',

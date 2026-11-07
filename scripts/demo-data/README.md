@@ -39,6 +39,24 @@ Running the generator writes only under `artifacts/demo-data/`:
 | `yardimci-asistan-demo-<version>-d-teknikel.zip` (opt-in) | `market` + wholesale/credit/online sales | 179 source products, 25 categories, 68 original image files, 30 synthetic customers, 28 curated publications, four demo orders, draft purchase and customer credit; no linked web accounts |
 | `demo-data-manifest.json` | — | SHA-256 hashes, sizes, expected counts, read checks and limitations |
 
+### QR Menü / Masadan Sipariş (A paketi)
+
+Pansiyon/restoran paketi 6 aktif masa, 14 resimli menü ürünü ve mevcut adisyon
+örneklerini içerir. **Masadan Sipariş varsayılan kapalıdır.** Paket geri
+alındıktan ve Gündoğdu gibi bir web modülüyle eşleştirildikten sonra QR Menü
+panelindeki **Masadan Sipariş** seçeneği etkinleştirilir. Masa başına QR
+bağlantıları o anda yerel olarak üretilir ve web yayınına yansıtılır.
+
+ZIP içine **masa token'ı, token oluşturma sırrı, açık web sipariş talebi veya
+sunucu bağlantı anahtarı konulmaz**. Bu nedenle paket farklı demo kurulumlarına
+güvenle aktarılabilir. QR üzerinden yapılan müşteri talebi canlı test
+sırasında oluşturulmalı; tarih aşımına uğrayacak bir talep sabit demo verisi
+olarak eklenmemelidir. Aktif testte Masa B3 örneği kullanılabilir; mevcut
+ödeme durumundaki Masa M1 adisyonuna sipariş aktarmaya çalışılmamalıdır.
+
+A paketi doğrulaması yeni QR şema alanlarını, varsayılan kapalı durumu, boş
+token sırrını ve siparişe uygun aktif masa/menü sayısını da kontrol eder.
+
 Each ZIP contains exactly one backup folder:
 
 ```

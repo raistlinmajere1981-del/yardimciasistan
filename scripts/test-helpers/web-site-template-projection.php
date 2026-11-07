@@ -3,6 +3,10 @@ declare(strict_types=1);
 require_once $argv[1] . '/core/bootstrap.php';
 
 function check(bool $value, string $message): void { if (!$value) throw new RuntimeException($message); }
+/** Internal cart/checkout routes deliberately persist after catalog closure. */
+function public_page_keys(array $pages): array {
+    return array_keys(array_filter($pages, static fn(array $page): bool => ($page['internal'] ?? false) !== true));
+}
 $business = ['ok' => true, 'business' => ['id' => 'b', 'display_name' => 'Published identity', 'profile_id' => 'pension_restaurant', 'public_surfaces' => []]];
 $sources = [
     'rooms' => ['data' => ['ok' => true, 'enabled' => true, 'rooms' => [['id' => 'r', 'name' => 'Hidden room']]]],
@@ -46,7 +50,7 @@ $sources['menu']['data']['enabled'] = false;
 $project = \YaSite\project_publication($business, $sources, '/yardimci-asistan', 'tr');
 check($project['rooms'] === [] && $project['products'] === [] && $project['menu'] === [], 'Disabled publication hides stale records');
 $project = \YaSite\project_publication([], $sources, '/yardimci-asistan', 'tr');
-check(count(\YaSite\available_pages($project, [])) === 1, 'No business response means only home');
+check(public_page_keys(\YaSite\available_pages($project, [])) === ['home'], 'No business response means only home');
 foreach (['javascript:alert(1)', 'data:image/svg+xml,unsafe', '//foreign.test/image.png', '/private.png', '/yardimci-asistan/media/../config/business.json', '/yardimci-asistan/media/%2e%2e/config/business.json', '/yardimci-asistan/media/photo%0a.png'] as $url) {
     check(\YaSite\media_url($url, '/yardimci-asistan') === '', 'Unsafe media URL');
 }
@@ -80,14 +84,14 @@ check(\YaSite\localized_field($payload, 'room', 'r', 'name', 'Source field', 'fr
 $project['about'] = 'Published description';
 $project['rooms'] = [['id' => 'r', 'name' => 'Published room']];
 $pages = \YaSite\available_pages($project, ['page_order' => ['rooms', 'unknown', 'about'], 'hidden_pages' => ['rooms']]);
-check(array_keys($pages) === ['home', 'about'], 'Site can restrict and order; cannot add unknown/unavailable routes');
+check(public_page_keys($pages) === ['home', 'about'], 'Site can restrict and order; cannot add unknown/unavailable routes');
 $extensionRoot = sys_get_temp_dir() . '/ya-extension-' . bin2hex(random_bytes(6));
 mkdir($extensionRoot . '/site/views/pages', 0777, true);
 file_put_contents($extensionRoot . '/site/views/pages/guide.php', '<?php echo "Editorial";');
 $extensions = ['guide'=>['key'=>'theme.guide','editorial'=>true], 'rooms'=>['key'=>'theme.bad','editorial'=>true], '../escape'=>['key'=>'theme.bad','editorial'=>true], 'absent'=>['key'=>'theme.bad','editorial'=>true]];
 $pages = \YaSite\available_pages(\YaSite\project_publication([], [], '/yardimci-asistan', 'tr'), ['extensions'=>$extensions], $extensionRoot);
-check(array_keys($pages) === ['home','guide'], 'Only present site-owned editorial extensions, no publication override or path traversal');
-check(array_keys(\YaSite\available_pages($project, ['extensions'=>$extensions, 'hidden_pages'=>['guide','rooms','about']], $extensionRoot)) === ['home'], 'Editorial extension respects hidden pages');
+check(public_page_keys($pages) === ['home','guide'], 'Only present site-owned editorial extensions, no publication override or path traversal');
+check(public_page_keys(\YaSite\available_pages($project, ['extensions'=>$extensions, 'hidden_pages'=>['guide','rooms','about']], $extensionRoot)) === ['home'], 'Editorial extension respects hidden pages');
 unlink($extensionRoot . '/site/views/pages/guide.php'); rmdir($extensionRoot . '/site/views/pages'); rmdir($extensionRoot . '/site/views'); rmdir($extensionRoot . '/site'); rmdir($extensionRoot);
 
 

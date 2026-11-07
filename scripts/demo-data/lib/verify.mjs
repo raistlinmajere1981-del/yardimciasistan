@@ -13,6 +13,7 @@ const electron = (name) => require(`../../../apps/desktop-app/dist-electron/${na
 
 const { createDesktopDashboardData } = electron("desktop-dashboard-service");
 const { getPublishedMenu } = electron("database/menu-store");
+const { listProductPhotos } = electron("product-photo-store");
 const { listTableOrders } = electron("database/table-order-store");
 const { listCatalogProducts, getCommerceStoreSnapshot } = electron("commerce-store");
 const { listCommercePurchaseOrders, getCommercePurchaseOrder } = electron("commerce-purchase-store");
@@ -210,6 +211,18 @@ function checkPensionRestaurant({ db, dbPath, folderPath, pack }) {
   check("dashboard.customers", () => dashboard.customers.length, expected.customers);
   check("dashboard.paymentWaitingTableOrders", () => dashboard.paymentWaitingTableOrders.length, 1);
   check("menu.items", () => menu.items.length, expected.menuItems);
+  // The current QR-table-order schema is part of backup-v2. Importing a demo
+  // must not accidentally publish bearer tokens or turn on guest ordering.
+  const qrSettings = db.prepare("SELECT publish_qr_menu_web, qr_table_orders_enabled, qr_table_order_secret FROM business WHERE deleted_at = '' LIMIT 1").get();
+  check("qrTableOrder.menuPublished", () => Number(qrSettings?.publish_qr_menu_web), 1);
+  check("qrTableOrder.offByDefault", () => Number(qrSettings?.qr_table_orders_enabled), 0);
+  check("qrTableOrder.tokenCreatedOnEnable", () => String(qrSettings?.qr_table_order_secret ?? ""), "");
+  check("qrTableOrder.activeTables", () => Number(db.prepare("SELECT COUNT(*) AS count FROM tables WHERE deleted_at = '' AND is_active = 1").get().count), expected.dashboardTables);
+  check("qrTableOrder.menuItemsReady", () => menu.items.filter((item) => item.is_available && menu.categories.some((c) => c.id === item.category_id && c.is_active)).length, expected.menuItems);
+  check("menu.originalPhotoArchive.validMimes", () => db.prepare("SELECT id FROM catalog_products WHERE deleted_at = ''").all()
+    .every(({ id }) => listProductPhotos(dbPath, String(id)).photos.every((photo) =>
+      ["image/jpeg", "image/png", "image/webp"].includes(photo.format))), true);
+
   check("tableOrders", () => tableOrders.length, expected.tableOrders);
   check("catalog.products", () => catalog.total, expected.menuItems);
   check("store.products", () => store.products.length, expected.menuItems);

@@ -26,6 +26,10 @@ function ya_public_request_intent(array $request, string $businessId): array
     foreach (['guest_count', 'adult_count', 'child_count'] as $field) $intent[$field] = (int) ($request[$field] ?? 0);
     $context = $request['context'] ?? [];
     foreach (['resourceType', 'resourceId', 'resourceName'] as $field) $intent['context'][$field] = trim((string) ($context[$field] ?? ''));
+    if (($request['request_type'] ?? '') === 'table_order') {
+        $intent['table_id'] = (string)($request['table_id'] ?? '');
+        $intent['order_items'] = $request['order_items'] ?? [];
+    }
     if (($request['request_type'] ?? '') === 'dealer_application') {
         $intent['dealer_application'] = $request['dealer_application'];
         $intent['documents'] = array_map(static function (array $doc): array { unset($doc['id']); return $doc; }, $request['documents'] ?? []);

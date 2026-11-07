@@ -8,6 +8,7 @@ export function formatRequestType(value: string) {
     restaurant_reservation: "Masa rezervasyonu",
     breakfast_request: "Kahvaltı talebi",
     qr_menu_question: "Menü sorusu",
+    table_order: "Masadan sipariş",
     location_question: "Ulaşım sorusu",
     price_question: "Fiyat sorusu",
     other: "Diğer"

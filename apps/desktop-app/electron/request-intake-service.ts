@@ -441,6 +441,8 @@ export function upsertSyncedRequests(
       customer_id,
       source,
       request_type,
+      table_id,
+      order_items_json,
       status,
       customer_name,
       customer_phone,
@@ -460,7 +462,7 @@ export function upsertSyncedRequests(
       created_at,
       updated_at,
       sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       customer_name = excluded.customer_name,
       customer_phone = excluded.customer_phone,
@@ -483,12 +485,14 @@ export function upsertSyncedRequests(
       // Replay must not recreate a deleted/detached customer either.
       const existing = db.prepare("SELECT customer_id FROM requests WHERE id = ?").get(request.id) as { customer_id: string } | undefined;
       const customerId = existing ? existing.customer_id
-        : request.request_type === "dealer_application" ? "" : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
+        : ["dealer_application", "table_order"].includes(request.request_type) ? "" : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
       statement.run(
         request.id,
         customerId,
         request.source,
         request.request_type,
+        request.table_id ?? "",
+        JSON.stringify(request.order_items ?? []),
         request.status,
         request.customer_name,
         request.customer_phone,

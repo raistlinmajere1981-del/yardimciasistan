@@ -68,6 +68,14 @@ export function registerRequestIpcHandlers(options: {
     return getDatabase().convertRequestToReservation(requestId);
   });
 
+  ipcMain.handle("request:acceptQrOrder", (_event, requestId: string): DesktopStatusUpdateResult => {
+    options.assertUnlocked();
+    for (const capability of [BUSINESS_CAPABILITIES.REQUESTS, BUSINESS_CAPABILITIES.QR_MENU, BUSINESS_CAPABILITIES.FOOD_TABLES, BUSINESS_CAPABILITIES.FOOD_ORDERS, BUSINESS_CAPABILITIES.FOOD_MENU]) {
+      assertCapability(capability, "Masadan sipariş için gerekli işletme yeteneği etkin değil.");
+    }
+    return getDatabase().acceptQrTableOrderRequest(requestId);
+  });
+
   ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");

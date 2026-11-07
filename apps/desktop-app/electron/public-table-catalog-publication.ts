@@ -1,4 +1,5 @@
 import { PublicTranslationStore } from "./database/public-translation-store";
+import { getQrTableOrderConfig, qrTableTokenHash } from "./database/qr-table-order-config";
 import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
@@ -26,9 +27,10 @@ export function createPublicTableCatalog(
       "SELECT publish_tables_web FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1"
     ).get() as { publish_tables_web?: unknown } | undefined;
     const publicationEnabled = Number(publication?.publish_tables_web ?? 0) === 1;
-    if (!publicationEnabled) {
-      return { version: 1, enabled: false, updatedAt: "", tables: [] };
-    }
+    const orderConfig = getQrTableOrderConfig(db);
+    const orderEnabled = orderConfig.enabled && hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.QR_MENU)
+      && hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS)
+      && hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.REQUESTS);
 
     const rows = db.prepare(`
       SELECT id, name, area, capacity, public_description, public_features_json,
@@ -48,7 +50,8 @@ export function createPublicTableCatalog(
       smokingPolicy: normalizeTableSmokingPolicy(row.smoking_policy),
       sortOrder: Math.max(0, Math.trunc(Number(row.sort_order ?? 0) || 0)),
       media: userDataPath ? getTablePublishedMedia(userDataPath, text(row.id)) : [],
-      updatedAt: text(row.updated_at)
+      updatedAt: text(row.updated_at),
+      ...(orderEnabled && orderConfig.secret ? { orderTokenHash: qrTableTokenHash(orderConfig.secret, text(row.id)) } : {})
     })).filter((table) => table.id && table.name);
 
     const updatedAt = tables.reduce(
@@ -58,7 +61,8 @@ export function createPublicTableCatalog(
 
     return {
       version: 1,
-      enabled: true,
+      enabled: publicationEnabled,
+      orderEnabled,
       localization: new PublicTranslationStore(db).localization(rows.map(r => ({kind: "table", id: String(r.id), fields: {name: String(r.name), area: String(r.area), description: String(r.public_description)}}))),
       updatedAt,
       tables: tables.map(({ updatedAt: _updatedAt, ...table }) => table)

@@ -1,3 +1,5 @@
+import { acceptQrTableOrderRequest as acceptStoredQrTableOrderRequest } from "./table-order-request-acceptance.js";
+import { getQrTableOrderConfig as getStoredQrTableOrderConfig, setQrTableOrdersEnabled as setStoredQrTableOrdersEnabled, listQrOrderTables as getStoredQrOrderTables } from "./database/qr-table-order-config.js";
 import { importOrderPaymentNotice } from "./commerce-order-payment";
 import { getTableOrderBenefitsState, previewTableOrderBenefits, settleTableOrderBenefits, type TableBenefitsAuthority } from "./table-order-benefits";
 import type { TableOrderBenefitsPreviewInput, TableOrderBenefitsCloseInput } from "@yardimci-asistan/shared";
@@ -515,6 +517,11 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  acceptQrTableOrderRequest(requestId: string): DesktopStatusUpdateResult {
+    const result = acceptStoredQrTableOrderRequest(this.db, requestId);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   updateRequestStatus(input: UpdateRequestStatusInput): DesktopStatusUpdateResult {
@@ -1207,6 +1214,11 @@ export class DesktopDatabase {
 
   getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
     const menu = getStoredQrMenuPublication(this.db);
+    menu.table_orders_enabled = getStoredQrTableOrderConfig(this.db).enabled
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.FOOD_ORDERS)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.FOOD_TABLES)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.QR_MENU)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.REQUESTS);
     menu.localization = this.translations().localization([
       ...menu.categories.filter(c => c.is_active).map(c => ({kind: "menu_category" as const, id: c.id, fields: {name: c.name, description: c.description}})),
       ...menu.items.map(p => ({kind: "menu_product" as const, id: p.id, fields: {name: p.name, description: p.description}}))
@@ -1214,6 +1226,10 @@ export class DesktopDatabase {
     return menu.enabled && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.QR_MENU)
       ? menu : { ...menu, enabled: false, categories: [], items: [] };
   }
+
+  getQrTableOrderConfig() { return getStoredQrTableOrderConfig(this.db); }
+  setQrTableOrdersEnabled(enabled: boolean) { setStoredQrTableOrdersEnabled(this.db, enabled); }
+  listQrOrderTables() { return getStoredQrOrderTables(this.db); }
 
   getQrMenuWebPublicationEnabled(): boolean {
     return getStoredQrMenuWebPublicationEnabled(this.db);

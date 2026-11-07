@@ -23,12 +23,15 @@ export interface TablePublicCatalogTable {
   smokingPolicy: TableSmokingPolicy;
   sortOrder: number;
   media: TablePublicMedia[];
+  /** Never return this hash from public /api/tables.php. */
+  orderTokenHash?: string;
 }
 
 export interface TablePublicCatalog {
   localization?: import("./public-translations").PublicLocalization;
   version: typeof TABLE_PUBLIC_CATALOG_VERSION;
   enabled: boolean;
+  orderEnabled?: boolean;
   updatedAt: string;
   tables: TablePublicCatalogTable[];
 }

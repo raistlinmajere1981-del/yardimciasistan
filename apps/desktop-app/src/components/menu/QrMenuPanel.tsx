@@ -5,6 +5,8 @@ import { ActionButton } from "../ui/ActionButton";
 import { ModalSurface } from "../ui/ModalSurface";
 import { createQrSvg, resolveQrMenuPublicUrl } from "./qr-code";
 
+type OrderTable = { id: string; name: string; area: string; token: string };
+
 export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, utilityAction }: {
   enabled: boolean;
   webModuleUrl: string;
@@ -12,6 +14,8 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
   utilityAction?: ReactNode;
 }) {
   const [webEnabled, setWebEnabled] = useState(true);
+  const [ordersEnabled, setOrdersEnabled] = useState(false);
+  const [orderTables, setOrderTables] = useState<OrderTable[]>([]);
   const [publicationLoading, setPublicationLoading] = useState(true);
   const [publicationSaving, setPublicationSaving] = useState(false);
   const [publicationError, setPublicationError] = useState("");
@@ -44,6 +48,8 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
       .then((state) => {
         if (!active) return;
         setWebEnabled(state.enabled !== false);
+        setOrdersEnabled(state.ordersEnabled === true);
+        setOrderTables(state.tables ?? []);
       })
       .catch(() => {
         if (!active) return;
@@ -88,6 +94,42 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
     } finally {
       setPublicationSaving(false);
     }
+  }
+
+  async function toggleOrders(next: boolean) {
+    if (!visibleOnWeb || busy) return;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.setQrTableOrdersEnabled) return;
+    setPublicationSaving(true);
+    try {
+      const result = await bridge.setQrTableOrdersEnabled(next);
+      if (!result.ok) { reportAppStatus("error", result.message); return; }
+      setOrdersEnabled(result.enabled);
+      setOrderTables(result.tables);
+      reportAppStatus("success", result.message);
+    } catch {
+      reportAppStatus("error", "Masa siparişi ayarı kaydedilemedi.");
+    } finally {
+      setPublicationSaving(false);
+    }
+  }
+
+  function tableUrl(table: OrderTable) {
+    return `${url}?table=${encodeURIComponent(table.token)}`;
+  }
+
+  function downloadTableQr(table: OrderTable) {
+    try {
+      const code = createQrSvg(tableUrl(table));
+      const href = URL.createObjectURL(new Blob([code], { type: "image/svg+xml;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `masa-${table.name.replace(/[^a-zA-Z0-9_-]/g, "-")}.svg`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+    } catch { reportAppStatus("error", "Bu masanın QR bağlantısı çok uzun."); }
   }
 
   async function copyUrl() {
@@ -156,6 +198,11 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
           <span>{publicationSaving ? "Güncelleniyor…" : visibleOnWeb ? "Webde aktif" : "Webde pasif"}</span>
         </label>
       </div>
+      <label className="menu-qr-service__toggle">
+        <input type="checkbox" aria-label="Masadan sipariş" checked={visibleOnWeb && ordersEnabled}
+          disabled={!visibleOnWeb || busy} onChange={(event) => void toggleOrders(event.target.checked)} />
+        <span>Masadan sipariş {ordersEnabled && visibleOnWeb ? "açık" : "kapalı"}</span>
+      </label>
     </section>
 
     {toolsOpen && visibleOnWeb && <ModalSurface
@@ -196,6 +243,23 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
             </div>
           </div>
         </div>
+        {ordersEnabled && orderTables.length > 0 && <section aria-label="Masalara özel QR kodları">
+          <strong>Masalara özel QR kodları</strong>
+          <p>Her masa kendi sipariş bağlantısına sahip. Kodları masalara yerleştirebilirsiniz.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16 }}>
+            {orderTables.map(table => {
+              let tableSvg = "";
+              try { tableSvg = createQrSvg(tableUrl(table)); } catch { /* invalid or too long */ }
+              return <div key={table.id} style={{ textAlign: "center" }}>
+                <strong>{table.area ? `${table.area} · ` : ""}{table.name}</strong>
+                {tableSvg && <div className="qr-menu-tools__code" aria-label={`${table.name} QR`} dangerouslySetInnerHTML={{ __html: tableSvg }} />}
+                <ActionButton variant="secondary" size="sm" disabled={!tableSvg} onClick={() => downloadTableQr(table)}>
+                  <Download size={16} aria-hidden="true" /> İndir
+                </ActionButton>
+              </div>;
+            })}
+          </div>
+        </section>}
       </div>
     </ModalSurface>}
   </>;

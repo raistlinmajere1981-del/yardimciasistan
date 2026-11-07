@@ -328,6 +328,7 @@ export async function pushTableCatalog(options: PushTableCatalogOptions): Promis
       version: options.catalog.version,
       ...(options.catalog.localization ? {localization: options.catalog.localization} : {}),
       enabled: options.catalog.enabled,
+      orderEnabled: options.catalog.orderEnabled === true,
       updated_at: options.catalog.updatedAt,
       tables: options.catalog.tables.map((table) => ({
         id: table.id,
@@ -336,6 +337,8 @@ export async function pushTableCatalog(options: PushTableCatalogOptions): Promis
         capacity: table.capacity,
         description: table.description,
         features: table.features,
+        // Only an irreversible hash is published; never the QR bearer token.
+        ...(options.catalog.orderEnabled === true && table.orderTokenHash ? { orderTokenHash: table.orderTokenHash } : {}),
         smoking_policy: table.smokingPolicy,
         sort_order: table.sortOrder,
         media: table.media.map((media) => ({

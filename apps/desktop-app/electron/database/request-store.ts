@@ -24,7 +24,7 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
-  const request = db.prepare("SELECT status, request_type, dealer_customer_id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string; request_type?: string; dealer_customer_id?: string } | undefined;
+  const request = db.prepare("SELECT status, request_type, dealer_customer_id, accepted_order_id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string; request_type?: string; dealer_customer_id?: string; accepted_order_id?: string } | undefined;
   if (!request) {
     return {
       ok: false,
@@ -32,6 +32,9 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
+  if (request.request_type === "table_order" && (status === "approved" || Boolean(request.accepted_order_id))) {
+    return { ok: false, message: "Masa siparişleri yalnızca adisyona aktarılarak onaylanabilir." };
+  }
   if (request.request_type === "dealer_application" && (status === "approved" || request.dealer_customer_id)) {
     return { ok: false, message: "Bayi başvurusu için Onayla ve Bayi Oluştur işlemini kullanın." };
   }
@@ -79,6 +82,7 @@ export function getRequestById(db: DatabaseSync, requestId: string): SyncedCusto
           customer_id,
           source,
           request_type,
+          table_id, order_items_json, accepted_order_id,
           status,
           customer_name,
           customer_phone,
@@ -228,6 +232,7 @@ export function getRequests(db: DatabaseSync, customerId?: string): SyncedCustom
           customer_id,
           source,
           request_type,
+          table_id, order_items_json, accepted_order_id,
           status,
           customer_name,
           customer_phone,
@@ -275,6 +280,9 @@ function mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
     customer_id: String(row.customer_id ?? ""),
     source: row.source as SyncedCustomerRequest["source"],
     request_type: row.request_type as SyncedCustomerRequest["request_type"],
+    table_id: String(row.table_id ?? ""),
+    order_items: JSON.parse(String(row.order_items_json ?? "[]")) as NonNullable<SyncedCustomerRequest["order_items"]>,
+    accepted_order_id: String(row.accepted_order_id ?? ""),
     status: row.status as SyncedCustomerRequest["status"],
     customer_name: String(row.customer_name ?? ""),
     customer_phone: String(row.customer_phone ?? ""),

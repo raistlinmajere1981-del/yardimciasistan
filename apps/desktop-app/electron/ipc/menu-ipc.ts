@@ -40,7 +40,8 @@ export function registerMenuIpcHandlers(options: {
   ipcMain.handle("menu:getWebPublication", () => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    return { enabled: getDatabase().getQrMenuWebPublicationEnabled() };
+    return { enabled: getDatabase().getQrMenuWebPublicationEnabled(),
+      ordersEnabled: getDatabase().getQrTableOrderConfig().enabled, tables: getDatabase().listQrOrderTables() };
   });
 
   ipcMain.handle("menu:setWebPublication", (_event, enabled: unknown) => {
@@ -65,6 +66,27 @@ export function registerMenuIpcHandlers(options: {
         message: error instanceof Error && error.message ? error.message : "QR Menü web görünürlüğü kaydedilemedi.",
         enabled: current
       };
+    }
+  });
+
+  ipcMain.handle("menu:setTableOrders", (_event, enabled: unknown) => {
+    options.assertUnlocked();
+    const current = getDatabase().getQrTableOrderConfig().enabled;
+    if (typeof enabled !== "boolean") return { ok: false, message: "Masa siparişi seçimi geçersiz.", enabled: current, tables: getDatabase().listQrOrderTables() };
+    if (enabled) {
+      for (const capability of [BUSINESS_CAPABILITIES.REQUESTS, BUSINESS_CAPABILITIES.CUSTOMERS, BUSINESS_CAPABILITIES.QR_MENU, BUSINESS_CAPABILITIES.FOOD_TABLES, BUSINESS_CAPABILITIES.FOOD_ORDERS]) {
+        assertCapability(capability, "QR masadan sipariş için QR Menü, masa yönetimi ve masa siparişleri etkin olmalı.");
+      }
+      if (!getDatabase().getQrMenuWebPublicationEnabled()) return { ok: false, message: "Önce QR Menü web yayınını açın.", enabled: current, tables: getDatabase().listQrOrderTables() };
+    }
+    try {
+      getDatabase().setQrTableOrdersEnabled(enabled);
+      scheduleSync();
+      return { ok: true, message: enabled ? "Masadan sipariş açık." : "Masadan sipariş kapalı.", enabled,
+        tables: getDatabase().listQrOrderTables() };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "Sipariş ayarı kaydedilemedi.", enabled: current,
+        tables: getDatabase().listQrOrderTables() };
     }
   });
 

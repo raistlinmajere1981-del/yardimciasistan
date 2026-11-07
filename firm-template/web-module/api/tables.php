@@ -40,6 +40,11 @@ if (trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
 
 $enabled = ($catalog['enabled'] ?? false) === true;
 $tables = $enabled && is_array($catalog['tables'] ?? null) ? array_values($catalog['tables']) : [];
+// Order token digests are private routing material, never a public table field.
+$tables = array_map(static function (array $table): array {
+    unset($table['orderTokenHash']);
+    return $table;
+}, $tables);
 usort($tables, static function (array $left, array $right): int {
     $order = ((int) ($left['sort_order'] ?? 0)) <=> ((int) ($right['sort_order'] ?? 0));
     return $order !== 0 ? $order : strcmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));

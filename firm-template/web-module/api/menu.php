@@ -23,7 +23,8 @@ try {
 }
 $publication = is_array($menu['_publication'] ?? null) ? $menu['_publication'] : [];
 $webEnabled = array_key_exists('enabled', $menu) ? (($menu['enabled'] ?? false) === true) : true;
-unset($menu['_publication'], $menu['enabled']);
+$orderEnabled = ($menu['table_orders_enabled'] ?? false) === true;
+unset($menu['_publication'], $menu['enabled'], $menu['table_orders_enabled']);
 if ($publication !== [] && !$webEnabled) {
     ya_menu_response(404, [
         'ok' => false,
@@ -66,6 +67,7 @@ ya_menu_response(200, [
     'ok' => true,
     'categories' => $categories,
     'items' => $items,
+    'table_orders_enabled' => $orderEnabled && $webEnabled,
     'localization' => ya_public_localization($menu['localization'] ?? null, [
         'menu_category' => ya_localization_records($categories, 'id', ['name','description']),
         'menu_product' => ya_localization_records($items, 'id', ['name','description'])]),

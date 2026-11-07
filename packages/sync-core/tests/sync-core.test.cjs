@@ -1166,9 +1166,11 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
     catalog: {
       version: 1,
       enabled: true,
+      orderEnabled: true,
       updatedAt: "2026-09-29T18:00:00Z",
       tables: [{
         id: "table_1",
+        orderTokenHash: "a".repeat(64),
         name: "Teras 1",
         area: "Teras",
         capacity: 4,
@@ -1200,8 +1202,10 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
   assert.equal(result.ok, true);
   assert.equal(calls[0].action, "publish_table_catalog");
   assert.equal(calls[0].table_catalog.enabled, true);
+  assert.equal(calls[0].table_catalog.orderEnabled, true);
   assert.deepEqual(calls[0].table_catalog.tables[0], {
     id: "table_1",
+    orderTokenHash: "a".repeat(64),
     name: "Teras 1",
     area: "Teras",
     capacity: 4,

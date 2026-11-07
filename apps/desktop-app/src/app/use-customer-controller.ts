@@ -138,7 +138,9 @@ export function useCustomerController({
       return;
     }
 
-    const result = await window.yardimciDesktop.updateRequestStatus({ requestId: request.id, status });
+    const result = request.request_type === "table_order" && status === "__accept_qr_order"
+      ? await window.yardimciDesktop.acceptQrTableOrderRequest(request.id)
+      : await window.yardimciDesktop.updateRequestStatus({ requestId: request.id, status });
     if (!result.ok) {
       setSyncState("error");
       setStatusMessage(result.message);

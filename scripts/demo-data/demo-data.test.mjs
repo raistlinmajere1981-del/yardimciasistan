@@ -4,6 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +15,9 @@ import { countFiles, sha256File } from "./lib/util.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generator = path.join(here, "generate-demo-data.mjs");
+const require = createRequire(import.meta.url);
+const qrTables = require("../../apps/desktop-app/dist-electron/database/qr-table-order-config.js");
+const { createPublicTableCatalog } = require("../../apps/desktop-app/dist-electron/public-table-catalog-publication.js");
 
 function tempDirectory() {
   const base = fs.existsSync("/tmp/opencode") ? "/tmp/opencode" : os.tmpdir();
@@ -85,6 +90,37 @@ test("demo generator emits restorable, readable packages", { timeout: 180000 }, 
         assert.equal(settings[0].auto_sync_enabled, 0);
       } finally {
         db.close();
+      }
+
+      // Do not store live QR bearer secrets in a reusable sample ZIP. Exercise
+      // opt-in on a disposable copy, preserving the verified original archive.
+      if (pkg.id === "a-pension-restaurant") {
+        const qrPath = path.join(extractRoot, "qr-order-readiness.sqlite");
+        fs.copyFileSync(databasePath, qrPath);
+        const qrDb = new DatabaseSync(qrPath);
+        try {
+          assert.deepEqual(qrTables.getQrTableOrderConfig(qrDb), { enabled: false, secret: "" });
+          qrTables.setQrTableOrdersEnabled(qrDb, true);
+          const tables = qrTables.listQrOrderTables(qrDb);
+          assert.equal(tables.length, 6);
+          assert.equal(new Set(tables.map((table) => table.token)).size, 6);
+          assert.ok(tables.every((table) => /^[A-Za-z0-9_-]{24}$/.test(table.token)));
+          const caps = new Set(qrDb.prepare("SELECT capability_id FROM business_capabilities WHERE is_enabled = 1")
+            .all().map((row) => String(row.capability_id)));
+          const published = createPublicTableCatalog(qrPath, caps);
+          assert.equal(published.enabled, true);
+          assert.equal(published.orderEnabled, true);
+          assert.equal(published.tables.length, 6);
+          for (const table of tables) {
+            assert.equal(published.tables.find((item) => item.id === table.id)?.orderTokenHash,
+              createHash("sha256").update(table.token).digest("hex"));
+          }
+          qrTables.setQrTableOrdersEnabled(qrDb, false);
+          assert.equal(qrTables.listQrOrderTables(qrDb).length, 0);
+          assert.equal(createPublicTableCatalog(qrPath, caps).orderEnabled, false);
+        } finally {
+          qrDb.close();
+        }
       }
 
       const result = verifyPackage({

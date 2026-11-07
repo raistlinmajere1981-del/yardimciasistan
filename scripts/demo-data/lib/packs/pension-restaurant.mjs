@@ -148,7 +148,7 @@ export const pensionRestaurantPack = {
         originalAssets: [{ fileName: photoByProduct.get(key)?.filename,
           sourcePath: photoByProduct.get(key)?.sourcePath,
           hash: photoByProduct.get(key)?.sha256,
-          format: "jpeg" }],
+          format: "image/jpeg" }],
         imageSourceUrl: photoByProduct.get(key)?.source_url,
         imageLicense: photoByProduct.get(key)?.license + " / " + photoByProduct.get(key)?.author,
         dataLicense: "Synthetic product data; representative Commons photo, not actual business photography",
