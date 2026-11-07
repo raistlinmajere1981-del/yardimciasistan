@@ -81,13 +81,13 @@ function ya_commerce_status_projection(mixed $rows): array
             || !is_string($row['order_number']??null) || !preg_match('/^YA-\d{8}-[A-F0-9]{10}$/D',$row['order_number'])
             || !in_array($row['status']??'', ['placed','confirmed','fulfilled','cancelled'],true)
             || !in_array($row['payment_status']??'', ['unpaid','verification_pending','paid','rejected','refunded'],true)
-            || !in_array($row['delivery_status']??'', ['unfulfilled','preparing','delivered','cancelled'],true)
+            || !in_array($row['delivery_status']??'', ['unfulfilled','preparing','delivered','cancelled','returned'],true)
             || !is_string($row['updated_at']??null) || strlen($row['updated_at'])>64 || strtotime($row['updated_at'])===false
             || !is_array($row['events']??null) || !array_is_list($row['events']) || count($row['events'])>1000)throw new InvalidArgumentException('invalid_order_status_projection');
         $events=[];$ids=[];
         foreach($row['events'] as $event) {
             if(!is_array($event) || !is_string($event['id']??null) || !preg_match('/^[A-Za-z0-9:_-]{1,180}$/D',$event['id']) || isset($ids[$event['id']])
-                || !in_array($event['type']??'', ['payment_reported','payment_approve','payment_reject','payment_refund','payment_prepare','order_confirmed','order_cancelled','order_delivered'],true)
+                || !in_array($event['type']??'', ['payment_reported','payment_approve','payment_reject','payment_refund','payment_prepare','order_confirmed','order_cancelled','order_delivered','order_refunded'],true)
                 || !is_string($event['created_at']??null) || strlen($event['created_at'])>64 || strtotime($event['created_at'])===false)throw new InvalidArgumentException('invalid_order_event_projection');
             $ids[$event['id']]=true;$events[]=array_intersect_key($event,array_flip(['id','type','created_at']));
         }
@@ -102,7 +102,7 @@ function ya_commerce_mail_event(PDO $db,array $order,string $eventId,string $typ
 {
     $labels=['payment_reported'=>'Havale bildiriminiz alındı. İşletme doğrulaması bekleniyor.','payment_approve'=>'Ödemeniz işletme tarafından doğrulandı.',
         'payment_reject'=>'Ödeme bildirimi doğrulanamadı. İşletmeyle iletişime geçin.','payment_refund'=>'İşletme havale iadesini kaydetti.',
-        'payment_prepare'=>'Siparişiniz hazırlanıyor.','order_confirmed'=>'Siparişiniz onaylandı.','order_cancelled'=>'Siparişiniz iptal edildi.', 'order_delivered'=>'Siparişiniz teslim edildi.'];
+        'payment_prepare'=>'Siparişiniz hazırlanıyor.','order_confirmed'=>'Siparişiniz onaylandı.','order_cancelled'=>'Siparişiniz iptal edildi.', 'order_delivered'=>'Siparişiniz teslim edildi.','order_refunded'=>'Siparişinizin tam iadesi işletme tarafından kaydedildi.'];
     if(!isset($labels[$type]))return;
     $number=$order['checkout']['order_number']??$order['id'];$body=$number."\n".$labels[$type]."\n";
     $recipient=$order['buyer']['email']??$order['notificationEmail']??'';

@@ -31,4 +31,4 @@ Hesap token iletileri artık aynı outbox'tadır; gövde AES-256-GCM ile şifrel
 
 Anahtar döndürme henüz bir key-ring/prosedürle otomatikleştirilmedi. Kuyruktaki eski token gövdelerinin okunabilmesi için anahtar korunmalı; anahtar değişirse o token iletileri yeniden üretilmeli. Anahtarı Git'e, sohbet mesajına, worker argümanına veya loga koymayın. Veritabanını açabilmek tek başına token gövdesini çözmeye yetmez.
 
-Sipariş alındı/banka talimatı, havale bildirimi, onay/ret, hazırlanıyor, teslim ve iptal/kaydedilen banka iadesi olayları bağlıdır. Bu olayların hazır olması V2'nin bütün kabulünün tamamlandığı anlamına gelmez: teslim sonrası stok/finans iadesi ve Desktop UI/restore kabulü hâlâ açıktır.
+Sipariş alındı/banka talimatı, havale bildirimi, onay/ret, hazırlanıyor, teslim ve iptal/kaydedilen banka iadesi olayları bağlıdır. Bu olayların hazır olması V2'nin bütün kabulünün tamamlandığı anlamına gelmez: teslim sonrası stok/finans iadesi, Desktop ödeme UI’si ve V2 snapshot restore kabulü bu devam diliminde geçti; kalan istemci/paket işleri `ECOMMERCE_V2.md` içinde kayıtlıdır.

@@ -19,6 +19,13 @@ function money(value: number, currency = "TRY") {
   }
 }
 
+function eventLabel(type: string): string {
+  const labels: Record<string, string> = {payment_reported:"Havale bildirildi",payment_approve:"Ödeme doğrulandı",payment_reject:"Ödeme bildirimi reddedildi",
+    payment_refund:"Banka iadesi kaydedildi",payment_prepare:"Hazırlamaya başlandı",order_confirmed:"Sipariş onaylandı",
+    order_cancelled:"Sipariş iptal edildi",order_delivered:"Sipariş teslim edildi",order_refunded:"Tam iade kaydedildi"};
+  return labels[type] || "İşlem kaydedildi";
+}
+
 function orderStatusLabel(status: string) {
   if (status === "confirmed") return "Onaylandı";
   if (status === "fulfilled") return "Tamamlandı";
@@ -57,14 +64,14 @@ export function MarketOrdersWorkspace({
   const bridge = window.yardimciDesktop?.commerce;
   const { search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
-    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder, benefits } = session;
+    fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder, benefits, refund } = session;
   const filteredOrders = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     return orders.filter(order => (!statusFilter || order.status === statusFilter)
       && (!needle || [order.customerName, order.buyerSnapshot?.name, order.source, sourceLabel(order.source), order.orderNumber, order.id]
         .some(value => value?.toLocaleLowerCase("tr-TR").includes(needle))));
   }, [orders, search, statusFilter]);
-  const disabled = busy || submitting || loadingOrders || benefits.locked;
+  const disabled = busy || submitting || loadingOrders || benefits.locked || refund.uncertain;
 
   async function updateStatus(status: "confirmed" | "cancelled") {
     if (!bridge || !selectedOrder || submitting || mutationInFlight.current || benefits.pending.current) return;
@@ -162,7 +169,7 @@ export function MarketOrdersWorkspace({
         <div className="market-order-list">
           {filteredOrders.map(order => (
             <button type="button" className={`market-order-card interactive-surface interactive-surface--record${selectedOrder?.order.id === order.id ? " is-selected" : ""}`}
-              key={order.id} aria-pressed={selectedOrder?.order.id === order.id} disabled={submitting || benefits.locked} onClick={() => void openOrder(order.id)}>
+              key={order.id} aria-pressed={selectedOrder?.order.id === order.id} disabled={submitting || benefits.locked || refund.uncertain} onClick={() => void openOrder(order.id)}>
               <span><strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
                 <small>{order.orderNumber && `${order.orderNumber} · `}{sourceLabel(order.source)} · {new Date(order.placedAt).toLocaleString("tr-TR")}</small></span>
               <span className="market-order-card-meta"><StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
@@ -212,7 +219,7 @@ export function MarketOrdersWorkspace({
                     <dt>Ülke</dt><dd>{selectedOrder.order.deliverySnapshot.address.countryCode}</dd>
                     {selectedOrder.order.deliverySnapshot.address.note && <><dt>Teslimat notu</dt><dd>{selectedOrder.order.deliverySnapshot.address.note}</dd></>}
                   </dl>
-                  <p className="market-muted">Kargo ücreti ayrıca belirlenecektir.</p>
+                  <p className="market-muted">{selectedOrder.order.checkoutSnapshot ? `Kargo bedeli: ${money(selectedOrder.order.deliveryFee || 0,selectedOrder.order.currency)}` : "Kargo ücreti ayrıca belirlenecektir."}</p>
                 </>
               )}
             </section>
@@ -233,21 +240,34 @@ export function MarketOrdersWorkspace({
             <div className="market-sale-totals">
               <span><small>Ara toplam</small><strong>{money(selectedOrder.order.subtotal, selectedOrder.order.currency)}</strong></span>
               <span><small>İndirim</small><strong>-{money(selectedOrder.order.discountTotal, selectedOrder.order.currency)}</strong></span>
+              {selectedOrder.order.checkoutSnapshot && <span><small>Teslimat</small><strong>{money(selectedOrder.order.deliveryFee || 0,selectedOrder.order.currency)}</strong></span>}
               <span className="market-sale-grand-total"><small>Toplam</small><strong>{money(selectedOrder.order.total, selectedOrder.order.currency)}</strong></span>
             </div>
 
             {selectedOrder.order.checkoutSnapshot && <section className="form-stack" aria-label="Havale ve sipariş olayları">
               <h3>Havale / EFT</h3>
               <p>Ödeme: {({unpaid:"Ödeme bekleniyor",verification_pending:"Havale bildirildi · doğrulama bekliyor",paid:"Doğrulandı",rejected:"Doğrulanamadı",refunded:"İade kaydedildi"})[selectedOrder.order.paymentStatus || "unpaid"]}</p>
-              <p>Teslimat: {({unfulfilled:"Hazırlanmadı",preparing:"Hazırlanıyor",delivered:"Teslim edildi",cancelled:"İptal"})[selectedOrder.order.deliveryStatus || "unfulfilled"]} · {money(selectedOrder.order.deliveryFee || 0,selectedOrder.order.currency)}</p>
-              <label className="form-field">İşlem açıklaması<input value={paymentReason} onChange={event=>setPaymentReason(event.target.value)} maxLength={500} disabled={disabled} /></label>
+              <p>Teslimat: {({unfulfilled:"Hazırlanmadı",preparing:"Hazırlanıyor",delivered:"Teslim edildi",cancelled:"İptal",returned:"İade alındı"})[selectedOrder.order.deliveryStatus || "unfulfilled"]}</p>
+              {selectedOrder.order.paymentStatus !== "refunded" && selectedOrder.order.status !== "fulfilled" && <label className="form-field">İşlem açıklaması<input value={paymentReason} onChange={event=>setPaymentReason(event.target.value)} maxLength={500} disabled={disabled} /></label>}
               <div className="action-row">
                 {["unpaid","verification_pending","rejected"].includes(selectedOrder.order.paymentStatus || "unpaid") && selectedOrder.order.status !== "cancelled" && <ActionButton disabled={disabled} onClick={()=>void paymentAction("approve")}>Havaleyi Doğrula</ActionButton>}
                 {["unpaid","verification_pending"].includes(selectedOrder.order.paymentStatus || "unpaid") && <ActionButton variant="danger" disabled={disabled || !paymentReason.trim()} onClick={()=>void paymentAction("reject")}>Bildirimi Reddet</ActionButton>}
                 {selectedOrder.order.paymentStatus === "paid" && selectedOrder.order.status === "confirmed" && selectedOrder.order.deliveryStatus === "unfulfilled" && <ActionButton disabled={disabled} onClick={()=>void paymentAction("prepare")}>Hazırlamaya Başla</ActionButton>}
                 {selectedOrder.order.paymentStatus === "paid" && selectedOrder.order.status === "cancelled" && <ActionButton disabled={disabled || !paymentReason.trim()} onClick={()=>void paymentAction("refund")}>Banka İadesini Kaydet</ActionButton>}
               </div>
-              <details><summary>İşlem geçmişi</summary><ol>{selectedOrder.events?.map(event=><li key={event.id}>{event.type} · {event.actorId} · {new Date(event.createdAt).toLocaleString("tr-TR")}{event.reason && ` · ${event.reason}`}</li>)}</ol></details>
+              {selectedOrder.order.status === "fulfilled" && selectedOrder.order.paymentStatus === "paid" && <div className="form-stack">
+                {!refund.preview && !refund.uncertain && <ActionButton variant="secondary" disabled={disabled} onClick={()=>void refund.previewRefund()}>Tam İadeyi İncele</ActionButton>}
+                {refund.preview?.orderId === selectedOrder.order.id && <>
+                  <p>{refund.preview.eligible ? `Teslimat dahil banka iadesi: ${money(refund.preview.cashMinor / 100,refund.preview.currency)}. Bu işlem banka üzerinden para göndermez.` : refund.preview.reason}</p>
+                  {refund.preview.eligible && <>
+                    <label className="form-field">İade gerekçesi<input maxLength={500} value={refund.reason} disabled={disabled} onChange={event=>refund.setReason(event.target.value)} /></label>
+                    <label><input type="checkbox" checked={refund.confirmed} disabled={disabled} onChange={event=>refund.setConfirmed(event.target.checked)} /> Ürünleri geri aldım ve belirtilen tutarı müşteriye banka yoluyla iade ettim.</label>
+                    <ActionButton variant="danger" disabled={disabled || !refund.reason.trim() || !refund.confirmed} onClick={()=>void refund.submit()}>Tam İadeyi Kaydet</ActionButton>
+                  </>}
+                </>}
+                {refund.uncertain && <><p role="alert">İade yanıtı alınamadı. Aynı işlemi yeniden sorgulayın.</p><ActionButton disabled={busy || submitting} onClick={()=>void refund.submit()}>İade Sonucunu Sorgula</ActionButton></>}
+              </div>}
+              <details><summary>İşlem geçmişi</summary><ol>{selectedOrder.events?.map(event=><li key={event.id}>{eventLabel(event.type)} · {event.actorId === "customer" ? "Müşteri" : "İşletme yetkilisi"} · {new Date(event.createdAt).toLocaleString("tr-TR")}{event.reason && ` · ${event.reason}`}</li>)}</ol></details>
             </section>}
 
             {selectedOrder.order.status === "fulfilled" && <p role="status">Sipariş {new Date(selectedOrder.order.fulfilledAt).toLocaleString("tr-TR")} tarihinde tamamlandı.</p>}

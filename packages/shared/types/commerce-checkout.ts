@@ -30,7 +30,7 @@ export interface CommerceCheckoutSnapshot {
 }
 
 export type CommercePaymentStatus = "unpaid" | "verification_pending" | "paid" | "rejected" | "refunded";
-export type CommerceDeliveryStatus = "unfulfilled" | "preparing" | "delivered" | "cancelled";
+export type CommerceDeliveryStatus = "unfulfilled" | "preparing" | "delivered" | "cancelled" | "returned";
 
 export interface CommerceOrderEvent {
   id: string; type: string; actorId: string; createdAt: string; reason: string;

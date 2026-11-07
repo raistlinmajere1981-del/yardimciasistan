@@ -65,6 +65,7 @@ const requiredFiles = [
   "lib/online-order.php",
   "lib/commerce-quote.php",
   "lib/commerce-checkout.php",
+  "lib/commerce-payment-provider.php",
   "lib/commerce-order-payment.php",
   "lib/customer-account-mail-queue.php",
   "api/checkout-quote.php",

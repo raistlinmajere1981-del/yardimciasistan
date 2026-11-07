@@ -5,6 +5,22 @@
   const $ = id => document.getElementById(id);
   const element = (tag, text, className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
   const statusLabel = status => ui(({awaiting_desktop:'Talep alındı · İşleme alınmayı bekliyor',placed:'Sipariş alındı',confirmed:'Onaylandı',fulfilled:'Tamamlandı',cancelled:'İptal edildi',rejected:'İşlenemedi'})[status] || 'Durum henüz doğrulanamadı');
+  const paymentLabel = status => ui(({unpaid:'Ödeme bekleniyor',verification_pending:'Havale bildirildi · doğrulama bekliyor',paid:'Ödeme doğrulandı',rejected:'Ödeme doğrulanamadı',refunded:'Banka iadesi kaydedildi'})[status] || 'Ödeme bekleniyor');
+  const deliveryLabel = status => ui(({unfulfilled:'Hazırlanmadı',preparing:'Hazırlanıyor',delivered:'Teslim edildi',cancelled:'İptal edildi',returned:'İade alındı'})[status] || 'Hazırlanmadı');
+  let authMode = 'login';
+  function renderAuth(available) {
+    if (!available) authMode = 'login';
+    for (const mode of ['login','register','recover']) {
+      $('account-'+mode).hidden = mode !== authMode;
+      const button = document.querySelector(`[data-account-mode="${mode}"]`);
+      button.hidden = mode !== 'login' && !available;
+      button.setAttribute('aria-pressed', String(mode === authMode));
+    }
+  }
+  for (const button of document.querySelectorAll('[data-account-mode]')) button.addEventListener('click', () => {
+    authMode = button.dataset.accountMode; renderAuth(config?.passwordRegistration && owner.state.status !== 'unavailable');
+    $('account-'+authMode).querySelector('input')?.focus();
+  });
   const message = text => { if ($('portal-message')) $('portal-message').textContent = text; };
   const token = new URLSearchParams(location.hash.slice(1)).get('token');
   const tokenAction = new URLSearchParams(location.search).get('action');
@@ -80,14 +96,20 @@
         detail.append(items);
         if(order.checkout) {
           const quote=order.checkout;
-          detail.append(element('p',ui('Ödeme durumu: {0}',{0:order.payment_status})),element('p',ui('Teslimat durumu: {0}',{0:order.delivery_status})),element('p',order.order_number));
+          detail.append(element('p',paymentLabel(order.payment_status)),element('p',deliveryLabel(order.delivery_status)));
           if(quote.demo)detail.append(element('p',ui('DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.')));
           const instructions=element('dl','');
-          for(const [label,value] of [['Banka',quote.bank.name],['Hesap sahibi',quote.bank.accountHolder],['IBAN',quote.bank.iban],['Havale açıklaması',order.order_number]]){instructions.append(element('dt',ui(label)),element('dd',value));}
+          const money = minor => new Intl.NumberFormat(locale,{style:'currency',currency:quote.currency}).format(minor/100);
+          detail.append(element('p',ui('Ürünler toplamı: {0}',{0:money(quote.subtotal_minor)})),element('p',ui('Teslimat: {0}',{0:money(quote.delivery_fee_minor)})));
+          for(const [label,value] of [['Banka',quote.bank.name],['Hesap sahibi',quote.bank.accountHolder],['IBAN',quote.bank.iban],['Ödenecek tutar',money(quote.total_minor)+' ('+quote.currency+')'],['Havale açıklaması',order.order_number]]){
+            const data=element('dd',value),copy=element('button',ui('Kopyala'),'quiet');copy.type='button';
+            copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(value);copy.textContent=ui('Kopyalandı');}catch{message(ui('Kopyalanamadı. Bilgiyi seçerek kopyalayabilirsiniz.'));}});
+            data.append(copy);instructions.append(element('dt',ui(label)),data);
+          }
           detail.append(instructions);
           const report=element('button',ui('Havale yaptım'),'button');report.type='button';
           report.disabled=['verification_pending','paid','refunded'].includes(order.payment_status) || order.status==='cancelled';
-          report.addEventListener('click',async()=>{report.disabled=true;try{const base=JSON.parse(document.getElementById('site-context').textContent).apiBasePath;const response=await fetch(base+'/api/order-payment.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-YA-Account':'1'},body:JSON.stringify({action:'report',orderId:order.order_id})});if([401,403].includes(response.status)){owner.clear('unavailable');return;}if(!response.ok)throw new Error('payment_notice_failed');message(ui('Havale bildiriminiz alındı. İşletme doğrulaması bekleniyor.'));}catch{report.disabled=false;message(ui('Havale bildirimi kaydedilemedi.'));}});
+          report.addEventListener('click',async()=>{report.disabled=true;try{const base=JSON.parse(document.getElementById('site-context').textContent).apiBasePath;const response=await fetch(base+'/api/order-payment.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-YA-Account':'1'},body:JSON.stringify({action:'report',orderId:order.order_id})});if([401,403].includes(response.status)){owner.clear('unavailable');return;}if(!response.ok)throw new Error('payment_notice_failed');message(ui('Havale bildiriminiz alındı. İşletme doğrulaması bekleniyor.'));await loadOrders(generation);}catch{report.disabled=false;message(ui('Havale bildirimi kaydedilemedi.'));}});
           detail.append(report);
         }
         if (Number.isFinite(order.total) && order.currency) detail.append(element('p', new Intl.NumberFormat(locale, {style: 'currency', currency: order.currency}).format(order.total)));
@@ -116,12 +138,12 @@
     if (!config.enabled) { message(ui('Online Satış kapalı. Hesap erişimi şu anda kullanılamıyor.')); return; }
     if (tokenFlow) return;
     if (state.status === 'unavailable') {
-      $('account-forms').hidden = false; $('account-register').hidden = true; $('account-recover').hidden = true;
+      $('account-forms').hidden = false; renderAuth(false);
       message(ui('Hesap şu anda doğrulanamıyor. Lütfen yeniden deneyin.')); return;
     }
     if (!account) {
       $('account-forms').hidden = false;
-      $('account-register').hidden = !config.passwordRegistration; $('account-recover').hidden = !config.passwordRegistration;
+      renderAuth(config.passwordRegistration);
       message(ui(config.passwordRegistration ? 'Müşteri hesabınızla giriş yapın.' : 'E-posta hizmeti hazırlanıyor. Yeni hesap ve şifre yenileme kapalı; misafir alışveriş yapabilirsiniz.')); return;
     }
     $('account-profile').hidden = false; $('account-orders').hidden = false;

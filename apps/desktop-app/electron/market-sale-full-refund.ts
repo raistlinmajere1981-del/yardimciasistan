@@ -7,6 +7,8 @@ import { synchronizeFinanceSourceInTransaction } from "./finance.js";
 import { canonicalBenefitsJson, withCommerceBenefitsTransaction } from "./commerce-benefits-rules.js";
 import { CommerceBenefitsStore, type CommerceBenefitsParentPorts, type BenefitsPricingRequest, type BenefitsReversalReceipt } from "./commerce-benefits-store.js";
 import type { MarketSaleBenefitsAuthority } from "./market-sale-benefits.js";
+import { getCommerceOrder } from "./commerce-order-store.js";
+import type { CommerceOrderDetail } from "@yardimci-asistan/shared";
 
 /** Money, customer, lines, method and tenant are exclusively persisted authority. */
 export interface FullRefundMarketSaleInput { saleId: string; operationId: string; kind: "full" }
@@ -16,10 +18,14 @@ export interface FullRefundMarketSaleReceipt {
   stockMovementIds: string[]; benefits: BenefitsReversalReceipt | null;
 }
 export interface FullRefundMarketSaleResult { receipt: FullRefundMarketSaleReceipt; replayed: boolean }
+export interface FullRefundCommerceOrderInput { orderId: string; operationId: string; kind: "full"; reason: string }
+export interface FullRefundCommerceOrderResult extends FullRefundMarketSaleResult { order: CommerceOrderDetail }
+type WebOrderRefundScope = { orderId: string; reason: string };
 
 const errors = {
   REFUND_INVALID_COMMAND: "Tam iade komutu geçersiz.",
   REFUND_SCOPE: "Yalnız bu işletmenin tamamlanmış masaüstü hızlı satışı iade edilebilir.",
+  REFUND_ORDER_SCOPE: "Yalnız teslim edilmiş ve havalesi doğrulanmış web siparişi bu işlemle iade edilebilir.",
   REFUND_ALREADY_COMPLETED: "Bu satışın tam iadesi başka bir işlemle kaydedilmiş.",
   REFUND_INTENT_CHANGED: "İade işlem anahtarı farklı bir istekte kullanılamaz.",
   REFUND_EVIDENCE_CONFLICT: "Satış veya tahsilat kanıtı tutarsız. İade uygulanmadı.",
@@ -34,6 +40,7 @@ function requireRefund(value: unknown, code: keyof typeof errors): asserts value
 type Row = Record<string, import("node:sqlite").SQLOutputValue>;
 const source = "desktop-market-quick-sale";
 const androidSource = "android-market-sale";
+const orderSource = "commerce-order";
 const safeMinor = (value: number) => Number.isSafeInteger(value) && value >= 0;
 function quantity(value: unknown): number {
   const number = Number(value), units = Math.round(number * 10000);
@@ -53,8 +60,25 @@ function authorize(db: DatabaseSync, authority: MarketSaleBenefitsAuthority): st
   requireRefund(typeof businessId === "string" && readEnabledBusinessCapabilities(db).includes(C.SALES), "REFUND_SCOPE");
   return businessId;
 }
-function paidSale(db: DatabaseSync, businessId: string, saleId: string): Row {
+function paidSale(db: DatabaseSync, businessId: string, saleId: string, scope?: WebOrderRefundScope): Row {
   const sale = db.prepare("SELECT * FROM commerce_sales WHERE id = ? AND business_id = ?").get(saleId, businessId);
+  if (scope) {
+    const caps = readEnabledBusinessCapabilities(db);
+    const order = db.prepare(`SELECT o.*, f.settlement_type, f.payment_method AS fulfillment_method FROM commerce_orders o
+      JOIN commerce_order_fulfillments f ON f.order_id=o.id AND f.business_id=o.business_id
+      WHERE o.id=? AND o.business_id=? AND f.sale_id=? AND o.deleted_at=''`).get(scope.orderId,businessId,saleId);
+    const refunded = Boolean(db.prepare("SELECT 1 FROM commerce_sale_full_refunds WHERE sale_id=? AND business_id=?").get(saleId,businessId));
+    requireRefund(caps.includes(C.ORDERS) && caps.includes(C.ONLINE_SALES) && sale?.source === orderSource && sale.status === "paid"
+      && sale.deleted_at === "" && sale.closed_at && order && order.checkout_snapshot_json !== "null"
+      && ["web-online-sales","web-dealer"].includes(String(order.source))
+      && order.settlement_type === "paid" && order.fulfillment_method === "bank" && sale.payment_method === "bank"
+      && (refunded ? order.status === "cancelled" && order.payment_status === "refunded" && order.delivery_status === "returned"
+        : order.status === "fulfilled" && order.payment_status === "paid" && order.delivery_status === "delivered")
+      && moneyToMinor(Number(order.total)) === moneyToMinor(Number(sale.total))
+      && moneyToMinor(Number(order.delivery_fee)) === moneyToMinor(Number(sale.delivery_fee))
+      && !db.prepare("SELECT 1 FROM customer_credit_entries WHERE sale_id=?").get(saleId), "REFUND_ORDER_SCOPE");
+    return sale;
+  }
   requireRefund(sale && sale.status === "paid" && (sale.source === source || sale.source === androidSource) && sale.deleted_at === "" && sale.closed_at
     && !db.prepare("SELECT 1 FROM commerce_order_fulfillments WHERE sale_id = ?").get(saleId)
     && !db.prepare("SELECT 1 FROM customer_credit_entries WHERE sale_id = ?").get(saleId), "REFUND_SCOPE");
@@ -91,7 +115,7 @@ function refundPorts(authority: MarketSaleBenefitsAuthority, businessId: string,
 
 export interface FullRefundMarketSalePreview {
   businessId: string; actorId: string; saleId: string; eligible: boolean; refunded: boolean; reason: string;
-  source: "desktop-market-quick-sale" | "android-market-sale" | null;
+  source: "desktop-market-quick-sale" | "android-market-sale" | "commerce-order" | null;
   cashMinor: number; pointsMinor: number; totalMinor: number; currency: string;
   customerName: string | null; lines: Array<{ name: string; quantity: number }>;
 }
@@ -163,18 +187,23 @@ function readRefundEvidence(db: DatabaseSync, businessId: string, saleId: string
     subtotal += moneyToMinor(Number(item.line_total));
   }
   const totalMinor = moneyToMinor(Number(sale.total));
+  const deliveryMinor = moneyToMinor(Number(sale.delivery_fee ?? 0));
   requireRefund(safeMinor(subtotal) && subtotal === moneyToMinor(Number(sale.subtotal))
-    && safeMinor(totalMinor) && subtotal - moneyToMinor(Number(sale.discount_total)) === totalMinor, "REFUND_EVIDENCE_CONFLICT");
+    && safeMinor(totalMinor) && safeMinor(deliveryMinor) && (sale.source === orderSource || deliveryMinor === 0)
+    && subtotal - moneyToMinor(Number(sale.discount_total)) + deliveryMinor === totalMinor, "REFUND_EVIDENCE_CONFLICT");
   const tender = db.prepare("SELECT * FROM commerce_sale_settlements WHERE sale_id = ?").get(saleId);
-  if (sale.source === androidSource) requireRefund(!tender && !db.prepare(
-    "SELECT 1 FROM commerce_benefit_snapshots WHERE source_kind = 'sale' AND source_id = ?").get(saleId), "REFUND_EVIDENCE_CONFLICT");
+  if (sale.source === androidSource || sale.source === orderSource) requireRefund(!tender && !db.prepare(
+    "SELECT 1 FROM commerce_benefit_snapshots WHERE source_id = ?").get(saleId), "REFUND_EVIDENCE_CONFLICT");
   const snapshot = db.prepare(`SELECT s.id,s.receipt_json,r.intent_json FROM commerce_benefit_snapshots s
     JOIN commerce_benefit_reservations r ON r.business_id = s.business_id AND r.id = s.reservation_id
     WHERE s.business_id = ? AND s.source_kind = 'sale' AND s.source_id = ?`).get(businessId, saleId);
   requireRefund(Boolean(tender) === Boolean(snapshot), "REFUND_EVIDENCE_CONFLICT");
   const cashMinor = tender ? Number(tender.cash_received_minor) : totalMinor;
   const pointsMinor = tender ? Number(tender.points_tender_minor) : 0;
-  const customerId = tender?.customer_id == null ? (sale.source === androidSource && sale.customer_id != null ? String(sale.customer_id) : null) : String(tender.customer_id);
+  const orderCustomer = sale.source === orderSource ? db.prepare(`SELECT o.customer_id FROM commerce_orders o JOIN commerce_order_fulfillments f
+    ON f.order_id=o.id AND f.business_id=o.business_id WHERE f.sale_id=? AND o.business_id=?`).get(saleId,businessId)?.customer_id : null;
+  const customerId = tender?.customer_id == null ? (orderCustomer != null ? String(orderCustomer)
+    : sale.source === androidSource && sale.customer_id != null ? String(sale.customer_id) : null) : String(tender.customer_id);
   const method = sale.payment_method === "transfer" ? "bank" : String(sale.payment_method);
   requireRefund(safeMinor(cashMinor) && safeMinor(pointsMinor) && cashMinor + pointsMinor === totalMinor
     && ["cash", "card", "bank", "other"].includes(method)
@@ -219,6 +248,11 @@ function readRefundEvidence(db: DatabaseSync, businessId: string, saleId: string
 /** Consistent read-only snapshot; eligibility is advisory and rechecked by the writer. */
 export function getFullRefundMarketSalePreview(databasePath: string, saleId: string,
   authority: MarketSaleBenefitsAuthority): FullRefundMarketSalePreview {
+  return getFullRefundSalePreview(databasePath,saleId,authority);
+}
+
+function getFullRefundSalePreview(databasePath: string, saleId: string,
+  authority: MarketSaleBenefitsAuthority, scope?: WebOrderRefundScope): FullRefundMarketSalePreview {
   authority.actor.assertAuthorized();
   requireRefund(typeof saleId === "string" && /^[a-zA-Z0-9_-]{1,160}$/.test(saleId), "REFUND_INVALID_COMMAND");
   const db = new DatabaseSync(databasePath, { readOnly: true });
@@ -228,7 +262,7 @@ export function getFullRefundMarketSalePreview(databasePath: string, saleId: str
     const base: FullRefundMarketSalePreview = { businessId, actorId: authority.actor.id, saleId, eligible: false,
       refunded: false, reason: "", source: null, cashMinor: 0, pointsMinor: 0, totalMinor: 0, currency: "TRY", customerName: null, lines: [] };
     try {
-      const sale = paidSale(db, businessId, saleId);
+      const sale = paidSale(db, businessId, saleId, scope);
       base.source = sale.source as FullRefundMarketSalePreview["source"];
       const previous = db.prepare("SELECT * FROM commerce_sale_full_refunds WHERE business_id = ? AND sale_id = ?").get(businessId, saleId);
       if (previous) {
@@ -258,23 +292,29 @@ export function getFullRefundMarketSalePreview(databasePath: string, saleId: str
  */
 export function fullRefundMarketSale(databasePath: string, input: FullRefundMarketSaleInput,
   authority: MarketSaleBenefitsAuthority): FullRefundMarketSaleResult {
+  return fullRefundPaidSale(databasePath,input,authority);
+}
+
+function fullRefundPaidSale(databasePath: string, input: FullRefundMarketSaleInput,
+  authority: MarketSaleBenefitsAuthority, scope?: WebOrderRefundScope): FullRefundMarketSaleResult {
   authority.actor.assertAuthorized(); // Before database or protected-key access.
-  const command = commandJson(input);
+  const originalCommand=commandJson(input);
+  const command=scope ? canonicalBenefitsJson({...input,orderId:scope.orderId,reason:scope.reason}) : originalCommand;
   const db = new DatabaseSync(databasePath);
   try {
     db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     const businessId = authorize(db, authority);
-    const initialSale = paidSale(db, businessId, input.saleId);
+    const initialSale = paidSale(db, businessId, input.saleId, scope);
     // Secure storage I/O is outside the transaction. Legacy refunds never need a key.
     const prior = db.prepare("SELECT id FROM commerce_sale_full_refunds WHERE business_id = ? AND operation_id = ?").get(businessId, input.operationId);
     const initialSnapshot = db.prepare("SELECT id FROM commerce_benefit_snapshots WHERE business_id = ? AND source_kind = 'sale' AND source_id = ?")
       .get(businessId, input.saleId);
-    if (initialSale.source === androidSource) requireRefund(!initialSnapshot, "REFUND_EVIDENCE_CONFLICT");
+    if (initialSale.source === androidSource || initialSale.source === orderSource) requireRefund(!initialSnapshot, "REFUND_EVIDENCE_CONFLICT");
     const alreadyRefunded = db.prepare("SELECT 1 FROM commerce_sale_full_refunds WHERE sale_id = ?").get(input.saleId);
     const key = !prior && !alreadyRefunded && initialSnapshot ? authority.keys.load() : undefined;
     return withCommerceBenefitsTransaction(db, Date.now(), tx => {
       requireRefund(authorize(db, authority) === businessId, "REFUND_SCOPE");
-      const sale = paidSale(db, businessId, input.saleId);
+      const sale = paidSale(db, businessId, input.saleId, scope);
       const previous = db.prepare(`SELECT f.command_json,r.receipt_json FROM commerce_sale_full_refunds f
         JOIN commerce_sale_full_refund_receipts r ON r.refund_id = f.id WHERE f.business_id = ? AND f.operation_id = ?`)
         .get(businessId, input.operationId);
@@ -303,7 +343,44 @@ export function fullRefundMarketSale(databasePath: string, input: FullRefundMark
       const receipt: FullRefundMarketSaleReceipt = { version: 1, refundId, saleId: input.saleId, businessId, customerId,
         cashMinor, pointsMinor, currency: String(sale.currency), paymentMethod: method, stockMovementIds, benefits };
       db.prepare("INSERT INTO commerce_sale_full_refund_receipts VALUES (?,?)").run(refundId, canonicalBenefitsJson(receipt));
+      if(scope) {
+        db.prepare("UPDATE commerce_orders SET status='cancelled',payment_status='refunded',delivery_status='returned',cancelled_at=?,updated_at=? WHERE id=? AND business_id=?")
+          .run(now,now,scope.orderId,businessId);
+        db.prepare("INSERT INTO commerce_order_events(id,business_id,order_id,type,actor_id,reason,request_json,created_at) VALUES (?,?,?,'order_refunded',?,?,?,?)")
+          .run(`order-refund:${refundId}`,businessId,scope.orderId,authority.actor.id,scope.reason,command,now);
+      }
       return { receipt, replayed: false };
     });
   } finally { db.close(); }
+}
+
+
+/** Resolve only the canonical fulfilled web order; callers cannot choose money or sale identity. */
+function webOrderSaleId(databasePath: string,orderId: string,authority: MarketSaleBenefitsAuthority): string {
+  authority.actor.assertAuthorized();
+  requireRefund(typeof orderId==="string" && /^[a-zA-Z0-9_-]{1,160}$/.test(orderId),"REFUND_INVALID_COMMAND");
+  const db=new DatabaseSync(databasePath,{readOnly:true});
+  try {
+    const businessId=authorize(db,authority);
+    const row=db.prepare("SELECT sale_id FROM commerce_order_fulfillments WHERE order_id=? AND business_id=?").get(orderId,businessId);
+    requireRefund(row,"REFUND_ORDER_SCOPE");
+    paidSale(db,businessId,String(row.sale_id),{orderId,reason:""});
+    return String(row.sale_id);
+  }finally{db.close();}
+}
+
+export function getFullRefundCommerceOrderPreview(databasePath: string,orderId: string,authority: MarketSaleBenefitsAuthority): FullRefundMarketSalePreview & {orderId: string} {
+  const saleId=webOrderSaleId(databasePath,orderId,authority);
+  return {...getFullRefundSalePreview(databasePath,saleId,authority,{orderId,reason:""}),orderId};
+}
+
+export function fullRefundCommerceOrder(databasePath: string,input: FullRefundCommerceOrderInput,authority: MarketSaleBenefitsAuthority): FullRefundCommerceOrderResult {
+  authority.actor.assertAuthorized();
+  requireRefund(input && Object.keys(input).length===4 && Object.keys(input).every(key=>["orderId","operationId","kind","reason"].includes(key))
+    && typeof input.reason==="string" && input.reason.trim().length>0 && input.reason.length<=500 && !/[\u0000-\u001f\u007f]/.test(input.reason),"REFUND_INVALID_COMMAND");
+  const saleId=webOrderSaleId(databasePath,input.orderId,authority);
+  const result=fullRefundPaidSale(databasePath,{saleId,operationId:input.operationId,kind:input.kind},authority,{orderId:input.orderId,reason:input.reason.trim()});
+  const order=getCommerceOrder(databasePath,input.orderId);
+  requireRefund(order,"REFUND_ORDER_SCOPE");
+  return {...result,order};
 }

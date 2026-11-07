@@ -11,7 +11,7 @@ import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerc
 import { desktopLog } from "./desktop-logger";
 import { getMarketSaleBenefitsState, previewMarketSaleBenefits } from "./market-sale-benefits";
 import { completeMarketSale } from "./market-sale-operation";
-import { fullRefundMarketSale, getFullRefundMarketSalePreview, listMarketSaleHistory, MarketSaleRefundError } from "./market-sale-full-refund";
+import { fullRefundCommerceOrder, getFullRefundCommerceOrderPreview, fullRefundMarketSale, getFullRefundMarketSalePreview, listMarketSaleHistory, MarketSaleRefundError } from "./market-sale-full-refund";
 import { previewCommerceOrderBenefits } from "./commerce-order-benefits";
 import { activateCatalogProduct, deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } from "./commerce-catalog-presentation-store";
 import {
@@ -223,6 +223,10 @@ export function registerCommerceIpcHandlers(options: {
   };
   ipcMain.handle("commerce:order:payment", (event,input: Parameters<DesktopCommerceBridge["manageOrderPayment"]>[0]) =>
     mutateForIpc("commerce:order:payment",()=>manageOrderPayment(databasePath(),input,marketBenefitsAuthority(event).actor)));
+  ipcMain.handle("commerce:order:fullRefundPreview", (event, orderId: string) =>
+    getFullRefundCommerceOrderPreview(databasePath(), orderId, marketBenefitsAuthority(event)));
+  ipcMain.handle("commerce:order:fullRefund", (event, input: Parameters<DesktopCommerceBridge["tryFullRefundOrder"]>[0]) =>
+    mutateForIpc("commerce:order:fullRefund", () => fullRefundCommerceOrder(databasePath(), input, marketBenefitsAuthority(event))));
   ipcMain.handle("commerce:sale:benefitsState", event => {
     try {
       marketBenefitsAuthority(event);

@@ -6,6 +6,9 @@ import {chromium,expect} from '@playwright/test';
 import {launchChromiumForSmoke} from './test-helpers/playwright-browser.mjs';
 import {accountFixture} from './test-helpers/customer-accounts.mjs';
 const require=createRequire(import.meta.url);
+const {DatabaseSync}=require('node:sqlite');
+const {fullRefundCommerceOrder,getFullRefundCommerceOrderPreview,fullRefundMarketSale}=require('../apps/desktop-app/dist-electron/market-sale-full-refund.js');
+const {setRuntimeInventoryCount,getRuntimeInventoryBalance}=require('../apps/desktop-app/dist-electron/commerce-runtime.js');
 const {WebSyncIngress}=require('../apps/desktop-app/dist-electron/web-sync-ingress.js');
 const {manageOrderPayment}=require('../apps/desktop-app/dist-electron/commerce-order-payment.js');
 const {getRuntimeOrder,listRuntimeOrders,updateRuntimeOrderStatus,fulfillRuntimeOrder}=require('../apps/desktop-app/dist-electron/commerce-runtime.js');
@@ -15,8 +18,11 @@ const {publishDesktopProjection}=require('../apps/desktop-app/dist-electron/desk
 const teknikelSource=join(process.cwd(),'../teknikel_web/canonical');
 const teknikel=!process.argv.includes('--common-template') && existsSync(teknikelSource);
 const site=teknikel?teknikelSource:join(process.cwd(),'web-site-template');
-const widths=process.argv.includes('--common-template') || process.argv.includes('--mobile-only') ? [390] : [390,768,1440];
-const f=await accountFixture({smtp:false});
+const shipping=process.argv.includes('--shipping');
+const expectedTotal=shipping ? 261.89 : 246.9, expectedMinor=Math.round(expectedTotal*100), expectedText=shipping ? '261,89' : '246,90';
+const widths=process.argv.includes('--desktop-ui') ? [390,768] : shipping || process.argv.includes('--common-template') || process.argv.includes('--mobile-only') ? [390] : [390,768,1440];
+const members=process.argv.includes('--members');
+const f=await accountFixture({smtp:members});
 let browser;
 try {
   cpSync(site,join(f.root,'canonical'),{recursive:true});
@@ -24,15 +30,17 @@ try {
   writeFileSync(join(f.root,'index.php'),"<?php require __DIR__ . '/canonical/public/index.php';");
   const config=join(f.root,'canonical/site/config.php');
   const configText=readFileSync(config,'utf8');
-  writeFileSync(config,configText.includes("'local_api_root'") ? configText.replace(/'local_api_root' => [^\n]+/,`'local_api_root' => ${JSON.stringify(f.hosting)},`) : configText.replace("'api_base_path'",`'local_api_root' => ${JSON.stringify(f.hosting)},\n    'api_base_path'`));
-  writeFileSync(join(f.hosting,'config/account.local.php'),"<?php putenv('YA_ACCOUNT_SITE_URL');");
+  writeFileSync(config,configText.includes("'local_api_root'") ? configText.replace(/'local_api_root' => [^\n]+/,`'local_api_root' => ${(members ? 'null' : JSON.stringify(f.hosting))},`) : configText.replace("'api_base_path'",`'local_api_root' => ${(members ? 'null' : JSON.stringify(f.hosting))},\n    'api_base_path'`));
+  if(!members)writeFileSync(join(f.hosting,'config/account.local.php'),"<?php putenv('YA_ACCOUNT_SITE_URL');");
   await f.publish();
-  const product=saveRuntimeCatalogProduct(f.database.databasePath,{name:'TEST Checkout Pompası',sku:'TEST-CHECKOUT',unit:'piece',salePrice:123.45,currency:'TRY',taxRate:20,isActive:true,trackInventory:false});
+  const product=saveRuntimeCatalogProduct(f.database.databasePath,{name:'TEST Checkout Pompası',sku:'TEST-CHECKOUT',unit:'piece',salePrice:123.45,currency:'TRY',taxRate:20,isActive:true,trackInventory:true});
+  setRuntimeInventoryCount(f.database.databasePath,{productId:product.id,countedQuantity:10,unitCost:50});
   f.database.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,titleOverride:'',descriptionOverride:'',sortOrder:0,isFeatured:true,featuredOrder:0});
-  const settings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:null,
+  const settings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:shipping ? 1499 : null,
     bank:{name:'DEMO Banka',accountHolder:'DEMO Teknikel',iban:'DEMO — GEÇERSİZ — ÖDEME YAPMAYIN'},legal:{version:'demo-v2',preliminary:'DEMO ön bilgilendirme. Ticari kullanıma hazır değildir.',agreement:'DEMO satış sözleşmesi. Ticari kullanıma hazır değildir.'}};
-  const setupInput={...f.database.getSetupData(),aiApiKey:'',clearAiApiKey:false,initialCounts:{rooms:0,tables:0},tableCategories:[],commerceCheckout:settings};
-  const saved=f.database.saveInitialSetup(setupInput);assert.equal(saved.ok,true,saved.message);
+  const setupInput={...f.database.getSetupData(),aiApiKey:'',clearAiApiKey:false,initialCounts:{rooms:0,tables:0},tableCategories:[],onlineSalesDelivery:{pickupEnabled:true,shippingEnabled:shipping},commerceCheckout:settings};
+  if(shipping)setupInput.arasShipping={enabled:true,environment:'test',customerCode:'fixture',username:'fixture',password:''};
+  const saved=f.database.saveInitialSetup(setupInput,undefined,undefined,shipping ? {mode:'replace',encryptedValue:'safe-storage:v1:fixture-ciphertext'} : undefined);assert.equal(saved.ok,true,saved.message);
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'checkout settings join the canonical settings transaction');
   assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,demo:false}}).ok,false,'invalid real bank data cannot be enabled');
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'rejected settings leave the saved owner intact');
@@ -82,17 +90,21 @@ try {
     await page.getByRole('button',{name:'Devam et',exact:true}).click();
     await expect(page.locator('select[name=deliveryMethod]')).toHaveValue('pickup');
     await page.goBack();await expect(page.locator('input[name=name]')).toHaveValue('TEST Misafir');await page.goForward();
+    if(shipping) {
+      await page.locator('select[name=deliveryMethod]').selectOption('shipping');
+      for(const [name,value] of Object.entries({recipientName:'TEST Alıcı',addressLine1:'TEST Mahallesi 1',district:'Kadıköy',city:'İstanbul'}))await page.locator(`[name="address.${name}"]`).fill(value);
+    }
     await page.getByRole('button',{name:'Devam et',exact:true}).click();
     await expect(page.getByLabel('Kredi kartı — Yakında')).toBeDisabled();
     await page.getByRole('button',{name:'Devam et',exact:true}).click();
-    await expect(page.locator('#checkout-body')).toContainText('246,90');
+    await expect(page.locator('#checkout-body')).toContainText(expectedText);
     await page.getByLabel('Ön bilgilendirmeyi okudum ve kabul ediyorum.').check();
     await page.getByLabel('Satış sözleşmesini kabul ediyorum.',{exact:true}).check();
     await page.getByRole('button',{name:'Siparişi onayla',exact:true}).click();
     await expect(page).toHaveURL(/page=checkout-result/);
     await expect(page.locator('#checkout-body')).toContainText('DEMO — GEÇERSİZ');
     await expect(page.locator('#checkout-body h2')).toHaveText(/^YA-\d{8}-[A-F0-9]{10}$/);
-    await expect(page.locator('#checkout-body')).toContainText('246,90');
+    await expect(page.locator('#checkout-body')).toContainText(expectedText);
     await page.getByRole('button',{name:'Havale yaptım',exact:true}).click();
     await expect(page.locator('#checkout-body')).toContainText('İşletme doğrulaması bekleniyor');
     assert.equal(listRuntimeOrders(f.database.databasePath).length,0,'no Desktop sync has run while browser accepts orders');
@@ -137,11 +149,47 @@ try {
   manageOrderPayment(f.database.databasePath,{orderId:order.id,operationKey:'checkout-payment-prepare-1',expectedUpdatedAt:confirmed.updatedAt,action:'prepare',reason:''},actor);
   const fulfillment={orderId:order.id,operationKey:'checkout-fulfill-paid-bank',settlement:{type:'paid',paymentMethod:'bank'}};
   const sale=fulfillRuntimeOrder(f.database.databasePath,fulfillment);
-  assert.equal(sale.order.order.deliveryStatus,'delivered');assert.equal(sale.sale.total,246.9);
+  assert.equal(sale.order.order.deliveryStatus,'delivered');assert.equal(sale.sale.total,expectedTotal);
   assert.equal(fulfillRuntimeOrder(f.database.databasePath,fulfillment).sale.id,sale.sale.id,'fulfillment never records a second payment');
   await f.publish();
   const delivered=await f.call('order-payment',{action:'read',orderId:order.sourceReference,orderAccessToken:guestToken});
   assert.equal(delivered.body.order.delivery_status,'delivered');
+  const authority={actor,keys:{load(){throw new Error('Web checkout refunds must not need benefits keys');}}};
+  const refund={orderId:order.id,operationId:'checkout-full-refund-01',kind:'full',reason:'Ürünler geri alındı; banka iadesi yapıldı.'};
+  assert.equal(getRuntimeInventoryBalance(f.database.databasePath,product.id).quantity,8);
+  assert.equal(getFullRefundCommerceOrderPreview(f.database.databasePath,order.id,authority).cashMinor,expectedMinor);
+  assert.throws(()=>fullRefundCommerceOrder(f.database.databasePath,refund,{...authority,actor:{...actor,role:'staff'}}));
+  assert.throws(()=>fullRefundCommerceOrder('/never-open.sqlite',refund,{...authority,actor:{...actor,assertAuthorized(){throw new Error('locked');}}}),/locked/);
+  assert.throws(()=>fullRefundMarketSale(f.database.databasePath,{saleId:sale.sale.id,operationId:'wrong-market-refund',kind:'full'},authority),error=>error.code==='REFUND_SCOPE','market refund cannot cross into web orders');
+  const failAudit=new DatabaseSync(f.database.databasePath);
+  try {
+    failAudit.exec("CREATE TRIGGER fixture_refund_audit_failure BEFORE INSERT ON commerce_order_events WHEN NEW.type='order_refunded' BEGIN SELECT RAISE(ABORT,'fixture refund audit failure'); END");
+    assert.throws(()=>fullRefundCommerceOrder(f.database.databasePath,refund,authority),/fixture refund audit failure/);
+    assert.equal(getRuntimeInventoryBalance(f.database.databasePath,product.id).quantity,8);
+    assert.equal(getRuntimeOrder(f.database.databasePath,order.id).order.paymentStatus,'paid');
+    assert.equal(failAudit.prepare('SELECT count(*) n FROM commerce_sale_full_refunds').get().n,0);
+    assert.equal(failAudit.prepare("SELECT count(*) n FROM finance_entries WHERE source_type='commerce_sale_refund'").get().n,0);
+  }finally{failAudit.exec('DROP TRIGGER fixture_refund_audit_failure');failAudit.close();}
+  const refunded=fullRefundCommerceOrder(f.database.databasePath,refund,authority);
+  assert.equal(refunded.order.order.paymentStatus,'refunded');assert.equal(refunded.order.order.deliveryStatus,'returned');
+  assert.equal(refunded.receipt.cashMinor,expectedMinor);assert.equal(refunded.receipt.stockMovementIds.length,1);
+  assert.equal(fullRefundCommerceOrder(f.database.databasePath,refund,authority).replayed,true);
+  assert.throws(()=>fullRefundCommerceOrder(f.database.databasePath,{...refund,reason:'Changed reason'},authority),error=>error.code==='REFUND_INTENT_CHANGED');
+  assert.throws(()=>fullRefundCommerceOrder(f.database.databasePath,{...refund,operationId:'another-refund-id'},authority),error=>error.code==='REFUND_ALREADY_COMPLETED');
+  assert.equal(getRuntimeInventoryBalance(f.database.databasePath,product.id).quantity,10);
+  const audit=new DatabaseSync(f.database.databasePath,{readOnly:true});
+  try {
+    assert.deepEqual(audit.prepare("SELECT direction,amount_minor FROM finance_entries WHERE source_id IN (?,?) ORDER BY direction").all(sale.sale.id,refunded.receipt.refundId).map(row=>({...row})),[{direction:'expense',amount_minor:expectedMinor},{direction:'income',amount_minor:expectedMinor}]);
+    assert.equal(audit.prepare("SELECT count(*) n FROM inventory_movements WHERE reference_type='commerce_sale_refund'").get().n,1);
+    assert.equal(audit.prepare("SELECT actor_id FROM commerce_order_events WHERE order_id=? AND type='order_refunded'").get(order.id).actor_id,actor.id);
+  }finally{audit.close();}
+  await f.publish();
+  const refundState=await f.call('order-payment',{action:'read',orderId:order.sourceReference,orderAccessToken:guestToken});
+  assert.equal(refundState.body.order.payment_status,'refunded');assert.equal(refundState.body.order.delivery_status,'returned');
+  assert.equal((await f.call('order-payment',{action:'report',orderId:order.sourceReference,orderAccessToken:guestToken})).status,409);
+  assert.equal(f.storage("echo $db->query(\"SELECT count(*) FROM commerce_mail_outbox WHERE body LIKE '%tam iadesi%'\")->fetchColumn();"),1);
+  console.log('PASS canonical web full refund: authorized stock return, audited bank expense, immutable original sale, exact replay and private status');
+
   if(orderCount>1){
   const unpaid=orders[1];
   manageOrderPayment(f.database.databasePath,{orderId:unpaid.id,operationKey:'checkout-payment-reject-01',expectedUpdatedAt:unpaid.updatedAt,action:'reject',reason:'No matching bank movement'},actor);
@@ -151,7 +199,12 @@ try {
   assert.equal(reportedAgain.body.order.payment_status,'verification_pending');
   assert.equal((await ingress.pullWebOrderPages(f.transport)).count,1,'a new notice after rejection is one new event');
   assert.equal(getRuntimeOrder(f.database.databasePath,unpaid.id).order.paymentStatus,'verification_pending');
+  if(process.argv.includes('--desktop-ui')) {
+    const {verifyCheckoutDesktop}=await import('./test-helpers/checkout-desktop-ui.mjs');
+    await verifyCheckoutDesktop(f,unpaid);
+  }
   }
   console.log('PASS retained offline intake, exact ACK, protected audited payment approval, ownership isolation and private status publication');
+  if(members) { const {verifyCheckoutMembers}=await import('./test-helpers/checkout-members-ui.mjs');await verifyCheckoutMembers(f,browser,product); }
   console.log('commerce-checkout-smoke-ok');
 } finally {await browser?.close();await f.cleanup();}

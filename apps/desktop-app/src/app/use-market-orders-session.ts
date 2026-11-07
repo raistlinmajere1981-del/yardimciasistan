@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { emptyArasShippingConfiguration } from "@yardimci-asistan/shared";
 import type { CommerceShipment, CommerceShipmentStatus, CommerceOrder, CommerceOrderDetail } from "@yardimci-asistan/shared";
 import { useMarketOrderBenefits } from "./use-market-order-benefits";
+import type { DesktopCommerceBridge } from "../../electron/commerce-ipc-contract";
 
 export type FulfillmentPaymentChoice = "cash" | "card" | "bank" | "other" | "credit";
 
@@ -15,6 +16,11 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const mutationInFlight = useRef(false);
+  const pendingRefund = useRef<Parameters<DesktopCommerceBridge["tryFullRefundOrder"]>[0] | null>(null);
+  const [refundPreview, setRefundPreview] = useState<Awaited<ReturnType<DesktopCommerceBridge["getFullRefundOrderPreview"]>> | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundConfirmed, setRefundConfirmed] = useState(false);
+  const [refundUncertain, setRefundUncertain] = useState(false);
   const [orders, setOrders] = useState<CommerceOrder[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<CommerceOrderDetail | null>(null);
   const [shippingProvider, setShippingProvider] = useState(emptyArasShippingConfiguration);
@@ -45,7 +51,7 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
 
   // Local mutation results invalidate older reads and update UI without an event round trip.
   const setSelectedOrder = useCallback((detail: CommerceOrderDetail | null) => {
-    if (pendingBenefits.current) return;
+    if (pendingBenefits.current || pendingRefund.current) return;
     ++reloadGeneration.current;
     ++detailGeneration.current;
     openingOrderRef.current = false;
@@ -67,10 +73,10 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
       if (!enabledRef.current || request !== reloadGeneration.current) return;
       setOrders(next);
       const selectedId = selectedIdRef.current;
-      if (pendingBenefits.current || mutationInFlight.current || openingOrderRef.current || !selectedId || !next.some((order) => order.id === selectedId)) return;
+      if (pendingBenefits.current || pendingRefund.current || mutationInFlight.current || openingOrderRef.current || !selectedId || !next.some((order) => order.id === selectedId)) return;
       detailRequest = ++detailGeneration.current;
       const detail = await bridge.getOrder(selectedId);
-      if (!pendingBenefits.current && !mutationInFlight.current && enabledRef.current && request === reloadGeneration.current && detailRequest === detailGeneration.current && selectedIdRef.current === selectedId) {
+      if (!pendingBenefits.current && !pendingRefund.current && !mutationInFlight.current && enabledRef.current && request === reloadGeneration.current && detailRequest === detailGeneration.current && selectedIdRef.current === selectedId) {
         setSelectedOrderState(detail);
       }
     } catch (error) {
@@ -83,15 +89,16 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
   }, [bridge, pendingBenefits]);
 
   const openOrder = useCallback(async (orderId: string) => {
-    if (!bridge || !enabledRef.current || pendingBenefits.current || mutationInFlight.current) return;
+    if (!bridge || !enabledRef.current || pendingBenefits.current || pendingRefund.current || mutationInFlight.current) return;
     const request = ++detailGeneration.current;
     openingOrderRef.current = true;
     try {
       const detail = await bridge.getOrder(orderId);
-      if (!pendingBenefits.current && !mutationInFlight.current && enabledRef.current && request === detailGeneration.current) {
+      if (!pendingBenefits.current && !pendingRefund.current && !mutationInFlight.current && enabledRef.current && request === detailGeneration.current) {
         selectedIdRef.current = detail?.order.id ?? "";
         setSelectedOrderState(detail);
         setFulfillmentPaymentState("cash");
+        setRefundPreview(null); setRefundReason(""); setRefundConfirmed(false);
       }
     } catch (error) {
       if (enabledRef.current && request === detailGeneration.current) {
@@ -101,6 +108,43 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
       if (request === detailGeneration.current) openingOrderRef.current = false;
     }
   }, [bridge, pendingBenefits]);
+
+  const previewRefund = useCallback(async () => {
+    const orderId = selectedIdRef.current;
+    if (!bridge || !enabledRef.current || !orderId || mutationInFlight.current || pendingRefund.current) return;
+    mutationInFlight.current = true; setSubmitting(true);
+    try {
+      const preview = await bridge.getFullRefundOrderPreview(orderId);
+      if (selectedIdRef.current === orderId) { setRefundPreview(preview); setRefundConfirmed(false); }
+    } catch (error) { stateChangeRef.current("error", error instanceof Error ? error.message : "İade önizlemesi alınamadı."); }
+    finally { mutationInFlight.current = false; setSubmitting(false); }
+  }, [bridge]);
+
+  const submitRefund = useCallback(async () => {
+    if (!bridge || !enabledRef.current || mutationInFlight.current || pendingBenefits.current) return;
+    if (!pendingRefund.current) {
+      if (!refundPreview?.eligible || refundPreview.orderId !== selectedIdRef.current || !refundConfirmed || !refundReason.trim()) return;
+      pendingRefund.current = { orderId: refundPreview.orderId, operationId: crypto.randomUUID(), kind: "full", reason: refundReason.trim() };
+    }
+    const input = pendingRefund.current;
+    mutationInFlight.current = true; setSubmitting(true);
+    try {
+      const response = await bridge.tryFullRefundOrder(input);
+      if (response?.ok === false) {
+        pendingRefund.current = null; setRefundUncertain(false);
+        setRefundPreview(null); setRefundConfirmed(false);
+        stateChangeRef.current("error", response.message); return;
+      }
+      if (!response?.ok || response.value.order?.order.id !== input.orderId || response.value.order.order.paymentStatus !== "refunded")
+        throw new Error("İade sonucu doğrulanamadı.");
+      pendingRefund.current = null; setRefundUncertain(false); setRefundPreview(null); setRefundReason(""); setRefundConfirmed(false);
+      setSelectedOrder(response.value.order);
+      stateChangeRef.current("success", "Tam iade kaydedildi. Ürünler stoğa alındı ve banka iadesi finans çıkışına işlendi.");
+    } catch {
+      setRefundUncertain(true);
+      stateChangeRef.current("error", "İade yanıtı alınamadı. Aynı işlemi yeniden sorgulayın; ikinci iade oluşturulmaz.");
+    } finally { mutationInFlight.current = false; setSubmitting(false); }
+  }, [bridge, pendingBenefits, refundPreview, refundConfirmed, refundReason, setSelectedOrder]);
 
   useEffect(() => {
     if (!enabled || !bridge) return;
@@ -189,7 +233,9 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
     }
   }, [bridge, reloadShipments, pendingBenefits]);
 
-  return { shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments,
+  return { refund: { preview: refundPreview, reason: refundReason, setReason: setRefundReason, confirmed: refundConfirmed,
+    setConfirmed: setRefundConfirmed, uncertain: refundUncertain, previewRefund, submit: submitRefund },
+    shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments,
     search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
     fulfillmentPayment, setFulfillmentPayment, reloadOrders, openOrder, benefits };

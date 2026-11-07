@@ -78,6 +78,8 @@ export interface MarketBarcodeFastPullState {
  * guarded commerce runtime rather than repository/store functions.
  */
 export interface DesktopCommerceBridge {
+  getFullRefundOrderPreview: (orderId: string) => Promise<import("./market-sale-full-refund").FullRefundMarketSalePreview & { orderId: string }>;
+  tryFullRefundOrder: (input: import("./market-sale-full-refund").FullRefundCommerceOrderInput) => Promise<CommerceIpcMutationResult<import("./market-sale-full-refund").FullRefundCommerceOrderResult>>;
   manageOrderPayment: (input: import("@yardimci-asistan/shared").CommerceOrderPaymentCommand) => Promise<CommerceOrderDetail>;
   getMarketSaleBenefitsState: () => Promise<import("@yardimci-asistan/shared").BenefitsManagementResult<import("./market-sale-benefits").MarketSaleBenefitsState>>;
   previewMarketSaleBenefits: (input: import("./market-sale-benefits").MarketSalePreviewInput) => Promise<import("@yardimci-asistan/shared").BenefitsManagementResult<import("./market-sale-benefits").MarketSalePreview>>;

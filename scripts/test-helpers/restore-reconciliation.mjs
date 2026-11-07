@@ -11,6 +11,7 @@ import { marketingFixture, editorialInput, imageBytes } from './marketing-fixtur
 const require = createRequire(import.meta.url);
 const core = require('../../packages/sync-core/dist');
 const { BUSINESS_CAPABILITIES: C, expandBusinessCapabilities, getEnabledBusinessCapabilityDependents } = require('../../packages/shared/dist');
+const { saveCheckoutSettings } = require('../../apps/desktop-app/dist-electron/commerce-checkout-settings.js');
 const { SyncCoordinator } = require('../../apps/desktop-app/dist-electron/sync-coordinator.js');
 const { DESKTOP_PUBLICATIONS } = require('../../apps/desktop-app/dist-electron/desktop-publication-registry.js');
 const { saveRuntimeCatalogProduct, listRuntimeOrders } = require('../../apps/desktop-app/dist-electron/commerce-runtime.js');
@@ -73,7 +74,12 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
   };
   const post = async (path, body, headers = {}) => {
     storage("$db->exec('DELETE FROM public_request_guard_events');");
-    const response = await nativeFetch(`${config.baseUrl}/api/${path}.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    if(['order','dealer/order'].includes(path)) {
+      const quote=await post(path==='order'?'checkout-quote':'dealer/checkout-quote',{items:body.items,delivery:body.delivery},headers);
+      assert.equal(quote.status,200,JSON.stringify(quote.body));
+      body={...body,quoteId:quote.body.quote.quote_id,paymentMethod:'bank_transfer',consent:{preliminary:true,agreement:true,marketing:false}};
+    }
+    const response = await nativeFetch(`${config.baseUrl}/api/${path}.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-YA-Account':'1', ...headers }, body: JSON.stringify(body) });
     return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie') };
   };
   let coordinator;
@@ -124,6 +130,9 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     const productInput = { name: 'Restore product', sku: 'RESTORE-SKU', salePrice: 100, dealerPriceA: 80, dealerPriceB: 60,
       purchasePrice: 50, currency: 'TRY', unit: 'piece', taxRate: 20, trackInventory: false, isActive: true };
     const product = saveRuntimeCatalogProduct(f.db.databasePath, productInput);
+    f.db.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,titleOverride:'',descriptionOverride:'',sortOrder:0});
+    const checkoutSettings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:1700,bank:{name:'DEMO Restore A',accountHolder:'DEMO',iban:'DEMO — GEÇERSİZ'},legal:{version:'restore-terms',preliminary:'DEMO',agreement:'DEMO'}};
+    saveCheckoutSettings(f.db.databasePath,checkoutSettings);
     const customer = f.db.saveCustomer({ fullName: 'Restore dealer', phone: '05550001199', email: '', notes: '', tags: [],
       commercialProfile: { companyName: 'Restore dealer', dealerStatus: 'active', priceGroup: 'dealer_a' } });
     assert.equal(customer.ok, true, customer.message);
@@ -144,10 +153,13 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     let result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);
     const a = backup(); // T1: no Web-owned request/order yet
     const cookie = sessionCookie();
+    saveCheckoutSettings(f.db.databasePath,{...checkoutSettings,bank:{...checkoutSettings.bank,name:'DEMO Restore B'}});
+    result = await coordinator.runNow(); assert.equal(result.ok,true,result.message);
     f.service.savePublication({ ...pub, expectedRevision: pub.revision, title: 'Remote B', text: 'Newer B' });
     mutate("UPDATE business SET name='Remote B', display_name='Remote B'; UPDATE settings SET google_place_id='restore-place-B';");
     mutate("UPDATE rooms SET name='Room B'; UPDATE reservations SET end_date='2030-07-25'; UPDATE tables SET name='Table B'; UPDATE menu_categories SET name='Menu B';");
     saveRuntimeCatalogProduct(f.db.databasePath, { ...productInput, id: product.id, salePrice: 140, dealerPriceA: 90 });
+    result=await coordinator.runNow();assert.equal(result.ok,true,result.message);
     const guest = await post('order', { idempotencyKey: 'restore-guest-order-01', items: [{ productId: product.id, quantity: 2 }],
       buyer: { name: 'Restore guest', phone: '05550001234' }, delivery: { method: 'pickup' }, note: 'Original intent' });
     assert.equal(guest.status, 201, JSON.stringify(guest.body));
@@ -161,6 +173,8 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     assert.equal((await core.pushGoogleReviewsSettings({ ...privateIdentity, settings: { enabled: true, place_id: 'restore-place-B', api_key: 'RESTORE_PRIVATE_SENTINEL' } })).ok, true);
     assert.equal((await core.pushAiSettings({ ...privateIdentity, aiSettings: { enabled: true, provider: 'openai_compatible', service: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'restore-B', apiKey: 'RESTORE_PRIVATE_SENTINEL', timeoutSeconds: 30 } })).ok, true);
     const acceptedOrders = orders(); assert.equal(acceptedOrders.length, 2);
+    const historicalCheckout = acceptedOrders.map(o=>[o.sourceReference,o.orderNumber,JSON.stringify(o.checkoutSnapshot),o.deliveryFee]).sort();
+    assert.ok(acceptedOrders.every(o=>o.checkoutSnapshot.bank.name==='DEMO Restore B'));
     const historicalPrices = acceptedOrders.map(o => [o.sourceReference, o.total]).sort();
     assert.equal(storage('echo $db->query("SELECT COUNT(*) FROM web_orders WHERE imported_at <> \'\'")->fetchColumn();'), 2);
     const webOwnedCounts = storage('echo json_encode([$db->query("SELECT COUNT(*) FROM web_order_submission_receipts")->fetchColumn(), $db->query("SELECT COUNT(*) FROM web_request_submission_receipts")->fetchColumn()]);');
@@ -254,6 +268,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     assert.equal(storage("echo json_encode(ya_storage_get_publication('public_room_availability', []));").blocks[0].end_date, '2030-07-20');
     assert.equal(storage("echo json_encode($db->query('SELECT payload_json FROM publications')->fetchAll(PDO::FETCH_COLUMN));").join('').includes('RESTORE_PRIVATE_SENTINEL'), false);
     assert.deepEqual(orders().map(o => [o.sourceReference, o.total]).sort(), historicalPrices, 'replay preserves canonical pricing, not restored current product pricing');
+    assert.deepEqual(orders().map(o=>[o.sourceReference,o.orderNumber,JSON.stringify(o.checkoutSnapshot),o.deliveryFee]).sort(),historicalCheckout,'restore replay retains V2 number, bank/legal/total snapshot and separate delivery fee');
     assert.equal(f.db.getDashboardData().requests.length, 1);
     assert.deepEqual(storage('echo json_encode([$db->query("SELECT COUNT(*) FROM web_order_submission_receipts")->fetchColumn(), $db->query("SELECT COUNT(*) FROM web_request_submission_receipts")->fetchColumn()]);'), webOwnedCounts);
     assert.equal((await nativeFetch(`${config.baseUrl}/api/dealer/session.php`, { headers: { Cookie: liveCookie } })).status, 401, 'old epoch session is invalidated by normal access apply');

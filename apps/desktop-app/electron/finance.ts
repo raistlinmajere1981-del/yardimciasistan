@@ -118,7 +118,7 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
     // All-Puan refunds return points only. Never create a zero-value ledger entry.
     if (Number(row.amount_minor) === 0) return;
     ensureFinanceCategories(db);
-    prefix = "finance_commerce_refund_"; category = "market_refund"; description = "Market tam satış iadesi";
+    prefix = "finance_commerce_refund_"; category = "market_refund"; description = row.source === "commerce-order" ? "Web siparişi tam iadesi" : "Market tam satış iadesi";
   } else if (source === "restaurant_order") {
     row = db.prepare(`SELECT o.*, CAST(ROUND(o.total * 100) AS INTEGER) AS amount_minor,
       COALESCE((SELECT currency FROM table_order_items WHERE order_id = o.id LIMIT 1), 'TRY') AS currency,

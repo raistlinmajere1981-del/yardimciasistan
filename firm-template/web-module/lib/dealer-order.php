@@ -59,7 +59,7 @@ function ya_dealer_order_submit(string $token, array $input): array
         $account=ya_account_session($token);
         ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'quote' => $quote, 'checkout'=>$checkout,
             'notificationEmail'=>$account['email'],'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'order_number'=>$number,'total_minor'=>$checkout['total_minor'],'delivery_fee_minor'=>$checkout['delivery_fee_minor'],'payment_status'=>'unpaid','delivery_status'=>'unfulfilled','checkout'=>$checkout,'message' => 'Siparişiniz alındı. Ödeme bekleniyor.'];
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'order_number'=>$number,'total_minor'=>$checkout['total_minor'],'delivery_fee_minor'=>$checkout['delivery_fee_minor'],'payment_status'=>ya_commerce_payment_provider($checkout['payment_method'])->initialStatus(),'delivery_status'=>'unfulfilled','checkout'=>$checkout,'message' => 'Siparişiniz alındı. Ödeme bekleniyor.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $fingerprint, $response);
         ya_commerce_mail_order($db,$id,['buyer'=>['email'=>$account['email']]],$checkout);
         $db->exec('COMMIT');

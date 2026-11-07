@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { listPackage } from "@electron/asar";
 
 // Check the resource owner without producing or launching an installer.
@@ -19,7 +19,9 @@ if (process.argv.includes("--contracts-only")) {
   process.exit(0);
 }
 
-const packageRoot = join(process.cwd(), "dist", "desktop", "linux-unpacked");
+const rootArgument = process.argv.indexOf("--package-root");
+assert.ok(rootArgument < 0 || process.argv[rootArgument + 1], "--package-root için paket yolu gerekli.");
+const packageRoot = rootArgument < 0 ? join(process.cwd(), "dist", "desktop", "linux-unpacked") : resolve(process.argv[rootArgument + 1]);
 const packageExecutable = join(packageRoot, "yardimci-asistan-desktop");
 const appAsar = join(packageRoot, "resources", "app.asar");
 

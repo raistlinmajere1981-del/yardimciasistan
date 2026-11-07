@@ -1,0 +1,100 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { expect } from '@playwright/test';
+import { accountPassword } from './customer-accounts.mjs';
+const require = createRequire(import.meta.url);
+const { WebSyncIngress } = require('../../apps/desktop-app/dist-electron/web-sync-ingress.js');
+const { saveRuntimeCatalogProduct, listRuntimeOrders } = require('../../apps/desktop-app/dist-electron/commerce-runtime.js');
+const { publishDesktopProjection } = require('../../apps/desktop-app/dist-electron/desktop-publication-service.js');
+
+export async function verifyCheckoutMembers(f, browser, product) {
+  const ingress = new WebSyncIngress({database:f.database},()=>'',()=>{});
+  const accounts = [];
+  for (const [kind,width,price] of [['customer',390,123.45],['dealer',1440,90]]) {
+    const context = await browser.newContext({viewport:{width,height:1100},reducedMotion:'reduce'});
+    const page = await context.newPage(), errors=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    await page.route('**/*',route=>new URL(route.request().url()).origin===f.siteUrl?route.continue():route.abort());
+    const email=`browser-${kind}@example.test`, name=`TEST ${kind}`;
+    await page.goto(f.siteUrl+'/?page=account');
+    await page.locator('[data-account-mode=register]').click();
+    await expect(page.locator('#account-login')).toBeHidden();
+    await page.locator('#account-register [name=fullName]').fill(name);
+    await page.locator('#account-register [name=email]').fill(email);
+    await page.locator('#account-register button').click();
+    await expect(page.locator('#portal-message')).toContainText('e-posta kuyruğuna');
+    await f.runCommerceMail();
+    const verification=new URL(f.emails.at(-1).match(/https?:\/\/[^\s]+/)[0]);
+    await page.goto(f.siteUrl+'/?page=account&action=verify'+verification.hash);
+    await page.locator('#account-token [name=password]').fill(accountPassword);
+    await page.locator('#account-token button').click();
+    await expect(page.locator('#account-login')).toBeVisible();
+    assert.equal((await ingress.pullCustomerAccountPages(f.transport)).error,'');
+    const customer=f.database.listCustomers({}).items.find(row=>row.email===email);assert.ok(customer);
+    if(kind==='dealer') {
+      assert.equal(f.database.saveCustomer({...customer,commercialProfile:{companyName:name,dealerStatus:'active',priceGroup:'dealer_a'}}).ok,true);
+      saveRuntimeCatalogProduct(f.database.databasePath,{...product,dealerPriceA:price});
+    }
+    await f.publish();
+    const catalog=f.database.createCommerceOnlineCatalog();
+    const publication=await publishDesktopProjection(f.database,{baseUrl:f.baseUrl,syncSecret:f.secret},'online_catalog_publish',catalog,(identity,value)=>f.transport.publishOnlineCatalog({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}));
+    assert.ok(publication===null || publication.ok,publication?.message);
+    await page.locator('#account-login [name=email]').fill(email);
+    await page.locator('#account-login [name=password]').fill(accountPassword);
+    await page.locator('#account-login button').click();
+    await expect(page.locator('#account-profile')).toBeVisible();
+    if(kind==='customer')await expect(page.locator('#account-dealer-badge')).toBeHidden();
+    if(kind==='dealer')await expect(page.locator('#account-dealer-badge')).toBeVisible();
+    await page.goto(f.siteUrl+'/?page=catalog');
+    await page.getByRole('button',{name:'Sepete ekle',exact:true}).first().click();
+    await page.locator('.header-cart-link').click();
+    await page.locator('#mini-cart').getByRole('link',{name:'Alışverişi tamamla',exact:true}).click();
+    await expect(page.locator('input[name=name]')).toHaveValue(name);
+    await expect(page.locator('input[name=email]')).toHaveValue(email);
+    await expect(page.locator('input[name=name]')).toHaveAttribute('readonly','');
+    await page.locator('input[name=phone]').fill('+90 555 123 4567');
+    await page.getByRole('button',{name:'Devam et',exact:true}).click();
+    await page.getByRole('button',{name:'Devam et',exact:true}).click();
+    await expect(page.getByLabel('Kredi kartı — Yakında')).toBeDisabled();
+    await page.getByRole('button',{name:'Devam et',exact:true}).click();
+    await expect(page.locator('.shopping-summary')).toContainText(price.toFixed(2).replace('.',','));
+    await page.getByLabel('Ön bilgilendirmeyi okudum ve kabul ediyorum.').check();
+    await page.getByLabel('Satış sözleşmesini kabul ediyorum.',{exact:true}).check();
+    await page.getByRole('button',{name:'Siparişi onayla',exact:true}).click();
+    await expect(page).toHaveURL(/page=checkout-result/);
+    const number=await page.locator('#checkout-body h2').innerText();
+    await page.goto(f.siteUrl+'/?page=account');
+    await page.locator('#account-order-list').getByRole('link',{name:new RegExp(number)}).click();
+    await expect(page.locator('#account-order-detail')).toContainText('DEMO Yeni Banka');
+    await expect(page.locator('#account-order-detail')).toContainText(price.toFixed(2).replace('.',','));
+    await page.locator('#account-order-detail').getByRole('button',{name:'Havale yaptım',exact:true}).click();
+    await expect(page.locator('#portal-message')).toContainText('İşletme doğrulaması bekleniyor');
+    assert.equal((await ingress.pullWebOrderPages(f.transport)).error,'');
+    const order=listRuntimeOrders(f.database.databasePath).find(row=>row.orderNumber===number);assert.ok(order);
+    assert.equal(order.customerId,customer.id);assert.equal(order.total,price);assert.equal(order.paymentStatus,'verification_pending');
+    assert.equal(order.source,kind==='dealer'?'web-dealer':'web-online-sales');
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    const own=(await f.call('account/orders',undefined,(await context.cookies()).map(x=>`${x.name}=${x.value}`).join('; '))).body.orders;
+    assert.equal(own.length,1,'separate customer/dealer histories never reveal the other owner');
+    await expect(page.locator('#account-order-detail')).toContainText('Havale bildirildi');
+    await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo(0,0);});
+    await page.screenshot({path:join(process.cwd(),'artifacts/commerce-checkout',`account-${kind}-${width}.png`),fullPage:true});
+    await page.locator('#logout').click();await expect(page.locator('#account-login')).toBeVisible();
+    if(kind==='customer') {
+      await page.locator('[data-account-mode=recover]').click();
+      await page.locator('#account-recover [name=email]').fill(email);await page.locator('#account-recover button').click();
+      await expect(page.locator('#portal-message')).toContainText('e-posta kuyruğuna');await f.runCommerceMail();
+      const reset=new URL(f.emails.at(-1).match(/https?:\/\/[^\s]+/)[0]);
+      await page.goto(f.siteUrl+'/?page=account&action=reset'+reset.hash);
+      const newPassword=accountPassword+'New';
+      await page.locator('#account-token [name=password]').fill(newPassword);await page.locator('#account-token button').click();
+      await expect(page.locator('#account-login')).toBeVisible();
+      await page.locator('#account-login [name=email]').fill(email);await page.locator('#account-login [name=password]').fill(newPassword);await page.locator('#account-login button').click();
+      await expect(page.locator('#account-profile')).toBeVisible();
+    }
+    assert.deepEqual(errors,[]);accounts.push({email,number});await context.close();
+    console.log('PASS real browser/SQLite/TLS SMTP account registration/verification, staged checkout, history, instructions, notice and isolated price',kind,width);
+  }
+  return accounts;
+}

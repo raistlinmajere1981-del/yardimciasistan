@@ -166,6 +166,8 @@ const addedProtectedChannels = [
     "companionGrantStatus", "companionSpendStatus", "companionSpendGrant", "companionSpendRevoke",
     "companionDevices", "companionGrant", "companionRevoke"].map(name => `benefits:${name}`),
   ...["benefitsState", "previewBenefits", "fullRefundMarketPreview", "fullRefundMarket", "marketHistory"].map(name => `commerce:sale:${name}`),
+  // V2 bank management and delivered-order refund share the actual owner/session gates.
+  ...["payment", "fullRefundPreview", "fullRefund"].map(name => `commerce:order:${name}`),
   // Reviewed additions: window-owned cancellation and native-picker-only backup import.
   "ai:cancelTestConnection", "dataMaintenance:importBackupZip",
   "commerce:order:previewBenefits", "tableOrder:benefitsState", "tableOrder:previewBenefits", "webTraffic:snapshot",
@@ -242,7 +244,7 @@ for (const channel of handlers.keys()) {
     const result = await invoke(channel, {});
     assert.equal(result.ok, false, `${channel}: locked operation fails closed`);
     assert.equal(result.code, documentResultChannels.has(channel) ? "DOCUMENT_SESSION_LOCKED" : "BENEFITS_SESSION_LOCKED", channel);
-  } else if (channel === "commerce:sale:fullRefundMarketPreview" || channel === "commerce:sale:marketHistory") {
+  } else if (["commerce:sale:fullRefundMarketPreview", "commerce:sale:marketHistory", "commerce:order:fullRefundPreview"].includes(channel)) {
     await assert.rejects(invoke(channel, {}), error => error.code === "BENEFITS_SESSION_LOCKED", channel);
   } else if (channel.startsWith("dictation:")) assert.equal((await invoke(channel, {})).ok, false, `${channel}: locked dictation returns sanitized failure`);
   else await assert.rejects(invoke(channel, {}), /Uygulama kilitli/, channel);

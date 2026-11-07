@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/commerce-payment-provider.php';
 
 /** Public configuration allowlist. Missing configuration closes checkout, never guesses a fee. */
 function ya_commerce_checkout_settings(mixed $raw): array
@@ -58,11 +59,11 @@ function ya_commerce_checkout_quote(array $items, array $delivery, array $catalo
 function ya_commerce_checkout_acceptance(array $input): array
 {
     $consent = $input['consent'] ?? null;
-    if (($input['paymentMethod'] ?? '') !== 'bank_transfer') throw new YaOnlineOrderRejection(422, 'payment_method_unavailable', 'Yalnız havale ile ödeme kullanılabilir.');
+    $provider = ya_commerce_payment_provider($input['paymentMethod'] ?? null);
     if (!is_array($consent) || ($consent['preliminary'] ?? false) !== true || ($consent['agreement'] ?? false) !== true
         || !is_bool($consent['marketing'] ?? null)) throw new YaOnlineOrderRejection(422, 'consent_required', 'Ön bilgilendirme ve satış sözleşmesi kabul edilmeli.');
     $quoteId = $input['quoteId'] ?? '';
     if (!is_string($quoteId) || !preg_match('/^[a-f0-9]{64}$/D', $quoteId)) throw new YaOnlineOrderRejection(422, 'quote_required', 'Sipariş özetini yeniden inceleyin.');
-    return ['paymentMethod' => 'bank_transfer', 'quoteId' => $quoteId,
+    return ['paymentMethod' => $provider->method(), 'quoteId' => $quoteId,
         'consent' => ['preliminary' => true, 'agreement' => true, 'marketing' => $consent['marketing']]];
 }

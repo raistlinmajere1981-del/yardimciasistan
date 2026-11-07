@@ -438,6 +438,15 @@ const BASE_CHECKS = [
   check("php-lint", "Web modülü PHP lint", "node", ["scripts/php-lint.mjs"], {
     phase: 20, presets: ["full"], domains: ["web", "business-messaging"]
   }),
+  check("commerce-checkout-members", "V2 müşteri/bayi checkout ve hesap SMTP browser kabulü", "node", ["scripts/smoke-commerce-checkout.mjs", "--members", "--mobile-only"], {
+    phase: 50, presets: ["full"], domains: ["commerce", "web", "customers"], requires: ["build-desktop", "php-lint"]
+  }),
+  check("commerce-checkout-shipping", "V2 kargo bedeli ve tam stok/finans iadesi", "node", ["scripts/smoke-commerce-checkout.mjs", "--shipping"], {
+    phase: 50, presets: ["full"], domains: ["commerce", "web", "finance"], requires: ["build-desktop", "php-lint"]
+  }),
+  check("commerce-checkout-desktop", "V2 gerçek Electron banka yönetimi ve belirsiz iade kurtarma", "node", ["scripts/smoke-commerce-checkout.mjs", "--desktop-ui"], {
+    phase: 50, presets: ["full"], domains: ["commerce", "desktop", "finance"], requires: ["build-desktop", "php-lint"], platforms: ["linux"]
+  }),
   check("local-lab", "Yerel web laboratuvarı", "node", ["scripts/local-dev-lab.mjs", "--once"], {
     phase: 35, presets: ["full"], domains: ["web"],
     requires: ["build-packages", "php-lint"]

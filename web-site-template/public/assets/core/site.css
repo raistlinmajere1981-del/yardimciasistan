@@ -63,6 +63,14 @@ nav a { display: inline-flex; align-items: center; }
 .account-card label { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .75rem; font-weight: 500; font-size: .95rem; }
 .account-card input { padding: .5rem .75rem; border: 1px solid var(--site-border); border-radius: var(--site-radius); font: inherit; }
 .account-actions { display: flex; gap: .75rem; margin-top: 1rem; }
+.account-auth-nav { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem; }
+.account-auth-nav button { border:1px solid var(--site-border); border-radius:var(--site-radius); background:var(--site-surface); color:var(--site-ink); font:inherit; padding:.65rem .85rem; cursor:pointer; min-height:44px; }
+.account-auth-nav button[aria-pressed="true"] { background:var(--site-ink); color:var(--site-bg); }
+#account-forms { max-width:520px; margin-inline:auto; }
+.account-order-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding-block:1rem; border-bottom:1px solid var(--site-border); }
+#account-order-detail dl { display:grid; grid-template-columns:minmax(90px,auto) minmax(0,1fr); gap:.6rem 1rem; }
+#account-order-detail dd { margin:0; overflow-wrap:anywhere; }
+#account-order-detail dd button { margin-inline-start:.75rem; }
 
 @media (max-width: 760px) {
   .main-navigation { width: 100%; flex-direction: column; gap: 0; }
