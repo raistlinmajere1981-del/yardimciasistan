@@ -1,3 +1,5 @@
+import { normalizeAcceptedCheckout } from "./commerce-checkout-snapshot";
+import type { CommerceCheckoutSnapshot } from "@yardimci-asistan/shared";
 import { DatabaseSync } from "node:sqlite";
 import {
   createId,
@@ -100,6 +102,11 @@ function activeBusinessId(database: DatabaseSync) {
 
 function mapOrder(row: Record<string, unknown>): CommerceOrder {
   return {
+    orderNumber: String(row.order_number ?? ""),
+    checkoutSnapshot: JSON.parse(String(row.checkout_snapshot_json ?? "null")) as CommerceCheckoutSnapshot | null,
+    paymentStatus: String(row.payment_status ?? "unpaid") as NonNullable<CommerceOrder["paymentStatus"]>,
+    deliveryStatus: String(row.delivery_status ?? "unfulfilled") as NonNullable<CommerceOrder["deliveryStatus"]>,
+    deliveryFee: Number(row.delivery_fee ?? 0),
     id: String(row.id ?? ""),
     businessId: String(row.business_id ?? ""),
     customerId: String(row.customer_id ?? ""),
@@ -164,7 +171,9 @@ function getOrderDetailInDatabase(
     WHERE order_id = ?
     ORDER BY created_at ASC, id ASC
   `).all(orderId) as Array<Record<string, unknown>>).map(mapOrderItem);
-  return { order: mapOrder(row), items };
+  const events = database.prepare("SELECT * FROM commerce_order_events WHERE order_id=? AND business_id=? ORDER BY created_at,id").all(orderId,businessId)
+    .map(event=>({id:String(event.id),type:String(event.type),actorId:String(event.actor_id),reason:String(event.reason),createdAt:String(event.created_at)}));
+  return { order: mapOrder(row), items, events };
 }
 
 export function getCommerceOrderDetailInTransaction(
@@ -232,38 +241,15 @@ export function getCommerceOrder(
 export function createCommerceOrder(
   databasePath: string,
   input: CreateCommerceOrderInput,
-  options: { wholesaleEnabled?: boolean; customerAccountId?: string; dealerAccess?: { accessId: string; accessRevision: number } } = {}
+  options: { acceptedCheckout?: CommerceCheckoutSnapshot; wholesaleEnabled?: boolean; customerAccountId?: string; dealerAccess?: { accessId: string; accessRevision: number } } = {}
 ): CommerceOrderDetail {
   const database = openDatabase(databasePath);
   try {
     database.exec("BEGIN IMMEDIATE");
     try {
       const businessId = activeBusinessId(database);
-      let dealerCustomerId: string | undefined;
-      if (options.customerAccountId) {
-        const owner = database.prepare("SELECT a.customer_id FROM customer_web_access a JOIN customers c ON c.id = a.customer_id WHERE a.account_id = ? AND a.business_id = ? AND c.deleted_at = ''").get(options.customerAccountId, businessId);
-        if (!owner || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Müşteri hesabı eşleştirmesi gerekli.");
-        dealerCustomerId = String(owner.customer_id);
-      }
-      if (options.dealerAccess) {
-        if (!hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Online satış bu işletmede etkin değil.");
-        const access = options.dealerAccess;
-        const dealer = database.prepare(`SELECT a.customer_id FROM customer_web_access a
-          JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id
-          JOIN customer_commercial_profiles p ON p.customer_id = c.id AND p.business_id = a.business_id
-          JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = ''
-          WHERE a.id = ? AND a.business_id = ? AND a.access_revision = ?
-            AND c.deleted_at = '' AND p.dealer_status = 'active' AND s.dealer_portal_enabled = 1`)
-          .get(access.accessId, businessId, access.accessRevision);
-        if (!dealer || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.WHOLESALE)) {
-          throw new DealerWebOrderAccessRejected();
-        }
-        dealerCustomerId = String(dealer.customer_id);
-        const delivery = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot);
-        const settings = database.prepare("SELECT online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
-        if (Number(settings.online_sales_delivery_enabled) !== 1 || Number(settings[delivery.method === "pickup" ? "online_sales_pickup_enabled" : "online_sales_shipping_enabled"]) !== 1) {
-          throw new Error("Bayi teslimat yöntemi kapalı.");
-        }
+      if ((options.customerAccountId || options.dealerAccess) && !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+        throw new Error("Online satış bu işletmede etkin değil.");
       }
       const sourceRaw = options.dealerAccess ? "web-dealer" : String(input.source ?? "desktop").trim() || "desktop";
       const sourceReference = String(input.sourceReference ?? "").trim();
@@ -287,6 +273,32 @@ export function createCommerceOrder(
         }
       }
 
+      let dealerCustomerId: string | undefined;
+      if (options.customerAccountId) {
+        const owner = database.prepare("SELECT a.customer_id FROM customer_web_access a JOIN customers c ON c.id = a.customer_id WHERE a.account_id = ? AND a.business_id = ? AND c.deleted_at = ''").get(options.customerAccountId, businessId);
+        if (!owner || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Müşteri hesabı eşleştirmesi gerekli.");
+        dealerCustomerId = String(owner.customer_id);
+      }
+      if (options.dealerAccess) {
+        if (!hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Online satış bu işletmede etkin değil.");
+        const access = options.dealerAccess;
+        const dealer = database.prepare(`SELECT a.customer_id FROM customer_web_access a
+          JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id
+          JOIN customer_commercial_profiles p ON p.customer_id = c.id AND p.business_id = a.business_id
+          JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = ''
+          WHERE a.id = ? AND a.business_id = ? AND a.access_revision = ?
+            AND c.deleted_at = '' AND p.dealer_status = 'active' AND s.dealer_portal_enabled = 1`)
+          .get(access.accessId, businessId, access.accessRevision);
+        if (!dealer || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.WHOLESALE)) {
+          throw new DealerWebOrderAccessRejected();
+        }
+        dealerCustomerId = String(dealer.customer_id);
+        const delivery = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot);
+        const settings = database.prepare("SELECT online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
+        if (!options.acceptedCheckout && (Number(settings.online_sales_delivery_enabled) !== 1 || Number(settings[delivery.method === "pickup" ? "online_sales_pickup_enabled" : "online_sales_shipping_enabled"]) !== 1)) {
+          throw new Error("Bayi teslimat yöntemi kapalı.");
+        }
+      }
       if (!Array.isArray(input.items) || input.items.length === 0) {
         throw new Error("Sipariş için en az bir ürün gerekli.");
       }
@@ -309,6 +321,10 @@ export function createCommerceOrder(
         customerName = String(customer.full_name ?? "").trim();
       }
 
+      const checkout = options.acceptedCheckout === undefined ? null : normalizeAcceptedCheckout(options.acceptedCheckout, input.items);
+      if (checkout && (!["web-online-sales","web-dealer"].includes(source) || checkout.delivery_method !== input.deliverySnapshot?.method)) {
+        throw new Error("Sipariş ödeme snapshot kaynağı geçersiz.");
+      }
       let currency = "";
       let subtotal = 0;
       const preparedItems: Array<{
@@ -337,6 +353,14 @@ export function createCommerceOrder(
           WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
           LIMIT 1
         `).get(productId, businessId) as Record<string, unknown> | undefined;
+        if (checkout) {
+          const line = checkout.items.find(line => line.product_id === productId)!;
+          currency = checkout.currency;
+          subtotal = roundMoney(subtotal + line.line_total_minor / 100);
+          preparedItems.push({ productId, productName: line.name, sku: line.sku, barcode: String(row?.barcode ?? ""),
+            unit: normalizeUnit(line.unit), unitPrice: line.unit_price_minor / 100, quantity, lineTotal: line.line_total_minor / 100, taxRate: line.tax_rate });
+          continue;
+        }
         if (!row) throw new Error("Sipariş ürünlerinden biri aktif değil veya bulunamadı.");
 
         const resolvedPrice = resolveCommerceProductPriceInDatabase(
@@ -377,7 +401,7 @@ export function createCommerceOrder(
         });
       }
 
-      const discountTotal = options.dealerAccess ? 0 : roundMoney(Number(input.discountTotal ?? 0));
+      const discountTotal = options.dealerAccess || checkout ? 0 : roundMoney(Number(input.discountTotal ?? 0));
       if (!Number.isFinite(discountTotal) || discountTotal < 0) {
         throw new Error("Sipariş indirimi geçersiz.");
       }
@@ -385,7 +409,7 @@ export function createCommerceOrder(
       if (discountTotal > subtotal) {
         throw new Error("Sipariş indirimi ara toplamı aşamaz.");
       }
-      const total = roundMoney(subtotal - discountTotal);
+      const total = checkout ? checkout.total_minor / 100 : roundMoney(subtotal - discountTotal);
       moneyToMinor(total);
 
       const note = String(input.note ?? "").trim().slice(0, 4000);
@@ -399,9 +423,9 @@ export function createCommerceOrder(
       database.prepare(`
         INSERT INTO commerce_orders (
           id, business_id, customer_id, customer_name, buyer_snapshot_json, delivery_snapshot_json, status, source, source_reference,
-          subtotal, discount_total, total, currency, note, placed_at,
+          subtotal, discount_total, total, delivery_fee, currency, note, placed_at,
           confirmed_at, fulfilled_at, cancelled_at, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
+        ) VALUES (?, ?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
       `).run(
         orderId,
         businessId,
@@ -414,12 +438,16 @@ export function createCommerceOrder(
         subtotal,
         discountTotal,
         total,
+        checkout ? checkout.delivery_fee_minor / 100 : 0,
         currency || "TRY",
         note,
         now,
         now,
         now
       );
+
+      if (checkout) database.prepare(`UPDATE commerce_orders SET order_number = ?, checkout_snapshot_json = ?, delivery_fee = ?, placed_at = ? WHERE id = ?`)
+        .run(checkout.order_number, JSON.stringify(checkout), checkout.delivery_fee_minor / 100, checkout.accepted_at, orderId);
 
       const insertItem = database.prepare(`
         INSERT INTO commerce_order_items (
@@ -476,6 +504,11 @@ export function updateCommerceOrderStatusInTransaction(
     return existing;
   }
   const now = mutationTime;
+  if (String(row.checkout_snapshot_json) !== "null" && current !== target) {
+    database.prepare("INSERT INTO commerce_order_events(id,business_id,order_id,type,actor_id,created_at) VALUES (?,?,?,?,?,?)")
+      .run(`order-event:${createId("commerce_order_")}`,businessId,String(row.id),"order_"+target,"desktop-owner",now);
+    if (target === "cancelled") database.prepare("UPDATE commerce_orders SET delivery_status='cancelled' WHERE id=?").run(String(row.id));
+  }
   database.prepare(`
     UPDATE commerce_orders
     SET status = ?,

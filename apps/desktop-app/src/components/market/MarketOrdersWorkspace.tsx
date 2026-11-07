@@ -1,6 +1,6 @@
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { CheckCircle2, ClipboardList, Search, WalletCards, XCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { MarketOrdersSession, FulfillmentPaymentChoice } from "../../app/use-market-orders-session";
 import { MarketOrderShipments } from "./MarketOrderShipments";
 import { ActionButton } from "../ui/ActionButton";
@@ -53,6 +53,7 @@ export function MarketOrdersWorkspace({
   busy: boolean;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
+  const [paymentReason,setPaymentReason] = useState("");
   const bridge = window.yardimciDesktop?.commerce;
   const { search, setSearch, statusFilter, setStatusFilter, mutationInFlight,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
@@ -60,7 +61,7 @@ export function MarketOrdersWorkspace({
   const filteredOrders = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     return orders.filter(order => (!statusFilter || order.status === statusFilter)
-      && (!needle || [order.customerName, order.buyerSnapshot?.name, order.source, sourceLabel(order.source), order.id]
+      && (!needle || [order.customerName, order.buyerSnapshot?.name, order.source, sourceLabel(order.source), order.orderNumber, order.id]
         .some(value => value?.toLocaleLowerCase("tr-TR").includes(needle))));
   }, [orders, search, statusFilter]);
   const disabled = busy || submitting || loadingOrders || benefits.locked;
@@ -85,10 +86,22 @@ export function MarketOrdersWorkspace({
     }
   }
 
+  async function paymentAction(action: "approve" | "reject" | "refund" | "prepare") {
+    if (!bridge || !selectedOrder || submitting || mutationInFlight.current) return;
+    mutationInFlight.current=true;setSubmitting(true);
+    try {
+      const order=selectedOrder.order;
+      const result=await bridge.manageOrderPayment({orderId:order.id,action,reason:paymentReason,
+        operationKey:`order-payment:${order.id}:${action}:${Date.parse(order.updatedAt)}`,expectedUpdatedAt:order.updatedAt});
+      setSelectedOrder(result);setPaymentReason("");await reloadOrders();onStateChange("success","Sipariş ödeme işlemi kaydedildi.");
+    } catch(error) {onStateChange("error",error instanceof Error ? error.message : "Ödeme kaydedilemedi.");}
+    finally {mutationInFlight.current=false;setSubmitting(false);}
+  }
+
   async function fulfillSelectedOrder() {
     if (!bridge || !selectedOrder || selectedOrder.order.status !== "confirmed" || submitting || mutationInFlight.current) return;
     const zeroTotal = selectedOrder.order.total === 0;
-    const paymentChoice = zeroTotal ? "no_payment" : fulfillmentPayment;
+    const paymentChoice = selectedOrder.order.checkoutSnapshot ? "bank" : zeroTotal ? "no_payment" : fulfillmentPayment;
     if (paymentChoice === "credit" && (!customerCreditEnabled || !selectedOrder.order.customerId)) {
       onStateChange("error", "Veresiye için Müşteri Hesabı etkin ve siparişte müşteri olmalı.");
       return;
@@ -139,7 +152,7 @@ export function MarketOrdersWorkspace({
         </header>
         <label className="market-search-field">
           <Search size={16} aria-hidden="true" />
-          <input aria-label="Sipariş ara" placeholder="Müşteri veya kaynak ara" value={search} onChange={event => setSearch(event.target.value)} />
+          <input aria-label="Sipariş ara" placeholder="Sipariş numarası veya müşteri ara" value={search} onChange={event => setSearch(event.target.value)} />
         </label>
         <ChoiceChips ariaLabel="Sipariş durumu" value={statusFilter} onChange={setStatusFilter} options={[
           { id: "", label: "Tümü" }, { id: "placed", label: "Yeni" }, { id: "confirmed", label: "Onaylanan" },
@@ -151,7 +164,7 @@ export function MarketOrdersWorkspace({
             <button type="button" className={`market-order-card interactive-surface interactive-surface--record${selectedOrder?.order.id === order.id ? " is-selected" : ""}`}
               key={order.id} aria-pressed={selectedOrder?.order.id === order.id} disabled={submitting || benefits.locked} onClick={() => void openOrder(order.id)}>
               <span><strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
-                <small>{sourceLabel(order.source)} · {new Date(order.placedAt).toLocaleString("tr-TR")}</small></span>
+                <small>{order.orderNumber && `${order.orderNumber} · `}{sourceLabel(order.source)} · {new Date(order.placedAt).toLocaleString("tr-TR")}</small></span>
               <span className="market-order-card-meta"><StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
                 <b>{money(order.total, order.currency)}</b></span>
             </button>
@@ -166,7 +179,7 @@ export function MarketOrdersWorkspace({
               <div>
                 <span>Detay</span>
                 <h2>{selectedOrder.order.customerName || selectedOrder.order.buyerSnapshot?.name || "Sipariş"}</h2>
-                <p>{sourceLabel(selectedOrder.order.source)} · {new Date(selectedOrder.order.placedAt).toLocaleString("tr-TR")}</p>
+                <p>{selectedOrder.order.orderNumber && `${selectedOrder.order.orderNumber} · `}{sourceLabel(selectedOrder.order.source)} · {new Date(selectedOrder.order.placedAt).toLocaleString("tr-TR")}</p>
               </div>
               <StatusBadge tone={orderStatusTone(selectedOrder.order.status)}>{orderStatusLabel(selectedOrder.order.status)}</StatusBadge>
             </header>
@@ -223,6 +236,20 @@ export function MarketOrdersWorkspace({
               <span className="market-sale-grand-total"><small>Toplam</small><strong>{money(selectedOrder.order.total, selectedOrder.order.currency)}</strong></span>
             </div>
 
+            {selectedOrder.order.checkoutSnapshot && <section className="form-stack" aria-label="Havale ve sipariş olayları">
+              <h3>Havale / EFT</h3>
+              <p>Ödeme: {({unpaid:"Ödeme bekleniyor",verification_pending:"Havale bildirildi · doğrulama bekliyor",paid:"Doğrulandı",rejected:"Doğrulanamadı",refunded:"İade kaydedildi"})[selectedOrder.order.paymentStatus || "unpaid"]}</p>
+              <p>Teslimat: {({unfulfilled:"Hazırlanmadı",preparing:"Hazırlanıyor",delivered:"Teslim edildi",cancelled:"İptal"})[selectedOrder.order.deliveryStatus || "unfulfilled"]} · {money(selectedOrder.order.deliveryFee || 0,selectedOrder.order.currency)}</p>
+              <label className="form-field">İşlem açıklaması<input value={paymentReason} onChange={event=>setPaymentReason(event.target.value)} maxLength={500} disabled={disabled} /></label>
+              <div className="action-row">
+                {["unpaid","verification_pending","rejected"].includes(selectedOrder.order.paymentStatus || "unpaid") && selectedOrder.order.status !== "cancelled" && <ActionButton disabled={disabled} onClick={()=>void paymentAction("approve")}>Havaleyi Doğrula</ActionButton>}
+                {["unpaid","verification_pending"].includes(selectedOrder.order.paymentStatus || "unpaid") && <ActionButton variant="danger" disabled={disabled || !paymentReason.trim()} onClick={()=>void paymentAction("reject")}>Bildirimi Reddet</ActionButton>}
+                {selectedOrder.order.paymentStatus === "paid" && selectedOrder.order.status === "confirmed" && selectedOrder.order.deliveryStatus === "unfulfilled" && <ActionButton disabled={disabled} onClick={()=>void paymentAction("prepare")}>Hazırlamaya Başla</ActionButton>}
+                {selectedOrder.order.paymentStatus === "paid" && selectedOrder.order.status === "cancelled" && <ActionButton disabled={disabled || !paymentReason.trim()} onClick={()=>void paymentAction("refund")}>Banka İadesini Kaydet</ActionButton>}
+              </div>
+              <details><summary>İşlem geçmişi</summary><ol>{selectedOrder.events?.map(event=><li key={event.id}>{event.type} · {event.actorId} · {new Date(event.createdAt).toLocaleString("tr-TR")}{event.reason && ` · ${event.reason}`}</li>)}</ol></details>
+            </section>}
+
             {selectedOrder.order.status === "fulfilled" && <p role="status">Sipariş {new Date(selectedOrder.order.fulfilledAt).toLocaleString("tr-TR")} tarihinde tamamlandı.</p>}
             {selectedOrder.order.status === "cancelled" && <p role="status">Sipariş {new Date(selectedOrder.order.cancelledAt).toLocaleString("tr-TR")} tarihinde iptal edildi.</p>}
             {selectedOrder.order.status === "placed" && (
@@ -247,9 +274,9 @@ export function MarketOrdersWorkspace({
                     Ödeme
                     <select
                       aria-label="Sipariş ödeme tercihi"
-                      value={fulfillmentPayment}
+                      value={selectedOrder.order.checkoutSnapshot ? "bank" : fulfillmentPayment}
                       onChange={(event) => setFulfillmentPayment(event.target.value as FulfillmentPaymentChoice)}
-                      disabled={disabled}
+                      disabled={disabled || Boolean(selectedOrder.order.checkoutSnapshot)}
                     >
                       <option value="cash">Nakit</option>
                       <option value="card">Kart</option>
@@ -300,7 +327,7 @@ export function MarketOrdersWorkspace({
                     onClick={() => void fulfillSelectedOrder()}
                     busy={submitting}
                     busyLabel="Sipariş tamamlanıyor…"
-                    disabled={busy || submitting || loadingOrders || (!benefits.uncertain && (benefits.locked || benefits.active && !benefits.current))}
+                    disabled={busy || submitting || loadingOrders || (Boolean(selectedOrder.order.checkoutSnapshot) && selectedOrder.order.paymentStatus !== "paid") || (!benefits.uncertain && (benefits.locked || benefits.active && !benefits.current))}
                   >
                     <WalletCards size={16} aria-hidden="true" /> {benefits.uncertain ? "Sipariş Sonucunu Doğrula" : "Siparişi Tamamla"}
                   </ActionButton>

@@ -42,7 +42,7 @@ export function beginRestoreReconciliation(db: DatabaseSync, operationId: string
       if (business && current.prepare("SELECT id FROM business WHERE deleted_at = '' LIMIT 1").get()?.id === business) {
         for (const row of current.prepare("SELECT * FROM sync_restore_order_snapshots").all()) retained.set(String(row.web_order_id), String(row.snapshot_json));
         for (const row of current.prepare(`SELECT id, business_id, customer_id, customer_name, buyer_snapshot_json, delivery_snapshot_json,
-          source, source_reference, subtotal, discount_total, total, currency, note, placed_at, created_at
+          order_number, checkout_snapshot_json, delivery_fee, source, source_reference, subtotal, discount_total, total, currency, note, placed_at, created_at
           FROM commerce_orders WHERE business_id = ? AND source IN ('web-online-sales', 'web-dealer') AND source_reference != ''`).all(business)) {
           const items = current.prepare(`SELECT product_id, product_name, sku, barcode, unit, unit_price, quantity, line_total, tax_rate, created_at
             FROM commerce_order_items WHERE order_id = ? ORDER BY id`).all(row.id!);
@@ -122,6 +122,9 @@ interface RestoreRejectedSnapshot {
 }
 
 interface RestoreOrderSnapshot {
+  order_number: RestoreSnapshotScalar;
+  checkout_snapshot_json: RestoreSnapshotScalar;
+  delivery_fee: RestoreSnapshotScalar;
   source: RestoreSnapshotScalar;
   source_reference: RestoreSnapshotScalar;
   business_id: RestoreSnapshotScalar;
@@ -156,7 +159,7 @@ type RetainedWebOrderSnapshot =
   | { kind: "order"; order: RestoreOrderSnapshot; items: RestoreSnapshotItem[] };
 
 const RESTORE_REJECTED_KEYS = ["dealer_access_id", "access_revision", "created_at"] as const;
-const RESTORE_ORDER_KEYS = ["source", "source_reference", "business_id", "customer_id", "customer_name",
+const RESTORE_ORDER_KEYS = ["order_number", "checkout_snapshot_json", "delivery_fee", "source", "source_reference", "business_id", "customer_id", "customer_name",
   "buyer_snapshot_json", "delivery_snapshot_json", "subtotal", "discount_total", "total", "currency",
   "note", "placed_at", "created_at"] as const;
 const RESTORE_ITEM_KEYS = ["product_id", "product_name", "sku", "barcode", "unit", "unit_price",
@@ -220,10 +223,10 @@ export function replayRetainedWebOrder(db: DatabaseSync, envelope: WebOrderEnvel
       const customerId = order.customer_id && db.prepare("SELECT 1 FROM customers WHERE id = ? AND business_id = ?").get(order.customer_id, businessId) ? order.customer_id : null;
       const id = createId("commerce_order_");
       db.prepare(`INSERT INTO commerce_orders(id, business_id, customer_id, customer_name, buyer_snapshot_json, delivery_snapshot_json,
-        status, source, source_reference, subtotal, discount_total, total, currency, note, placed_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        status, source, source_reference, subtotal, discount_total, total, currency, note, placed_at, created_at, updated_at, order_number, checkout_snapshot_json, delivery_fee)
+        VALUES (?, ?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, businessId, customerId, order.customer_name, order.buyer_snapshot_json, order.delivery_snapshot_json, source, envelope.id,
-          order.subtotal, order.discount_total, order.total, order.currency, order.note, order.placed_at, order.created_at, new Date().toISOString());
+          order.subtotal, order.discount_total, order.total, order.currency, order.note, order.placed_at, order.created_at, new Date().toISOString(),order.order_number,order.checkout_snapshot_json,order.delivery_fee);
       const insert = db.prepare(`INSERT INTO commerce_order_items(id, order_id, product_id, product_name, sku, barcode, unit, unit_price, quantity, line_total, tax_rate, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const item of snapshot.items) insert.run(createId("commerce_order_item_"), id, item.product_id, item.product_name, item.sku, item.barcode,

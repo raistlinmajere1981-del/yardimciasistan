@@ -38,6 +38,7 @@ function ya_commerce_quote(array $items, array $products): array
         if ($total > $maximum - $lineTotal) throw new YaOnlineOrderRejection(422, 'amount_out_of_range', 'Sipariş tutarı sınırı aşıldı.');
         $total += $lineTotal;
         $lines[] = ['product_id' => $product['product_id'], 'name' => $product['name'], 'unit' => $product['unit'],
+            'tax_rate' => $product['tax_rate'], 'sku' => $product['sku'],
             'quantity' => $quantity, 'unit_price_minor' => $minor, 'line_total_minor' => $lineTotal];
     }
     if (!$lines) throw new YaOnlineOrderRejection(422, 'invalid_order', 'Sepet boş.');

@@ -67,3 +67,5 @@ export * from "./types/public-languages";
 export * from "./types/document-output";
 
 export * from "./types/document-output-management";
+
+export * from "./types/commerce-checkout";

@@ -208,6 +208,7 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
       ...(options.catalog.localization ? {localization: options.catalog.localization} : {}),
       enabled: options.catalog.enabled,
       delivery_methods: options.catalog.deliveryMethods,
+      ...(options.catalog.checkout ? { checkout: options.catalog.checkout } : {}),
       ...(options.catalog.categories ? {categories: options.catalog.categories} : {}),
       updated_at: options.catalog.updatedAt,
       products: options.catalog.products.map((product) => ({

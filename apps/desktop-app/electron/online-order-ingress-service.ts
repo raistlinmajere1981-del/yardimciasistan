@@ -1,4 +1,5 @@
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, normalizeCommerceOrderBuyerSnapshot, normalizeCommerceOrderDeliverySnapshot } from "@yardimci-asistan/shared";
+import { normalizeAcceptedCheckout } from "./commerce-checkout-snapshot";
 import type { WebOrderEnvelope } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 
@@ -14,9 +15,19 @@ function record(value: unknown): Record<string, unknown> {
 /** Validates only ingress data; canonical pricing and persistence own order rules. */
 export class OnlineOrderIngressService {
   constructor(private readonly database: Pick<DesktopDatabase,
-    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "createDealerWebOrder" | "createCustomerWebOrder" | "replayRetainedWebOrder">>) {}
+    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "importOrderPaymentNotice" | "createAcceptedWebOrder" | "createDealerWebOrder" | "createCustomerWebOrder" | "replayRetainedWebOrder">>) {}
 
   importOrder(input: WebOrderEnvelope, afterSeq = 0, restoreReplay = false) {
+    const event = (input as unknown as Record<string, unknown>)?.event;
+    if (event !== undefined) {
+      const envelope=record(input), notice=record(event);
+      if (!hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)
+        || !this.database.importOrderPaymentNotice || notice.type !== "payment_reported" || typeof notice.orderId !== "string"
+        || !/^(web_order_|web_dealer_order_)[a-f0-9]{32}$/.test(notice.orderId) || typeof envelope.id !== "string"
+        || !/^payment_notice_[a-f0-9]{64}$/.test(envelope.id) || !Number.isSafeInteger(envelope.syncSeq) || Number(envelope.syncSeq)<=afterSeq
+        || typeof envelope.createdAt !== "string" || !Number.isFinite(Date.parse(envelope.createdAt))) return invalidEnvelope();
+      return this.database.importOrderPaymentNotice(envelope.id,notice.orderId,envelope.createdAt);
+    }
     const dealer = input?.kind === "dealer";
     // Online Sales pauses retained intake for every account kind. Commercial revocation
     // remains a terminal outcome inside the canonical dealer transaction.
@@ -60,7 +71,15 @@ export class OnlineOrderIngressService {
           || !this.database.createDealerWebOrder) return invalidEnvelope();
       return this.database.createDealerWebOrder(envelope.dealerAccessId, Number(envelope.accessRevision), {
         sourceReference: id, deliverySnapshot, note: note.trim(), items
-      });
+      }, envelope.checkout === undefined ? undefined : normalizeAcceptedCheckout(envelope.checkout, items));
+    }
+    if (envelope.checkout !== undefined) {
+      if (!this.database.createAcceptedWebOrder || (envelope.kind !== undefined && envelope.kind !== "guest" && envelope.kind !== "customer")) return invalidEnvelope();
+      const checkout = normalizeAcceptedCheckout(envelope.checkout, items);
+      const accountId = envelope.kind === "customer" ? envelope.accountId : undefined;
+      if (accountId !== undefined && (typeof accountId !== "string" || !/^[a-f0-9-]{36}$/.test(accountId))) return invalidEnvelope();
+      return this.database.createAcceptedWebOrder({ sourceReference: id, deliverySnapshot, note: note.trim(), items,
+        buyerSnapshot: normalizeCommerceOrderBuyerSnapshot(envelope.buyer) }, checkout, accountId);
     }
     if (envelope.kind === "customer") {
       if (typeof envelope.accountId !== "string" || !/^[a-f0-9-]{36}$/.test(envelope.accountId) || !this.database.createCustomerWebOrder) return invalidEnvelope();

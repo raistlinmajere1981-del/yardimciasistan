@@ -198,6 +198,10 @@ export function fulfillCommerceOrder(
         throw new Error("Yalnız onaylanmış sipariş tamamlanabilir.");
       }
 
+      if (order.order.checkoutSnapshot && (order.order.paymentStatus !== "paid" || input.benefits !== undefined
+        || settlement.type !== "paid" || settlement.paymentMethod !== "bank")) {
+        throw new Error("Sipariş ödeme onayı gerekli. Kesinleşmiş web siparişi havale kaydıyla tamamlanmalı.");
+      }
       if (order.order.total === 0) {
         if (settlement.type !== "no_payment") {
           throw new Error("Sıfır toplamlı sipariş ödeme gerektirmeden tamamlanmalı.");
@@ -233,6 +237,7 @@ export function fulfillCommerceOrder(
       }
       const saleResult = createCommerceSaleFromOrderSnapshotInTransaction(database, {
         subtotal: order.order.subtotal,
+        deliveryFee: order.order.deliveryFee ?? 0,
         discountTotal: order.order.discountTotal,
         total: order.order.total,
         currency: order.order.currency,
@@ -285,6 +290,12 @@ export function fulfillCommerceOrder(
             updated_at = ?
         WHERE id = ? AND business_id = ? AND status = 'confirmed' AND deleted_at = ''
       `).run(now, now, orderId, business.id);
+
+      if(order.order.checkoutSnapshot) {
+        database.prepare("UPDATE commerce_orders SET delivery_status='delivered' WHERE id=?").run(orderId);
+        database.prepare("INSERT INTO commerce_order_events(id,business_id,order_id,type,actor_id,created_at) VALUES (?,?,?,'order_delivered','desktop-owner',?)")
+          .run(`order-delivered:${orderId}`,business.id,orderId,now);
+      }
 
       const fulfillmentRow = database.prepare(`
         SELECT *

@@ -18,7 +18,7 @@ const YA_PUBLIC_ORDER_MAX_BODY_BYTES = 16384;
  */
 function ya_public_guard_enforce(string $bucket, int $maxBodyBytes = YA_PUBLIC_GUARD_MAX_BODY_BYTES): void
 {
-    if ($bucket === 'order') {
+    if (in_array($bucket, ['order','checkout_quote','order_payment'], true)) {
         ya_public_guard_apply_cors();
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
             header('Allow: POST');
@@ -127,6 +127,7 @@ function ya_public_guard_enforce(string $bucket, int $maxBodyBytes = YA_PUBLIC_G
 
 function ya_public_guard_policy(string $bucket): ?array
 {
+    if ($bucket === 'checkout_quote' || $bucket === 'order_payment') return ['subject_windows'=>[['seconds'=>600,'limit'=>60,'retry_after'=>120]], 'global_windows'=>[['seconds'=>3600,'limit'=>1200,'retry_after'=>120]]];
     if ($bucket === 'dealer_claim') {
         return [
             'subject_windows' => [['seconds' => 600, 'limit' => 8, 'retry_after' => 120]],

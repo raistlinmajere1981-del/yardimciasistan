@@ -556,6 +556,7 @@ export interface DesktopSetupData {
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
   dealerPortalEnabled: boolean;
   dealerApplicationEnabled: boolean;
+  commerceCheckout?: import("@yardimci-asistan/shared").CommerceCheckoutSettings;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {
@@ -599,6 +600,7 @@ export interface SaveInitialSetupInput {
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;
   dealerApplicationEnabled?: boolean;
+  commerceCheckout?: import("@yardimci-asistan/shared").CommerceCheckoutSettings;
   onlineSalesDelivery?: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {

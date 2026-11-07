@@ -41,6 +41,10 @@ function ya_storage_open(): PDO
         if ($journalMode !== 'wal') {
             $database->exec('PRAGMA journal_mode = DELETE');
         }
+        if ($database->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='commerce_mail_outbox'")->fetchColumn()) {
+            $columns=$database->query('PRAGMA table_info(commerce_mail_outbox)')->fetchAll(PDO::FETCH_COLUMN,1);
+            if(!in_array('message_kind',$columns,true))throw new RuntimeException('commerce_v2_schema_reset_required');
+        }
         ya_storage_create_schema($database);
         foreach ([YA_STORAGE_DATABASE_FILE, YA_STORAGE_DATABASE_FILE . '-wal', YA_STORAGE_DATABASE_FILE . '-shm'] as $privateFile) {
             if (is_file($privateFile) && !@chmod($privateFile, 0600)) throw new RuntimeException('private_storage_permissions_failed');
@@ -65,6 +69,9 @@ function ya_storage_capabilities(): array
             'marketing_website_publications',
             'business_messaging_status_v1',
             'web_orders_v1',
+            'commerce_checkout_v2',
+            'commerce_payment_events_v1',
+            'secure_account_mail_outbox_v1',
             'online_catalog_v1',
             'customer_accounts_v1',
             'request_documents_v1',
@@ -278,6 +285,8 @@ function ya_storage_enqueue_web_order(array $order): array
     if (isset($order['note'])) $payload['note'] = $order['note'];
     // Only server submission owners pass this immutable, authorized price snapshot.
     if (isset($order['quote'])) $payload['quote'] = $order['quote'];
+    if (isset($order['checkout'])) $payload['checkout'] = $order['checkout'];
+    if (($order['kind'] ?? '') === 'dealer' && isset($order['notificationEmail'])) $payload['notificationEmail'] = $order['notificationEmail'];
     $database = ya_storage_open();
     $statement = $database->prepare(<<<'SQL'
         INSERT INTO web_orders (id, payload_json, created_at)
@@ -903,7 +912,8 @@ function ya_storage_create_schema(PDO $database): void
         CREATE TABLE IF NOT EXISTS commerce_mail_outbox (
           id TEXT PRIMARY KEY, content_hash TEXT NOT NULL,
           recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','failed')),
+          message_kind TEXT NOT NULL DEFAULT 'commerce' CHECK(message_kind IN ('commerce','account_token')),
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','failed','cancelled')),
           attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL,
           lease_token TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0,
           last_error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, sent_at INTEGER NOT NULL DEFAULT 0
@@ -917,6 +927,9 @@ function ya_storage_create_schema(PDO $database): void
           created_at TEXT NOT NULL,
           imported_at TEXT NOT NULL DEFAULT ''
         );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS web_orders_number ON web_orders(json_extract(payload_json, '$.checkout.order_number'))
+          WHERE json_extract(payload_json, '$.checkout.order_number') IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS web_order_submission_receipts (
           key_hash TEXT PRIMARY KEY,

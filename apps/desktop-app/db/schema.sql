@@ -270,6 +270,7 @@ CREATE TABLE commerce_sales (
   status TEXT NOT NULL DEFAULT 'open',
   subtotal REAL NOT NULL DEFAULT 0,
   discount_total REAL NOT NULL DEFAULT 0,
+  delivery_fee REAL NOT NULL DEFAULT 0 CHECK(delivery_fee >= 0),
   total REAL NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'TRY',
   payment_method TEXT NOT NULL DEFAULT '',
@@ -348,6 +349,12 @@ CREATE TRIGGER trg_refunded_sale_no_delete BEFORE DELETE ON commerce_sales
 WHEN EXISTS (SELECT 1 FROM commerce_sale_full_refunds WHERE sale_id = OLD.id)
 BEGIN SELECT RAISE(ABORT, 'commerce_refunded_sale_immutable'); END;
 
+CREATE TABLE commerce_checkout_settings (
+  business_id TEXT PRIMARY KEY REFERENCES business(id),
+  settings_json TEXT NOT NULL CHECK(json_valid(settings_json)),
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE commerce_orders (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL REFERENCES business(id),
@@ -359,6 +366,11 @@ CREATE TABLE commerce_orders (
     CHECK (status IN ('placed', 'confirmed', 'fulfilled', 'cancelled')),
   source TEXT NOT NULL DEFAULT 'desktop',
   source_reference TEXT NOT NULL DEFAULT '',
+  order_number TEXT NOT NULL DEFAULT '',
+  checkout_snapshot_json TEXT NOT NULL DEFAULT 'null' CHECK(json_valid(checkout_snapshot_json)),
+  delivery_fee REAL NOT NULL DEFAULT 0 CHECK(delivery_fee >= 0),
+  payment_status TEXT NOT NULL DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid','verification_pending','paid','rejected','refunded')),
+  delivery_status TEXT NOT NULL DEFAULT 'unfulfilled' CHECK(delivery_status IN ('unfulfilled','preparing','delivered','cancelled')),
   subtotal REAL NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
   discount_total REAL NOT NULL DEFAULT 0 CHECK (discount_total >= 0),
   total REAL NOT NULL DEFAULT 0 CHECK (total >= 0),
@@ -374,8 +386,17 @@ CREATE TABLE commerce_orders (
   deleted_at TEXT NOT NULL DEFAULT '',
   FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id),
   CHECK (discount_total <= subtotal),
-  CHECK (total <= subtotal)
+  CHECK (total <= subtotal + delivery_fee)
 );
+
+CREATE UNIQUE INDEX idx_commerce_order_number ON commerce_orders(business_id, order_number) WHERE order_number <> '';
+
+CREATE TABLE commerce_order_events (
+ id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id),
+ order_id TEXT NOT NULL REFERENCES commerce_orders(id), type TEXT NOT NULL,
+ actor_id TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', request_json TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+);
+CREATE INDEX commerce_order_event_history ON commerce_order_events(order_id,created_at,id);
 
 CREATE TABLE commerce_order_items (
   id TEXT PRIMARY KEY,
@@ -3281,7 +3302,7 @@ SELECT b.id AS business_id, 'marketing' AS record_type, r.id AS record_id, r.tit
 
 -- Dealer read projections share the existing private durable publication.
 CREATE TRIGGER trg_dealer_history_commerce_orders_insert AFTER INSERT ON commerce_orders
-WHEN NEW.source IN ('web-dealer', 'web-online-sales') AND EXISTS (SELECT 1 FROM customer_web_access WHERE business_id = NEW.business_id)
+WHEN NEW.source IN ('web-dealer', 'web-online-sales')
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -3290,7 +3311,7 @@ BEGIN
 END;
 
 CREATE TRIGGER trg_dealer_history_commerce_orders_update AFTER UPDATE ON commerce_orders
-WHEN NEW.source IN ('web-dealer', 'web-online-sales') AND EXISTS (SELECT 1 FROM customer_web_access WHERE business_id = NEW.business_id)
+WHEN NEW.source IN ('web-dealer', 'web-online-sales')
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -3299,7 +3320,7 @@ BEGIN
 END;
 
 CREATE TRIGGER trg_dealer_history_commerce_orders_delete AFTER DELETE ON commerce_orders
-WHEN OLD.source IN ('web-dealer', 'web-online-sales') AND EXISTS (SELECT 1 FROM customer_web_access WHERE business_id = OLD.business_id)
+WHEN OLD.source IN ('web-dealer', 'web-online-sales')
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -3910,3 +3931,15 @@ CREATE TRIGGER document_template_no_delete BEFORE DELETE ON document_print_templ
 BEGIN SELECT RAISE(ABORT, 'DOCUMENT_TEMPLATE_IMMUTABLE'); END;
 CREATE TRIGGER document_binding_immutable BEFORE UPDATE ON document_printer_bindings
 BEGIN SELECT RAISE(ABORT, 'DOCUMENT_BINDING_IMMUTABLE'); END;
+
+-- Payment terms use the same durable catalog intent and exact publication receipts.
+CREATE TRIGGER trg_checkout_settings_insert AFTER INSERT ON commerce_checkout_settings BEGIN
+  INSERT INTO sync_outbox(job_key,job_type,source_revision,created_at,updated_at)
+  VALUES('online_catalog','online_catalog_publish',1,NEW.updated_at,NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1, attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+CREATE TRIGGER trg_checkout_settings_update AFTER UPDATE ON commerce_checkout_settings BEGIN
+  INSERT INTO sync_outbox(job_key,job_type,source_revision,created_at,updated_at)
+  VALUES('online_catalog','online_catalog_publish',1,NEW.updated_at,NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1, attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/storage.php';
 require_once __DIR__ . '/online-catalog.php';
 require_once __DIR__ . '/customer-account.php';
+require_once __DIR__ . '/commerce-order-payment.php';
 
 const YA_DEALER_ERROR = 'Bağlantı geçersiz veya süresi dolmuş.';
 
@@ -58,12 +59,13 @@ function ya_dealer_projection(array $input): array
                 return $product;
             }, $safe['products'])];
     }
-    return ['version' => 3, 'online_sales_enabled' => $input['online_sales_enabled'], 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs, 'order_history' => ya_dealer_history_projection($input['order_history'] ?? [], $owners)];
+    return ['version' => 3, 'online_sales_enabled' => $input['online_sales_enabled'], 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs, 'web_order_statuses' => ya_commerce_status_projection($input['web_order_statuses'] ?? []), 'order_history' => ya_dealer_history_projection($input['order_history'] ?? [], $owners)];
 }
 
 /** Called inside the existing versioned publication transaction, only for an accepted new revision. */
 function ya_dealer_apply_projection(PDO $db, array $projection, int $sourceEpoch = 0): void
 {
+    ya_commerce_apply_status_mail($db, $projection['web_order_statuses'] ?? []);
     $find = $db->prepare('SELECT * FROM dealer_access WHERE access_id = ?');
     $accountOwner = $db->prepare("SELECT access_id FROM dealer_access WHERE account_id = ? AND account_id <> ''");
     foreach ($projection['dealers'] as $row) {

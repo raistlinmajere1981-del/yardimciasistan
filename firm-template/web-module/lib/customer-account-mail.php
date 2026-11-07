@@ -1,21 +1,30 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/customer-account-mail-queue.php';
+
 /** Explicit TLS SMTP transport. No token return, file mailbox or PHP mail fallback in production. */
-function ya_account_mail_configured(): bool
+function ya_mail_transport_configured(): bool
 {
     return (bool)getenv('YA_ACCOUNT_SMTP_HOST') && (bool)getenv('YA_ACCOUNT_SMTP_USER')
         && (bool)getenv('YA_ACCOUNT_SMTP_PASSWORD') && filter_var(getenv('YA_ACCOUNT_MAIL_FROM'), FILTER_VALIDATE_EMAIL)
         && (bool)getenv('YA_ACCOUNT_SITE_URL');
 }
-function ya_account_mail(string $email, string $purpose, string $token): void
+function ya_account_mail_configured(): bool
+{
+    return ya_mail_transport_configured() && ya_account_mail_key_configured();
+}
+function ya_account_mail(string $email, string $purpose, string $token, array $account): void
 {
     if (!ya_account_mail_configured()) throw new YaAccountError(503, 'mail_unconfigured');
     $site = ya_account_site_url();
     $link = $site . '?action=' . ($purpose === 'verify' ? 'verify' : 'reset') . '#token=' . rawurlencode($token);
     $subject = $purpose === 'verify' ? 'Verify your email / E-posta doğrulama' : 'Reset your password / Şifre yenileme';
     $body = "Hesabınız için aşağıdaki bağlantıyı açın. / Open the link for your account.\r\n\r\n" . $link . "\r\n\r\nBu işlemi siz istemediyseniz yok sayın. / Ignore if you did not request this.\r\n";
-    ya_mail_send($email, $subject, $body);
+    require_once __DIR__ . '/commerce-mail.php';
+    $sealed=ya_account_mail_seal(['body'=>$body,'token_hash'=>ya_account_hash($token),'account_id'=>$account['id'],
+        'purpose'=>$purpose,'session_version'=>(int)$account['session_version']]);
+    ya_commerce_mail_enqueue(ya_storage_open(),'account-token:'.ya_account_hash($token),$email,$subject,$sealed,'account_token');
 }
 
 /** Single TLS transport for account messages and durable commerce mail. */

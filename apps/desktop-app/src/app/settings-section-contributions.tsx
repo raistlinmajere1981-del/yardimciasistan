@@ -1,3 +1,4 @@
+import { CommerceCheckoutSettingsSection } from "../components/settings/CommerceCheckoutSettingsSection";
 import { SmsSettingsSection, InstagramSettingsSection } from "../components/settings/MarketingChannelsSettingsSection";
 import { WhatsAppBusinessSettingsSection } from "../components/settings/WhatsAppBusinessSettingsSection";
 import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
@@ -76,6 +77,7 @@ const stagedSettingsContributions = {
       return (
       <ServiceSettingsCard id="settings-online-delivery" readiness="Test kullanılamıyor" title="Teslimat ve Gönderim"
         enabled={draft.onlineSalesDeliveryEnabled} disabled={busy} onEnabledChange={onlineSalesDeliveryEnabled => onChange({ onlineSalesDeliveryEnabled })}>
+        <CommerceCheckoutSettingsSection value={draft.commerceCheckout} onChange={commerceCheckout=>onChange({commerceCheckout})} disabled={busy}/>
         <small>En az bir teslimat yöntemi açık olmalı. Kapalıyken web siparişi alınmaz.</small>
         <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.pickupEnabled}
           onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, pickupEnabled: event.target.checked } })} /><span>İşletmeden teslim</span></label>

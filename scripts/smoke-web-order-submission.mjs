@@ -36,17 +36,29 @@ async function sync(payload) {
   return response.json();
 }
 let revision = 0;
+const checkout = { version: 1, enabled: true, demo: true, currency: "TRY", shippingFeeMinor: 1500,
+  bank: { name: "DEMO Banka", accountHolder: "DEMO İşletme", iban: "DEMO — GEÇERSİZ — ÖDEME YAPMAYIN" },
+  legal: { version: "demo-v2", preliminary: "DEMO ön bilgilendirme. Ticari kullanıma hazır değildir.", agreement: "DEMO satış sözleşmesi. Ticari kullanıma hazır değildir." } };
 const publishedProduct = { product_id: "published-product", name: "Published product", description: "", sku: "", unit: "piece", price: 25,
   currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0 };
 async function publish(enabled, extraProducts = [], methods = ["pickup"]) {
   revision += 1;
   if (revision === 1) await activateFixtureSource(baseUrl, secret, "desktop-a3");
   return sync({ action: "publish_online_catalog", client_id: "desktop-a3", source_revision: revision, idempotency_key: `catalog-${revision}`,
-    online_catalog: { version: 1, enabled, delivery_methods: enabled ? methods : [], updated_at: new Date().toISOString(), products: enabled ? [publishedProduct, ...extraProducts] : [] } });
+    online_catalog: { version: 1, checkout, enabled, delivery_methods: enabled ? methods : [], updated_at: new Date().toISOString(), products: enabled ? [publishedProduct, ...extraProducts] : [] } });
 }
 const buyer = { name: "Guest buyer", phone: "+1 (202) 555-0100", email: "guest@example.test" };
 const input = { idempotencyKey: "guest-order-key-0001", items: [{ productId: "published-product", quantity: 2 }], buyer, delivery: { method: "pickup" }, note: "Guest note" };
+const quoteCache = new Map();
 async function submit(payload, options = {}) {
+  // Simulate the review page: fetch a server quote once, preserve it on uncertain retry.
+  if (!quoteCache.has(payload?.idempotencyKey)) {
+    clearGuard();
+    const response = await fetch(`${baseUrl}/api/checkout-quote.php`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({items: payload?.items, delivery: payload?.delivery}) });
+    const result = await response.json();
+    if (result.ok) quoteCache.set(payload.idempotencyKey, result.quote.quote_id);
+  }
+  payload = { ...payload, paymentMethod: "bank_transfer", consent: {preliminary: true, agreement: true, marketing: false}, quoteId: quoteCache.get(payload?.idempotencyKey) || "0".repeat(64), ...options.checkoutFields };
   if (options.clear !== false) clearGuard();
   const response = await fetch(`${baseUrl}/api/order.php`, { method: options.method ?? "POST",
     headers: { "Content-Type": options.contentType ?? "application/json" },
@@ -100,11 +112,16 @@ try {
   assert.equal((await submit({ ...input, items: Array.from({ length: 11 }, (_, index) => ({ productId: `p${index}`, quantity: 1000 })) })).status, 422);
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 0);
   assert.equal((await submit({ ...input, items: [{ productId: "published-product", quantity: 0.5 }] })).payload.code, "invalid_quantity");
+  assert.equal((await submit(input,{checkoutFields:{paymentMethod:'card'}})).payload.code,'payment_method_unavailable');
+  assert.equal((await submit(input,{checkoutFields:{consent:{preliminary:true,agreement:false,marketing:false}}})).payload.code,'consent_required');
+  assert.equal((await submit(input,{checkoutFields:{quoteId:'f'.repeat(64)}})).payload.code,'quote_changed');
   const injected = { ...input, customerId: "fake-customer", discountTotal: 999, price: 0.01, stock: 99, fulfillment: "done",
     items: [{ ...input.items[0], unitPrice: 0.01, taxRate: 0 }], buyer: { ...buyer, customerId: "fake-customer" } };
   const accepted = await submit(injected);
   assert.equal(accepted.status, 201);
-  assert.deepEqual(Object.keys(accepted.payload).sort(), ["ok", "order_id", "accepted_at", "quoted_total", "currency", "message"].sort());
+  assert.match(accepted.payload.order_number, /^YA-\d{8}-[A-F0-9]{10}$/);
+  assert.equal(accepted.payload.total_minor, 5000);
+  assert.equal(accepted.payload.payment_status, "unpaid");
   assert.equal(accepted.payload.quoted_total, 50);
   assert.equal(accepted.payload.currency, "TRY");
   assert.match(accepted.payload.order_id, /^web_order_[a-f0-9]{32}$/);
@@ -157,6 +174,10 @@ try {
   const address = { recipientName: "Delivery Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "gb", note: "Ring bell" };
   const shipping = { ...input, idempotencyKey: "guest-order-key-shipping", delivery: { method: "shipping", address } };
   assert.equal((await submit(shipping)).payload.code, "delivery_method_unavailable");
+  checkout.shippingFeeMinor=null;
+  await publish(true, [], ["pickup", "shipping"]);
+  assert.equal((await submit({...shipping,idempotencyKey:'shipping-fee-unconfigured'})).payload.code,'shipping_fee_unconfigured');
+  checkout.shippingFeeMinor=1500;
   await publish(true, [], ["pickup", "shipping"]);
   for (const delivery of [undefined, null, { method: "carrier" }, { method: "shipping" }, { method: "shipping", address: {} },
     ...[{ recipientName: "" }, { addressLine1: "x".repeat(301) }, { addressLine2: "x".repeat(301) }, { district: "" }, { city: "x".repeat(121) },

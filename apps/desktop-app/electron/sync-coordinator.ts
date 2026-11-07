@@ -424,7 +424,7 @@ export class SyncCoordinator {
         }
         return this.result(false, message, counts);
       }
-      this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
+      this.webOrdersSupported = ["web_orders_v1","commerce_checkout_v2","commerce_payment_events_v1"].every(feature=>capabilities.features.includes(feature));
       this.businessMessagingStatusesSupported = capabilities.features.includes("business_messaging_status_v1");
       this.publications.setSupportedFeatures(capabilities.features);
       this.capabilitiesTarget = targetKey;

@@ -77,10 +77,10 @@ try {
     catch (RuntimeException) { $conflict = true; }
     expect($conflict, 'changed event content conflicts');
     $failed = ya_commerce_mail_run($db, static function () { throw new RuntimeException('SECRET SMTP FAILURE'); });
-    expect($failed === ['sent' => 0, 'retry' => 1, 'failed' => 0], 'failed transport remains retryable');
+    expect($failed === ['sent' => 0, 'retry' => 1, 'failed' => 0, 'cancelled' => 0], 'failed transport remains retryable');
     $row = $db->query('SELECT * FROM commerce_mail_outbox')->fetch();
     expect($row['status'] === 'pending' && $row['last_error'] === 'transport_failed' && $row['next_attempt_at'] > time(), 'safe failure and backoff stored');
-    expect(ya_commerce_mail_run($db, static function () { throw new RuntimeException('too early'); }) === ['sent' => 0, 'retry' => 0, 'failed' => 0], 'backoff respected');
+    expect(ya_commerce_mail_run($db, static function () { throw new RuntimeException('too early'); }) === ['sent' => 0, 'retry' => 0, 'failed' => 0, 'cancelled' => 0], 'backoff respected');
     $db->exec('UPDATE commerce_mail_outbox SET next_attempt_at = 0');
     $sent = [];
     $deliver = static function (...$args) use (&$sent): void { $sent[] = $args; };
@@ -99,6 +99,11 @@ try {
     ya_commerce_mail_enqueue($db, 'event-rollback', 'guest@example.test', 'Subject', 'Body');
     $db->exec('ROLLBACK');
     expect((int)$db->query('SELECT COUNT(*) FROM commerce_mail_outbox')->fetchColumn() === 3, 'domain rollback also rolls back mail event');
+    ya_commerce_mail_enqueue($db, 'event-exhausted-lease', 'guest@example.test', 'Subject', 'Body');
+    $db->exec("UPDATE commerce_mail_outbox SET status='sending', attempts=8, lease_until=1 WHERE status='pending'");
+    $ninthSend = false;
+    $exhausted = ya_commerce_mail_run($db, static function () use (&$ninthSend) { $ninthSend = true; });
+    expect($exhausted['failed'] === 1 && !$ninthSend, 'expired eighth lease cannot create a ninth SMTP attempt');
     echo "web-orders-storage-smoke-ok\n";
 } finally {
     foreach (glob($root . '/data/*') ?: [] as $file) unlink($file);

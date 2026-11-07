@@ -1,3 +1,4 @@
+import {randomBytes} from "node:crypto";
 import assert from 'node:assert/strict';
 import {spawn,spawnSync} from 'node:child_process';
 import {mkdtempSync,cpSync,mkdirSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -12,11 +13,11 @@ const {BUSINESS_CAPABILITIES:C} = require('../../packages/shared/dist/index.js')
 const {PhpHostingSyncTransport} = require('../../packages/sync-core/dist/index.js');
 const {publishDesktopProjection} = require('../../apps/desktop-app/dist-electron/desktop-publication-service.js');
 export const accountPassword = 'Account-fixture-Password-249!';
-export async function accountFixture({smtp = true, siteSource, providers = false} = {}) {
+export async function accountFixture({smtp = true, siteSource, providers = false, tokenKey = true} = {}) {
   const root = mkdtempSync(join(tmpdir(),'ya-customer-account-'));
   if (siteSource) cpSync(siteSource,root,{recursive:true,filter:path=>!/(\/\.git|\/node_modules|\/\.test-artifacts|\/yardimci-asistan)(\/|$)/.test(path)});
   const hosting = join(root,'yardimci-asistan');
-  cpSync('firm-template/web-module',hosting,{recursive:true,filter:path=>!/(\/data|\/vendor)(\/|$)/.test(path)});
+  cpSync('firm-template/web-module',hosting,{recursive:true,filter:path=>!/(\/data|\/vendor)(\/|$)/.test(path) && !/(?:^|\/)config\/[^/]*\.local\.[^/]+$/.test(path)});
   mkdirSync(join(hosting,'data'),{recursive:true});
   const secret = 'isolated-customer-account-test-secret';
   writeFileSync(join(hosting,'config/business.json'),JSON.stringify({name:'Account Fixture',sync_secret:secret}));
@@ -45,7 +46,7 @@ export async function accountFixture({smtp = true, siteSource, providers = false
       });
     });
     await new Promise(resolve=>smtpServer.listen(0,'127.0.0.1',resolve));
-    Object.assign(env,{YA_ACCOUNT_SMTP_HOST:'127.0.0.1',YA_ACCOUNT_SMTP_PORT:String(smtpServer.address().port),YA_ACCOUNT_SMTP_TLS:'implicit',YA_ACCOUNT_SMTP_USER:'fixture-user',YA_ACCOUNT_SMTP_PASSWORD:'fixture-password',YA_ACCOUNT_MAIL_FROM:'accounts@example.test',SSL_CERT_FILE:cert});
+    Object.assign(env,{...(tokenKey ? {YA_ACCOUNT_MAIL_ENCRYPTION_KEY:randomBytes(32).toString('base64')} : {}),YA_ACCOUNT_SMTP_HOST:'127.0.0.1',YA_ACCOUNT_SMTP_PORT:String(smtpServer.address().port),YA_ACCOUNT_SMTP_TLS:'implicit',YA_ACCOUNT_SMTP_USER:'fixture-user',YA_ACCOUNT_SMTP_PASSWORD:'fixture-password',YA_ACCOUNT_MAIL_FROM:'accounts@example.test',SSL_CERT_FILE:cert});
   }
   const port = await new Promise(resolve=>{const server=http.createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});});
   const siteUrl=`http://127.0.0.1:${port}`, baseUrl=siteUrl+'/yardimci-asistan';
@@ -77,7 +78,7 @@ export async function accountFixture({smtp = true, siteSource, providers = false
   }
   async function call(endpoint,body,cookie='',headers={}){const response=await fetch(`${baseUrl}/api/${endpoint}.php`,{method:body===undefined?'GET':'POST',headers:{Accept:'application/json',...(cookie?{Cookie:cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json','X-YA-Account':'1','X-YA-Dealer':'1'}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});let value;const text=await response.text();try{value=JSON.parse(text);}catch{value=text;}return {status:response.status,body:value,cookie:response.headers.getSetCookie().map(x=>x.split(';')[0]).filter(x=>/ya_account_(session|refresh)=/.test(x)).sort().reverse().join('; '),headers:response.headers};}
   const login=async(email,client='web')=>{const result=await call('account/login',{email,password:accountPassword},'',{'X-YA-Client':client});assert.equal(result.status,200,JSON.stringify(result.body));assert.match(result.cookie,/ya_account_session=/);return result.cookie;};
-  async function register(email,name='Account Fixture'){const result=await call('account/register',{email,fullName:name});assert.equal(result.status,200,JSON.stringify(result.body));const token=new URL(emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);assert.equal((await call('account/verify',{token,password:accountPassword})).status,200);return storage('echo json_encode($db->query("SELECT id FROM customer_accounts WHERE email = " . $db->quote($argv[2]))->fetchColumn());',[email]);}
+  async function register(email,name='Account Fixture'){const result=await call('account/register',{email,fullName:name});await runCommerceMail();assert.equal(result.status,200,JSON.stringify(result.body));const token=new URL(emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);assert.equal((await call('account/verify',{token,password:accountPassword})).status,200);return storage('echo json_encode($db->query("SELECT id FROM customer_accounts WHERE email = " . $db->quote($argv[2]))->fetchColumn());',[email]);}
   return {root,hosting,siteUrl,baseUrl,secret,database,transport,storage,runCommerceMail,call,login,register,publish,emails,logs:()=>logs,
     async cleanup(){try{process.kill(-server.pid,'SIGTERM');}catch{}if(smtpServer)await new Promise(resolve=>smtpServer.close(resolve));desktop.cleanup();rmSync(root,{recursive:true,force:true});}};
 }

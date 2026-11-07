@@ -53,9 +53,6 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   </section>
 
   <div class="account-actions">
-    <?php if (isset($view['pages']['catalog'])): ?>
-      <a class="button" href="<?= e(page_url($site, 'catalog')) ?>"><?= e(t($site, 'account.browse_catalog')) ?></a>
-    <?php endif; ?>
     <button id="account-refresh" class="button secondary" type="button" hidden><?= e(t($site, 'account.refresh_session')) ?></button>
     <button id="account-logout-all" class="button secondary" type="button" hidden><?= e(t($site, 'account.logout_all')) ?></button>
     <button id="logout" class="button secondary" type="button" hidden><?= e(t($site, 'account.logout')) ?></button>

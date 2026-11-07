@@ -164,6 +164,11 @@ export type CommerceOrderStatus =
   | "cancelled";
 
 export interface CommerceOrder {
+  orderNumber?: string;
+  checkoutSnapshot?: import("./commerce-checkout").CommerceCheckoutSnapshot | null;
+  paymentStatus?: import("./commerce-checkout").CommercePaymentStatus;
+  deliveryStatus?: import("./commerce-checkout").CommerceDeliveryStatus;
+  deliveryFee?: number;
   id: string;
   businessId: string;
   customerId: string;
@@ -278,6 +283,7 @@ export interface CommerceShippingProviderAdapter {
 }
 
 export interface CommerceOrderDetail {
+  events?: import("./commerce-checkout").CommerceOrderEvent[];
   order: CommerceOrder;
   items: CommerceOrderItem[];
 }
@@ -502,6 +508,7 @@ export interface PublishedCommerceProduct {
 }
 
 export interface CommerceOnlineCatalog {
+  checkout?: import("./commerce-checkout").CommerceCheckoutSettings;
   categories?: Array<{id: string; name: string}>;
   localization?: import("./public-translations").PublicLocalization;
   /** Empty when delivery is disabled: public catalog, no new online orders. */

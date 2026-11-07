@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/public-localization.php';
+require_once __DIR__ . '/commerce-checkout.php';
 
 function ya_online_product_image_url(mixed $value): string
 {
@@ -99,6 +100,7 @@ function ya_online_catalog_projection(array $candidate): array
             'catalog_product' => ya_localization_records($products, 'product_id', ['name','description']),
             'catalog_category' => ya_localization_records($categories, 'id', ['name'])]),
         'version' => 1, 'enabled' => $enabled, 'delivery_methods' => $methods,
+        'checkout' => ya_commerce_checkout_settings($enabled ? ($candidate['checkout'] ?? null) : null),
         'updated_at' => mb_substr(is_string($candidate['updated_at'] ?? null) ? $candidate['updated_at'] : '', 0, 64),
         'products' => $products
     ];

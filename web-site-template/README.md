@@ -1,4 +1,4 @@
-# Ortak işletme sitesi şablonu 0.7.7
+# Ortak işletme sitesi şablonu 0.8.0 — yerel V2 adayı
 
 Public yayınları ve Desktop kaynaklı dinamik çevirileri gösteren bağımsız PHP/CSS/JavaScript temeli.
 İşletme verisi, örnek içerik, seed, secret, kurulum indirme veya demo tanıtımı içermez.
@@ -107,7 +107,7 @@ temadan önce yüklenir. Her site kendi filtre/kart/sepet yerleşimini seçer.
 Katalog renderer'ından önce yüklenen `core/commerce.js`, DOM bağımsız ortak istemcidir:
 
 ```js
-const commerce = window.YaCommerce.create({apiBase: document.currentScript.dataset.apiBase});
+const commerce = window.YaCommerce.shared({apiBase: document.currentScript.dataset.apiBase});
 const unsubscribe = commerce.subscribe((state, reason) => {
   // Kendi HTML'inizi state.products/cart/totals ve canEdit/canCheckout/canSubmit ile sunun.
   // reason === 'fence': özel DOM ve kişisel form taslağını senkron temizleyin.
@@ -115,8 +115,10 @@ const unsubscribe = commerce.subscribe((state, reason) => {
 commerce.start();
 // Kullanıcı eylemleri: commerce.add(productId), setQuantity(productId, quantity),
 // remove(productId), clearCart(), setDelivery(method), toggleFavorite(productId),
-// submit({name, phone, email, note, address}), reorder(orderId), refresh(), newOrder().
-// Sayfa/controller bırakılırken unsubscribe(); commerce.destroy();
+// quote({name,phone,email,note,address}) -> sunucu quote_id; ardından
+// submit({name,phone,email,note,address,paymentMethod:"bank_transfer",quoteId,consent}),
+// reorder(orderId), refresh(), newOrder().
+// Görünüm bırakılırken unsubscribe(); ortak controller diğer görünümlerde yaşamaya devam eder.
 ```
 
 `state` kopyalanmış snapshot'tır: `products`, `categories`, `cart` (ürün kimliği, güncel
@@ -129,7 +131,7 @@ bildirimleri kullanılır; `products` yalnız `catalogStatus === 'ready'` iken s
 Controller yetkili endpoint, payload, idempotency ve receipt akışını sahiplenir;
 renderer fiyat/rol/kimlik seçmez ve yeni HTTP sipariş yolu açmaz.
 
-Override yoksa basit `data-commerce-*` katalog/checkout fallback'i çalışır. Üç sütun,
+Override yoksa basit `data-commerce-*` katalog renderer'ı çalışır; sepet ve checkout ortak ayrı rotalardadır. Üç sütun,
 checkbox filtreler, karşılaştırma, galeri ve sayfalama site tercihleridir. Özel sayfa
 kendi runtime'ıyla eşlenir; core hiçbir site DOM'unu zorunlu kılmaz. Controller mevcut
 aynı-origin `YaAccount` ve `YaCartDraft` sahiplerini kullanır. Özel DOM'un fencing anında
@@ -425,3 +427,21 @@ dönüşte otomatik uyarı, reload veya ek poller çalışmaz; mevcut form/sepet
 state'i korunur. Menü sayfasındaki manuel “Yayınları yenile” bağlantısı kalır.
 İşlem anındaki yetki/fiyat/müsaitlik denetimi mevcut API sahiplerindedir; açık
 sayfa içeriğinin kendiliğinden güncellendiği varsayılmamalıdır.
+
+
+## E-Ticaret V2 yerel sözleşmesi
+
+`cart`, `checkout-customer`, `checkout-delivery`, `checkout-payment`, `checkout-review`
+ve `checkout-result` ortak rotalardır. Nav/sitemap'e girmez, noindex kullanır.
+Katalog kapansa da boş sepet ve kabul edilmiş konuk siparişinin sonuç rotası kalır.
+`core/shopping.js` aynı `YaCommerce.shared()` örneğine abone olur; sayfa başına ikinci
+controller oluşturulmaz. Mini sepet ortak header kancasıyla açılır. Site header
+özelleştirmesi `data-cart-open` ve `aria-controls="mini-cart"` kullanmalıdır.
+
+Review server quote / sözleşme kabulünü, sonuç kesin banka talimatını ve müşteri
+bildirimini sunar. Banka, kargo bedeli ve metinler API publication'ından gelir;
+site dosyalarına gerçek banka veya fiyat kuralı yazılmaz. `api/order-payment.php`
+sahipliği kanıtlanmış okuma/bildirimdir; ödeme onayı değildir. Kart pasiftir.
+Bu sürüm adayının bütün V2 kabulü bitmedi; tamamlanma ve DB/SMTP gereksinimleri
+ana repo `docs/commerce/ECOMMERCE_V2.md` belgesindedir. Diğer sitelerin kopyaları
+koordineli olarak yükseltilmeden API/Desktop/site sürümleri birlikte yayımlanmaz.

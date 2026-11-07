@@ -109,10 +109,8 @@ function ya_account_require_session(bool $recent = false): array
 }
 function ya_account_order_owner(): array
 {
-    $account = ya_account_require_session();
-    $find = ya_storage_open()->prepare("SELECT 1 FROM dealer_access WHERE account_id = ?"); $find->execute([$account['id']]);
-    if (!$find->fetchColumn()) throw new YaAccountError(409, 'customer_link_pending');
-    return $account;
+    // Verified account identity owns retail checkout before Desktop customer linking.
+    return ya_account_require_session();
 }
 function ya_account_issue_session(PDO $db, string $id, string $client = 'web', ?int $authenticatedAt = null): void
 {
@@ -157,10 +155,17 @@ function ya_account_send_token(array $account, string $purpose): void
 {
     if (!ya_account_mail_configured()) throw new YaAccountError(503, 'mail_unconfigured');
     $db = ya_storage_open(); $token = ya_account_random();
-    $db->prepare('DELETE FROM customer_account_tokens WHERE account_id = ? AND purpose = ?')->execute([$account['id'], $purpose]);
-    $db->prepare('INSERT INTO customer_account_tokens VALUES (?, ?, ?, ?, 0)')->execute([ya_account_hash($token), $account['id'], $purpose, time() + 1800]);
-    try { ya_account_mail($account['email'], $purpose, $token); }
-    catch (Throwable $error) { $db->prepare('DELETE FROM customer_account_tokens WHERE token_hash = ?')->execute([ya_account_hash($token)]); throw $error; }
+    $db->exec('BEGIN IMMEDIATE');
+    try {
+        // Re-read under lock: a reset/verification may have changed the account.
+        $find=$db->prepare('SELECT * FROM customer_accounts WHERE id=?');$find->execute([$account['id']]);$account=$find->fetch();
+        if(!$account)throw new YaAccountError(400,'invalid_account');
+        $db->prepare('DELETE FROM customer_account_tokens WHERE account_id = ? AND purpose = ?')->execute([$account['id'], $purpose]);
+        $db->prepare('INSERT INTO customer_account_tokens VALUES (?, ?, ?, ?, 0)')->execute([ya_account_hash($token), $account['id'], $purpose, time() + 1800]);
+        ya_account_mail($account['email'],$purpose,$token,$account);
+        $db->exec('COMMIT');
+    } catch(Throwable $error){$db->exec('ROLLBACK');throw $error;}
+
 }
 function ya_account_register(array $input): void
 {

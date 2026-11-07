@@ -1,3 +1,4 @@
+import { manageOrderPayment } from "./commerce-order-payment";
 import { app, ipcMain, safeStorage } from "electron";
 import { CommerceBenefitsKey } from "./commerce-benefits-key";
 import { CommerceBenefitsError } from "./commerce-benefits-engine";
@@ -220,6 +221,8 @@ export function registerCommerceIpcHandlers(options: {
     return { actor: { id: "local-desktop-owner", role: "desktop_owner" as const, assertAuthorized },
       keys: new CommerceBenefitsKey(app.getPath("userData"), safeStorage) };
   };
+  ipcMain.handle("commerce:order:payment", (event,input: Parameters<DesktopCommerceBridge["manageOrderPayment"]>[0]) =>
+    mutateForIpc("commerce:order:payment",()=>manageOrderPayment(databasePath(),input,marketBenefitsAuthority(event).actor)));
   ipcMain.handle("commerce:sale:benefitsState", event => {
     try {
       marketBenefitsAuthority(event);

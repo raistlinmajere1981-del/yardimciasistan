@@ -252,6 +252,32 @@ try {
   const resetDb = new DatabaseSync(database.databasePath);
   try { assert.deepEqual(resetDb.prepare("SELECT source_reference FROM commerce_orders").all().map((row) => row.source_reference), ["web-after-reset"]); }
   finally { resetDb.close(); }
+  const frozen = { version: 2, currency: "TRY", minor_unit: 2, subtotal_minor: 5000, delivery_fee_minor: 1500, total_minor: 6500,
+    delivery_method: "shipping", payment_method: "bank_transfer", demo: true,
+    bank: {name: "DEMO", accountHolder: "DEMO", iban: "DEMO — GEÇERSİZ"},
+    legal: {version: "demo-v2", preliminary: "DEMO", agreement: "DEMO"}, quote_id: "a".repeat(64),
+    order_number: "YA-20261107-A123456789", accepted_at: "2026-11-07T10:00:00Z", consent: {preliminary: true, agreement: true, marketing: false},
+    items: [{product_id: currentProduct.id, name: "Accepted product name", sku: "ACCEPTED", unit: "piece", quantity: 2, unit_price_minor: 2500, line_total_minor: 5000, tax_rate: 20}] };
+  saveRuntimeCatalogProduct(database.databasePath, {...currentProduct, salePrice: 99, isActive: false});
+  const acceptedEnvelope = {...envelope, id: "web_order_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkout: frozen, items: [{productId: currentProduct.id, quantity: 2}]};
+  const acceptedTransport = enqueue(acceptedEnvelope);
+  const acceptedSync=await coordinator().runNow();assert.equal(acceptedSync.ok, true, "accepted checkout imports after product withdrawal and price changes: "+JSON.stringify(acceptedSync));
+  const check = new DatabaseSync(database.databasePath);
+  try {
+    const row = check.prepare("SELECT id FROM commerce_orders WHERE source_reference = 'web_order_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'").get();
+    const detail = getRuntimeOrder(database.databasePath, row.id);
+    assert.equal(detail.order.total, 65);
+    assert.equal(detail.order.subtotal, 50);
+    assert.equal(detail.order.deliveryFee, 15);
+    assert.equal(detail.order.paymentStatus, "unpaid");
+    assert.equal(detail.order.orderNumber, frozen.order_number);
+    assert.equal(detail.items[0].productName, "Accepted product name");
+    assert.equal(detail.items[0].unitPrice, 25);
+    new OnlineOrderIngressService(database).importOrder(acceptedTransport);
+    assert.equal(check.prepare("SELECT count(*) AS n FROM commerce_orders WHERE source_reference = 'web_order_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'").get().n, 1);
+    assert.throws(() => new OnlineOrderIngressService(database).importOrder({...acceptedTransport, id: "bad-checkout", checkout: {...frozen, total_minor: 1}}), /snapshot/);
+    assert.equal(check.prepare("SELECT count(*) AS n FROM finance_entries").get().n, 0, "acceptance is never a paid sale");
+  } finally {check.close();}
   console.log("commerce-online-order-ingress-smoke-ok");
 } finally {
   globalThis.fetch = originalFetch;

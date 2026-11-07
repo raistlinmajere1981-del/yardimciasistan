@@ -1,3 +1,4 @@
+import { importOrderPaymentNotice } from "./commerce-order-payment";
 import { getTableOrderBenefitsState, previewTableOrderBenefits, settleTableOrderBenefits, type TableBenefitsAuthority } from "./table-order-benefits";
 import type { TableOrderBenefitsPreviewInput, TableOrderBenefitsCloseInput } from "@yardimci-asistan/shared";
 import { getAppLockPasswordVerifier as getAppLockPasswordVerifierStored, setAppLockPasswordVerifier as setAppLockPasswordVerifierStored, getAppLockNotificationCount as getAppLockNotificationCountStored } from "./database/app-lock-store.js";
@@ -1115,13 +1116,21 @@ export class DesktopDatabase {
     return createRuntimeOrder(this.databasePath, input);
   }
 
+  importOrderPaymentNotice(eventId: string, sourceReference: string, createdAt: string) {
+    importOrderPaymentNotice(this.databasePath,eventId,sourceReference,createdAt);
+  }
+
+  createAcceptedWebOrder(input: CreateCommerceOrderInput, checkout: import("@yardimci-asistan/shared").CommerceCheckoutSnapshot, accountId?: string) {
+    return createRuntimeOrder(this.databasePath, { ...input, source: "web-online-sales" }, { acceptedCheckout: checkout, ...(accountId ? { customerAccountId: accountId } : {}) });
+  }
+
   createCustomerWebOrder(accountId: string, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note" | "buyerSnapshot">) {
     return createRuntimeOrder(this.databasePath, { ...input, source: "web-online-sales" }, { customerAccountId: accountId });
   }
 
-  createDealerWebOrder(accessId: string, accessRevision: number, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note">) {
+  createDealerWebOrder(accessId: string, accessRevision: number, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note">, checkout?: import("@yardimci-asistan/shared").CommerceCheckoutSnapshot) {
     return createRuntimeOrder(this.databasePath, { ...input, source: "web-dealer" },
-      { dealerAccess: { accessId, accessRevision } });
+      { dealerAccess: { accessId, accessRevision }, ...(checkout ? {acceptedCheckout:checkout} : {}) });
   }
 
   recordRejectedDealerWebOrder(orderId: string, accessId: string, accessRevision: number) {

@@ -10,7 +10,21 @@ const {OnlineOrderIngressService}=require('../apps/desktop-app/dist-electron/onl
 const {saveRuntimeCatalogProduct,listRuntimeOrders,fulfillRuntimeOrder}=require('../apps/desktop-app/dist-electron/commerce-runtime.js');
 const {updateCommerceOrderStatus}=require('../apps/desktop-app/dist-electron/commerce-order-store.js');
 const {publishDesktopProjection}=require('../apps/desktop-app/dist-electron/desktop-publication-service.js');
-const f=await accountFixture(),{database,call,transport}=f;let raw;
+const {saveCheckoutSettings}=require('../apps/desktop-app/dist-electron/commerce-checkout-settings.js');
+const {manageOrderPayment}=require('../apps/desktop-app/dist-electron/commerce-order-payment.js');
+const f=await accountFixture(),{database,transport}=f;let raw;
+const quotes=new Map();
+async function call(endpoint,body,cookie='',headers={}) {
+  if(['dealer/order','order'].includes(endpoint) && body?.items) {
+    const key=endpoint+':'+body.idempotencyKey;
+    if(!quotes.has(key)) {
+      const quoted=await f.call(endpoint==='dealer/order'?'dealer/checkout-quote':'checkout-quote',{items:body.items,delivery:body.delivery},cookie);
+      if(quoted.body.ok)quotes.set(key,quoted.body.quote.quote_id);
+    }
+    body={...body,paymentMethod:'bank_transfer',consent:{preliminary:true,agreement:true,marketing:false},quoteId:quotes.get(key)||'0'.repeat(64)};
+  }
+  return f.call(endpoint,body,cookie,headers);
+}
 try {
   await f.publish();
   for(const name of ['a','b','ordinary'])await f.register(name+'@example.test',name+' Customer');
@@ -27,6 +41,9 @@ try {
   const beforeLink=database.createDealerAccessProjection();
   assert.ok(beforeLink.dealers.some(dealer=>dealer.enabled && dealer.account_id===''));
   assert.equal(beforeLink.catalogs.length,2,'never build private catalogs for unverified, unlinked web accounts');
+  saveCheckoutSettings(database.databasePath,{version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:1500,bank:{name:'DEMO',accountHolder:'DEMO',iban:'DEMO — GEÇERSİZ'},legal:{version:'demo-v2',preliminary:'DEMO',agreement:'DEMO'}});
+  const initialCatalog=database.createCommerceOnlineCatalog();
+  assert.equal((await publishDesktopProjection(database,{baseUrl:f.baseUrl,syncSecret:f.secret},'online_catalog_publish',initialCatalog,(identity,value)=>transport.publishOnlineCatalog({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}))).ok,true);
   await f.publish();
   const ac=await f.login('a@example.test'),bc=await f.login('b@example.test','android'),oc=await f.login('ordinary@example.test');
   const publicIds=database.createCommerceOnlineCatalog().products.map(row=>row.productId);
@@ -48,15 +65,20 @@ try {
   assert.equal((await call('dealer/order',{...payload,customerId:b.id},ac)).status,422);
   assert.equal((await call('dealer/receipt',{idempotencyKey:payload.idempotencyKey},ac)).body.receipt.order_id,accepted.body.order_id);
   assert.equal((await call('dealer/receipt',{idempotencyKey:payload.idempotencyKey},bc)).body.receipt,null);
-  assert.equal((await call('dealer/orders',undefined,ac)).body.orders[0].status,'awaiting_desktop');
+  assert.equal((await call('dealer/orders',undefined,ac)).body.orders[0].status,'placed');
   assert.equal((await call('dealer/orders',undefined,bc)).body.orders.length,0);
   assert.equal((await ingress.pullWebOrderPages(transport)).error,'');
   const order=listRuntimeOrders(database.databasePath).find(x=>x.sourceReference===accepted.body.order_id);assert.ok(order);assert.equal(order.customerId,a.id);assert.equal(order.total,160);
   assert.equal((await ingress.pullWebOrderPages(transport)).count,0);assert.equal(listRuntimeOrders(database.databasePath).length,1);
   await f.publish();assert.equal((await call('dealer/orders',undefined,ac)).body.orders[0].status,'placed');
+  manageOrderPayment(database.databasePath,{orderId:order.id,operationKey:'dealer-payment-approve-1',expectedUpdatedAt:order.updatedAt,action:'approve',reason:''},{id:'fixture-owner',role:'desktop_owner',assertAuthorized(){}});
   updateCommerceOrderStatus(database.databasePath,{orderId:order.id,status:'confirmed'});
-  fulfillRuntimeOrder(database.databasePath,{orderId:order.id,operationKey:randomUUID(),settlement:{type:'paid',paymentMethod:'cash'}});
+  fulfillRuntimeOrder(database.databasePath,{orderId:order.id,operationKey:randomUUID(),settlement:{type:'paid',paymentMethod:'bank'}});
   await f.publish();assert.equal((await call('dealer/orders',undefined,ac)).body.orders[0].status,'fulfilled');
+  const acceptedEnvelope=f.storage("echo $db->query('SELECT payload_json FROM web_orders ORDER BY seq LIMIT 1')->fetchColumn();");
+  database.saveCustomer({...database.getCustomer(a.id),commercialProfile:{companyName:'A Customer',dealerStatus:'inactive',priceGroup:'dealer_a'}});
+  assert.doesNotThrow(()=>new OnlineOrderIngressService(database).importOrder({...acceptedEnvelope,syncSeq:1}), 'accepted duplicate remains the existing paid order after dealer revocation');
+  database.saveCustomer({...database.getCustomer(a.id),commercialProfile:{companyName:'A Customer',dealerStatus:'active',priceGroup:'dealer_a'}});
   const android=await f.login('a@example.test','android');assert.equal((await call('dealer/catalog',undefined,android)).body.catalog.products[0].price,80);
   database.changeDealerWebAccess(a.id,'revoke_sessions');await f.publish();assert.equal((await call('dealer/catalog',undefined,ac)).status,401);assert.equal((await call('dealer/catalog',undefined,android)).status,401);
   const renewed=await f.login('a@example.test');assert.equal((await call('dealer/receipt',{idempotencyKey:payload.idempotencyKey},renewed)).body.receipt.order_id,accepted.body.order_id);
@@ -108,6 +130,7 @@ try {
   assert.equal(currentOrders().length,1);assert.equal(currentOrders()[0].total,130);assert.equal(currentOrders()[0].customerId,a.id);
   // Desktop gates a queued order again when dealer status changes before import.
   const queued=await call('dealer/order',{...payload,idempotencyKey:randomUUID()},bc);assert.equal(queued.status,201);
+  assert.equal((await call('order-payment',{action:'report',orderId:queued.body.order_id},bc)).status,200);
   const queuedPage=await transport.pullWebOrders({afterSeq:database.getSyncRuntimeStatus().webOrderCursor});
   database.saveCustomer({...database.getCustomer(b.id),commercialProfile:{companyName:'B Customer',dealerStatus:'inactive',priceGroup:'dealer_b'}});
   assert.throws(()=>new OnlineOrderIngressService(database).importOrder(queuedPage.orders[0]),/Bayi web erişimi/);

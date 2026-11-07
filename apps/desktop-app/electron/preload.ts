@@ -696,6 +696,7 @@ const bridge: DesktopBridge = {
     listShipmentsForOrder: (orderId) => invokeWhenUnlocked<import("@yardimci-asistan/shared").CommerceShipment[]>("commerce:shipment:listForOrder", orderId),
     createShipmentForOrder: (orderId) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipment:create", orderId),
     updateShipmentStatus: (input) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipment:updateStatus", input),
+    manageOrderPayment: input => invokeCommerceMutation<CommerceOrderDetail>("commerce:order:payment", input),
     listOrders: (options) => invokeWhenUnlocked<CommerceOrder[]>("commerce:order:list", options),
     getOrder: (orderId) => invokeWhenUnlocked<CommerceOrderDetail | null>("commerce:order:get", orderId),
     createOrder: (input) => invokeWhenUnlocked<CommerceIpcMutationResult<CommerceOrderDetail>>("commerce:order:create", input),

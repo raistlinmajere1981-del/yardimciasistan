@@ -3,17 +3,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/storage.php';
 
 /** The caller owns the transaction with its domain write. No network IO here. */
-function ya_commerce_mail_enqueue(PDO $db, string $eventId, string $recipient, string $subject, string $body): void
+function ya_commerce_mail_enqueue(PDO $db, string $eventId, string $recipient, string $subject, string $body, string $kind = 'commerce'): void
 {
-    if ($recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $recipient)
+    if (!in_array($kind,['commerce','account_token'],true) || $recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $recipient)
         || $eventId === '' || strlen($eventId) > 240 || strlen($body) > 131072 || strlen($subject) > 500) {
         throw new InvalidArgumentException('invalid_mail_event');
     }
     $id = hash('sha256', $eventId . ':' . strtolower($recipient));
-    $hash = hash('sha256', json_encode([$recipient, $subject, $body], JSON_THROW_ON_ERROR));
-    $statement = $db->prepare('INSERT INTO commerce_mail_outbox(id, content_hash, recipient, subject, body, next_attempt_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING');
-    $statement->execute([$id, $hash, $recipient, $subject, $body, time(), time()]);
+    $hash = hash('sha256', json_encode([$recipient, $subject, $body, $kind], JSON_THROW_ON_ERROR));
+    $statement = $db->prepare('INSERT INTO commerce_mail_outbox(id, content_hash, recipient, subject, body, message_kind, next_attempt_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING');
+    $statement->execute([$id, $hash, $recipient, $subject, $body, $kind, time(), time()]);
     $find = $db->prepare('SELECT content_hash FROM commerce_mail_outbox WHERE id = ?'); $find->execute([$id]);
     if (!hash_equals($hash, (string)$find->fetchColumn())) throw new RuntimeException('mail_event_conflict');
 }
@@ -27,6 +27,15 @@ function ya_commerce_mail_order(PDO $db, string $id, array $request, array $quot
     }
     $body .= "\nÜrünler toplamı: " . number_format($quote['subtotal_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
         . "\nTeslimat ve ödeme talimatları henüz kesinleşmedi. Bu mesaj ödeme onayı değildir.\n";
+    if (($quote['version'] ?? 1) === 2) {
+        $body = str_replace($id, $quote['order_number'], $body);
+        $body = str_replace("Teslimat ve ödeme talimatları henüz kesinleşmedi.",
+            "Teslimat: " . number_format($quote['delivery_fee_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
+            . "\nÖdenecek toplam: " . number_format($quote['total_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
+            . "\n" . ($quote['demo'] ? 'DEMO — gerçek ödeme yapmayın. ' : '')
+            . $quote['bank']['name'] . "\n" . $quote['bank']['accountHolder'] . "\nIBAN: " . $quote['bank']['iban']
+            . "\nHavale açıklaması: " . $quote['order_number'], $body);
+    }
     $email = $request['buyer']['email'] ?? '';
     if ($email !== '') ya_commerce_mail_enqueue($db, $id . ':received', $email, 'Sipariş talebiniz alındı', $body);
     $business = getenv('YA_COMMERCE_NOTIFICATION_EMAIL') ?: '';
@@ -39,7 +48,7 @@ function ya_commerce_mail_order(PDO $db, string $id, array $request, array $quot
  */
 function ya_commerce_mail_run(PDO $db, callable $send, int $limit = 20): array
 {
-    $result = ['sent' => 0, 'retry' => 0, 'failed' => 0];
+    $result = ['sent' => 0, 'retry' => 0, 'failed' => 0, 'cancelled' => 0];
     for ($index = 0; $index < max(1, min(100, $limit)); $index++) {
         $now = time(); $lease = bin2hex(random_bytes(16));
         $db->exec('BEGIN IMMEDIATE');
@@ -47,13 +56,22 @@ function ya_commerce_mail_run(PDO $db, callable $send, int $limit = 20): array
             $find = $db->prepare("SELECT * FROM commerce_mail_outbox WHERE (status = 'pending' AND next_attempt_at <= ?) OR (status = 'sending' AND lease_until <= ?) ORDER BY created_at, id LIMIT 1");
             $find->execute([$now, $now]); $row = $find->fetch();
             if (!$row) { $db->exec('COMMIT'); break; }
+            if((int)$row['attempts']>=8) {
+                $db->prepare("UPDATE commerce_mail_outbox SET status='failed',lease_token='',lease_until=0,last_error='retry_exhausted' WHERE id=?")->execute([$row['id']]);
+                $db->exec('COMMIT');$result['failed']++;continue;
+            }
             $db->prepare("UPDATE commerce_mail_outbox SET status = 'sending', attempts = attempts + 1, lease_token = ?, lease_until = ? WHERE id = ?")
                 ->execute([$lease, $now + 600, $row['id']]);
             $db->exec('COMMIT');
         } catch (Throwable $error) { $db->exec('ROLLBACK'); throw $error; }
         $attempt = (int)$row['attempts'] + 1;
         try {
-            $send($row['recipient'], $row['subject'], $row['body'], '<' . $row['id'] . '@yardimci.invalid>');
+            $body=$row['message_kind']==='account_token' ? ya_account_mail_unseal($db,$row) : $row['body'];
+            if($body===null){
+                $db->prepare("UPDATE commerce_mail_outbox SET status='cancelled',lease_token='',lease_until=0,body='',last_error='token_invalidated' WHERE id=? AND lease_token=?")->execute([$row['id'],$lease]);
+                $result['cancelled']++;continue;
+            }
+            $send($row['recipient'], $row['subject'], $body, '<' . $row['id'] . '@yardimci.invalid>');
         } catch (Throwable) {
             $status = $attempt >= 8 ? 'failed' : 'pending';
             $db->prepare('UPDATE commerce_mail_outbox SET status = ?, next_attempt_at = ?, last_error = ?, lease_token = ?, lease_until = 0 WHERE id = ? AND lease_token = ?')

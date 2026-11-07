@@ -45,6 +45,7 @@ const SMOKE_FILES = [
   "scripts/smoke-demo-two-layer.mjs",
   "scripts/smoke-web-site-template.mjs",
   "scripts/smoke-customer-accounts.mjs",
+  "scripts/smoke-commerce-checkout.mjs",
   "scripts/smoke-desktop-visible-updater.mjs",
   "scripts/smoke-entity-single-card.mjs",
   "scripts/smoke-data-transfer.mjs",
@@ -764,7 +765,7 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-instagram-staging.mjs" || file === "scripts/smoke-instagram-oauth-web.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
-  if (file === "scripts/smoke-customer-accounts.mjs") return ["build-desktop", "php-lint"];
+  if (file === "scripts/smoke-customer-accounts.mjs" || file === "scripts/smoke-commerce-checkout.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-dealer-applications.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file === "scripts/smoke-web-storefront.mjs") return ["build-demo", "php-lint"];

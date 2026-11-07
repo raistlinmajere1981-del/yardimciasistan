@@ -1,3 +1,4 @@
+import { readCheckoutSettings, normalizeCheckoutSettings, saveCheckoutSettingsInTransaction } from "./commerce-checkout-settings";
 import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, saveMarketingProviderConfigurations, storedMarketingProvider } from "./marketing/provider-configuration-store";
 import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import { getMessagingConfiguration, getStoredMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
@@ -121,6 +122,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     whatsappCloud: getMessagingConfiguration(db),
     dealerApplicationEnabled: Number(settings?.dealer_application_enabled ?? 0) === 1,
     dealerPortalEnabled: available("dealerPortal") && Number(settings?.dealer_portal_enabled ?? 0) === 1,
+    commerceCheckout: readCheckoutSettings(db,String(business?.id ?? "")),
     onlineSalesDeliveryEnabled: available("delivery") && Number(settings?.online_sales_delivery_enabled ?? 0) === 1,
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
@@ -229,6 +231,7 @@ export function saveSetupData(
   }
   let onlineSalesDelivery;
   try {
+    if(input.commerceCheckout !== undefined)normalizeCheckoutSettings(input.commerceCheckout);
     const deliveryDraft = input.onlineSalesDelivery ?? {
       pickupEnabled: Number(existingSettings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(existingSettings?.online_sales_shipping_enabled ?? 0) === 1
@@ -561,6 +564,8 @@ export function saveSetupData(
 
     db.prepare("UPDATE settings SET online_sales_delivery_enabled = ?, online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
       .run(deliveryEnabled ? 1 : 0, onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
+
+    if(input.commerceCheckout !== undefined)saveCheckoutSettingsInTransaction(db,businessId,input.commerceCheckout,now);
 
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);

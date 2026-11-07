@@ -11,7 +11,7 @@ const {WebSyncIngress}=require('../apps/desktop-app/dist-electron/web-sync-ingre
 const f=await accountFixture({providers:true});
 const {database,call,storage,transport}=f;
 let raw;
-const token=()=>new URL(f.emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);
+const token=async()=>{await f.runCommerceMail();return new URL(f.emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);};
 const stage=text=>console.log('PASS',text);
 try {
   assert.deepEqual((await call('account/config')).body,{ok:true,enabled:false,passwordRegistration:false,site_url:"",providers:[]});
@@ -20,13 +20,16 @@ try {
   assert.equal((await call('account/config')).body.enabled,true);
   assert.equal((await call('dealer/claim',{invite_token:'a'.repeat(43)})).status,404);
   const registered=await call('account/register',{email:'new@example.test',fullName:'New Customer',password:'Attacker-preregister-123'});
-  assert.equal(registered.status,200,JSON.stringify(registered.body));assert.equal(JSON.stringify(registered.body).includes(token()),false);
+  assert.equal(registered.status,200,JSON.stringify(registered.body));assert.equal(JSON.stringify(registered.body).includes(await token()),false);
   assert.equal(storage('echo json_encode($db->query("SELECT password_hash FROM customer_accounts WHERE email=\'new@example.test\'")->fetchColumn());'),'','unverified account must never store a preregistration password');
   assert.equal((await call('account/login',{email:'new@example.test',password:'Attacker-preregister-123'})).body.code,'invalid_credentials');
-  const verifyToken=token();
+  const verifyToken=await token();
   assert.equal((await call('account/verify',{token:verifyToken,password:accountPassword})).status,200);
   assert.equal((await call('account/verify',{token:verifyToken,password:accountPassword})).status,400);
   assert.equal((await call('account/login',{email:'new@example.test',password:'Attacker-preregister-123'})).status,401,'verification must choose its own password, preventing preregistration takeover');
+  const queued=storage("echo json_encode($db->query(\"SELECT body FROM commerce_mail_outbox WHERE message_kind='account_token' LIMIT 1\")->fetchColumn());");
+  assert.equal(queued.includes(verifyToken),false,'verification bearer never appears in durable plaintext');
+  assert.equal(queued.includes('https://'),false,'token URL is sealed at rest');
   const web=await f.login('new@example.test'),android=await f.login('new@example.test','android');assert.notEqual(web,android);
   const profile=(await call('account/session',undefined,web)).body.account;assert.equal(profile.email,'new@example.test');assert.equal(profile.dealer,null);
   const stored=storage('echo json_encode($db->query("SELECT password_hash FROM customer_accounts LIMIT 1")->fetchColumn());');assert.match(stored,/^\$argon2id\$/);assert.equal(stored.includes(accountPassword),false);
@@ -64,10 +67,18 @@ try {
   assert.equal((await call('account/session',undefined,android)).status,200);
   assert.equal((await call('account/logout',{},android)).status,200);assert.equal((await call('account/session',undefined,android)).status,401);
   const recovery=await call('account/recover',{email:'new@example.test'});assert.equal(recovery.status,200);
-  const resetToken=token();assert.equal((await call('account/reset',{token:resetToken,password:accountPassword})).status,200);
+  const resetToken=await token();assert.equal((await call('account/reset',{token:resetToken,password:accountPassword})).status,200);
   assert.equal((await call('account/session',undefined,refreshed.cookie)).status,401);
   assert.equal((await call('account/reset',{token:resetToken,password:accountPassword})).status,400);
   stage('CSRF rejection, profile allowlist, session/refresh rotation, independent logout and single-use password recovery');
+
+  await call('account/recover',{email:'new@example.test'});
+  await call('account/recover',{email:'new@example.test'});
+  const replacementMail=await f.runCommerceMail();assert.equal(replacementMail.sent,1);assert.equal(replacementMail.cancelled,1,'superseded token mail is cancelled before SMTP');
+  await call('account/recover',{email:'new@example.test'});
+  storage("$db->exec('UPDATE customer_account_tokens SET expires_at=0 WHERE consumed_at=0');");
+  const expiredMail=await f.runCommerceMail();assert.equal(expiredMail.sent,0);assert.equal(expiredMail.cancelled,1,'expired token mail is never sent');
+  stage('sealed durable token mail, token replacement and expiry cancellation');
 
   // Full OAuth state/PKCE flow with an injected provider transport at the service boundary.
   // HTTP start and state rejection are real; Google/Facebook responses below are explicit test doubles.
@@ -149,6 +160,13 @@ try {
     assert.equal((await unconfigured.call('account/recover',{email:'missing@example.test'})).body.code,'mail_unconfigured');
     assert.equal(unconfigured.storage('echo json_encode($db->query("SELECT COUNT(*) FROM customer_accounts")->fetchColumn());'),0);
   } finally { await unconfigured.cleanup(); }
+  const keyless=await accountFixture({smtp:true,tokenKey:false});
+  try {
+    await keyless.publish();
+    assert.equal((await keyless.call('account/config')).body.passwordRegistration,false,'configured SMTP cannot bypass the missing token encryption key');
+    assert.equal((await keyless.call('account/register',{email:'keyless@example.test',fullName:'Keyless'})).body.code,'mail_unconfigured');
+    assert.equal(keyless.storage("echo $db->query('SELECT COUNT(*) FROM customer_accounts')->fetchColumn();"),0);
+  }finally{await keyless.cleanup();}
   stage('missing SMTP/provider configuration has no fake registration, delivery or social sign-in fallback');
   console.log('customer-accounts-ok');
 } catch(error){console.error(f.logs().slice(-1800));throw error;}

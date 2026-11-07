@@ -14,6 +14,7 @@ export interface DealerWebAccess {
 export interface DealerAccessResult { access: DealerWebAccess; }
 /** Private sync contract. Opaque customer binding and resolved commercial projections only. */
 export interface DealerAccessProjection {
+  web_order_statuses?: import("./commerce-checkout").CommerceWebOrderStatus[];
   version: 3;
   online_sales_enabled: boolean;
   enabled: boolean;

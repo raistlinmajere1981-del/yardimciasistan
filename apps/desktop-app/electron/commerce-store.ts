@@ -147,6 +147,7 @@ export interface CreateCommerceSaleInput {
 }
 
 export interface CreateCommerceSaleFromOrderSnapshotInput {
+  deliveryFee?: number;
   subtotal: number;
   discountTotal: number;
   total: number;
@@ -1082,13 +1083,16 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
   const subtotal = roundMoney(Number(input.subtotal));
   const discountTotal = roundMoney(Number(input.discountTotal));
   const total = roundMoney(Number(input.total));
+  const deliveryFee=roundMoney(Number(input.deliveryFee ?? 0));
+  moneyToMinor(deliveryFee);
+  if(deliveryFee<0)throw new Error("Sipariş teslimat bedeli geçersiz.");
   moneyToMinor(subtotal);
   moneyToMinor(discountTotal);
   moneyToMinor(total);
   if (subtotal < 0 || discountTotal < 0 || total < 0 || discountTotal > subtotal) {
     throw new Error("Sipariş toplamları geçersiz.");
   }
-  if (roundMoney(subtotal - discountTotal) !== total) {
+  if (roundMoney(subtotal - discountTotal + deliveryFee) !== total) {
     throw new Error("Sipariş toplamı snapshot ile uyuşmuyor.");
   }
 
@@ -1152,6 +1156,8 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
     saleId, businessId, status, subtotal, discountTotal, total, currency,
     paymentMethod, source, now, now, now, now
   );
+
+  database.prepare("UPDATE commerce_sales SET delivery_fee=? WHERE id=? AND business_id=?").run(deliveryFee,saleId,businessId);
 
   const insertSaleItem = database.prepare(`
     INSERT INTO commerce_sale_items (

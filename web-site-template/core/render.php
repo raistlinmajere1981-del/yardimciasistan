@@ -64,6 +64,7 @@ function render_view(string $name, array $view, array $site): void
 function render_navigation(array $view, array $site): void
 {
     foreach ($view['pages'] as $id => $page) {
+        if (!empty($page['internal'])) continue;
         echo '<a href="' . e(page_url($site, $id)) . '"' . ($view['page'] === $id ? ' aria-current="page"' : '') . '>' . e(t($site, $page['key'])) . '</a>';
     }
 }
@@ -226,7 +227,7 @@ function public_origin(mixed $value): string
 
 function canonical_url(array $site, array $view): string
 {
-    if (($site['public_origin'] ?? '') === '' || in_array($view['page'], ['missing', 'account'], true)) return '';
+    if (($site['public_origin'] ?? '') === '' || !empty($view['pages'][$view['page']]['internal']) || in_array($view['page'], ['missing', 'account'], true)) return '';
     $url = $site['public_origin'] . page_url($site, $view['page']);
     $record = $view['room'] ?? $view['table'] ?? null;
     if ($record !== null) $url .= '&id=' . rawurlencode($record['id']);
@@ -275,7 +276,7 @@ function sitemap_xml(array $site, array $view): string
     if (($site['public_origin'] ?? '') !== '' && $view['status'] === 'ok') {
         foreach (array_keys($site['language']['catalogs']) as $code) {
             foreach ($view['pages'] as $id => $_definition) {
-                if ($id === 'account') continue;
+                if ($id === 'account' || !empty($_definition['internal'])) continue;
                 $url = $site['public_origin'] . page_url($site, $id, $code);
                 $urls[] = $url;
                 $records = $id === 'rooms' ? $view['publication']['rooms'] : ($id === 'restaurant' ? $view['publication']['tables'] : []);

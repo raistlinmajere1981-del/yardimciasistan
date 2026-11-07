@@ -4,6 +4,7 @@ require_once __DIR__ . '/storage.php';
 require_once __DIR__ . '/online-catalog.php';
 require_once __DIR__ . '/commerce-quote.php';
 require_once __DIR__ . '/commerce-mail.php';
+require_once __DIR__ . '/commerce-order-payment.php';
 
 final class YaOnlineOrderRejection extends RuntimeException
 {
@@ -82,7 +83,7 @@ function ya_online_order_normalize(array $input): array
     if ($name === '' || preg_match('/^\+?[0-9 ().\/-]+$/', $phone) !== 1
         || strlen($digits) < 7 || strlen($digits) > 15) ya_online_order_invalid();
     $email = ya_online_order_text($buyer['email'] ?? '', 254);
-    if ($email !== '' && preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/u', $email) !== 1) ya_online_order_invalid();
+    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) ya_online_order_invalid();
     return [
         'delivery' => ya_online_order_delivery($input['delivery'] ?? null),
         'items' => $items,
@@ -102,7 +103,7 @@ function ya_online_order_submit(array $input, ?array $account = null): array
         $input['buyer']['name'] = $account['full_name'];
         $input['buyer']['email'] = $account['email'];
     }
-    $request = ya_online_order_normalize($input);
+    $request = [...ya_online_order_normalize($input), ...ya_commerce_checkout_acceptance($input)];
     if ($account) $request = ['kind' => 'customer', 'accountId' => $account['id'], ...$request];
     $keyHash = hash('sha256', ($account ? 'customer:' . $account['id'] . ':' : '') . $key);
     $database = ya_storage_open();
@@ -118,7 +119,7 @@ function ya_online_order_submit(array $input, ?array $account = null): array
         if ($receipt !== null) {
             // Replay a prior acceptance even if publication changed; no new submission.
             $database->exec('COMMIT');
-            return $receipt['response'];
+            return $account ? $receipt['response'] : [...$receipt['response'], 'order_access_token' => ya_commerce_guest_order_token($receipt['response']['order_id'])];
         }
         $catalog = ya_online_catalog_projection(ya_storage_get_publication('online_catalog', []));
         if (!$catalog['enabled']) {
@@ -136,15 +137,21 @@ function ya_online_order_submit(array $input, ?array $account = null): array
                 throw new YaOnlineOrderRejection(422, 'product_not_published', 'Siparişteki ürünlerden biri web satışında yayınlanmıyor.');
             }
         }
-        $quote = ya_commerce_quote($request['items'], $catalog['products']);
+        $quote = ya_commerce_checkout_quote($request['items'], $request['delivery'], $catalog);
+        if (!hash_equals($quote['quote_id'], $request['quoteId'])) {
+            throw new YaOnlineOrderRejection(409, 'quote_changed', 'Fiyat veya satış koşulları değişti. Sipariş özetini yeniden onaylayın.');
+        }
         $now = date(DATE_ATOM);
         $id = 'web_order_' . bin2hex(random_bytes(16));
-        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'quote' => $quote, 'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'message' => 'Sipariş talebiniz alındı.'];
+        $number = 'YA-' . gmdate('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)));
+        $checkout = [...$quote, 'order_number' => $number, 'accepted_at' => $now, 'consent' => $request['consent']];
+        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'quote' => $quote, 'checkout' => $checkout, 'createdAt' => $now]);
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'order_number' => $number, 'total_minor' => $checkout['total_minor'], 'delivery_fee_minor' => $checkout['delivery_fee_minor'],
+            'payment_status' => 'unpaid', 'delivery_status' => 'unfulfilled', 'checkout' => $checkout, 'message' => 'Siparişiniz alındı. Ödeme bekleniyor.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $requestHash, $response);
-        ya_commerce_mail_order($database, $id, $request, $quote);
+        ya_commerce_mail_order($database, $id, $request, $checkout);
         $database->exec('COMMIT');
-        return $response;
+        return $account ? $response : [...$response, 'order_access_token' => ya_commerce_guest_order_token($id)];
     } catch (Throwable $error) {
         $database->exec('ROLLBACK');
         throw $error;

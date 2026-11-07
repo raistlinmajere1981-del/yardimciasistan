@@ -59,6 +59,8 @@ export type PullCustomerAccountsResult = { ok: true; accounts: CustomerAccountEn
 
 /** Hosting inbox record; canonical business ownership remains in commerce.orders. */
 interface WebOrderEnvelopeBase {
+  event?: { type: "payment_reported"; orderId: string };
+  checkout?: import("@yardimci-asistan/shared").CommerceCheckoutSnapshot;
   previouslyAcknowledged?: boolean;
   id: string;
   items: Array<{ productId: string; quantity: number }>;

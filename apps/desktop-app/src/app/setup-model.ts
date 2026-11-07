@@ -1,3 +1,4 @@
+import { DEFAULT_COMMERCE_CHECKOUT, type CommerceCheckoutSettings } from "@yardimci-asistan/shared";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SmsConfigurationInput, type InstagramConfiguration } from "@yardimci-asistan/shared";
 import { type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
@@ -71,6 +72,7 @@ export interface SetupFormState {
   arasShipping: Omit<ArasShippingConfigurationInput, "enabled"> & { hasSecret: boolean };
   dealerPortalEnabled: boolean;
   dealerApplicationEnabled: boolean;
+  commerceCheckout: CommerceCheckoutSettings;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled: boolean;
 }
@@ -141,6 +143,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     dealerApplicationEnabled: setupData.dealerApplicationEnabled ?? false,
+    commerceCheckout: structuredClone(setupData.commerceCheckout ?? DEFAULT_COMMERCE_CHECKOUT),
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
     onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? false,
     productDataEnabled: setupData.productData.enabled,
@@ -288,6 +291,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
         ...(setupForm.arasShipping.password === undefined ? {} : { password: setupForm.arasShipping.password }), ...(setupForm.arasShipping.clearPassword === undefined ? {} : { clearPassword: setupForm.arasShipping.clearPassword }) },
       dealerPortalEnabled: setupForm.dealerPortalEnabled,
       dealerApplicationEnabled: setupForm.dealerApplicationEnabled,
+      commerceCheckout: setupForm.commerceCheckout,
       onlineSalesDelivery: setupForm.onlineSalesDelivery,
       onlineSalesDeliveryEnabled: setupForm.onlineSalesDeliveryEnabled,
       productData: {

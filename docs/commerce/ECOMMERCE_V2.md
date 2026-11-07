@@ -1,65 +1,76 @@
-# E-Ticaret V2 — mimari envanter ve doğrulama
+# E-Ticaret V2 — yerel uygulama ve kalan kabul
 
-2026-11-07. Durum: **kısmi uygulama; V2 kabulü ve yayın yapılmadı.**
+2026-11-07. **Çalışan yerel kontrol noktası; V2 tamamlandı / yayına hazır kabulü verilmedi.**
+Oturum: `01a1b6d7-fc73-7793-ad7a-20cd5d2d244c`. Push ve canlı deploy yok.
 
-## Mevcut sahipler
+## Tek ticaret sahipliği
 
-| Alan | Mevcut kaynak | Bulgu / yapılacak iş |
-| --- | --- | --- |
-| Canonical masaüstü veri | `apps/desktop-app/db/schema.sql`, `electron/commerce-order-store.ts` | Ürün, fiyat, müşteri ve sipariş sahibi. Web girişinde güncel fiyatı tekrar çözüyor. V2 için kabul edilen fiyatın ve teslimat koşullarının korunması henüz tamamlanmadı. |
-| Hosting veri | `firm-template/web-module/lib/storage.php` | Tek SQLite; `web_orders`, kapsamlı idempotency receipt, sıra/cursor/ACK ve kaynak epoch fencing. İkinci site veritabanı kurulmadı. |
-| Sipariş girişi | `lib/online-order.php`, `lib/dealer-order.php` | Perakende/müşteri ve yetkili bayi uçları aynı normalizasyon ve fiyat hesaplayıcısını kullanır. Henüz ödeme kesinleştiren satış sözleşmesi değildir. |
-| Senkron | `electron/online-order-ingress-service.ts`, `WebSyncIngress`, publication v3 | Masaüstü kapalıyken kayıt tutulur. Mevcut durable outbox/exact ACK yolu korunur. Yeni ödeme olaylarının bu yola eklenmesi gerekiyor. |
-| Tarayıcı | `web-site-template/public/assets/core/commerce.js` | `YaCommerce`, `YaAccount`, `YaCartDraft`; sahip kapsamı, belirsiz istek kurtarma, fiyat izolasyonu. Mini sepet için aynı controller örneğinin sayfa render bileşenlerince paylaşılması gerekiyor. |
-| Teknikel sunumu | `teknikel_web/canonical/site/`, ortak `canonical/core/` | Ana sayfa kartları ortak kart renderer'ını kullanıyor. Ana sayfa ve katalogda ayrı sepet sunumları var; checkout halen form. Ayrı rotalar ve mini sepet yapılmadı. |
-| Kimlik | `lib/customer-account*.php`, `api/account/` | Kayıt/doğrulama, Argon2id, parola sıfırlama, rotasyonlu oturum, profil, kendi siparişleri mevcut. SMTP yokken `passwordRegistration:false`; kayıt formunun gizlenmesinin nedeni bu. Yeni müşterinin Desktop bağlanmasını bekleyen `customer_link_pending` sınırı ayrıca çözülmeli. |
-| E-posta | `customer-account-mail.php`, `commerce-mail.php` | Tek TLS SMTP transport. Hesap e-postaları halen senkron; perakende sipariş alındı olayı kalıcı kuyrukta. Diğer olay şablonları ve hesap token kuyruğu yapılmadı. |
-| Hosting | `scripts/deploy-teknikel-web-module.sh` | Hedef Alwaysdata. Mevcut korumalı `config/account.local.php` sırları paketlenmez. Bu çalışmada uzaktaki ayarlar okunmadı/değiştirilmedi. |
-
-## Bu uygulamada doğrulanan değişiklikler
-
-- Perakende/bayi için tek `ya_commerce_quote`: sunucu yayınından fiyat, ürün ve miktar; adet/paket/kutu için tam sayı; karışık para birimlerini reddetme; tam sayı minor-unit satır hesabı ve aralık kontrolü. İlk destek TRY/EUR/USD/GBP (iki ondalık); farklı minor-unit ölçeğindeki para birimleri açık sözleşme eklenene kadar reddedilir.
-- Kabul anı fiyat teklifi mevcut `web_orders.payload_json.quote` içinde saklanır. İstemcinin fiyat alanları bu kaynağa girmez. Tekrar kabul yanıtı eski tutarı korur. `quoted_total` **ürünler toplamıdır**; teslimat bedeli veya ödenmesi gereken kesin tutar değildir.
-- Perakende sipariş/receipt/e-posta olayı aynı SQLite işleminde yazılır. Ağ üzerinden e-posta bu işlemin dışında gönderilir. Gönderim başarısızlığı siparişi silmez.
-- `commerce_mail_outbox`: benzersiz olay/alıcı kimliği, içerik çatışması kontrolü, pending/sending/sent/failed, lease, bekleme ve sekiz deneme sınırı. Hata kayıtları alıcı/mesaj/sır içermez.
-- CLI worker: `php /mutlak/modul/yolu/lib/commerce-mail-worker.php`. HTTP çağrısı 404. Kuyruk temiz kurulum şemasında ve runtime reset kapsamındadır; paketleme gerekli dosyaları doğrular.
-- SMTP kabulü, gelen kutusuna teslim kanıtı değildir. `sent` SMTP sunucusunun DATA kabulünü ifade eder. Normal olay tekrarları mükerrer gönderim üretmez. SMTP'nin kabulünden sonra bağlantı/DB kaybında mutlak tek-gönderim garantisi yoktur; sabit Message-ID bu sınırlamayı ortadan kaldırmaz. Kesin sağlayıcı idempotency'si için gelecekte sağlayıcı API adaptörü gerekir.
-- Hesap doğrulama/sıfırlama tokenları bu kuyruğa düz metin yazılmaz. Bu iletileri kuyruğa almak için süre/iptal denetimi ve sunucu anahtarıyla şifrelenmiş içerik tasarımı gereklidir.
-
-## Vitrin ürünü — yerel hazırlık (V2 kabulü değildir)
-
-- Masaüstü `commerce_product_publications`: `is_featured` ve `featured_order` alanları eklenmiştir. Bunlar satış ekranının `quick_access_enabled` alanından bağımsızdır; kategori/sipariş/fiyat bilgisini değiştirmez.
-- Ürün detayındaki **Vitrinde göster** / **Vitrin sırası** kontrolleri Ürünü Kaydet ile tek işlemde kaydedilir. Yalnız yayınlanan ve aktif ürünler siteye ulaşır.
-- Online katalog yayın sözleşmesi ve sunucu `ya_online_catalog_projection` doğrulaması işaret/sırayı korur. Aynı halka açık alanlar bayi katalog sunumunda da taşınır; perakende ve bayi fiyat ayrımı değişmez.
-- Teknikel ana sayfası işaretli ürünleri `featured_order` ile gösterir; hiç işaretli ürün yoksa mevcut ilk dört ürün gösterimi korunur. Tek ürün kartı / sepet / karşılaştırma motoru kullanılmaya devam eder.
-- DEMO Teknikel veri üretimi ilk dört küratörlü ürünü vitrin ürünü olarak işaretler. Yeni verilerle test yapılabilir; mevcut canlı veriyi değiştirmedik.
-- Ortak web şablonu `0.7.7`, BlackSea/Teknikel/Gündoğdu/demo yerel kopyaları uyumluluk için eşitlendi. **Canlı deploy, uygulama paketi üretimi ve uzak veritabanı güncellemesi yapılmadı.**
-- Masaüstü tam şema imzası korundu: eski demo SQLite dosyası yeni `schema.sql` ile uyumsuz sayılır. V2 temiz kurulum aşamasında veriler sıfırlanmalı; otomatik / gölge migration eklenmedi. Önceden paylaşılan `0.7.6` site/API kurulumlarının birlikte güncellenmesi gerekir.
-
-## Aşamaların gerçek durumu
-
-| Aşama | Durum |
+| Alan | Sahip / sözleşme |
 | --- | --- |
-| A — ortak mimari/veritabanı | Kısmi: fiyat teklifi ve mail outbox var; kesin satış, ödeme/teslimat sözleşmesi yok. |
-| B — tek sepet/mini sepet/sepet sayfası | Yapılmadı. |
-| C — hesap sunumu/ayrı checkout rotaları | Yapılmadı; mevcut hesap altyapısı regresyonla doğrulandı. |
-| D — havale/masaüstü ödeme yönetimi | Yapılmadı. |
-| E — e-posta | Kısmi: perakende sipariş alındı ve işletme bildirimi, tek transport ve worker. Banka/ödeme/kargo/iptal/iade olayları bağlı değil. Bayi sipariş bildirimi bağlı değil. |
-| F — tam kabul/temiz kurulum/deploy/Git | Tamamlanmadı. Yerel dar testler aşağıda. |
+| Fiyat ve sipariş | Hosting `online-order.php`, `dealer-order.php`, ortak `commerce-quote.php` ve `commerce-checkout.php`; Desktop `commerce-order-store.ts`. |
+| Ödeme ve teslimat | Desktop `commerce-order-payment.ts`, mevcut `commerce-order-fulfillment-service.ts`; müşteri bildirimi `commerce-order-payment.php`. |
+| Kalıcı taşıma | Mevcut `web_orders` sequence/cursor/ACK ve publication v3. Ödeme bildirimi aynı inbox'a ayrı, idempotent olay olarak girer. İkinci Teknikel sipariş DB'si, poller veya outbox yoktur. |
+| Banka/teslimat/sözleşme ayarları | `commerce_checkout_settings`; mevcut Teslimat ve Gönderim hizmetinin bağımsız draft, Kaydet/Vazgeç ve çıkış koruması. Aynı `online_catalog` durable publication'ına katılır. |
+| Durum yayını | Mevcut özel `dealer_access_private` publication'ında `web_order_statuses`. Konuk/müşteri/bayi okuması hosting'deki özgün sipariş sahipliğini doğrular; bu alan halka açık kataloğa girmez. |
+| Tarayıcı | `YaCommerce.shared()` aynı API kökü için sayfada tek controller. Ana sayfa, katalog, detay, mini sepet, cart, hesap ve checkout aynı sahip kapsamını / `YaCartDraft` kaydını kullanır. Hesaplar arasında özel taslak taşınmaz. |
+| Hesap/e-posta | Mevcut `YaAccount`, Argon2id, tek kullanımlık tokenlar ve rotasyonlu oturum. Tek TLS SMTP transport ve `commerce_mail_outbox`. |
+| Teknikel | Yalnız `canonical/site/` sunumu ve ortak şablonun `0.8.0` kopyası. Image Inspector, karşılaştırma, favoriler, vitrin ve slider korunur. |
 
-Sonraki uygulama sırası: canonical siparişe sunucuda kabul edilen fiyat/teslimat ve okunabilir benzersiz numara; ayrı ödeme ve fulfillment durumları; yetkili/auditli/idempotent ödeme işlemleri; aynı publication/ingress ile senkron; ardından ortak controller ve checkout sayfaları. Hosting verisi ayrı bir Teknikel sipariş motoruna dönüştürülmemeli.
+## Kabul edilen checkout kaydı
 
-Gelecekteki banka ayarları işletme kaydı/publication'ından gelmeli. DEMO banka numarası açıkça geçersiz olmalı. Kart sağlayıcısı hosted/tokenized ödeme sunmalı; PAN/CVV toplanmamalı. Hukuki metin sürümü ve zorunlu kabul siparişe bağlanmalı; pazarlama izni ayrı alan olmalı. Bu çalışma hukuki metin hazırlamadı veya canlı ticaret uygunluğu iddia etmedi.
+`POST api/checkout-quote.php` ve yetkili `api/dealer/checkout-quote.php`, ürün ID/miktar ve normalize teslimat için sunucu teklifi döndürür. Bayi fiyatı yalnız yetkili özel katalogdan gelir. Kamuya açık fiyat endpoint'i bayi fiyatı seçmez.
 
-## Yerel doğrulama
+`POST api/order.php` / `api/dealer/order.php` artık `paymentMethod: bank_transfer`, `quoteId`, `consent: {preliminary:true, agreement:true, marketing:boolean}` ister. Eski katalog formuna ikinci bir kabul yolu eklenmedi. Güncel fiyat/teslimat/banka/sözleşme özeti değişmişse `409 quote_changed`; yeni inceleme ve onay gerekir. Daha önce kabul edilmiş idempotency receipt, sonradan fiyat veya koşullar değişse de eski sonucu döndürür.
 
-Standart test dosyaları genişletildi; yeni test koşucusu eklenmedi:
+Hosting `payload_json.checkout` sürüm 2; para birimi, iki ondalık ölçeği, ürün adı/birim/SKU/vergi/miktar/birim fiyat/satır toplamları, `subtotal_minor`, ayrı `delivery_fee_minor`, kesin `total_minor`, teslimat yöntemi, banka talimatı, demo işareti, sözleşme metinleri/sürümü, kabul zamanı ve ayrılmış izinleri saklar. İstemci parası kullanılmaz. `quoted_total` ürün ara toplamıdır; ödeme tutarı `total_minor` alanıdır.
 
-- `node scripts/smoke-web-order-submission.mjs`: gerçek PHP/SQLite, fiyat enjeksiyonu, tam sayı miktar, yuvarlama, para birimi, fiyat değişimi sonrası tekrar, çift istek, receipt/outbox rollback, reset.
-- `php scripts/smoke-web-orders-storage.php`: mail dedupe/çatışma, hata/backoff, başarı, tekrar, lease kurtarma, kalıcı failure ve transaction rollback.
-- `node scripts/smoke-customer-accounts.mjs`: gerçek yerel TLS SMTP, kuyruk worker'ı, kayıt/doğrulama/oturum/şifre kurtarma ve yetki regresyonu.
-- `node scripts/smoke-commerce-dealer-orders.mjs`, `node scripts/smoke-commerce-online-order-ingress.mjs`, `node scripts/test-account-order-receipt.mjs`: bayi/müşteri izolasyonu ve mevcut masaüstü ingress.
-- `node scripts/smoke-web-data-service.mjs`: geçici temiz kurulumdan backend paketleri ve mevcut API sözleşmesi.
-- `node scripts/php-lint.mjs`, `git diff --check`.
+Okunabilir benzersiz numara: `YA-YYYYMMDD-XXXXXXXXXX`. SQLite benzersiz indeksi çakışmayı reddeder. Konuk yanıtındaki `order_access_token`, siparişe bağlı sunucu HMAC'idir; URL'ye veya publication'a yazılmaz. Kayıtlı müşterinin / bayinin sahipliği oturumdan çözülür.
 
-Bu liste test kapsamını tarif eder; son çalıştırma sonuçları devam kaydında tutulur. Mobil/klavye/ayrı checkout ve gerçek SMTP/DNS doğrulanmış değildir. Ortak sunum şablonu değiştirilmediği için Teknikel/Gündoğdu/Blacksea kopyalarına aktarım yapılmadı.
+Desktop, yetkili hosting snapshot'ının satır/miktar/tutar hesabını doğrular ve **yeniden fiyatlandırmaz**. Ürün fiyatı/aktifliği değişse bile kabul edilmiş tutar ve talimat korunur. Tekrarlanan ingress mevcut siparişi döndürür; sonradan bayi izni kalkması daha önce içe alınmış ödenmiş siparişi ikinci bir ret kaydına çeviremez. Yeni bayi taleplerinde ticari yetki yeniden doğrulanır.
+
+Desktop şeması `commerce_orders` üzerinde `order_number`, `checkout_snapshot_json`, `delivery_fee`, `payment_status`, `delivery_status`; ayrıca `commerce_order_events` içerir. Satışa dönüşümde `commerce_sales.delivery_fee` ayrıdır. Kabul veya müşteri bildirimi satış/tahsilat oluşturmaz; mevcut fulfillment sahibi, doğrulanmış havaleyi bir defa satışa dönüştürür. Sipariş/ödeme/teslimat durumları ayrıdır.
+
+## Akış ve güvenlik
+
+- Rotalar: `cart`, `checkout-customer`, `checkout-delivery`, `checkout-payment`, `checkout-review`, `checkout-result`. `?page=...` mevcut router ile kullanılır. `/sepet/` cart'a gider. Bu rotalar nav/sitemap'e eklenmez, noindex'tir.
+- Konuk checkout SMTP veya hesap URL ayarı olmadan çalışır. Teslimat seçenekleri yayından gelir; kargo bedeli `null` ise shipping checkout kapanır. Pickup bedeli açıkça sıfırdır. TRY/EUR/USD/GBP ve pozitif havale toplamı desteklenir; sıfır tutarlı checkout henüz ayrı bir ödeme sözleşmesine sahip değildir.
+- Ana sayfa ayrı Sepetim bloğu ve katalog sağ formu kaldırıldı. Üst menü dialog'u masaüstünde kompakt panel, mobilde alt drawer; ayrı cart miktar/silme/boş/satıştan kalkmış ürün durumlarını gösterir. Eski yerel fiyat sipariş parası değildir.
+- Review gerekli iki kabul ile isteğe bağlı pazarlama iznini ayırır. DEMO metinler ticari kullanıma hazır olarak sunulmaz. DEMO IBAN'ı geçersiz olmalıdır; gerçek modda IBAN biçim ve mod-97 doğrulaması vardır.
+- `POST api/order-payment.php`, JSON/custom header ve sahiplik doğrulamasıyla `read` / `report` sunar. Konuk bearer siparişe bağlıdır. Müşteri/bayi için oturum gerekir. Bildirim `verification_pending` olur; `paid` yalnız yetkili Desktop owner işlemiyle verilir. Retten sonra yeni bildirim bir sonraki inceleme turuna bağlanır; aynı turdaki tekrar ikinci olay yaratmaz.
+- Desktop mevcut Siparişler alanında numara araması, banka durumu, yetkili onay/ret, hazırlama, iptal öncesi/sonrası ödeme durumu ve olay geçmişi vardır. Onaylar trusted renderer + açık uygulama + owner yetkisi + persisted capability + güncel kayıt koşulunu doğrular. İşlem kimliği aynı niyetle tekrarlandığında olay çoğalmaz. Ret/iade açıklaması zorunludur.
+- Mevcut sipariş onayı, ödeme onayından ayrıdır. V2 fulfillment, doğrulanmış banka ödemesi olmadan çalışmaz. Var olan İndirim/Puan motoru sabit web tutarına yeni indirim ekleyemez.
+- Kart seçeneği Yakında/pasiftir; PAN/CVV toplanmaz. Duyuru afişlerinin indirim/taksit/Puan/ücretsiz kargo vaatleri etkin kural değildir; Teknikel bunu DEMO olarak açıklar.
+- Hesap kayıt/doğrulama/reset güvenliği korunur. SMTP veya token şifreleme anahtarı eksikse `passwordRegistration:false`; misafir checkout açık kalabilir. Yeni doğrulanmış hesaplar mevcut customer-account ingress ile bağlanır. Aynı e-postalı mevcut müşteri çatışmasında otomatik yetki devri yapılmaz: Customer Workspace'teki açık eşleştirme gerekir. Böyle bir kaydın Desktop sipariş intake'ı bağlama kadar bekleyebilir.
+- Hesap sayfasındaki Ürünlere göz at düğmesi kaldırıldı; kendi siparişindeki banka talimatı ve havale bildirimi gösterilir. Oturum yenileme/çıkış/diğer hesapların fiyatlarına erişim mevcut sınırlarla korunur.
+
+## E-posta
+
+Hesap doğrulama/reset dahil tüm iletiler aynı kalıcı outbox/worker'dadır. Token içeren gövde AES-256-GCM ile, SQLite dışında tutulan `YA_ACCOUNT_MAIL_ENCRYPTION_KEY` kullanılarak şifrelenir. Worker tokenın süre/tek kullanım/değiştirilme koşulunu, hesap sürümünü ve hesap kapısını gönderimden hemen önce denetler; geçersiz iletiler `cancelled` olur. Düz token/URL kuyrukta veya logda saklanmaz.
+
+Sipariş alındı ve banka talimatı birlikte gönderilir; ödeme bildirimi, onay/ret, hazırlama, sipariş onayı/iptali, teslim ve kaydedilen banka iadesi olayları aynı kuyruğa bağlanır. İşletme alıcısı isteğe bağlı `YA_COMMERCE_NOTIFICATION_EMAIL` ayarıdır. Ağ üzerinden SMTP domain işleminin dışındadır; SMTP hatası kabul edilmiş siparişi silmez.
+
+Pending/sending/sent/failed/cancelled, lease, geri çekilme ve sekiz deneme sınırı vardır. SMTP DATA kabulünden sonraki bağlantı/DB kaybında mutlak tek gönderim garantisi yoktur; sabit Message-ID bunu çözmez. Ayrıntı: [SMTP_SETUP.md](SMTP_SETUP.md).
+
+## Aşamalar ve açık işler
+
+| Aşama | Gerçek durum |
+| --- | --- |
+| A | Kabul anı tutar/banka/sözleşme, bağımsız durumlar ve yayın/ingress uygulandı; gerçek PHP/SQLite testleri var. Restore snapshot alanları genişletildi; V2 restore uçtan uca kabulü ayrıca tamamlanmalı. |
+| B | Tek controller, mini sepet ve ayrı cart uygulandı; gerçek browser/API ve 46 Teknikel regresyonu geçti. |
+| C | Ayrı checkout rotaları ve mevcut güvenli hesap akışı bağlandı. Kayıtlı müşteri API/SQLite + hesap SMTP regresyonu geçti. Kayıtlı müşteri ve bayi için bütün checkout'un yeni sayfalarda browser kabulü henüz tamamlanmadı; Hesabım son tasarım incelemesi de açık. |
+| D | Müşteri bildirimi, mevcut Desktop yönetimi ve durum yayını uygulandı. Yetki/idempotency/onay/hazırlama/teslim servis zinciri test edildi. Yeni Desktop ödeme kontrollerinin Electron UI E2E'si; teslim sonrası iadenin stok/finans/ödeme ile tek işlemde tamamlanması **açık**. Yalnız iptal edilmiş, henüz fulfillment yapılmamış havalenin işletmede yapılmış iadesini kaydetme mevcut. |
+| E | Şifreli token kuyruğu, SMTP transport, sipariş ve durum olayları bağlı; süre/iptal/lease/retry testleri var. Gerçek gönderen/DNS/cron ve dış alıcı doğrulaması yapılmadı. |
+| F | Teknikel 46 görsel/etkileşim regresyonu, 390/768/1440 gerçek konuk checkout'u ve Settings platform regresyonu geçti. Tüm 20 kabul senaryosunun eksiksiz Desktop/Electron/browser matrisi henüz bitmedi. |
+| G | Geçici temiz SQLite ve backend arşiv sözleşmesi test edildi. Mevcut çalışma/canlı DB silinmedi. Diğer şablon kopyalarının güncellenmesi, son temiz kurulum/restore kabulü ve uygulama release paketleri henüz hazırlanmadı. |
+
+Bu kontrol noktası **V2 tamamlandı değildir**. Sonraki bounded slice: önce teslim sonrası iade sahibini mevcut stok/finans işlemiyle tamamla; ardından yeni Desktop ödeme/ayar UI'si, kayıtlı müşteri/bayi browser checkout ve V2 restore kabulünü bitir. Bunlar geçmeden installer / koordineli yayın kabulü verilmemeli.
+
+## Kurulum ve koordineli yayın hazırlığı
+
+- Desktop mevcut schema imzası değişmiştir; proje demo DB'si için açık temiz kurulum/reseed gerekir. Var olan backup/restore/legacy-data korumaları kaldırılmadı. Bu oturumda yalnız geçici test DB'leri kuruldu/silindi.
+- Hosting eski `commerce_mail_outbox` tablosunda `message_kind` yoksa `commerce_v2_schema_reset_required` ile kapanır. Otomatik ALTER/backfill veya veri silme yoktur. Gerçek sunucudaki reset/reseed, korunan `account.local.php` sırları ve publication source kurulumu birlikte planlanmalıdır.
+- Desktop yeni hosting `commerce_checkout_v2` / `commerce_payment_events_v1` yeteneklerini bekler. API/site/Desktop farklı sürümlerde kalıcı olarak kullanılmamalıdır.
+- Ortak şablon kaynağı ve Teknikel yerel canonical kopyası `0.8.0` adayıdır. Bayi Android uygulamasının `dealer/order` isteği de yeni quote/consent sözleşmesine geçirilmeden APK/API birlikte yayımlanmamalıdır; bu istemci bu oturumda güncellenmedi. BlackSea, Gündoğdu ve demo kopyaları bu oturumda yükseltilmedi; onların publication/checkout tüketicileri de güncellenmelidir.
+- Kalan kabul → diğer yerel şablon tüketicileri → temiz demo kurulum/restore → uygulama ve API/site paketlerinin preflight'ı → kullanıcının kabulü → açık onayla koordineli Desktop/API/Teknikel yayın sırası. Şu anda push veya canlı deploy yetkisi yoktur.
+
+Test komutları ve gerçek son kanıtlar devam kaydında ve ilgili smoke dosyalarında tutulur. `verify:pre-main`, `verify:release`, `verify:full` bu oturumda çalıştırılmadı.

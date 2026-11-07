@@ -27,7 +27,7 @@ export function useMarketOrdersSession({ enabled, benefitsEnabled = false, onSta
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fulfillmentPayment, setFulfillmentPaymentState] = useState<FulfillmentPaymentChoice>("cash");
-  const benefits = useMarketOrderBenefits({ enabled: enabled && benefitsEnabled, detail: selectedOrder, payment: fulfillmentPayment });
+  const benefits = useMarketOrderBenefits({ enabled: enabled && benefitsEnabled && !selectedOrder?.order.checkoutSnapshot, detail: selectedOrder, payment: fulfillmentPayment });
   const pendingBenefits = benefits.pending;
   const setFulfillmentPayment = useCallback((value: FulfillmentPaymentChoice) => {
     if (!pendingBenefits.current && !mutationInFlight.current) setFulfillmentPaymentState(value);

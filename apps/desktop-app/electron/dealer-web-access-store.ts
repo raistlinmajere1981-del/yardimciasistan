@@ -1,3 +1,4 @@
+import { createWebOrderStatuses } from "./commerce-order-payment";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, type DealerAccessAction, type DealerAccessProjection, type DealerAccessResult, type DealerWebAccess } from "@yardimci-asistan/shared";
 import { desktopLog } from "./desktop-logger";
@@ -51,6 +52,6 @@ export function createDealerAccessProjection(db: DatabaseSync): DealerAccessProj
       display_name: Array.from(String(row.company_name ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")).slice(0, 160).join(""),
       access_revision: Number(row.access_revision), session_revision: Number(row.session_revision), enabled: enabled && row.dealer_status === "active" && row.deleted_at === ""
     })) };
-    return { ...projection, catalogs: createDealerCatalogs(db, projection), order_history: createDealerOrderHistory(db, projection) };
+    return { ...projection, web_order_statuses: createWebOrderStatuses(db), catalogs: createDealerCatalogs(db, projection), order_history: createDealerOrderHistory(db, projection) };
   } finally { db.exec("RELEASE dealer_access_projection"); }
 }

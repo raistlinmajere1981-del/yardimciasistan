@@ -24,7 +24,7 @@ function ya_dealer_order_submit(string $token, array $input): array
     if (!is_string($key) || preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $key) !== 1) ya_online_order_invalid();
     $semantic = ['items' => ya_online_order_items($input['items'] ?? null),
         'delivery' => ya_online_order_delivery($input['delivery'] ?? null),
-        'note' => ya_online_order_text($input['note'] ?? '', 2000, true)];
+        'note' => ya_online_order_text($input['note'] ?? '', 2000, true), ...ya_commerce_checkout_acceptance($input)];
     $db = ya_storage_open();
     $db->exec('BEGIN IMMEDIATE');
     try {
@@ -48,13 +48,20 @@ function ya_dealer_order_submit(string $token, array $input): array
         foreach ($semantic['items'] as $item) if (!isset($ids[$item['productId']])) {
             throw new YaOnlineOrderRejection(422, 'product_unavailable', 'Siparişteki ürünlerden biri artık sunulmuyor.');
         }
-        $quote = ya_commerce_quote($semantic['items'], $catalog['products']);
+        $public=ya_online_catalog_projection(ya_storage_get_publication('online_catalog',[]));
+        $quote = ya_commerce_checkout_quote($semantic['items'],$semantic['delivery'],[...$public,'enabled'=>true,'products'=>$catalog['products'],'delivery_methods'=>$catalog['delivery_methods']]);
+        if(!hash_equals($quote['quote_id'],$semantic['quoteId']))throw new YaOnlineOrderRejection(409,'quote_changed','Fiyat veya satış koşulları değişti. Sipariş özetini yeniden onaylayın.');
         $now = date(DATE_ATOM); $id = 'web_dealer_order_' . bin2hex(random_bytes(16));
         $hint = $input['catalogRevision'] ?? $catalog['catalog_revision'];
         if (!is_string($hint) || preg_match('/^[a-f0-9]{64}$/D', $hint) !== 1) ya_online_order_invalid();
-        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'quote' => $quote, 'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'message' => 'Sipariş talebiniz alındı.'];
+        $number='YA-'.gmdate('Ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
+        $checkout=[...$quote,'order_number'=>$number,'accepted_at'=>$now,'consent'=>$semantic['consent']];
+        $account=ya_account_session($token);
+        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'quote' => $quote, 'checkout'=>$checkout,
+            'notificationEmail'=>$account['email'],'createdAt' => $now]);
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'order_number'=>$number,'total_minor'=>$checkout['total_minor'],'delivery_fee_minor'=>$checkout['delivery_fee_minor'],'payment_status'=>'unpaid','delivery_status'=>'unfulfilled','checkout'=>$checkout,'message' => 'Siparişiniz alındı. Ödeme bekleniyor.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $fingerprint, $response);
+        ya_commerce_mail_order($db,$id,['buyer'=>['email'=>$account['email']]],$checkout);
         $db->exec('COMMIT');
         return $response;
     } catch (Throwable $error) { $db->exec('ROLLBACK'); throw $error; }
@@ -98,10 +105,15 @@ function ya_customer_order_history(array $access): array
     $query->execute([$access['access_id'], $access['account_id'] ?? '']);
     foreach ($query as $row) {
         $input = json_decode($row['payload_json'], true, 512, JSON_THROW_ON_ERROR);
-        if (isset($orders[$input['id']])) continue;
-        $orders[$input['id']] = ['order_id' => $input['id'], 'status' => 'awaiting_desktop',
+        $existing = $orders[$input['id']] ?? null;
+        $orders[$input['id']] = $existing ?? ['order_id' => $input['id'], 'status' => 'awaiting_desktop',
             'created_at' => $input['createdAt'], 'updated_at' => $input['createdAt'], 'total' => null, 'currency' => '',
             'items' => array_map(static fn(array $item): array => ['product_id' => $item['productId'], 'quantity' => $item['quantity'], 'name' => ''], $input['items'])];
+        if (isset($input['checkout'])) {
+            $state = ya_commerce_order_state($input);
+            $orders[$input['id']] = [...$orders[$input['id']], ...$state, 'total' => $input['checkout']['total_minor'] / 100, 'currency' => $input['checkout']['currency'],
+                'items' => array_map(static fn(array $line): array => ['product_id' => $line['product_id'], 'quantity' => $line['quantity'], 'name' => $line['name']], $input['checkout']['items'])];
+        }
     }
     $orders = array_values($orders);
     usort($orders, static fn(array $a, array $b): int => strcmp($b['created_at'], $a['created_at']) ?: strcmp($b['order_id'], $a['order_id']));
