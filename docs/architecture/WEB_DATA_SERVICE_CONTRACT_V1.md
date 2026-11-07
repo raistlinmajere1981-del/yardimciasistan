@@ -38,6 +38,14 @@ public profile ve galeri yayın sahibine ikinci veri yazma yolu eklenmez.
   zorunlu client idempotency_key, aynı niyette aynı sonuç ve değişen niyette 409.
 - `POST api/order.php`: mevcut buyer/items/delivery alanları ve idempotent kabul sonucu.
   Güncel yöntem/fiyat/stok doğrulamasının canonical sahibi değişmez.
+  Hosting kabul yanıtı `quoted_total` ve `currency` ile kabul anındaki ürünler toplamını
+  verir; teslimat bedeli veya kesin ödeme tutarı değildir. Ortak `commerce-quote.php`
+  perakende ve bayi için yetkili yayından minor-unit satır hesabı yapar; kesirli adet,
+  karışık/henüz desteklenmeyen para birimi ve güvensiz tutarı reddeder. Snapshot mevcut
+  `web_orders.payload_json.quote` içinde korunur. Perakende sipariş alındı e-postası
+  aynı transaction'da `commerce_mail_outbox` içine eklenir, SMTP CLI worker'ında çalışır.
+  Kesin V2 satış/ödeme sözleşmesi henüz tamamlanmamıştır; ayrıntılar
+  [envanterde](../commerce/ECOMMERCE_V2.md).
 - `POST api/chat.php`, `api/audio-transcribe.php`: mevcut AI/voice sözleşmesi,
   güvenli fallback/error ve public abuse guard. Ham sağlayıcı cevabı/anahtar açılmaz.
   Site `chat.php` isteğine isteğe bağlı `response_language: 'en'` eklediğinde

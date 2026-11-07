@@ -31,6 +31,11 @@ try {
   const profile=(await call('account/session',undefined,web)).body.account;assert.equal(profile.email,'new@example.test');assert.equal(profile.dealer,null);
   const stored=storage('echo json_encode($db->query("SELECT password_hash FROM customer_accounts LIMIT 1")->fetchColumn());');assert.match(stored,/^\$argon2id\$/);assert.equal(stored.includes(accountPassword),false);
   stage('real local TLS SMTP, registration, mailbox proof, password hashing and independent web/Android sessions');
+  storage(`require dirname($argv[1]) . '/commerce-mail.php'; ya_commerce_mail_enqueue($db, 'tls-order-event', 'new@example.test', 'Order fixture', 'Durable order fixture');`);
+  assert.equal((await f.runCommerceMail()).sent, 1);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.ok(f.emails.at(-1).includes('Durable order fixture'), 'durable commerce mail uses the same verified TLS SMTP transport as account mail');
+  stage('durable commerce outbox delivered through real local TLS SMTP');
 
   const ingress=new WebSyncIngress({database},()=>'',()=>{});
   let pulled=await ingress.pullCustomerAccountPages(transport);assert.equal(pulled.error,'');assert.equal(pulled.count,1);

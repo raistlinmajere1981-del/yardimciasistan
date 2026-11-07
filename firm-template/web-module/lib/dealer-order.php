@@ -48,19 +48,12 @@ function ya_dealer_order_submit(string $token, array $input): array
         foreach ($semantic['items'] as $item) if (!isset($ids[$item['productId']])) {
             throw new YaOnlineOrderRejection(422, 'product_unavailable', 'Siparişteki ürünlerden biri artık sunulmuyor.');
         }
-        // The private Desktop projection is the only quote source; client money is ignored.
-        $products = array_column($catalog['products'], null, 'product_id'); $total = 0; $currency = null;
-        foreach ($semantic['items'] as $item) {
-            $product = $products[$item['productId']];
-            if ($currency !== null && $currency !== $product['currency']) ya_online_order_invalid();
-            $currency = $product['currency'];
-            $total += round($product['price'] * $item['quantity'], 2);
-        }
+        $quote = ya_commerce_quote($semantic['items'], $catalog['products']);
         $now = date(DATE_ATOM); $id = 'web_dealer_order_' . bin2hex(random_bytes(16));
         $hint = $input['catalogRevision'] ?? $catalog['catalog_revision'];
         if (!is_string($hint) || preg_match('/^[a-f0-9]{64}$/D', $hint) !== 1) ya_online_order_invalid();
-        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => round($total, 2), 'currency' => $currency, 'message' => 'Sipariş talebiniz alındı.'];
+        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'catalogRevision' => $hint, 'quote' => $quote, 'createdAt' => $now]);
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'message' => 'Sipariş talebiniz alındı.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $fingerprint, $response);
         $db->exec('COMMIT');
         return $response;

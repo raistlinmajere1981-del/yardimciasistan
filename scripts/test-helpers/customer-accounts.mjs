@@ -62,9 +62,22 @@ export async function accountFixture({smtp = true, siteSource, providers = false
   const transport=new PhpHostingSyncTransport({baseUrl,syncSecret:secret,clientId:database.getSyncRuntimeStatus().clientId,sourceEpoch:1});
   const publish=async(expectSuccess=true)=>{const value=database.createDealerAccessProjection();const result=await publishDesktopProjection(database,{baseUrl,syncSecret:secret},'dealer_access_publish',value,(identity,value)=>transport.publishDealerAccess({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}));if(expectSuccess)assert.equal(result?.ok,true,result?.message);return result;};
   function storage(code,args=[]){const result=spawnSync('php',['-r',`require $argv[1]; $_SERVER['SCRIPT_NAME']='/yardimci-asistan/api/account/callback.php'; $db=ya_storage_open(); ${code}`,join(hosting,'lib/customer-account-oauth.php'),...args],{encoding:'utf8',env:{...env,YA_ACCOUNT_SITE_URL:'https://fixture.example/hesabim/',YA_ACCOUNT_MODULE_URL:'https://fixture.example/yardimci-asistan/'}});assert.equal(result.status,0,result.stderr);return result.stdout?JSON.parse(result.stdout):null;}
+  function runCommerceMail() {
+    return new Promise((resolve, reject) => {
+      const worker = spawn('php', [join(hosting, 'lib/commerce-mail-worker.php')], {env, stdio:['ignore','pipe','pipe']});
+      let output = '', errors = '';
+      worker.stdout.on('data', chunk => { output += chunk; });
+      worker.stderr.on('data', chunk => { errors += chunk; });
+      worker.once('error', reject);
+      worker.once('close', code => {
+        if (code !== 0) { reject(new Error(errors || 'mail worker failed')); return; }
+        try { resolve(JSON.parse(output)); } catch (error) { reject(error); }
+      });
+    });
+  }
   async function call(endpoint,body,cookie='',headers={}){const response=await fetch(`${baseUrl}/api/${endpoint}.php`,{method:body===undefined?'GET':'POST',headers:{Accept:'application/json',...(cookie?{Cookie:cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json','X-YA-Account':'1','X-YA-Dealer':'1'}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});let value;const text=await response.text();try{value=JSON.parse(text);}catch{value=text;}return {status:response.status,body:value,cookie:response.headers.getSetCookie().map(x=>x.split(';')[0]).filter(x=>/ya_account_(session|refresh)=/.test(x)).sort().reverse().join('; '),headers:response.headers};}
   const login=async(email,client='web')=>{const result=await call('account/login',{email,password:accountPassword},'',{'X-YA-Client':client});assert.equal(result.status,200,JSON.stringify(result.body));assert.match(result.cookie,/ya_account_session=/);return result.cookie;};
   async function register(email,name='Account Fixture'){const result=await call('account/register',{email,fullName:name});assert.equal(result.status,200,JSON.stringify(result.body));const token=new URL(emails.at(-1).match(/https?:\/\/[^\s]+/)[0]).hash.slice(7);assert.equal((await call('account/verify',{token,password:accountPassword})).status,200);return storage('echo json_encode($db->query("SELECT id FROM customer_accounts WHERE email = " . $db->quote($argv[2]))->fetchColumn());',[email]);}
-  return {root,hosting,siteUrl,baseUrl,secret,database,transport,storage,call,login,register,publish,emails,logs:()=>logs,
+  return {root,hosting,siteUrl,baseUrl,secret,database,transport,storage,runCommerceMail,call,login,register,publish,emails,logs:()=>logs,
     async cleanup(){try{process.kill(-server.pid,'SIGTERM');}catch{}if(smtpServer)await new Promise(resolve=>smtpServer.close(resolve));desktop.cleanup();rmSync(root,{recursive:true,force:true});}};
 }

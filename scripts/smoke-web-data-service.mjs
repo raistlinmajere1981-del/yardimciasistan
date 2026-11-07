@@ -31,6 +31,7 @@ try {
   assert.ok(paths.includes("api/whatsapp-webhook.php"));
   assert.ok(paths.includes("api/business-gallery-media.php"));
   assert.ok(paths.includes(".user.ini"), "Document upload limits must ship with the API service");
+  for (const name of ["commerce-quote", "commerce-mail", "commerce-mail-worker"]) assert.ok(paths.includes(`lib/${name}.php`));
   assert.ok(paths.includes("lib/request-documents.php"), "Document handling must ship with the request endpoint");
   assert.equal(readFileSync(join(hosting, ".user.ini"), "utf8"), readFileSync(join(source, ".user.ini"), "utf8"));
   assert.ok(paths.every(path => !/\.(?:js|css|html|png|webp|tsx?)$/.test(path)));
@@ -107,6 +108,7 @@ try {
   await publish({ action: "publish_menu", menu: { enabled: false, categories: [], items: [] } });
   assert.equal((await fetch(`${base}/api/menu.php`)).status, 404);
   assert.equal((await fetch(`${base}/api/order.php`)).status, 405);
+  assert.equal((await fetch(`${base}/lib/commerce-mail-worker.php`)).status, 404, "mail worker cannot be invoked over HTTP");
   assert.equal((await fetch(`${base}/api/dealer/session.php`)).status, 403);
   console.log("web-data-service-smoke-ok: backend archives, presentation rejection, public profile/gallery, visibility, ETag and auth");
 } finally {

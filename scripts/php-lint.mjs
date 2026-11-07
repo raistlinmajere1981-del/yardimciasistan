@@ -44,6 +44,7 @@ const phpFiles = [
   "firm-template/web-module/lib/audio-transcription.php",
   "firm-template/web-module/lib/storage.php",
   "firm-template/web-module/lib/online-order.php",
+  ...["commerce-quote", "commerce-mail", "commerce-mail-worker"].map(name => `firm-template/web-module/lib/${name}.php`),
   "firm-template/web-module/lib/online-catalog.php",
   "firm-template/web-module/lib/public-request-guard.php",
   "firm-template/web-module/lib/public-request-submission.php",

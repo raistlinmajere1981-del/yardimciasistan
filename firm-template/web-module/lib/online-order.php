@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/storage.php';
 require_once __DIR__ . '/online-catalog.php';
+require_once __DIR__ . '/commerce-quote.php';
+require_once __DIR__ . '/commerce-mail.php';
 
 final class YaOnlineOrderRejection extends RuntimeException
 {
@@ -134,11 +136,13 @@ function ya_online_order_submit(array $input, ?array $account = null): array
                 throw new YaOnlineOrderRejection(422, 'product_not_published', 'Siparişteki ürünlerden biri web satışında yayınlanmıyor.');
             }
         }
+        $quote = ya_commerce_quote($request['items'], $catalog['products']);
         $now = date(DATE_ATOM);
         $id = 'web_order_' . bin2hex(random_bytes(16));
-        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'createdAt' => $now]);
-        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'message' => 'Sipariş talebiniz alındı.'];
+        ya_storage_enqueue_web_order(['id' => $id, ...$request, 'quote' => $quote, 'createdAt' => $now]);
+        $response = ['ok' => true, 'order_id' => $id, 'accepted_at' => $now, 'quoted_total' => $quote['subtotal_minor'] / 100, 'currency' => $quote['currency'], 'message' => 'Sipariş talebiniz alındı.'];
         ya_storage_insert_web_order_submission_receipt($keyHash, $requestHash, $response);
+        ya_commerce_mail_order($database, $id, $request, $quote);
         $database->exec('COMMIT');
         return $response;
     } catch (Throwable $error) {

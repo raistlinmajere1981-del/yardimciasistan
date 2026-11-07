@@ -94,6 +94,7 @@ function ya_storage_reset_runtime(): array
         'dealer_catalogs',
         'dealer_access',
         'web_requests',
+        'commerce_mail_outbox',
         'web_orders',
         'web_order_submission_receipts',
         'web_request_submission_receipts',
@@ -275,6 +276,8 @@ function ya_storage_enqueue_web_order(array $order): array
     }
     $payload = ['id' => $id, 'items' => $items, ...$identity, 'delivery' => $delivery, 'createdAt' => $createdAt];
     if (isset($order['note'])) $payload['note'] = $order['note'];
+    // Only server submission owners pass this immutable, authorized price snapshot.
+    if (isset($order['quote'])) $payload['quote'] = $order['quote'];
     $database = ya_storage_open();
     $statement = $database->prepare(<<<'SQL'
         INSERT INTO web_orders (id, payload_json, created_at)
@@ -896,6 +899,16 @@ function ya_storage_create_schema(PDO $database): void
           response_json TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS commerce_mail_outbox (
+          id TEXT PRIMARY KEY, content_hash TEXT NOT NULL,
+          recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','failed')),
+          attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL,
+          lease_token TEXT NOT NULL DEFAULT '', lease_until INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, sent_at INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS commerce_mail_due ON commerce_mail_outbox(status, next_attempt_at, lease_until);
 
         CREATE TABLE IF NOT EXISTS web_orders (
           seq INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -4,7 +4,8 @@ declare(strict_types=1);
 $root = sys_get_temp_dir() . '/ya-web-orders-' . bin2hex(random_bytes(8));
 mkdir($root . '/lib', 0700, true);
 copy(__DIR__ . '/../firm-template/web-module/lib/storage.php', $root . '/lib/storage.php');
-require $root . '/lib/storage.php';
+copy(__DIR__ . '/../firm-template/web-module/lib/commerce-mail.php', $root . '/lib/commerce-mail.php');
+require $root . '/lib/commerce-mail.php';
 function expect(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
 }
@@ -68,10 +69,41 @@ try {
     expect($deleted['web_orders'] === 4 && $deleted['sync_clients'] === 2, 'reset clears orders and clients');
     expect(ya_storage_pull_web_orders(200, 0)['orders'] === [], 'reset queue empty');
     expect(ya_storage_enqueue_web_order($order)['syncSeq'] === 1, 'reset sequence');
+    ya_commerce_mail_enqueue($db, 'event-1', 'guest@example.test', 'Subject', 'Body');
+    ya_commerce_mail_enqueue($db, 'event-1', 'guest@example.test', 'Subject', 'Body');
+    expect((int)$db->query('SELECT COUNT(*) FROM commerce_mail_outbox')->fetchColumn() === 1, 'mail event replay dedupes');
+    $conflict = false;
+    try { ya_commerce_mail_enqueue($db, 'event-1', 'guest@example.test', 'Subject', 'Changed'); }
+    catch (RuntimeException) { $conflict = true; }
+    expect($conflict, 'changed event content conflicts');
+    $failed = ya_commerce_mail_run($db, static function () { throw new RuntimeException('SECRET SMTP FAILURE'); });
+    expect($failed === ['sent' => 0, 'retry' => 1, 'failed' => 0], 'failed transport remains retryable');
+    $row = $db->query('SELECT * FROM commerce_mail_outbox')->fetch();
+    expect($row['status'] === 'pending' && $row['last_error'] === 'transport_failed' && $row['next_attempt_at'] > time(), 'safe failure and backoff stored');
+    expect(ya_commerce_mail_run($db, static function () { throw new RuntimeException('too early'); }) === ['sent' => 0, 'retry' => 0, 'failed' => 0], 'backoff respected');
+    $db->exec('UPDATE commerce_mail_outbox SET next_attempt_at = 0');
+    $sent = [];
+    $deliver = static function (...$args) use (&$sent): void { $sent[] = $args; };
+    expect(ya_commerce_mail_run($db, $deliver)['sent'] === 1, 'retry delivered');
+    expect(count($sent) === 1 && preg_match('/^<[a-f0-9]{64}@yardimci.invalid>$/', $sent[0][3]) === 1, 'stable message identifier');
+    expect(ya_commerce_mail_run($db, $deliver)['sent'] === 0 && count($sent) === 1, 'sent events never resent by normal replay');
+    ya_commerce_mail_enqueue($db, 'event-2', 'guest@example.test', 'Subject', 'Body');
+    $db->exec("UPDATE commerce_mail_outbox SET status = 'sending', lease_token = 'active', lease_until = " . (time() + 600) . " WHERE status = 'pending'");
+    expect(ya_commerce_mail_run($db, $deliver)['sent'] === 0, 'active worker lease excludes concurrent claim');
+    $db->exec("UPDATE commerce_mail_outbox SET lease_until = 1 WHERE status = 'sending'");
+    expect(ya_commerce_mail_run($db, $deliver)['sent'] === 1, 'crashed worker lease recovered');
+    ya_commerce_mail_enqueue($db, 'event-3', 'guest@example.test', 'Subject', 'Body');
+    $db->exec("UPDATE commerce_mail_outbox SET attempts = 7 WHERE status = 'pending'");
+    expect(ya_commerce_mail_run($db, static function () { throw new RuntimeException('failure'); })['failed'] === 1, 'retry limit produces explicit failed state');
+    $db->exec('BEGIN IMMEDIATE');
+    ya_commerce_mail_enqueue($db, 'event-rollback', 'guest@example.test', 'Subject', 'Body');
+    $db->exec('ROLLBACK');
+    expect((int)$db->query('SELECT COUNT(*) FROM commerce_mail_outbox')->fetchColumn() === 3, 'domain rollback also rolls back mail event');
     echo "web-orders-storage-smoke-ok\n";
 } finally {
     foreach (glob($root . '/data/*') ?: [] as $file) unlink($file);
     unlink($root . '/lib/storage.php');
+    unlink($root . '/lib/commerce-mail.php');
     rmdir($root . '/data');
     rmdir($root . '/lib');
     rmdir($root);

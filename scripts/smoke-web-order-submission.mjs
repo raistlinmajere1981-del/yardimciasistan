@@ -99,11 +99,14 @@ try {
   // Cumulative quantity is bounded even with individually valid rows.
   assert.equal((await submit({ ...input, items: Array.from({ length: 11 }, (_, index) => ({ productId: `p${index}`, quantity: 1000 })) })).status, 422);
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 0);
+  assert.equal((await submit({ ...input, items: [{ productId: "published-product", quantity: 0.5 }] })).payload.code, "invalid_quantity");
   const injected = { ...input, customerId: "fake-customer", discountTotal: 999, price: 0.01, stock: 99, fulfillment: "done",
     items: [{ ...input.items[0], unitPrice: 0.01, taxRate: 0 }], buyer: { ...buyer, customerId: "fake-customer" } };
   const accepted = await submit(injected);
   assert.equal(accepted.status, 201);
-  assert.deepEqual(Object.keys(accepted.payload).sort(), ["ok", "order_id", "accepted_at", "message"].sort());
+  assert.deepEqual(Object.keys(accepted.payload).sort(), ["ok", "order_id", "accepted_at", "quoted_total", "currency", "message"].sort());
+  assert.equal(accepted.payload.quoted_total, 50);
+  assert.equal(accepted.payload.currency, "TRY");
   assert.match(accepted.payload.order_id, /^web_order_[a-f0-9]{32}$/);
   assert.deepEqual((await submit(input)).payload, accepted.payload, "price/private injection does not affect semantic identity");
   const concurrent = await Promise.all(Array.from({ length: 3 }, () => submit(input, { clear: false })));
@@ -117,6 +120,8 @@ try {
   assert.deepEqual(pulled.orders[0].delivery, { method: "pickup", address: null });
   assert.equal(pulled.orders[0].note, input.note);
   assert.deepEqual(pulled.orders[0].items, input.items);
+  assert.equal(pulled.orders[0].quote.subtotal_minor, 5000);
+  assert.equal(pulled.orders[0].quote.items[0].unit_price_minor, 2500);
   assert.equal(JSON.stringify(pulled.orders[0]).includes("fake-customer"), false);
   const receipt = storage("echo json_encode($db->query('SELECT * FROM web_order_submission_receipts')->fetch());");
   const receiptText = JSON.stringify(receipt);
@@ -142,10 +147,11 @@ try {
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 1);
   storage("$db->exec('DROP TRIGGER reject_receipt');");
   assert.equal((await submit(newInput)).status, 201);
-  await publish(true, [{ ...publishedProduct, product_id: "second-product", name: "Second published product" }]);
+  await publish(true, [{ ...publishedProduct, product_id: "second-product", unit: "kg", name: "Second published product" }]);
   const multiItem = { ...input, idempotencyKey: "guest-order-key-multi", items: [...input.items, { productId: "second-product", quantity: 0.125 }] };
   const multiAccepted = await submit(multiItem);
   assert.equal(multiAccepted.status, 201);
+  assert.equal(multiAccepted.payload.quoted_total, 53.13, "fractional weight rounds half-up to minor units");
   assert.deepEqual((await submit({ ...multiItem, items: [...multiItem.items].reverse(), note: ` ${input.note} ` })).payload,
     multiAccepted.payload, "normalized row order and trimmed fields preserve semantic identity");
   const address = { recipientName: "Delivery Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "gb", note: "Ring bell" };
@@ -175,6 +181,27 @@ try {
   assert.equal(limited.status, 429);
   assert.equal(limited.payload.code, "rate_limited");
   assert.ok(Number(limited.headers.get("retry-after")) > 0);
+  const mailCount = storage("echo $db->query('SELECT COUNT(*) FROM commerce_mail_outbox')->fetchColumn();");
+  assert.equal(mailCount, storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), "each accepted guest order has exactly one durable customer event despite replays");
+  storage("$db->exec(\"CREATE TRIGGER reject_mail BEFORE INSERT ON commerce_mail_outbox BEGIN SELECT RAISE(ABORT, 'fixture_mail_failure'); END\");");
+  const beforeFailure = storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();");
+  assert.equal((await submit({ ...input, idempotencyKey: "atomic-mail-order-1" })).status, 503);
+  assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), beforeFailure, "outbox failure cannot leave an accepted order without its durable event");
+  storage("$db->exec('DROP TRIGGER reject_mail');");
+  assert.equal((await submit({ ...input, idempotencyKey: "atomic-mail-order-1" })).status, 201);
+  await publish(true, [{ ...publishedProduct, product_id: "usd-product", currency: "USD" }]);
+  assert.equal((await submit({ ...input, idempotencyKey: "mixed-currency-order", items: [...input.items, { productId: "usd-product", quantity: 1 }] })).payload.code, "mixed_currency");
+  publishedProduct.price = 0.1;
+  await publish(true);
+  assert.deepEqual((await submit(input)).payload, accepted.payload, "accepted money snapshot survives later catalog repricing");
+  assert.equal((await submit({ ...input, idempotencyKey: "decimal-rounding-order", items: [{ productId: "published-product", quantity: 3 }] })).payload.quoted_total, 0.3);
+  publishedProduct.currency = "JPY";
+  await publish(true);
+  assert.equal((await submit({ ...input, idempotencyKey: "unsupported-currency-order" })).payload.code, "unsupported_currency");
+  publishedProduct.currency = "TRY";
+  publishedProduct.price = 1e15;
+  await publish(true);
+  assert.equal((await submit({ ...input, idempotencyKey: "unsafe-price-order" })).payload.code, "invalid_price");
   const reset = await sync({ action: "reset_runtime" });
   assert.equal(reset.ok, true);
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_order_submission_receipts')->fetchColumn();"), 0);
