@@ -35,6 +35,37 @@ public class DealerApiTest {
     assertEquals("POST", connection.getRequestMethod()); assertNull(connection.getRequestProperty("Authorization"));
     assertEquals("ya_account_session=" + "c".repeat(43), reply.cookie); assertFalse(connection.getInstanceFollowRedirects());
   }
+  @Test public void v2QuoteUsesAuthorizedDealerEndpointAndNeverClientMoney() throws Exception {
+    Connection connection = new Connection(new URL("https://firma.example/module/api/dealer/checkout-quote.php"));
+    DealerApi api = new DealerApi("https://firma.example/module/", url -> {
+      assertEquals("https://firma.example/module/api/dealer/checkout-quote.php", url.toString());
+      return connection;
+    });
+    JSONObject draft = new JSONObject().put("items", new org.json.JSONArray()
+        .put(new JSONObject().put("productId","p").put("quantity",2)))
+        .put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
+    api.call("checkout-quote",draft,"ya_account_session="+"b".repeat(43));
+    assertEquals("POST",connection.getRequestMethod());
+    assertEquals("1",connection.getRequestProperty("X-YA-Dealer"));
+    assertEquals("ya_account_session="+"b".repeat(43),connection.getRequestProperty("Cookie"));
+    assertEquals(draft.toString(),connection.sent.toString("UTF-8"));
+    for(String forbidden : new String[]{"unitPrice","customerId","costPrice","dealerAccessId","priceGroup","sync_secret"})
+      assertFalse(connection.sent.toString("UTF-8").contains(forbidden));
+  }
+  @Test public void paymentReportUsesSharedRootEndpointWithSessionOwnership() throws Exception {
+    Connection connection=new Connection(new URL("https://firma.example/module/api/order-payment.php"));
+    DealerApi api=new DealerApi("https://firma.example/module/",url->{
+      assertEquals("https://firma.example/module/api/order-payment.php",url.toString());
+      return connection;
+    });
+    JSONObject input=new JSONObject().put("action","report").put("orderId","web_dealer_order_"+"a".repeat(32));
+    api.call("order-payment",input,"ya_account_session="+"b".repeat(43));
+    assertEquals("1",connection.getRequestProperty("X-YA-Account"));
+    assertEquals("1",connection.getRequestProperty("X-YA-Dealer"));
+    assertEquals("android",connection.getRequestProperty("X-YA-Client"));
+    assertEquals(input.toString(),connection.sent.toString("UTF-8"));
+    assertFalse(connection.sent.toString("UTF-8").contains("sync_secret"));
+  }
   @Test public void redirectsAreRejectedWithoutForwardingSession() throws Exception {
     Connection connection = new Connection(new URL("https://firma.example/")); connection.status = 302;
     DealerApi.Failure error = assertThrows(DealerApi.Failure.class, () -> new DealerApi("https://firma.example/", url -> connection).call("session", null, ""));

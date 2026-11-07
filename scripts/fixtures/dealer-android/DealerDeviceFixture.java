@@ -224,8 +224,30 @@ public final class DealerDeviceFixture extends Instrumentation {
         requireText(label);
       clickDescription("fixture-placed ürünlerini tekrar sepete ekle");
       requireText("Tahmini toplam 100,00 TL");
+      // The synthetic UI fixture uses an intentionally invalid hostname. It must
+      // never persist a new order without a real authenticated server quote.
       click("Siparişi gönder");
       settle("Yenile");
+      check(!new JSONObject(disk.read()).has("pending"),"Unreachable quote must not create pending order");
+      // The real TLS/PHP fixture above tests quote -> consent -> order independently.
+      // Seed a previously approved immutable draft solely for offline/restart retry UI.
+      DealerState frozen = new DealerState(disk.read(),disk);
+      JSONObject draft=frozen.draftOrder();
+      JSONObject line=new JSONObject().put("product_id","p").put("name","Fixture Parça")
+          .put("quantity",4).put("unit_price_minor",2500).put("line_total_minor",10000);
+      JSONObject offlineQuote=new JSONObject().put("version",2).put("minor_unit",2)
+          .put("items",new JSONArray().put(line)).put("currency","TRY")
+          .put("delivery_method","pickup").put("payment_method","bank_transfer")
+          .put("subtotal_minor",10000).put("delivery_fee_minor",0).put("total_minor",10000)
+          .put("quote_id",repeat(64)).put("demo",true)
+          .put("bank",new JSONObject().put("name","DEMO Test").put("accountHolder","DEMO")
+              .put("iban","DEMO-GECERSIZ-HESAP"))
+          .put("legal",new JSONObject().put("version","test").put("preliminary","DEMO ön bilgilendirme")
+              .put("agreement","DEMO satış sözleşmesi"));
+      frozen.prepareOrder(offlineQuote,true,true,false);
+      restart();
+      settle("Yenile");
+      click("Sepet (1)");
       requireText("Aynı siparişi tekrar dene");
       JSONObject pending = new JSONObject(disk.read()).getJSONObject("pending");
       check(pending.getJSONArray("items").getJSONObject(0).getDouble("quantity") == 4,
@@ -253,13 +275,12 @@ public final class DealerDeviceFixture extends Instrumentation {
           "Bekleyen sipariş kesinleşene kadar sepetler kilitli. Aynı siparişi tekrar deneyin.");
       appearance();
       result.putString("stream",
-          "dealer-native-device-ok: real local TLS/PHP shared login, refresh, independent web logout, canonical dealer prices/order retry, demotion, Online Sales and revocation; business connection VIEW/SEND and synthetic account authorization; private storage; large "
-              + "sampled gallery; native pinch/pan/double-tap/rotation/paging; five filters; "
-              + "gallery "
-              + "EXIF, simulated camera FileProvider result/cancel; independent "
-              + "comparison/overlay/opacity/reset/close; lifecycle and 20-cycle bitmap release; "
-              + "appearance persistence; immediate quantities, encrypted offline restart, order "
-              + "states/retry. Synthetic fixtures only.\n");
+          "dealer-native-device-ok: real local HTTPS/PHP dealer checkout quote, consent, authoritative price "
+              + "and bank-payment report/read, exact retry, access rotation, demotion and revocation; "
+              + "synthetic independent cart and restart persistence, refused unquoted order, "
+              + "shared WebView Inspector launch/close, appearance and app lifecycle. "
+              + "Detailed native Inspector filters, EXIF, gestures and bitmap cleanup are verified "
+              + "by the separate packages/image-inspector/test/device.mjs.\n");
       finish(Activity.RESULT_OK, result);
     } catch (Throwable error) {
       result.putString("stream", "dealer-native-device-failed: " + error + "\n");
@@ -307,157 +328,19 @@ public final class DealerDeviceFixture extends Instrumentation {
     waitForIdleSync();
   }
   private void photoWorkspace() throws Exception {
+    // Image Inspector V2 is a WebView: no legacy DealerPhotoView pixels exist.
+    // Detailed Worker filters, EXIF, gestures and memory are tested separately by
+    // packages/image-inspector/test/device.mjs / InspectorInstrumentation.
     click("Fotoğrafı incele (3)");
-    pictureReady();
-    DealerPhotoView image = photoViews().get(0);
-    Bitmap original = picture(image);
-    check(Math.max(original.getWidth(), original.getHeight()) <= 2048,
-        "Full-size original allocated");
-    final DealerPhotoView initial = image;
-    main(() -> doubleTap(initial));
-    check(image.transform.zoom > 1.5f, "Double tap did not zoom");
-    main(() -> drag(initial));
-    check(
-        Math.abs(image.transform.x) + Math.abs(image.transform.y) > 0, "Zoomed image did not pan");
-    click("Sığdır");
-    image = photoViews().get(0);
-    check(image.transform.zoom == 1, "Fit failed");
-    pictureReady();
-    final DealerPhotoView fitted = image;
-    main(() -> pinch(fitted));
-    check(fitted.transform.zoom > 1.1f,
-        "Native two-pointer scale failed: zoom=" + fitted.transform.zoom
-            + ", width=" + fitted.getWidth());
-    click("Sığdır");
-    click("Döndür");
-    check(photoViews().get(0).transform.rotation == 90, "Quarter turn failed");
-    click("Sığdır");
-    for (String label : new String[] {"Detay", "Kod okuma", "Negatif", "Kenar", "Normal"}) {
-      click(label);
-      await(() -> !boolViewer("effectBusy"), "Filter did not settle");
-      check(picture(photoViews().get(0)) != null, "Filter lost picture");
-    }
-    clickDescription("Sonraki fotoğraf");
-    pictureReady();
-    requireText("2 / 3");
-    check(original.isRecycled(), "Previous gallery bitmap retained");
-    final DealerPhotoView gallery = photoViews().get(0);
-    main(() -> {
-      long t = nextEventTime();
-      for (int step = 0; step < 3; step++) {
-        MotionEvent e = MotionEvent.obtain(t, t + step * 100,
-            step == 0       ? MotionEvent.ACTION_DOWN
-                : step == 2 ? MotionEvent.ACTION_UP
-                            : MotionEvent.ACTION_MOVE,
-            gallery.getWidth() * (.85f - step * .35f), gallery.getHeight() / 2f, 0);
-        gallery.dispatchTouchEvent(e);
-        e.recycle();
-      }
-    });
-    pictureReady();
-    requireText("3 / 3");
-    clickDescription("Önceki fotoğraf");
-    pictureReady();
-    requireText("2 / 3");
-    check(photoViews().get(0).transform.rotation == 0 && photoViews().get(0).transform.zoom == 1,
-        "Photo transition retained transform");
-    click("Karşılaştır");
-    click("Kamera");
-    requireText("Karşılaştır");
-    click("Karşılaştır");
-    click("Galeri");
-    await(()
-              -> photoViews().size() == 2 && picture(photoViews().get(1)) != null,
-        "Local gallery decode failed");
-    Bitmap own = picture(photoViews().get(1));
-    check(own.getHeight() > own.getWidth(), "EXIF orientation ignored");
-    List<DealerPhotoView> pair = photoViews();
-    main(() -> {
-      pair.get(0).zoom(2);
-      pair.get(1).rotate();
-    });
-    check(pair.get(0).transform.zoom == 2 && pair.get(1).transform.rotation == 90,
-        "Comparison transforms are not independent");
-    click("Üst üste");
-    main(() -> views(SeekBar.class).get(0).setProgress(30));
-    check(Math.abs(photoViews().get(1).getAlpha() - .3f) < .01, "Overlay opacity failed");
-    screenshot("photo-overlay");
-    click("Ürün");
-    click("Döndür");
-    check(photoViews().get(0).transform.rotation == 90, "Active overlay layer rotation failed");
-    click("Hizalamayı sıfırla");
-    check(
-        photoViews().get(0).transform.rotation == 0 && photoViews().get(1).transform.rotation == 0,
-        "Alignment reset failed");
-    String personal = (String) field(viewer(), "personalPath");
-    click("Karşılaştırmayı kapat");
-    check(own.isRecycled(), "Personal bitmap retained after compare");
-    check(!new File(personal).exists(), "Comparison file retained after exit");
-    click("Karşılaştır");
-    cameraResult = "ok";
-    click("Kamera");
-    await(()
-              -> photoViews().size() == 2 && picture(photoViews().get(1)) != null,
-        "Camera result did not decode");
-    click("Karşılaştırmayı kapat");
-    main(() -> activity.recreate());
     await(() -> {
-      Activity current = lastActivity();
-      return current != null && current != activity;
-    }, "Activity recreation not observed");
-    activity = (DealerActivity) lastActivity();
-    pictureReady();
-    requireText("2 / 3");
-    main(() -> activity.moveTaskToBack(true));
-    getTargetContext().startActivity(new Intent(getTargetContext(), DealerActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-    waitForIdleSync();
-    pictureReady();
-    requireText("2 / 3");
-    click("Kapat");
-    long before = android.os.Debug.getNativeHeapAllocatedSize();
-    for (int i = 0; i < 20; i++) {
-      click("Fotoğrafı incele (3)");
-      pictureReady();
-      Bitmap bitmap = picture(photoViews().get(0));
-      click("Karşılaştır");
-      click("Galeri");
-      await(()
-                -> photoViews().size() == 2 && picture(photoViews().get(1)) != null,
-          "Repeated local decode failed");
-      click("Karşılaştırmayı kapat");
-      click("Kapat");
-      check(bitmap.isRecycled(), "Gallery close did not release bitmap");
-    }
-    System.gc();
-    Thread.sleep(100);
-    long growth = android.os.Debug.getNativeHeapAllocatedSize() - before;
-    check(growth < 32L * 1024 * 1024, "Native heap grew by " + growth);
-    click("‹ Katalog");
-    clickDescription("Fixture Görselsiz ürününü incele");
-    requireText("Fotoğraf yok");
-    JSONObject single =
-        new JSONObject().put("name", "TEK FOTOĞRAF TESTİ").put("image_url", photoUrl(0));
-    main(() -> ((DealerPhotoViewer) viewer()).open(single));
-    pictureReady();
-    main(()
-             -> check(find(root(), "Sonraki fotoğraf", false, true) == null,
-                 "Single photo exposed gallery paging"));
-    click("Kapat");
-    JSONObject broken =
-        new JSONObject().put("name", "BOZUK FOTOĞRAF TESTİ").put("image_url", photoUrl(3));
-    DealerImages loader = new DealerImages(getTargetContext());
-    File corrupt = loader.cacheFile(photoUrl(3));
-    try (FileOutputStream out = new FileOutputStream(corrupt)) {
-      out.write(new byte[] {1, 2, 3});
-    }
-    loader.close();
-    main(() -> ((DealerPhotoViewer) viewer()).open(broken));
-    await(() -> findButton("Yeniden dene") != null, "Corrupt photo did not expose retry");
-    check(!corrupt.exists(), "Corrupt download stayed cached");
-    click("Kapat");
-    click("‹ Katalog");
-    clickDescription("Fixture Parça ürününü incele");
+      if (!((DealerPhotoViewer) viewer()).active()) return false;
+      Object current=field(viewer(),"web");
+      return current instanceof android.webkit.WebView
+          && ((android.webkit.WebView)current).getProgress() == 100;
+    }, "Shared offline WebView image inspector was not loaded");
+    screenshot("photo-inspector");
+    main(() -> ((DealerPhotoViewer) viewer()).close());
+    requireText("Test açıklaması");
   }
   private volatile Activity resumed;
   private boolean mockAccountAuthorization;
@@ -568,17 +451,8 @@ public final class DealerDeviceFixture extends Instrumentation {
     }
     throw new AssertionError(message);
   }
-  private void pictureReady() throws Exception {
-    await(()
-              -> !photoViews().isEmpty() && picture(photoViews().get(0)) != null
-            && photoViews().get(0).getWidth() > 0,
-        "Product image not rendered");
-  }
   private Object viewer() {
     return field(activity, "photos");
-  }
-  private boolean boolViewer(String name) {
-    return (boolean) field(viewer(), name);
   }
   private Object field(Object object, String name) {
     try {
@@ -588,12 +462,6 @@ public final class DealerDeviceFixture extends Instrumentation {
     } catch (Exception e) {
       throw new AssertionError(e);
     }
-  }
-  private Bitmap picture(DealerPhotoView view) {
-    return (Bitmap) field(view, "picture");
-  }
-  private List<DealerPhotoView> photoViews() {
-    return views(DealerPhotoView.class);
   }
   private <T extends View> List<T> views(Class<T> type) {
     List<T> result = new ArrayList<>();
@@ -708,69 +576,5 @@ public final class DealerDeviceFixture extends Instrumentation {
   private void check(boolean okay, String message) {
     if (!okay)
       throw new AssertionError(message);
-  }
-  private long eventTime;
-  private long nextEventTime() {
-    eventTime = Math.max(SystemClock.uptimeMillis(), eventTime + 700);
-    return eventTime;
-  }
-  private void tap(DealerPhotoView v, long down, long up) {
-    MotionEvent a = MotionEvent.obtain(
-        down, down, MotionEvent.ACTION_DOWN, v.getWidth() / 2f, v.getHeight() / 2f, 0);
-    v.dispatchTouchEvent(a);
-    a.recycle();
-    MotionEvent b = MotionEvent.obtain(
-        down, up, MotionEvent.ACTION_UP, v.getWidth() / 2f, v.getHeight() / 2f, 0);
-    v.dispatchTouchEvent(b);
-    b.recycle();
-  }
-  private void doubleTap(DealerPhotoView v) {
-    long t = nextEventTime();
-    tap(v, t, t + 30);
-    tap(v, t + 100, t + 130);
-  }
-  private void drag(DealerPhotoView v) {
-    long t = nextEventTime();
-    for (int i = 0; i < 3; i++) {
-      MotionEvent e = MotionEvent.obtain(t, t + i * 30,
-          i == 0       ? MotionEvent.ACTION_DOWN
-              : i == 2 ? MotionEvent.ACTION_UP
-                       : MotionEvent.ACTION_MOVE,
-          v.getWidth() / 2f + (i == 0 ? 0 : 40), v.getHeight() / 2f + (i == 0 ? 0 : 20), 0);
-      v.dispatchTouchEvent(e);
-      e.recycle();
-    }
-  }
-  private void pinch(DealerPhotoView v) {
-    long t = nextEventTime();
-    MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[2];
-    for (int i = 0; i < 2; i++) {
-      props[i] = new MotionEvent.PointerProperties();
-      props[i].id = i;
-      props[i].toolType = MotionEvent.TOOL_TYPE_FINGER;
-    }
-    for (int step = 0; step < 12; step++) {
-      int count = step == 0 || step == 11 ? 1 : 2;
-      MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[count];
-      float distance = v.getWidth() * (.12f + Math.max(0, step - 1) * .03f);
-      for (int i = 0; i < count; i++) {
-        coords[i] = new MotionEvent.PointerCoords();
-        coords[i].x = v.getWidth() / 2f + (i == 0 ? -distance : distance);
-        coords[i].y = v.getHeight() / 2f;
-        coords[i].pressure = 1;
-        coords[i].size = .1f;
-      }
-      int action = step == 0 ? MotionEvent.ACTION_DOWN
-          : step == 1
-          ? MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT)
-          : step == 10
-          ? MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT)
-          : step == 11 ? MotionEvent.ACTION_UP
-                       : MotionEvent.ACTION_MOVE;
-      MotionEvent e = MotionEvent.obtain(t, t + step * 35, action, count, props, coords, 0, 0, 1, 1,
-          0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0);
-      v.dispatchTouchEvent(e);
-      e.recycle();
-    }
   }
 }

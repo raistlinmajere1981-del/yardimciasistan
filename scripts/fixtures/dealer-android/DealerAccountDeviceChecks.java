@@ -34,8 +34,25 @@ final class DealerAccountDeviceChecks {
     String cookie=api.call("account/login",credentials,"").cookie;
     JSONObject catalog=api.call("catalog",null,cookie).body.getJSONObject("catalog");
     JSONObject product=catalog.getJSONArray("products").getJSONObject(0);check(product.getDouble("price")==80,"Dealer price must come from Desktop");
-    JSONObject order=new JSONObject().put("idempotencyKey",UUID.randomUUID().toString()).put("items",new org.json.JSONArray().put(new JSONObject().put("productId",product.getString("product_id")).put("quantity",1))).put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
+    JSONObject draft=new JSONObject().put("items",new org.json.JSONArray().put(new JSONObject().put("productId",product.getString("product_id")).put("quantity",1)))
+        .put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
+    JSONObject firstQuote=DealerCheckout.verifiedQuote(api.call("checkout-quote",draft,cookie).body,draft);
+    check(firstQuote.getLong("subtotal_minor")==8000 && firstQuote.getLong("total_minor")==8000,"Server dealer A quote must be 80, not retail 100");
+    check(!firstQuote.toString().contains("dealer_price_b"),"Private dealer B prices leaked into the quote");
+    JSONObject order=DealerCheckout.approvedRequest(draft,firstQuote,true,true,false);
+    check("bank_transfer".equals(order.getString("paymentMethod")),"Bank transfer missing");
+    check(order.getJSONObject("consent").getBoolean("agreement"),"Consent not recorded");
+    JSONObject rejectedConsent=new JSONObject(order.toString());
+    rejectedConsent.remove("consent");
+    try {api.call("order",rejectedConsent,cookie);throw new AssertionError("Missing legal consent accepted");}
+    catch(DealerApi.Failure error){check(error.status==422,"Consent missing must be rejected without creating an order");}
     String receipt=api.submit(order,cookie).getString("order_id");check(api.submit(order,cookie).getString("order_id").equals(receipt),"Retry duplicated order");
+    JSONObject reported=api.call("order-payment",new JSONObject().put("action","report").put("orderId",receipt),cookie).body.getJSONObject("order");
+    check(reported.getString("payment_status").equals("verification_pending"),"Dealer payment report must await business verification");
+    JSONObject repeated=api.call("order-payment",new JSONObject().put("action","report").put("orderId",receipt),cookie).body.getJSONObject("order");
+    check(repeated.getString("payment_status").equals("verification_pending"),"Payment report is not idempotent");
+    check(api.call("order-payment",new JSONObject().put("action","read").put("orderId",receipt),cookie).body.getJSONObject("order")
+        .getString("payment_status").equals("verification_pending"),"Payment status read failed");
     control(base,"import",connections);check(api.call("orders",null,cookie).body.getJSONArray("orders").getJSONObject(0).getString("order_id").equals(receipt),"Canonical order belongs to another customer");
     JSONObject before=api.call("catalog",null,cookie).body.getJSONObject("catalog");
     String oldRevision=before.getString("catalog_revision"),accessId=before.getString("access_id");
@@ -58,9 +75,11 @@ final class DealerAccountDeviceChecks {
     check(replayed.getString("order_id").equals(receipt),"Catalog change replaced the accepted order");
     check(replayed.getDouble("quoted_total")==80,"Retried acceptance must keep its original quote");
     check(api.call("orders",null,cookie).body.getJSONArray("orders").length()==1,"Retried submission created another order");
-    JSONObject repricedOrder=new JSONObject().put("idempotencyKey",UUID.randomUUID().toString()).put("catalogRevision",oldRevision)
-      .put("items",new org.json.JSONArray().put(new JSONObject().put("productId",repricedProduct.getString("product_id")).put("quantity",1).put("price",0).put("unitPrice",0)))
-      .put("delivery",new JSONObject().put("method","pickup").put("address",JSONObject.NULL));
+    JSONObject nextDraft=new JSONObject(draft.toString()).put("catalogRevision",oldRevision);
+    JSONObject repricedQuote=DealerCheckout.verifiedQuote(api.call("checkout-quote",nextDraft,cookie).body,nextDraft);
+    check(repricedQuote.getLong("subtotal_minor")==6500,"New authorized price must be 65");
+    check(!firstQuote.getString("quote_id").equals(repricedQuote.getString("quote_id")),"Repricing must invalidate the old quote");
+    JSONObject repricedOrder=DealerCheckout.approvedRequest(nextDraft,repricedQuote,true,true,false);
     JSONObject quote=api.submit(repricedOrder,cookie);
     check(!quote.getString("order_id").equals(receipt),"New attempt reused the previous order identity");
     check(quote.getDouble("quoted_total")==65,"New order must be quoted from the repriced catalog");

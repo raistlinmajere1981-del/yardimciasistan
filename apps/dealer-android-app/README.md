@@ -55,8 +55,13 @@ SMTP/OAuth ayarlarını ve gerçek sağlayıcı/cihaz doğrulama sınırlarını
   API/AI isteğine girmez ve kapatınca temizlenir.
 - Sepet: çoklu ürün, miktarı anında değiştirme/çıkarma, para birimi kontrolü; elden teslim veya
   mevcut allowlist'e göre adrese gönderim; adres ve not cihazda korunur.
+- Sipariş öncesi **V2 sunucu teklifi** alınır: kesin bayi fiyatı, teslimat bedeli, havale
+  hesabı ve iki zorunlu sözleşme görülmeden sipariş oluşmaz. Pazarlama izni isteğe bağlıdır.
+  Teklif yalnız internet üzerinden alınır; çevrimdışı sepete ürün eklemek sipariş oluşturmaz.
 - Siparişler: aktarım bekleyen talep ile canonical alındı/onaylandı/tamamlandı/iptal
-  durumları ayrıdır. Geçmiş ürünleri güncel katalog fiyatlarıyla yeniden sepete ekler.
+  durumları ayrıdır. Onaylanan havale siparişi için numara, kesin tutar, banka talimatı,
+  **Havale yaptım** bildirimi ve ödeme durumu sorgulama vardır; bildirim ödeme onayı değildir.
+  Geçmiş ürünleri güncel katalog fiyatlarıyla yeniden sepete ekler.
 - Ayarlar: Sistem/Açık/Koyu, dört renk tonu, %90–150 yazı, Normal/Yüksek kontrast,
   görünümü sıfırla ve hesap/oturumu kapat. Tercihler cihazda kalır; çıkışta korunur.
 
@@ -68,11 +73,13 @@ Gönderilmemiş sepet/bekleyen deneme varsa şifreli, hesap ve sunucu kapsamlı 
 korunur; yalnız aynı hesapla tekrar girişte geri açılır. Başka bayi bu taslağı göremez.
 Çıkış güncel hesabı temizler; başka hesapların saklanan gönderilmemiş taslaklarını silmez.
 
-İlk gönderimden **önce** değişmez JSON ve idempotency key atomik kaydedilir. Başarısı
+Sunucu teklifi ve iki zorunlu kullanıcı onayı **öncesinde** idempotency/pending üretilmez.
+Onaylandığında ilk gönderimden **önce** `quoteId`, havale yöntemi, sözleşme kabulü ve
+değişmez JSON/idempotency key atomik kaydedilir. Başarısı
 belirsiz deneme otomatik gönderilmez veya silinmez; Sepet'te açıkça gösterilir, aynı
 kimlikle kullanıcı tarafından tekrar denenir. Her gönderim önce oturum kapsamındaki
 makbuzu sorgular; sunucu yanıt kaybında/yeni oturumda eski makbuz dönerse tekrar POST
-edilmez. 422 ile kesin reddedilen talep düzenlenebilir. Gönderimi belirsiz talep varken
+edilmez. 422 veya `quote_changed` ile kesin reddedilen talep yeni teklif/onaya döner. Gönderimi belirsiz talep varken
 çıkış, önce Sepet'e yönlendirir. Sunucu çıkışı başarısızsa açık hata gösterilir; giriş ekranındaki yerel oturum temizleme internet olmadan kullanılabilir.
 
 Cihaz verisi Android Keystore AES-GCM ile `noBackupFilesDir` içinde şifreli, atomik
@@ -119,10 +126,12 @@ Sonuç `artifacts/dealer-android/native-fixture-sdk<SDK>.txt`, native ekran gör
 2. İki ayrı bayiyle fiyat izolasyonunu ve kategori/marka/stok kodu aramasını kontrol edin.
 3. Ürün detayı, favori, iki ürünlü sepet, miktar ve adres/not girişini 320–360dp genişlikte
    ve büyük yazı/açık-koyu temalarda deneyin.
-4. Uçak modunda sepeti değiştirin; uygulamayı kapatıp açın. Gönderimi deneyin: bekleyen
-   talep görünür kalmalı. Bağlantıyı açıp aynı talebi tekrar deneyin; masaüstünde tek sipariş olmalı.
-5. Sunucu kabulünden hemen sonra bağlantıyı keserek yanıt kaybını ve uygulama yeniden
-   başlatıldıktan sonra aynı makbuzun kurtarılmasını kontrol edin.
+4. Uçak modunda sepeti değiştirin; uygulamayı kapatıp açın. Gönderim denemesi
+   **pending oluşturmasın** (sunucu teklifi alınamadı). İnternete dönüp kesin teklifi
+   inceleyin, zorunlu sözleşmeleri onaylayıp tek sipariş oluşturun.
+5. Kabulden hemen sonraki yanıt kaybını ve uygulama yeniden başlatıldıktan sonra
+   **aynı** makbuzun kurtarılmasını kontrol edin. Havale yaptım bildirimini yineleyin:
+   işletme onayı yokken durum doğrulama bekliyor olmalı, iki bildirim olayına dönüşmemeli.
 6. Masaüstünü eşitleyin; siparişin alındı/onaylandı/iptal veya fulfillment sonrası
    tamamlandı durumlarını yenileyin. Sadece talep gönderimi satış/tahsilat/stok üretmemeli.
 7. Bayi oturumlarını iptal edip yayını eşitleyin. Yenileme 401 sonrası katalog kapanmalı;

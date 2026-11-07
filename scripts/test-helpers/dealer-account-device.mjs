@@ -10,6 +10,8 @@ const require=createRequire(import.meta.url);
 const {WebSyncIngress}=require('../../apps/desktop-app/dist-electron/web-sync-ingress.js');
 const {BUSINESS_CAPABILITIES:C}=require('../../packages/shared/dist/index.js');
 const {saveRuntimeCatalogProduct,listRuntimeOrders}=require('../../apps/desktop-app/dist-electron/commerce-runtime.js');
+const {saveCheckoutSettings}=require('../../apps/desktop-app/dist-electron/commerce-checkout-settings.js');
+const {publishDesktopProjection}=require('../../apps/desktop-app/dist-electron/desktop-publication-service.js');
 
 /** Disposable loopback TLS/PHP/SQLite fixture, reachable only through this test's own ADB reverse. */
 export async function createDealerAccountDeviceFixture(serial) {
@@ -25,7 +27,19 @@ export async function createDealerAccountDeviceFixture(serial) {
     assert.equal((await ingress.pullCustomerAccountPages(f.transport)).error,'');
     const customer=f.database.listCustomers({}).items.find(row=>row.email==='physical@example.test');assert.ok(customer);
     const product=saveRuntimeCatalogProduct(f.database.databasePath,{name:'Physical API fixture product',sku:'PHYSICAL-ACCOUNT',brand:'',categoryId:'',salePrice:100,dealerPriceA:80,dealerPriceB:60,purchasePrice:20,currency:'TRY',unit:'piece',taxRate:20,trackInventory:false,isActive:true});
+    const settings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:null,
+      bank:{name:'DEMO Banka',accountHolder:'DEMO Bayi',iban:'DEMO-GECERSIZ-HESAP'},
+      legal:{version:'dealer-device-v2',preliminary:'DEMO test ön bilgilendirme metni.',agreement:'DEMO test satış sözleşmesi.'}};
+    saveCheckoutSettings(f.database.databasePath,settings);
+    f.database.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,sortOrder:0});
     await f.publish();
+    const publishCatalog=async()=>{
+      const value=f.database.createCommerceOnlineCatalog();
+      const result=await publishDesktopProjection(f.database,{baseUrl:f.baseUrl,syncSecret:f.secret},'online_catalog_publish',value,
+        (identity,value)=>f.transport.publishOnlineCatalog({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}));
+      assert.equal(result.ok,true,JSON.stringify(result));
+    };
+    await publishCatalog();
     const webCookie=await f.login('physical@example.test');let webSurvivedLogout=false;
     raw=new DatabaseSync(f.database.databasePath);
     server=https.createServer({key:readFileSync(join(f.root,'smtp.key')),cert:readFileSync(join(f.root,'smtp.pem'))},async(req,res)=>{
@@ -46,6 +60,7 @@ export async function createDealerAccountDeviceFixture(serial) {
             assert.equal(repriced.salePrice,100,'fixture reprice must keep the retail price');
             assert.equal(repriced.dealerPriceB,60,'fixture reprice must keep the dealer B price');
             await f.publish();
+            await publishCatalog();
           } else if(action==='import') {assert.equal((await ingress.pullWebOrderPages(f.transport)).error,'');await f.publish();}
           else throw new Error('unknown fixture operation');
           res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,accountId,productId:product.id}));return;

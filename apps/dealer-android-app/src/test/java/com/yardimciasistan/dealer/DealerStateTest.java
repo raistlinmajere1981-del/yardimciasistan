@@ -6,6 +6,40 @@ import org.json.*;
 
 public class DealerStateTest {
   private String disk = "{}";
+  /** Simulated authenticated quote; no local price is ever accepted by the actual API. */
+  private static JSONObject quoted(DealerState state) throws Exception {
+    JSONObject draft = state.draftOrder();
+    JSONArray lines = new JSONArray();
+    long sum = 0;
+    JSONArray items = draft.getJSONArray("items");
+    for (int i = 0; i < items.length(); i++) {
+      JSONObject item = items.getJSONObject(i);
+      JSONObject product = state.product(item.getString("productId"));
+      long unit = new java.math.BigDecimal(product.get("price").toString())
+          .movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+      long amount = new java.math.BigDecimal(item.get("quantity").toString())
+          .multiply(java.math.BigDecimal.valueOf(unit))
+          .setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+      sum += amount;
+      lines.put(new JSONObject().put("product_id", item.getString("productId"))
+          .put("quantity", item.getDouble("quantity"))
+          .put("name", product.optString("name", "Ürün"))
+          .put("unit_price_minor", unit).put("line_total_minor", amount));
+    }
+    return new JSONObject().put("version", 2).put("minor_unit", 2).put("items", lines)
+        .put("currency", state.product(items.getJSONObject(0).getString("productId")).getString("currency"))
+        .put("delivery_method", draft.getJSONObject("delivery").getString("method"))
+        .put("subtotal_minor", sum).put("delivery_fee_minor", 0).put("total_minor", sum)
+        .put("payment_method", "bank_transfer").put("quote_id", "a".repeat(64))
+        .put("demo", true).put("bank", new JSONObject().put("name", "TEST BANKA")
+            .put("accountHolder", "DEMO").put("iban", "DEMO-GECERSIZ-HESAP"))
+        .put("legal", new JSONObject().put("version", "test-v1")
+            .put("preliminary", "Ön bilgilendirme test metni")
+            .put("agreement", "Satış sözleşmesi test metni"));
+  }
+  private static JSONObject approved(DealerState state) throws Exception {
+    return state.prepareOrder(state.data.has("pending") ? new JSONObject() : quoted(state), true, true, false);
+  }
   private DealerState state() throws Exception { return new DealerState(disk, json -> disk = json); }
   private DealerState signedIn() throws Exception {
     DealerState state = state(); state.authenticate("https://firma.example/module/", "session-a", new JSONObject().put("access_id", "a"));
@@ -23,7 +57,7 @@ public class DealerStateTest {
     assertFalse(disk.contains(secret));
     assertFalse(new JSONObject(disk).has("cookie"));
     assertEquals(1, state().object("cart").getInt("p"));
-    state.prepareOrder();
+    approved(state);
     assertFalse(disk.contains(secret)); // pending-order copy-on-write cannot persist an opted-out session
     assertEquals(1, state().object("cart").getInt("p"));
     state.accepted(new JSONObject().put("order_id", "receipt"));
@@ -87,9 +121,39 @@ public class DealerStateTest {
     assertTrue(activity.contains("state.setRememberMe(enabled)"));
     assertFalse(disk.contains("password"));
   }
+  @Test public void draftNeedsOnlineQuoteAndConsentBeforePendingExists() throws Exception {
+    DealerState state = signedIn();state.quantity("p",2);
+    JSONObject draft = state.draftOrder();
+    assertFalse(state.data.has("pending"));
+    JSONObject quote = quoted(state);
+    assertEquals(quote.getString("quote_id"), DealerCheckout.verifiedQuote(
+        new JSONObject().put("ok",true).put("quote",quote), draft).getString("quote_id"));
+    assertThrows(IllegalArgumentException.class, () -> state.prepareOrder(quote, false,true,false));
+    assertThrows(IllegalArgumentException.class, () -> state.prepareOrder(quote, true,false,false));
+    assertFalse(state.data.has("pending"));
+    assertEquals("bank_transfer", state.prepareOrder(quote,true,true,true).getString("paymentMethod"));
+    assertTrue(state.object("pending").getJSONObject("consent").getBoolean("marketing"));
+    assertEquals(state.object("pending").toString(), state().object("pending").toString());
+  }
+  @Test public void invalidOrTamperedServerQuotesFailBeforeDurableOrder() throws Exception {
+    DealerState state=signedIn();state.quantity("p",2);JSONObject draft=state.draftOrder();
+    JSONObject q=quoted(state);
+    for (String key : new String[]{"quote_id","currency","payment_method","total_minor","items","bank","legal"}) {
+      JSONObject broken=new JSONObject(q.toString());
+      switch(key){
+        case "items":broken.put(key,new JSONArray());break;
+        case "bank":broken.put(key,JSONObject.NULL);break;
+        case "legal":broken.put(key,JSONObject.NULL);break;
+        case "total_minor":broken.put(key,3);break;
+        default:broken.put(key,"tampered");
+      }
+      assertThrows(Exception.class,()->DealerCheckout.verifiedQuote(new JSONObject().put("ok",true).put("quote",broken),draft));
+      assertFalse(state.data.has("pending"));
+    }
+  }
   @Test public void offlineCartAndCatalogPricesAreExplicitlyUnconfirmed() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
-    String pending = state.prepareOrder().toString();
+    String pending = approved(state).toString();
     DealerState reopened = state();
     assertEquals(2, reopened.object("cart").getInt("p"));
     assertEquals(pending, reopened.object("pending").toString());
@@ -104,51 +168,82 @@ public class DealerStateTest {
   }
   @Test public void lostResponseRetriesExactRequestAfterRestart() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2); state.put("note", "Deneme");
-    String first = state.prepareOrder().toString(); assertEquals(first, state().prepareOrder().toString());
+    String first = approved(state).toString(); assertEquals(first, approved(state()).toString());
     assertFalse(first.contains("unitPrice")); assertFalse(first.contains("customerId")); assertFalse(first.contains("priceGroup"));
   }
   @Test public void dealerOrderDoesNotForgeRetailBenefitsOrResolvedPrices() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
-    JSONObject request = state.prepareOrder();
-    for (String forbidden : new String[]{"benefits", "couponCode", "requestedPointsMinor", "discountMinor", "expectedQuote", "paymentMethod"}) {
+    JSONObject request = approved(state);
+    assertEquals("bank_transfer", request.getString("paymentMethod"));
+    assertEquals("a".repeat(64), request.getString("quoteId"));
+    assertTrue(request.getJSONObject("consent").getBoolean("agreement"));
+    assertFalse(request.getJSONObject("consent").getBoolean("marketing"));
+    for (String forbidden : new String[]{"benefits", "couponCode", "requestedPointsMinor", "discountMinor", "expectedQuote", "unitPrice"}) {
       assertFalse("Bayi otoritesi dışında alan: " + forbidden, request.has(forbidden));
     }
     JSONObject line = request.getJSONArray("items").getJSONObject(0);
     assertEquals(2, line.length());
     assertTrue(line.has("productId")); assertTrue(line.has("quantity"));
     assertFalse(line.has("price")); assertFalse(line.has("unitPrice")); assertFalse(line.has("discount"));
-    assertEquals(request.toString(), state().prepareOrder().toString());
+    assertEquals(request.toString(), approved(state()).toString());
   }
   @Test public void pendingIsSavedBeforeSendingAndFreezesCart() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 2); state.prepareOrder(); assertTrue(new JSONObject(disk).has("pending"));
+    DealerState state = signedIn(); state.quantity("p", 2); approved(state); assertTrue(new JSONObject(disk).has("pending"));
     assertThrows(IllegalStateException.class, () -> state.quantity("p", 3));
   }
   @Test public void diskFailureNeverAllowsUnsavedSend() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
     DealerState failing = new DealerState(disk, json -> { throw new java.io.IOException("disk-full"); });
-    assertThrows(java.io.IOException.class, failing::prepareOrder);
-    assertThrows(java.io.IOException.class, failing::prepareOrder);
+    assertThrows(java.io.IOException.class, () -> approved(failing));
+    assertThrows(java.io.IOException.class, () -> approved(failing));
+  }
+  @Test public void paymentNoticeAndStatusRefreshCanOnlyUpdateSameFrozenReceipt() throws Exception {
+    DealerState state=signedIn();state.quantity("p",1);
+    JSONObject acceptedQuote=quoted(state);
+    approved(state);
+    JSONObject receipt=new JSONObject().put("ok",true).put("order_id","web_dealer_order_"+"a".repeat(32))
+        .put("order_number","YA-20261107-0123456789").put("payment_status","unpaid")
+        .put("delivery_status","unfulfilled").put("status","placed")
+        .put("total_minor",1235).put("currency","TRY")
+        .put("checkout",acceptedQuote);
+    state.accepted(receipt);
+    JSONObject update=new JSONObject().put("order_id",receipt.getString("order_id"))
+        .put("order_number",receipt.getString("order_number"))
+        .put("payment_status","verification_pending")
+        .put("delivery_status","unfulfilled").put("status","placed");
+    state.paymentStatus(update);
+    assertEquals("verification_pending",state().object("last_receipt").getString("payment_status"));
+    assertEquals(1235,state().object("last_receipt").getInt("total_minor"));
+    assertEquals("bank_transfer",state().object("last_receipt").getJSONObject("checkout").getString("payment_method"));
+    String before=disk;
+    assertThrows(IllegalArgumentException.class,()->state.paymentStatus(new JSONObject(update.toString()).put("order_number","other")));
+    assertThrows(IllegalArgumentException.class,()->state.paymentStatus(new JSONObject(update.toString()).put("payment_status","fake_paid")));
+    assertEquals(before,disk);
+    DealerState failing=new DealerState(disk,json->{throw new java.io.IOException("disk-full");});
+    assertThrows(java.io.IOException.class,()->failing.paymentStatus(new JSONObject(update.toString()).put("payment_status","paid")));
+    assertEquals("verification_pending",failing.object("last_receipt").getString("payment_status"));
+    assertEquals(before,disk);
   }
   @Test public void acceptanceClearsPendingAndCartDurably() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 1); state.prepareOrder(); state.accepted(new JSONObject().put("order_id", "server-id"));
+    DealerState state = signedIn(); state.quantity("p", 1); approved(state); state.accepted(new JSONObject().put("order_id", "server-id"));
     DealerState reopened = state(); assertFalse(reopened.data.has("pending")); assertEquals(0, reopened.object("cart").length()); assertEquals("server-id", reopened.object("last_receipt").getString("order_id"));
   }
   @Test public void failedAcceptancePersistenceRetainsExactPendingRequest() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 1);
-    String request = state.prepareOrder().toString();
+    String request = approved(state).toString();
     DealerState failing = new DealerState(disk, json -> { throw new java.io.IOException("disk-full"); });
     assertThrows(java.io.IOException.class, () -> failing.accepted(new JSONObject().put("order_id", "server-id")));
     assertEquals(request, failing.object("pending").toString());
     assertEquals(1, failing.object("cart").getInt("p"));
-    assertEquals(request, state().prepareOrder().toString());
+    assertEquals(request, approved(state()).toString());
   }
   @Test public void revokedSessionPreservesHiddenDraftForSameOwner() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 1); state.prepareOrder(); String first = state.object("pending").toString(); state.invalidateSession();
+    DealerState state = signedIn(); state.quantity("p", 1); approved(state); String first = state.object("pending").toString(); state.invalidateSession();
     assertEquals("", state().text("cookie"));
     state.authenticate("https://firma.example/module/", "new-cookie", new JSONObject().put("access_id", "a")); assertEquals(first, state.object("pending").toString());
   }
   @Test public void otherDealerCannotSeePreviousPricesCartOrHistory() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 1); state.favorite("p"); state.prepareOrder(); state.put("orders", new JSONArray().put(new JSONObject().put("total", 20))); state.put("last_receipt", new JSONObject().put("quoted_total", 99));
+    DealerState state = signedIn(); state.quantity("p", 1); state.favorite("p"); approved(state); state.put("orders", new JSONArray().put(new JSONObject().put("total", 20))); state.put("last_receipt", new JSONObject().put("quoted_total", 99));
     state.authenticate("https://firma.example/module/", "new-cookie", new JSONObject().put("access_id", "b"));
     assertEquals(0, state.object("cart").length()); assertFalse(state.data.has("catalog")); assertFalse(state.data.has("pending")); assertEquals(0, state.array("orders").length()); assertEquals(0, state.object("favorites").length()); assertFalse(state.data.has("last_receipt"));
   }
@@ -158,26 +253,26 @@ public class DealerStateTest {
   }
   @Test public void missingProductBlocksSubmissionButCanBeRemoved() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 1); state.object("catalog").put("products", new JSONArray());
-    assertThrows(IllegalArgumentException.class, state::prepareOrder); state.quantity("p", 0); assertEquals(0, state.object("cart").length());
+    assertThrows(IllegalArgumentException.class, state::draftOrder); state.quantity("p", 0); assertEquals(0, state.object("cart").length());
   }
   @Test public void mixedCurrenciesCannotBeSubmitted() throws Exception {
     DealerState state = signedIn(); state.product("q").put("currency", "USD"); state.quantity("p", 1); state.quantity("q", 1);
-    assertThrows(IllegalArgumentException.class, state::prepareOrder);
+    assertThrows(IllegalArgumentException.class, state::draftOrder);
   }
   @Test public void corruptedOrStaleDealerPriceNeverCreatesPendingOrder() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
     for (Object invalid : new Object[]{-1, "NaN", JSONObject.NULL}) {
       state.product("p").put("price", invalid);
       assertThrows(IllegalArgumentException.class, state::total);
-      assertThrows(IllegalArgumentException.class, state::prepareOrder);
+      assertThrows(IllegalArgumentException.class, state::draftOrder);
       assertFalse(state.data.has("pending"));
     }
     state.product("p").put("price", 12.35).put("currency", "invalid");
-    assertThrows(IllegalArgumentException.class, state::prepareOrder);
+    assertThrows(IllegalArgumentException.class, state::draftOrder);
     assertFalse(state.data.has("pending"));
     state.product("p").put("currency", "TRY");
     assertEquals("24.70", state.total().toPlainString());
-    assertEquals(1, state.prepareOrder().getJSONArray("items").length());
+    assertEquals(1, state.draftOrder().getJSONArray("items").length());
   }
   @Test public void quantityBoundariesAndFractionalUnits() throws Exception {
     DealerState state = signedIn();
@@ -186,9 +281,9 @@ public class DealerStateTest {
   }
   @Test public void deliveryRequiresAllowedMethodAndCompleteAddress() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 1); state.put("delivery", "shipping");
-    assertThrows(IllegalArgumentException.class, state::prepareOrder);
+    assertThrows(IllegalArgumentException.class, state::draftOrder);
     state.put("address", new JSONObject("{\"recipientName\":\"Bayi\",\"addressLine1\":\"Cadde\",\"district\":\"Merkez\",\"city\":\"İstanbul\",\"countryCode\":\"TR\"}"));
-    assertEquals("shipping", state.prepareOrder().getJSONObject("delivery").getString("method"));
+    assertEquals("shipping", state.draftOrder().getJSONObject("delivery").getString("method"));
   }
   @Test public void logoutClearsSessionAndPrivateState() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2); state.favorite("p"); state.logout();
@@ -213,7 +308,7 @@ public class DealerStateTest {
   }
 
   @Test public void switchingAfterRevocationNeverSilentlyLosesOldPendingDraft() throws Exception {
-    DealerState state = signedIn(); state.quantity("p", 2); state.put("note", "private-a"); String request = state.prepareOrder().toString(); state.invalidateSession();
+    DealerState state = signedIn(); state.quantity("p", 2); state.put("note", "private-a"); String request = approved(state).toString(); state.invalidateSession();
     state.authenticate("https://firma.example/module/", "b-cookie", new JSONObject().put("access_id", "b"));
     assertFalse(state.data.has("pending")); assertEquals("", state.text("note")); assertEquals(0, state.object("cart").length());
     state.logout(); state = state();
@@ -283,8 +378,8 @@ public class DealerStateTest {
     DealerState state = signedIn(); state.quantity("p", 1);
     String first = state.activeCartId();
     String second = state.newCart("İkinci"); state.quantity("q", 2);
-    String request = state.prepareOrder().toString();
-    assertEquals(request, state().prepareOrder().toString());
+    String request = approved(state).toString();
+    assertEquals(request, approved(state()).toString());
     assertThrows(IllegalStateException.class, () -> state.newCart("Üçüncü"));
     assertThrows(IllegalStateException.class, () -> state.selectCart(first));
     assertThrows(IllegalStateException.class, () -> state.renameCart(second, "Yeni"));
@@ -301,7 +396,7 @@ public class DealerStateTest {
     DealerState state = signedIn(); state.quantity("p", 1); state.put("note", "ilk");
     String first = state.activeCartId();
     String second = state.newCart("İkinci"); state.quantity("q", 2); state.put("note", "ikinci");
-    state.prepareOrder(); state.accepted(new JSONObject().put("order_id", "x"));
+    approved(state); state.accepted(new JSONObject().put("order_id", "x"));
     assertEquals(0, state.object("cart").length()); assertEquals("", state.text("note"));
     JSONObject kept = state.object("carts").getJSONObject(first);
     assertEquals(1, kept.getJSONObject("cart").getInt("p")); assertEquals("ilk", kept.getString("note"));

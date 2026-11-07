@@ -107,8 +107,9 @@ final class DealerState {
     }
     return total;
   }
-  JSONObject prepareOrder() throws Exception {
-    if (data.has("pending")) { save(); return new JSONObject(object("pending").toString()); }
+  /** Pre-flight is read-only: no pending/identity is created until the human reviews server terms. */
+  JSONObject draftOrder() throws Exception {
+    if (data.has("pending")) throw new IllegalStateException("Önce bekleyen siparişinizi sorgulayın.");
     total(); JSONObject cart = object("cart");
     if (cart.length() == 0) throw new IllegalArgumentException("Sepetiniz boş.");
     JSONArray items = new JSONArray();
@@ -124,12 +125,34 @@ final class DealerState {
     if (method.equals("shipping")) for (String key : new String[]{"recipientName", "addressLine1", "district", "city", "countryCode"}) {
       if (address.optString(key).trim().isEmpty()) throw new IllegalArgumentException("Teslimat adresindeki zorunlu alanları doldurun.");
     }
-    JSONObject request = new JSONObject().put("idempotencyKey", UUID.randomUUID().toString()).put("items", items)
+    return new JSONObject().put("items", items)
         .put("catalogRevision", object("catalog").getString("catalog_revision"))
         .put("delivery", new JSONObject().put("method", method).put("address", method.equals("shipping") ? address : JSONObject.NULL))
         .put("note", text("note"));
-    // Freeze an independent snapshot before the first byte is sent. Retried verbatim after restart.
-    data.put("pending", new JSONObject(request.toString())); save(); return object("pending");
+  }
+  /** Frozen once before the network POST; all ambiguous retries use the identical persisted bytes. */
+  JSONObject prepareOrder(JSONObject quote, boolean preliminary, boolean agreement, boolean marketing) throws Exception {
+    if (data.has("pending")) return new JSONObject(object("pending").toString());
+    JSONObject request = DealerCheckout.approvedRequest(draftOrder(), quote, preliminary, agreement, marketing);
+    JSONObject next = new JSONObject(data.toString()).put("pending", request);
+    persistence.write(diskJson(next));
+    data.put("pending", request);
+    return new JSONObject(request.toString());
+  }
+  /** Update only the server-owned status on the last accepted order; keep its frozen terms. */
+  void paymentStatus(JSONObject response) throws Exception {
+    JSONObject prior = object("last_receipt");
+    String id = prior.optString("order_id");
+    String status = response.optString("payment_status");
+    if (id.isEmpty() || !id.equals(response.optString("order_id"))
+        || !prior.optString("order_number").equals(response.optString("order_number"))
+        || !java.util.Arrays.asList("unpaid","verification_pending","paid","rejected","refunded").contains(status))
+      throw new IllegalArgumentException("Siparişin güncel ödeme durumu doğrulanamadı.");
+    JSONObject next = new JSONObject(prior.toString());
+    next.put("payment_status", status);
+    next.put("delivery_status", response.optString("delivery_status", "unfulfilled"));
+    next.put("status", response.optString("status", "placed"));
+    commit(new JSONObject(data.toString()).put("last_receipt",next));
   }
   void accepted(JSONObject receipt) throws Exception {
     JSONObject next = new JSONObject(data.toString());

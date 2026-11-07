@@ -55,8 +55,8 @@ final class DealerApi {
     return receipt;
   }
   Reply call(String endpoint, JSONObject request, String cookie) throws Exception {
-    if (!endpoint.matches("session|catalog|order|orders|logout|receipt|account/(config|login|session|refresh|logout|oauth|exchange|recover|register)")) throw new IllegalArgumentException("Geçersiz işlem.");
-    HttpURLConnection connection = connections.open(new URL(base + "api/" + (endpoint.startsWith("account/") ? endpoint : "dealer/" + endpoint) + ".php"));
+    if (!endpoint.matches("session|catalog|checkout-quote|order|orders|logout|receipt|order-payment|account/(config|login|session|refresh|logout|oauth|exchange|recover|register)")) throw new IllegalArgumentException("Geçersiz işlem.");
+    HttpURLConnection connection = connections.open(new URL(base + "api/" + (endpoint.startsWith("account/") || endpoint.equals("order-payment") ? endpoint : "dealer/" + endpoint) + ".php"));
     connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(15000); connection.setReadTimeout(20000);
     connection.setUseCaches(false); connection.setRequestProperty("Accept", "application/json");
     connection.setRequestProperty("X-YA-Dealer", "1");

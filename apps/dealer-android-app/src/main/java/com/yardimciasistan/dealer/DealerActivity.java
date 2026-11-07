@@ -48,7 +48,7 @@ public final class DealerActivity extends ComponentActivity {
   private JSONObject accountConfig;
   private int page;
   private final Locale locale = new Locale("tr", "TR");
-  private enum Task { REFRESH, LOGIN, VERIFY, SUBMIT, LOGOUT }
+  private enum Task { REFRESH, LOGIN, VERIFY, QUOTE, SUBMIT, PAYMENT, LOGOUT }
   interface Action {
     void run() throws Exception;
   }
@@ -247,7 +247,7 @@ public final class DealerActivity extends ComponentActivity {
         try {
           if (problem == null) {
             success.run(value);
-            if (kind != Task.REFRESH)
+            if (kind != Task.REFRESH && kind != Task.QUOTE)
               render();
           } else if (problem instanceof DealerApi.Failure) {
             DealerApi.Failure error = (DealerApi.Failure) problem;
@@ -259,7 +259,8 @@ public final class DealerActivity extends ComponentActivity {
               message = error.status == 401 && kind != Task.LOGIN ? "Oturumunuz sona erdi. Aynı hesabınızla yeniden giriş yapın. Sepetiniz cihazda korunuyor." : error.getMessage();
               render();
             } else {
-              if (kind == Task.SUBMIT && error.status == 422) {
+              if (kind == Task.SUBMIT && (error.status == 422
+                  || (error.status == 409 && "quote_changed".equals(error.code)))) {
                 state.data.remove("pending");
                 state.save();
                 message = error.getMessage();
@@ -267,6 +268,8 @@ public final class DealerActivity extends ComponentActivity {
               } else
                 showMessage(error.getMessage());
             }
+          } else if (kind == Task.QUOTE && problem instanceof IllegalArgumentException) {
+            showMessage(problem.getMessage());
           } else
             showMessage(kind == Task.SUBMIT
                     ? "Gönderim doğrulanamadı. Aynı siparişi tekrar deneyin."
@@ -1110,29 +1113,146 @@ public final class DealerActivity extends ComponentActivity {
       showMessage("Yenileme bitince siparişinizi gönderebilirsiniz.");
       return;
     }
-    if (!state.data.has("pending"))
-      for (Map.Entry<String, EditText> entry : cartFields.entrySet()) {
-        double value = amount(entry.getValue());
-        if (value <= 0)
-          throw new IllegalArgumentException(
-              "Miktar sıfırdan büyük olmalı. İstemediğiniz ürünü Çıkar ile kaldırın.");
-        state.quantity(entry.getKey(), value);
-      }
-    JSONObject request = state.prepareOrder();
+    // Ambiguous attempts are never repriced or resent under a new idempotency key.
+    if (state.data.has("pending")) { sendPending(); return; }
+    for (Map.Entry<String, EditText> entry : cartFields.entrySet()) {
+      double value = amount(entry.getValue());
+      if (value <= 0) throw new IllegalArgumentException(
+          "Miktar sıfırdan büyük olmalı. İstemediğiniz ürünü Çıkar ile kaldırın.");
+      state.quantity(entry.getKey(), value);
+    }
+    JSONObject draft = state.draftOrder();
     String base = state.text("base"), cookie = state.text("cookie");
     hideKeyboard();
+    task(() -> {
+      JSONObject response = new DealerSession(base, cookie, rotatedCookieSaver())
+          .call("checkout-quote", new JSONObject()
+              .put("items", draft.getJSONArray("items"))
+              .put("delivery", draft.getJSONObject("delivery"))).body;
+      return DealerCheckout.verifiedQuote(response, draft);
+    }, this::showOrderReview, Task.QUOTE);
+  }
+
+  private void showOrderReview(JSONObject quote) throws Exception {
+    // This dialog is the only path from a cart draft to an immutable pending order.
+    final String currency = quote.getString("currency");
+    ScrollView scrollView = new ScrollView(this);
+    LinearLayout details = ui.column();
+    details.setPadding(ui.dp(18), ui.dp(8), ui.dp(18), ui.dp(14));
+    scrollView.addView(details);
+    ui.label(details, "Sunucunun doğruladığı kesin sipariş tutarı:", 15, ui.muted);
+    ui.label(details, money(quote.getLong("total_minor") / 100d, currency), 25, ui.accent)
+        .setTypeface(null, Typeface.BOLD);
+    if (quote.optBoolean("demo")) {
+      ui.label(details, "DEMO — Banka bilgileri geçersizdir; gerçek para göndermeyin.", 14, ui.danger);
+    }
+    JSONArray lines = quote.getJSONArray("items");
+    for (int i = 0; i < lines.length(); i++) {
+      JSONObject line = lines.getJSONObject(i);
+      ui.label(details, number(line.getDouble("quantity")) + " × " + line.getString("name")
+          + " — " + money(line.getLong("line_total_minor") / 100d, currency), 14, ui.ink);
+    }
+    ui.label(details, "Ürünler: " + money(quote.getLong("subtotal_minor") / 100d, currency)
+        + " · Teslimat: " + money(quote.getLong("delivery_fee_minor") / 100d, currency), 14, ui.muted);
+    JSONObject bank = quote.getJSONObject("bank"), legal = quote.getJSONObject("legal");
+    ui.label(details, "Ödeme: Banka havalesi / EFT", 17, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(details, bank.getString("name") + " · " + bank.getString("accountHolder")
+        + "\nIBAN: " + bank.getString("iban")
+        + "\nAçıklamaya sipariş numaranızı yazmanız gerekecek.", 14, ui.ink);
+    ui.label(details, "Ön bilgilendirme", 16, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(details, legal.getString("preliminary"), 13, ui.muted);
+    ui.label(details, "Mesafeli satış sözleşmesi", 16, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(details, legal.getString("agreement"), 13, ui.muted);
+    CheckBox preliminary = new CheckBox(this), agreement = new CheckBox(this), marketing = new CheckBox(this);
+    preliminary.setText("Ön bilgilendirmeyi okudum ve kabul ediyorum");
+    agreement.setText("Satış sözleşmesini okudum ve kabul ediyorum");
+    marketing.setText("Kampanya e-postaları almak istiyorum (isteğe bağlı)");
+    for (CheckBox box : new CheckBox[]{preliminary, agreement, marketing}) {
+      box.setTextColor(ui.ink);
+      box.setMinHeight(ui.dp(48));
+      details.addView(box);
+    }
+    AlertDialog dialog = new AlertDialog.Builder(this)
+        .setTitle("Sipariş ve havale onayı")
+        .setView(scrollView)
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton("Siparişi onayla", null)
+        .create();
+    dialog.setOnShowListener(ignored -> {
+      Button accept = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+      Runnable check = () -> accept.setEnabled(preliminary.isChecked() && agreement.isChecked());
+      preliminary.setOnCheckedChangeListener((button, value) -> check.run());
+      agreement.setOnCheckedChangeListener((button, value) -> check.run());
+      check.run();
+      accept.setOnClickListener(view -> {
+        try {
+          state.prepareOrder(quote, preliminary.isChecked(), agreement.isChecked(), marketing.isChecked());
+          dialog.dismiss();
+          render();
+          sendPending();
+        } catch (IllegalArgumentException | IllegalStateException error) {
+          showMessage(error.getMessage());
+        } catch (Exception error) {
+          fatalStorage();
+        }
+      });
+    });
+    dialog.show();
+  }
+
+  private void sendPending() {
+    if (busy || !state.data.has("pending")) return;
+    JSONObject request = state.object("pending");
+    String base = state.text("base"), cookie = state.text("cookie");
     render();
     task(() -> new DealerSession(base, cookie, rotatedCookieSaver()).submit(request), receipt -> {
       state.accepted(receipt);
       quantityDrafts.clear();
       tab = "Siparişler";
       detail = "";
-      message = "Talebiniz alındı. İşletme onayı bekleniyor.";
+      message = "Sipariş alındı. Havale ödemesi bekleniyor; bu bir ödeme onayı değildir.";
     }, Task.SUBMIT);
+  }
+
+  private void paymentUpdate(String action) {
+    if (busy) return;
+    String id = state.object("last_receipt").optString("order_id");
+    if (id.isEmpty()) return;
+    String base = state.text("base"), cookie = state.text("cookie");
+    task(() -> new DealerSession(base, cookie, rotatedCookieSaver())
+        .call("order-payment", new JSONObject().put("action", action).put("orderId", id)).body,
+      result -> {
+        if (!result.optBoolean("ok") || result.optJSONObject("order") == null)
+          throw new IllegalArgumentException("Ödeme durumu güncellenemedi.");
+        state.paymentStatus(result.getJSONObject("order"));
+        message = "report".equals(action) ? "Havale bildiriminiz alındı. İşletme doğrulaması bekleniyor."
+            : "Güncel ödeme durumu alındı.";
+      }, Task.PAYMENT);
   }
   private void orders() {
     ui.label(
         body, "Son kontrol: " + fallback(state.text("orders_at"), "Henüz alınmadı"), 12, ui.muted);
+    JSONObject receipt = state.object("last_receipt");
+    if (receipt.optString("order_number").matches("YA-[0-9]{8}-[A-F0-9]{10}")
+        && receipt.optJSONObject("checkout") != null) {
+      JSONObject checkout = receipt.optJSONObject("checkout"), bank = checkout.optJSONObject("bank");
+      if (bank != null) {
+        LinearLayout info = ui.card(body);
+        ui.label(info, "Son sipariş · " + receipt.optString("order_number"), 18, ui.accent)
+            .setTypeface(null, Typeface.BOLD);
+        ui.label(info, "Ödeme: " + ("paid".equals(receipt.optString("payment_status"))
+            ? "Doğrulandı" : "Havale bekleniyor / işletme doğrulayacak"), 14, ui.ink);
+        ui.label(info, "Tutar: " + money(receipt.optLong("total_minor") / 100d, receipt.optString("currency")), 17, ui.ink);
+        if (checkout.optBoolean("demo")) ui.label(info, "DEMO — Gerçek ödeme yapmayın.", 14, ui.danger);
+        ui.label(info, bank.optString("name") + " · " + bank.optString("accountHolder")
+            + "\nIBAN: " + bank.optString("iban")
+            + "\nHavale açıklaması: " + receipt.optString("order_number"), 14, ui.ink);
+        String paymentState=receipt.optString("payment_status", "unpaid");
+        if ("unpaid".equals(paymentState) || "rejected".equals(paymentState))
+          ui.button(info, "Havale yaptım", () -> paymentUpdate("report"), true);
+        ui.button(info, "Ödeme durumunu güncelle", () -> paymentUpdate("read"), false);
+      }
+    }
     JSONArray orders = state.array("orders");
     if (orders.length() == 0)
       ui.label(body,
