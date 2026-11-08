@@ -93,7 +93,7 @@ function discovery_metadata(): array
   },
   "commerce.benefits": {
     "key": "discovery.commerce.benefits",
-    "platforms": ["desktop"]
+    "platforms": ["desktop", "companion"]
   },
   "service.whatsapp": {
     "key": "discovery.service.whatsapp",
@@ -472,7 +472,7 @@ function render_discovery_tree(): void
             <summary>
               <span class="capability-heading"><span class="card-symbol"><?= icon($cardIcon) ?></span><strong><?= e(t($key . '.title')) ?></strong></span>
               <span class="capability-benefit"><?= e(t($key . '.benefit')) ?></span>
-              <span class="capability-badges"><span><?= e(t('platform.' . $meta['platforms'][0])) ?></span><?php if ($meta['ai'] ?? false): ?><span class="ai-mark"><?= icon('spark') ?><?= e(t('tree.ai_badge')) ?></span><?php endif; ?><?php if ($service): ?><span><?= e(t('tree.setup')) ?></span><?php endif; ?></span>
+              <span class="capability-badges"><?php foreach ($meta['platforms'] as $platform): ?><span><?= e(t('platform.' . $platform)) ?></span><?php endforeach; ?><?php if ($meta['ai'] ?? false): ?><span class="ai-mark"><?= icon('spark') ?><?= e(t('tree.ai_badge')) ?></span><?php endif; ?><?php if ($service): ?><span><?= e(t('tree.setup')) ?></span><?php endif; ?></span>
               <span class="card-detail-action"><span class="detail-more"><?= e(t('tree.more')) ?></span><span class="detail-less"><?= e(t('tree.less')) ?></span><span class="detail-plus" aria-hidden="true">+</span></span>
             </summary>
             <div class="capability-detail">

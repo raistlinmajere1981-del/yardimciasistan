@@ -67,13 +67,16 @@ Demo ana sayfa `deneme/site/views/pages/home.php`, üst gezinme
   ortak çekirdekte kalır. Diğer sayfalara gezinirken `view` korunur.
 - Geri dönüş için yalnız demo üst menüsünden ana tanıtım sitesine bağlantı
   verilir. Test sitesi kendi gezinmesini kullanır.
-- Üst tanıtımdaki 2.1.0 iş akışları kartları sabit tanıtım metnidir;
-  sektörel yetenek ağacına alternatif bir özellik kaydı değildir. Sektör bazlı
-  ayrıntılı yetenek analizi ayrı çalışma kapsamında yürütülür.
+- Üst tanıtımın sürüm etiketi `release.json` dosyasından okunur. Yenilik
+  kartları ve `inc/scenarios.php` içindeki sektörel senaryolar yalnızca
+  sunum verisidir; kanonik yetenek kayıtlarını veya çalışma izinlerini değiştirmez.
+  Senaryo, sektör geçişi ve mobil taşma kontrolü için
+  `node test-site/landing/scripts/smoke-landing-scenarios.mjs` çalıştırılabilir.
 - Yeni UI metinleri `locales/tr.json` içinde tutulur; dağıtım kopyası
   `deneme/locales/tr.json` dosyasıyla eşit olmalıdır. Mevcut kaynak katalog
-  üst limiti 1000 anahtar olduğundan yeni kapsamlı metin eklemeleri için
-  ortak çekirdek sahibiyle limit değerlendirmesi gerekir.
+  kaynağında uygulanan üst limit 2048 anahtardır
+  (`web-site-template/core/i18n.php`). Eski 1000 anahtar belgesi güncel
+  değildir; 512 KiB yanıt sınırı ayrıca gözetilir.
 
 ## Dinamik dil
 
@@ -195,6 +198,4 @@ Ortak şablon 0.5.2 sabit site fotoğraflarını yalnız
 `effects-manifest.json` üzerinden bağlar. Ürün, oda/masa ve
 dinamik galeri medyası bundan bağımsızdır. Görseli Atölye'den
 yerelde hazırlamak canlı siteye yüklemek anlamına gelmez.
-Yeni kaynak çeviri anahtarı eklenmedi; mevcut 1000 anahtar sınırı
-korunuyor. Geçici sabit vitrin başlıkları sonraki TR/EN düzenlemesinde
-ortak sözlükle ele alınmalıdır.
+Sektörel senaryo metinleri ortak TR kaynak kataloğuna eklendi; deneme katmanına aynı kaynak kopyası taşınır. Katalog 2048 anahtar ve kaynak HTTP boyutu sınırlarında kalmalıdır.

@@ -34,7 +34,7 @@ export function stageDemoDeployment(source, target) {
   mkdirSync(target, {recursive:true});
   const copy = path => cpSync(join(source, path), join(target, path), {recursive:true});
   for (const path of ['index.php','favicon.png','release.json', ...demoRoutes,
-    'inc/.htaccess','inc/discovery.php','inc/upper-shell.php','inc/flag-language.php','inc/demo-installation.php','inc/retired-route.php',
+    'inc/.htaccess','inc/discovery.php','inc/scenarios.php','inc/upper-shell.php','inc/flag-language.php','inc/demo-installation.php','inc/retired-route.php',
     'assets/css/landing.css','assets/css/flag-language.css','assets/js/upper.js','assets/js/flag-language.js',
     'assets/assistant','assets/guide','assets/flags','assets/yardimci-asistan-symbol.png']) {
     mkdirSync(join(target, path, '..'), {recursive:true});

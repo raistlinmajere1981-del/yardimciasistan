@@ -13,6 +13,7 @@ if (($_GET['resource'] ?? '') === 'translation-source') {
 
 require_once __DIR__ . '/inc/upper-shell.php';
 require_once __DIR__ . '/inc/discovery.php';
+require_once __DIR__ . '/inc/scenarios.php';
 use function YaLanding\t;
 use function YaLanding\e;
 
@@ -21,6 +22,9 @@ $bizConfig = is_file($bizPath) ? json_decode((string)@file_get_contents($bizPath
 $demoSecret = is_array($bizConfig) ? trim((string)($bizConfig['sync_secret'] ?? '')) : '';
 
 $lang = YaLanding\resolve_language();
+$releasePath = __DIR__ . '/release.json';
+$releaseData = is_file($releasePath) ? json_decode((string) file_get_contents($releasePath), true) : [];
+$releaseVersion = is_array($releaseData) ? (string)($releaseData['desktopVersion'] ?? '') : '';
 $pageTitle = t('landing.title');
 
 YaLanding\render_header(
@@ -82,7 +86,7 @@ YaLanding\render_header(
 <section class="section release-section" id="yenilikler" aria-labelledby="release-title">
   <div class="shell">
     <div class="section-heading">
-      <span class="eyebrow"><?= e(t('release.eyebrow')) ?></span>
+      <span class="eyebrow"><?= e(t('release.eyebrow', ['version' => $releaseVersion])) ?></span>
       <h2 id="release-title"><?= e(t('release.title')) ?></h2>
       <p><?= e(t('release.lead')) ?></p>
     </div>
@@ -100,6 +104,17 @@ YaLanding\render_header(
       <?php endforeach; ?>
     </div>
     <div class="release-outro"><p><?= e(t('release.note')) ?></p><a class="text-link" href="/deneme/"><?= e(t('release.explore')) ?> <?= YaLanding\icon('arrow') ?></a></div>
+  </div>
+</section>
+
+<section class="section scenario-section" id="is-akislari" aria-labelledby="scenario-title">
+  <div class="shell">
+    <div class="section-heading">
+      <span class="eyebrow"><?= e(t('scenario.eyebrow')) ?></span>
+      <h2 id="scenario-title"><?= e(t('scenario.title')) ?></h2>
+      <p><?= e(t('scenario.lead')) ?></p>
+    </div>
+    <?php YaLanding\render_scenarios(); ?>
   </div>
 </section>
 

@@ -27,10 +27,19 @@ document.documentElement.classList.add('js-enabled');
   const counter = document.querySelector('[data-tree-count]');
   const selector = document.querySelector('[data-explanation-selector]');
   const hint = document.querySelector('[data-explanation-hint]');
+  const scenarios = document.querySelector('[data-scenario-gallery]');
+  function updateScenario(sector) {
+    if (!scenarios) return;
+    for (const pane of scenarios.querySelectorAll('[data-scenario-pane]')) pane.hidden = pane.dataset.scenarioPane !== sector;
+    for (const link of scenarios.querySelectorAll('[data-scenario-sector]')) {
+      if (link.dataset.scenarioSector === sector) link.setAttribute('aria-current', 'true');
+      else link.removeAttribute('aria-current');
+    }
+  }
   function updateLinks(sector, mode) {
-    for (const link of [...filters.querySelectorAll('a'), ...selector.querySelectorAll('a')]) {
+    for (const link of [...filters.querySelectorAll('a'), ...selector.querySelectorAll('a'), ...(scenarios?.querySelectorAll('[data-scenario-sector]') ?? [])]) {
       const url = new URL(link.href);
-      url.searchParams.set('sector', link.dataset.sector || sector);
+      url.searchParams.set('sector', link.dataset.sector || link.dataset.scenarioSector || sector);
       url.searchParams.set('explanation', link.dataset.explanation || mode);
       link.href = url;
     }
@@ -74,7 +83,23 @@ document.documentElement.classList.add('js-enabled');
     for (const label of tree.querySelectorAll('[data-dependency]')) label.hidden = !document.getElementById(`cap-${label.dataset.dependency}`)?.hidden;
     updateLinks(sector, tree.dataset.explanationMode);
     counter.textContent = counter.dataset.countTemplate.replace('{count}', String(count));
+    updateScenario(sector);
   }
+  scenarios?.addEventListener('click', event => {
+    const filter = event.target.closest('[data-scenario-sector]');
+    if (filter && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      select(filter.dataset.scenarioSector);
+      const url = new URL(filter.href);
+      url.searchParams.set('explanation', tree.dataset.explanationMode);
+      history.pushState({}, '', url);
+      return;
+    }
+    const step = event.target.closest('[data-scenario-step]');
+    if (!step) return;
+    const target = document.getElementById('cap-' + step.dataset.scenarioStep);
+    if (target && !target.hidden) target.open = true;
+  });
   filters.addEventListener('click', event => {
     const link = event.target.closest('a[data-sector]');
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
