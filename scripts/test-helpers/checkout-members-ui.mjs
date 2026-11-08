@@ -83,9 +83,17 @@ export async function verifyCheckoutMembers(f, browser, product) {
     await page.locator('#logout').click();await expect(page.locator('#account-login')).toBeVisible();
     if(kind==='customer') {
       await page.locator('[data-account-mode=recover]').click();
+      const mailCountBeforeRecovery=f.emails.length;
       await page.locator('#account-recover [name=email]').fill(email);await page.locator('#account-recover button').click();
-      await expect(page.locator('#portal-message')).toContainText('e-posta kuyruğuna');await f.runCommerceMail();
-      const reset=new URL(f.emails.at(-1).match(/https?:\/\/[^\s]+/)[0]);
+      await expect(page.locator('#portal-message')).toContainText('e-posta kuyruğuna');
+      const delivery=await f.runCommerceMail();
+      // Commerce receipts and account tokens share one SMTP outbox. Their delivery
+      // order is not guaranteed, so select this recovery link, not the last email.
+      const resetLink=f.emails.slice(mailCountBeforeRecovery)
+        .flatMap(body=>body.match(/https?:\/\/[^\s]+/g)??[])
+        .find(value=>{const url=new URL(value);return url.searchParams.get('action')==='reset'&&url.hash.startsWith('#token=');});
+      assert.ok(resetLink,`Password reset token mail not delivered (new messages: ${f.emails.length-mailCountBeforeRecovery}, worker: ${JSON.stringify(delivery)})`);
+      const reset=new URL(resetLink);
       await page.goto(f.siteUrl+'/?page=account&action=reset'+reset.hash);
       const newPassword=accountPassword+'New';
       await page.locator('#account-token [name=password]').fill(newPassword);await page.locator('#account-token button').click();
