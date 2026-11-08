@@ -206,10 +206,17 @@ try {
   await checkoutField('deliveryMethod').selectOption('pickup');await advance('payment');
   await expect(checkoutBody).toContainText(ui('Havale / EFT'));
   await expect(checkoutBody.getByLabel(ui('Kredi kartı — Yakında'))).toBeDisabled();
-  const quoted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/checkout-quote.php` && r.request().method()==='POST');
-  await advance('review');const quoteResponse=await quoted;
-  assert.equal(quoteResponse.status(),200,await quoteResponse.text());
-  const quote=(await quoteResponse.json()).quote;
+  // Capture the real PHP response before checkout navigation releases the CDP body.
+  let quotedResult;
+  await page.route(`${config.baseUrl}/api/checkout-quote.php`,async route=>{
+    const response=await route.fetch();
+    quotedResult={status:response.status(),body:await response.json()};
+    await route.fulfill({response});
+  },{times:1});
+  await advance('review');
+  // The review document fetches its quote asynchronously after navigation.
+  await expect.poll(()=>quotedResult?.status,{message:'Real checkout quote must finish before inspection'}).toBe(200);
+  const quote=quotedResult.body.quote;
   assert.equal(quote.items[0].name,'Çay','Server acceptance retains the original authoritative product name');
   assert.equal(quote.subtotal_minor,123450);assert.equal(quote.total_minor,123450);assert.equal(quote.currency,'TRY');
   await expect(checkoutBody.locator('.shopping-summary')).toContainText('Çay × 1');
@@ -217,10 +224,17 @@ try {
   await expect(checkoutBody.locator('button[type=submit]')).toHaveText(ui('Siparişi onayla'));
   await checkoutField('preliminary').check();await checkoutField('agreement').check();
   await expect(checkoutField('marketing')).not.toBeChecked();
-  const orderAccepted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/order.php` && r.request().method()==='POST');
-  await checkoutBody.locator('button[type=submit]').click();const orderReceipt=await orderAccepted;
-  assert.equal(orderReceipt.status(),201,await orderReceipt.text());
-  const orderPayload=orderReceipt.request().postDataJSON(),order=await orderReceipt.json();
+  let acceptedOrder;
+  await page.route(`${config.baseUrl}/api/order.php`,async route=>{
+    const payload=route.request().postDataJSON();
+    const response=await route.fetch();
+    acceptedOrder={status:response.status(),body:await response.json(),payload};
+    await route.fulfill({response});
+  },{times:1});
+  await checkoutBody.locator('button[type=submit]').click();
+  await expect(page).toHaveURL(/page=checkout-result/);
+  assert.equal(acceptedOrder?.status,201,JSON.stringify(acceptedOrder?.body));
+  const orderPayload=acceptedOrder.payload,order=acceptedOrder.body;
   assert.equal(orderPayload.note,'Sipariş notu / Original buyer note.');
   assert.deepEqual(orderPayload.buyer,{name:'English Buyer',phone:'+44 7911 123456'});
   assert.deepEqual(orderPayload.items,[{productId:'p',quantity:1}]);
@@ -279,11 +293,17 @@ try {
   await widget.locator('button[type="submit"]').click();
   await expect(widget.locator('[data-ya-status]')).toContainText(ui('Talep işletmeye iletilemedi.'));
   await expect(widget.locator('textarea[name="message"]')).toHaveValue(userNote);
-  const accepted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/request.php` && r.request().method()==='POST');
+  let acceptedRequest;
+  await page.route(`${config.baseUrl}/api/request.php`,async route=>{
+    const payload=route.request().postDataJSON();
+    const response=await route.fetch();
+    acceptedRequest={status:response.status(),body:await response.json(),payload};
+    await route.fulfill({response});
+  },{times:1});
   await widget.locator('button[type="submit"]').click();
-  const receipt=await accepted;
-  assert.equal(receipt.status(),201,await receipt.text());
-  const sent=receipt.request().postDataJSON();
+  await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Talebiniz işletmeye iletildi'));
+  assert.equal(acceptedRequest?.status,201,JSON.stringify(acceptedRequest?.body));
+  const sent=acceptedRequest.payload;
   assert.equal(sent.message,userNote);assert.equal(sent.request_type,'pension_reservation');assert.equal(sent.source,'web_form');
   assert.equal(sent.idempotency_key,firstAttempt.idempotency_key);assert.equal(sent.guest_count,3);assert.match(sent.start_date,/^\d{4}-\d{2}-\d{2}$/);
   await expect(widget.locator('.ya-widget-view-title')).toHaveText(ui('Talebiniz işletmeye iletildi'));
