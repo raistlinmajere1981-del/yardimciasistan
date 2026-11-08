@@ -61,6 +61,11 @@ try {
       syncSecret: secret,
       webModuleUrl: config.baseUrl,
       servicePreferences: { whatsapp: true, android: false },
+      commerceCheckout: {
+        version: 1, enabled: true, demo: true, currency: 'TRY', shippingFeeMinor: null,
+        bank: { name: 'DEMO Banka', accountHolder: 'DEMO İki Katman', iban: 'DEMO — GEÇERSİZ — ÖDEME YAPMAYIN' },
+        legal: { version: 'demo-v2', preliminary: 'DEMO ön bilgilendirme.', agreement: 'DEMO satış sözleşmesi.' }
+      },
       initialCounts: { rooms: 0, tables: 0 },
       tableCategories: []
     })).ok,
@@ -71,6 +76,7 @@ try {
   const page = await browser.newPage();
   const pageErrors = [];
   page.on('pageerror', err => pageErrors.push(err.message));
+  await page.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
 
   console.log('1. Checking Source Discovery (Desktop Catalog Contract)...');
   const rootCatalogRes = await fetch(`${base}/?resource=translation-source`);
@@ -217,28 +223,69 @@ try {
   // Real retail transaction through the shared storefront, including an uncertain response retry.
   await page.goto(`${base}/deneme/?page=catalog`);
   await page.locator('[data-commerce-products]').getByRole('button',{name:'Sepete ekle',exact:true}).click();
-  await expect(page.locator('[data-commerce-lines] [data-commerce-quantity]')).toHaveCount(1);
-  await expect(page.locator('[data-commerce-lines] [data-commerce-quantity]')).toHaveValue('1');
-  await page.locator('[data-commerce-checkout]').click();
-  await page.locator('#commerce-name').fill('Demo Buyer');
-  await page.locator('#commerce-phone').fill('+905321234567');
-  await page.locator('#commerce-note').fill('Original demo order note');
+  await expect(page.locator('#header-cart-count')).toHaveText('1');
+  await page.goto(`${base}/deneme/?page=cart`);
+  await expect(page.locator('#shopping-cart [data-cart-lines]')).toContainText('Doğal Karadeniz Balı');
+  await expect(page.locator('#shopping-cart input[type=number]')).toHaveCount(1);
+  await expect(page.locator('#shopping-cart input[type=number]')).toHaveValue('1');
+  await page.locator('#shopping-cart [data-checkout-link]').click();
+  await expect(page).toHaveURL(/page=checkout-customer/);
+  await page.locator('input[name=name]').fill('Demo Buyer');
+  await page.locator('input[name=phone]').fill('+905321234567');
+  await page.locator('input[name=note]').fill('Original demo order note');
+  await page.getByRole('button',{name:'Devam et',exact:true}).click();
+  await expect(page).toHaveURL(/page=checkout-delivery/);
+  await page.getByRole('link',{name:'Geri',exact:true}).click();
+  await expect(page.locator('input[name=note]')).toHaveValue('Original demo order note');
+  await page.getByRole('button',{name:'Devam et',exact:true}).click();
+  await page.locator('select[name=deliveryMethod]').selectOption('pickup');
+  await page.getByRole('button',{name:'Devam et',exact:true}).click();
+  await expect(page).toHaveURL(/page=checkout-payment/);
+  await expect(page.getByLabel('Havale / EFT',{exact:true})).toBeChecked();
+  await expect(page.getByLabel('Kredi kartı — Yakında')).toBeDisabled();
+  const quoted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/checkout-quote.php`&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Devam et',exact:true}).click();
+  const quoteResponse=await quoted;assert.equal(quoteResponse.status(),200,await quoteResponse.text());
+  const {quote}=await quoteResponse.json();assert.equal(quote.total_minor,45000);assert.equal(quote.delivery_method,'pickup');
+  await expect(page).toHaveURL(/page=checkout-review/);
+  await expect(page.locator('.shopping-summary')).toContainText('450,00');
+  await page.getByLabel('Ön bilgilendirmeyi okudum ve kabul ediyorum.').check();
+  await page.getByLabel('Satış sözleşmesini kabul ediyorum.',{exact:true}).check();
   let attempt;
-  await page.route(`${config.baseUrl}/api/order.php`,async route=>{attempt=route.request().postDataJSON();await route.fulfill({status:503,json:{ok:false}});},{times:1});
-  await page.locator('[data-commerce-submit]').click();
-  await expect(page.locator('[data-commerce-message]')).toContainText('doğrulanamadı');
-  await expect(page.locator('#commerce-note')).toHaveValue('Original demo order note');
-  const accepted=page.waitForResponse(r=>r.url()===`${config.baseUrl}/api/order.php`&&r.request().method()==='POST');
-  await page.locator('[data-commerce-submit]').click();const receipt=await accepted;
-  assert.equal(receipt.status(),201,await receipt.text());
-  assert.deepEqual(receipt.request().postDataJSON(),attempt,'Retry must preserve the exact order intent and identity');
-  await expect(page.locator('[data-commerce-reference]')).not.toHaveText('');
-  await expect(page.locator('[data-commerce-success]')).toBeVisible();
+  await page.route(`${config.baseUrl}/api/order.php`,async route=>{attempt=route.request().postData();await route.fulfill({status:503,json:{ok:false}});},{times:1});
+  await page.getByRole('button',{name:'Siparişi onayla',exact:true}).click();
+  await expect(page.locator('#checkout-message')).toContainText('doğrulanamadı');
+  await expect(page).toHaveURL(/page=checkout-review/);
+  const intent=JSON.parse(attempt);
+  assert.equal(intent.note,'Original demo order note');
+  assert.equal(intent.quoteId,quote.quote_id);
+  assert.equal(intent.paymentMethod,'bank_transfer');
+  assert.deepEqual(intent.consent,{preliminary:true,agreement:true,marketing:false});
+  // Capture the actual PHP response before checkout navigation destroys its CDP body.
+  let acceptedResult;
+  await page.route(`${config.baseUrl}/api/order.php`,async route=>{
+    const response=await route.fetch();
+    acceptedResult={status:response.status(),body:await response.json(),requestBody:route.request().postData()};
+    await route.fulfill({response});
+  },{times:1});
+  await page.getByRole('button',{name:'Siparişi onayla',exact:true}).click();
+  await expect(page).toHaveURL(/page=checkout-result/);
+  assert.equal(acceptedResult?.status,201,JSON.stringify(acceptedResult?.body));
+  assert.equal(acceptedResult.requestBody,attempt,'Retry must preserve the exact order body and identity');
+  const order=acceptedResult.body;assert.equal(order.ok,true);assert.ok(order.order_id);
+  assert.equal(order.total_minor,45000);assert.equal(order.payment_status,'unpaid');
+  assert.equal(order.checkout.quote_id,quote.quote_id);assert.deepEqual(order.checkout.consent,intent.consent);
+  assert.match(order.order_number,/^YA-\d{8}-[A-F0-9]{10}$/);
+  await expect(page).toHaveURL(/page=checkout-result/);
+  await expect(page.locator('#checkout-body h2')).toHaveText(order.order_number);
+  await expect(page.locator('#checkout-body')).toContainText('DEMO — GEÇERSİZ');
+  console.log('PASS shared Commerce V2 guest checkout: server quote, consent, uncertain 503, exact retry and accepted reference');
 
   console.log('7. Verifying Account Portal and Redirects...');
   await page.goto(`${base}/deneme/?page=account`);
   await expect(page.locator('#account-login')).toBeVisible();
-  await expect(page.locator('#portal-message')).toContainText('giriş yapın');
+  await expect(page.locator('#portal-message')).toContainText('E-posta hizmeti hazırlanıyor');
+  await expect(page.locator('#account-register')).toBeHidden();
 
   // Test legacy path redirects
   await page.goto(`${base}/deneme/hesabim/`);

@@ -14,7 +14,9 @@ const code = `require $argv[1].'/core/bootstrap.php';
   echo json_encode(['about'=>$about,'gallery'=>$gallery,'pages'=>array_keys($pages)]);`;
 for(const [name,root] of [['canonical',resolve('web-site-template')],['demo',resolve('test-site/landing/deneme')],['blacksea',resolveInstallationRepo('blacksea')]]) {
   const render=value=>JSON.parse(execFileSync('php',['-r',code,root],{encoding:'utf8',input:JSON.stringify(value)}));
-  const empty=render({});assert.deepEqual(empty.pages,['home']);assert.equal(empty.about,'');assert.equal(empty.gallery,'');
+  const checkoutPages = ['cart','checkout-customer','checkout-delivery','checkout-payment','checkout-review','checkout-result'];
+  const assertNoBusinessSurface = (pages) => assert.deepEqual(pages, ['home',...checkoutPages], 'Only home and hidden checkout recovery routes may exist without publication');
+  const empty=render({});assertNoBusinessSurface(empty.pages);assert.equal(empty.about,'');assert.equal(empty.gallery,'');
   const populated=render({about_text:'Hakkımızda <script>alert(1)</script>',gallery:[
     {id:'bad',url:'javascript:alert(1)',title:'bad'},
     {id:'valid',url:'/yardimci-asistan/media/gallery/gallery/valid.jpg',title:'Oda <b>fotoğrafı</b>'},
@@ -23,7 +25,7 @@ for(const [name,root] of [['canonical',resolve('web-site-template')],['demo',res
   assert.ok(populated.about.includes('Hakkımızda &lt;script&gt;alert(1)&lt;/script&gt;'));
   assert.ok(populated.gallery.includes('/yardimci-asistan/media/gallery/gallery/valid.jpg'));assert.ok(!populated.gallery.includes('javascript:'));
   assert.ok(populated.gallery.includes('Oda &lt;b&gt;fotoğrafı&lt;/b&gt;'));assert.ok(!populated.gallery.includes('withdrawn.jpg'));
-  assert.deepEqual(render({about_text:'',gallery:[]}).pages,['home']);
+  assertNoBusinessSurface(render({about_text:'',gallery:[]}).pages);
   console.log(name+'-shared-template-about-gallery-visibility-ok');
 }
 console.log('business-site-pages-contract-ok');

@@ -42,6 +42,8 @@ const SMOKE_FILES = [
   "scripts/smoke-companion-points-principal.mjs",
   "scripts/smoke-companion-points-production-path.mjs",
   "scripts/smoke-connection-status.mjs",
+  "scripts/smoke-qr-table-order-web.mjs",
+  "scripts/smoke-qr-table-order-acceptance.mjs",
   "scripts/smoke-demo-two-layer.mjs",
   "scripts/smoke-web-site-template.mjs",
   "scripts/smoke-customer-accounts.mjs",
@@ -743,6 +745,7 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-android-device-authorization-epoch.mjs" || file === "scripts/smoke-android-local-business-summary.mjs") return [];
   if (file === "scripts/smoke-local-pairing-qr.mjs") return [];
   if (file === "scripts/smoke-connection-status.mjs") return [];
+  if (file === "scripts/smoke-qr-table-order-web.mjs" || file === "scripts/smoke-qr-table-order-acceptance.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["build-desktop", "build-demo", "php-lint"];
   // Copied PHP site/hosting plus isolated Desktop translation fixtures; no Demo build.
   if (file === "scripts/smoke-web-site-template.mjs") return ["build-desktop"];
@@ -793,6 +796,7 @@ function smokeDomains(file) {
   if (file === "scripts/smoke-service-prerequisites.mjs" || file === "scripts/smoke-service-tiles-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-print-management-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-table-order-benefits.mjs" || file === "scripts/smoke-table-order-benefits-ui.mjs") return ["desktop", "hospitality", "commerce", "finance", "customers"];
+  if (file === "scripts/smoke-qr-table-order-web.mjs" || file === "scripts/smoke-qr-table-order-acceptance.mjs") return ["web", "hospitality", "commerce", "product-identity"];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["web", "translations", "commerce"];
   if (file.startsWith("scripts/smoke-product-photos")) return ["desktop", "commerce", "web", "product-identity"];
   if (file === "scripts/smoke-entity-single-card.mjs") return ["desktop", "commerce", "customers", "hospitality"];

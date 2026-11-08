@@ -246,11 +246,11 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
         {ordersEnabled && orderTables.length > 0 && <section aria-label="Masalara özel QR kodları">
           <strong>Masalara özel QR kodları</strong>
           <p>Her masa kendi sipariş bağlantısına sahip. Kodları masalara yerleştirebilirsiniz.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16 }}>
+          <div className="qr-menu-tools__tables">
             {orderTables.map(table => {
               let tableSvg = "";
               try { tableSvg = createQrSvg(tableUrl(table)); } catch { /* invalid or too long */ }
-              return <div key={table.id} style={{ textAlign: "center" }}>
+              return <div key={table.id} className="qr-menu-tools__table">
                 <strong>{table.area ? `${table.area} · ` : ""}{table.name}</strong>
                 {tableSvg && <div className="qr-menu-tools__code" aria-label={`${table.name} QR`} dangerouslySetInnerHTML={{ __html: tableSvg }} />}
                 <ActionButton variant="secondary" size="sm" disabled={!tableSvg} onClick={() => downloadTableQr(table)}>

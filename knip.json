@@ -41,6 +41,10 @@
         "*.config.ts"
       ]
     },
+    "packages/image-inspector": {
+      "entry": ["runtime/*.js", "sync-web.mjs"],
+      "project": ["runtime/*.js", "sync-web.mjs", "test/*.test.mjs"]
+    },
     "packages/shared": {
       "project": [
         "**/*.ts"

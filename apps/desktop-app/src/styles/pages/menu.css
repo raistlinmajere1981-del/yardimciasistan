@@ -852,6 +852,16 @@
   padding: var(--space-4);
 }
 
+.qr-menu-tools__tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+}
+
+.qr-menu-tools__table {
+  text-align: center;
+}
+
 .qr-menu-tools__code {
   width: min(100%, 14rem);
   aspect-ratio: 1;

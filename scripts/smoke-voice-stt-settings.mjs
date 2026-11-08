@@ -43,7 +43,7 @@ function frontend(file) {
   tsCache.set(file, module.exports);
   const localRequire = createRequire(file);
   const code = ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  runInNewContext(code, { module, exports: module.exports, require: id => id.startsWith(".") ? frontend(resolve(dirname(file), `${id}.ts`)) : localRequire(id) });
+  runInNewContext(code, { module, exports: module.exports, structuredClone, require: id => id.startsWith(".") ? frontend(resolve(dirname(file), `${id}.ts`)) : localRequire(id) });
   return module.exports;
 }
 const model = frontend(resolve("apps/desktop-app/src/app/setup-model.ts"));
