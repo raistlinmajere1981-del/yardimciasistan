@@ -9,6 +9,7 @@ import { runEffectStudio } from "./effect-studio-service";
 
 type StudioReply = {
   sourceHash?: string;
+  draftDigest?: string;
   changed?: boolean;
   readiness?: EffectReadiness;
   scene?: unknown;
@@ -66,14 +67,15 @@ export class BirdesengorEffectRelease {
     requireTarget(id);
     this.invalidate();
     const prepared = await this.studio("prepare", BIRDESENGOR_EFFECT_SCENE_ID);
-    if (!prepared.sourceHash || !prepared.readiness?.ready)
+    if (!prepared.sourceHash || !prepared.draftDigest || !prepared.readiness?.ready)
       throw new Error("V2 sahnesi henüz siteye hazırlanmaya uygun değil.");
     await runStage(this.runner, "preflight");
     const current = await this.studio("load", BIRDESENGOR_EFFECT_SCENE_ID);
-    if (current.sourceHash !== prepared.sourceHash || !current.readiness?.ready)
-      throw new Error("Ön kontrol sırasında kaynak değişti. Yeni ön kontrol gerekiyor.");
+    if (current.sourceHash !== prepared.sourceHash || !current.readiness?.ready ||
+        draftHash(current.scene) !== prepared.draftDigest)
+      throw new Error("Ön kontrol sırasında kaynak veya kaydedilen taslak değişti. Yeni ön kontrol gerekiyor.");
     const token = randomUUID();
-    this.pending = { token, sourceHash: prepared.sourceHash, draftHash: draftHash(current.scene),
+    this.pending = { token, sourceHash: prepared.sourceHash, draftHash: prepared.draftDigest,
       expiresAt: Date.now() + RELEASE_TTL_MS };
     return {
       ok: true as const, token, sourceHash: prepared.sourceHash,

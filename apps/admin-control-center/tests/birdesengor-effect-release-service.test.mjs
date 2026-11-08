@@ -1,4 +1,5 @@
 import test from "node:test";
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { BirdesengorEffectRelease } from "../dist-electron/electron/services/birdesengor-effect-release-service.js";
 import { getDeploymentTargets } from "../dist-electron/electron/services/deployment-runner.js";
@@ -31,8 +32,9 @@ function fixtures(results = {}) {
   };
   const studio = async (action, id) => {
     studioCalls.push([action, id]);
-    return { sourceHash, changed: action === "prepare", readiness: { ...readiness, ready: currentReady },
-      scene: { kind: "objectScene", sceneId: "birdesengor-study-v2", revision: draftRevision } };
+    const scene = { kind: "objectScene", sceneId: "birdesengor-study-v2", revision: draftRevision };
+    return { sourceHash, changed: action === "prepare", readiness: { ...readiness, ready: currentReady }, scene,
+      draftDigest: action === "prepare" ? createHash("sha256").update(JSON.stringify(scene)).digest("hex") : undefined };
   };
   return {
     runner, calls, studioCalls,
@@ -93,6 +95,15 @@ test("source changes after dry-run invalidate approval, even when user has a tok
   await assert.rejects(fixture.site.deploy(sceneId,gate.token), /kaynağı.*değişti/);
   assert.deepEqual(fixture.calls.map(item => item.action), ["preflight"]);
   await assert.rejects(fixture.site.deploy(sceneId,gate.token), /onayı geçersiz/);
+});
+
+test("saved draft changed DURING preflight aborts before approval", async () => {
+  const fixture = fixtures();
+  fixture.runner.subscribe(state => {
+    if (state.action === "preflight" && !state.running) fixture.updateDraft(2);
+  });
+  await assert.rejects(fixture.site.preflight(sceneId), /taslak değişti/);
+  assert.deepEqual(fixture.calls.map(item => item.action), ["preflight"]);
 });
 
 test("saved draft changed after preflight also invalidates approval", async () => {
