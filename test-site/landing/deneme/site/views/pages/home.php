@@ -4,7 +4,7 @@ namespace YaSite;
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
 
 $visitor = ($_GET['view'] ?? '') === 'visitor';
-$available = array_diff(array_keys($view['pages']), ['home']);
+$available = array_diff(array_keys(array_filter($view['pages'], static fn (array $page): bool => empty($page['internal']))), ['home']);
 $catalog = [
   'about' => 'HK', 'rooms' => 'OD', 'restaurant' => 'MS',
   'menu' => 'QR', 'catalog' => 'ÜR', 'gallery' => 'GA',
@@ -31,7 +31,7 @@ $status = $view['status'];
     </section>
   <?php else: ?>
     <div class="page-grid">
-      <?php foreach ($view['pages'] as $id => $page): if ($id === 'home') continue; ?>
+      <?php foreach ($view['pages'] as $id => $page): if ($id === 'home' || !empty($page['internal'])) continue; ?>
       <a class="page-link" href="<?= e(page_url($site, $id) . '&view=visitor') ?>"><?= e(t($site, $page['key'])) ?></a>
       <?php endforeach; ?>
     </div>
@@ -100,7 +100,7 @@ $status = $view['status'];
       </section>
       <?php else: ?>
       <div class="page-grid lab-live-grid">
-        <?php foreach ($view['pages'] as $id => $page): if ($id === 'home') continue; ?>
+        <?php foreach ($view['pages'] as $id => $page): if ($id === 'home' || !empty($page['internal'])) continue; ?>
           <a class="page-link lab-live-card" href="<?= e(page_url($site, $id)) ?>">
             <span class="lab-card-symbol" aria-hidden="true"><?= e($catalog[$id] ?? '•') ?></span>
             <span class="lab-card-text"><strong><?= e(t($site, $page['key'])) ?></strong><small><?= e(t($site, 'lab.live_card')) ?></small></span>

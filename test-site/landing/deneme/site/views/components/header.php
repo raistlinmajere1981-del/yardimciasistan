@@ -15,9 +15,11 @@ $home = page_url($site, 'home') . ($visitor ? '&view=visitor' : '');
     <button type="button" class="menu-toggle" aria-expanded="true" aria-controls="main-navigation" data-menu-toggle hidden><?= e(t($site, 'nav.close')) ?></button>
     <nav id="main-navigation" class="main-navigation" aria-label="<?= e(t($site, 'nav.main')) ?>">
       <?php foreach ($view['pages'] as $id => $page): ?>
+      <?php if (!empty($page['internal'])) continue; // Checkout steps are direct routes, never primary navigation. ?>
       <a href="<?= e(page_url($site, $id) . ($visitor ? '&view=visitor' : '')) ?>"<?= $view['page'] === $id ? ' aria-current="page"' : '' ?>><?= e(t($site, $page['key'])) ?></a>
       <?php endforeach; ?>
     </nav>
+    <?php if (isset($view['pages']['catalog'])): ?><a class="header-cart-link" data-cart-open aria-controls="mini-cart" aria-haspopup="dialog" href="<?= e(page_url($site, 'cart')) ?>"><?= e(t($site, 'cart.title')) ?> <span id="header-cart-count" hidden>0</span></a><?php endif; ?>
     <a class="lab-exit" href="/"><?= e(t($site, 'lab.back')) ?><span aria-hidden="true">↗</span></a>
     <?php if (count($site['language']['catalogs']) > 1): ?>
     <form method="get" class="language-picker">
