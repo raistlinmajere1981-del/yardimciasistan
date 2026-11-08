@@ -88,6 +88,23 @@ test("demo generator emits restorable, readable packages", { timeout: 180000 }, 
         assert.equal(settings[0].web_module_url, "");
         assert.equal(settings[0].sync_secret, "");
         assert.equal(settings[0].auto_sync_enabled, 0);
+        if (pkg.id === "c-market-dealer") {
+          // A portable sample must not fabricate verified account identities:
+          // the real host rejects unregistered dealer bindings with HTTP 422.
+          assert.equal(db.prepare("SELECT COUNT(*) AS n FROM web_customer_accounts").get().n, 0);
+          assert.equal(db.prepare("SELECT COUNT(*) AS n FROM customer_web_access WHERE account_id <> ''").get().n, 0);
+          const { createDealerAccessProjection } = require("../../apps/desktop-app/dist-electron/dealer-web-access-store.js");
+          const projection = createDealerAccessProjection(db);
+          assert.equal(projection.dealers.filter(dealer => dealer.enabled).length, 2);
+          assert.deepEqual(projection.catalogs, []);
+          const validatorPath = path.resolve(here, "../../firm-template/web-module/lib/dealer-access.php");
+          const phpCode = `require ${JSON.stringify(validatorPath)}; $input=json_decode(file_get_contents("php://stdin"),true); try { ya_dealer_projection($input); echo "valid"; } catch (InvalidArgumentException $e) { fwrite(STDERR,$e->getMessage()); exit(2); }`;
+          const accepted = spawnSync("php", ["-r", phpCode], {
+            input: JSON.stringify(projection), encoding: "utf8"
+          });
+          assert.equal(accepted.status, 0, accepted.stderr || accepted.error?.message);
+          assert.equal(accepted.stdout, "valid");
+        }
       } finally {
         db.close();
       }

@@ -35,7 +35,7 @@ Running the generator writes only under `artifacts/demo-data/`:
 | --- | --- | --- |
 | `yardimci-asistan-demo-<version>-a-pension-restaurant.zip` | `pension_restaurant` | Rooms, stays, an open folio, table orders, QR menu, reservations, tasks, requests, Finance projections and a four-piece media set (cover, photo, 180° and 360° panorama) for every room and table |
 | `yardimci-asistan-demo-<version>-b-market.zip` | `market` | Catalog, barcode stock, suppliers, a purchase order, paid sales, one full refund, benefit rules and points |
-| `yardimci-asistan-demo-<version>-c-market-dealer.zip` | `market` + wholesale/credit/online sales | Dealer profiles, dealer prices, web-linked dealer accounts, dealer orders, online catalog publication, customer credit and benefit rules |
+| `yardimci-asistan-demo-<version>-c-market-dealer.zip` | `market` + wholesale/credit/online sales | Dealer profiles, dealer prices, unlinked web-access eligibility, sample dealer orders, online catalog publication, customer credit and benefit rules; real web accounts must be registered and linked on the live server |
 | `yardimci-asistan-demo-<version>-d-teknikel.zip` (opt-in) | `market` + wholesale/credit/online sales | 179 source products, 25 categories, 68 original image files, 30 synthetic customers, 28 curated publications, four demo orders, draft purchase and customer credit; no linked web accounts |
 | `demo-data-manifest.json` | — | SHA-256 hashes, sizes, expected counts, read checks and limitations |
 

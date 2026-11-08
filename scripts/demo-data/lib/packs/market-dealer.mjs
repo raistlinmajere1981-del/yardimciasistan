@@ -274,16 +274,9 @@ export const marketDealerPack = {
     });
     const customerByKey = new Map(customers.map((customer) => [customer.key, customer]));
 
-    // Link two dealer customers to synthetic web accounts so the dealer publication is consumable.
-    const linkedCustomers = [customerByKey.get("dealer_a"), customerByKey.get("dealer_b")];
-    const accounts = linkedCustomers.map((customer, index) => {
-      const accountId = `acct_demo_md_${index + 1}`;
-      db.prepare("INSERT INTO web_customer_accounts (account_id, email, full_name, customer_id, status) VALUES (?, ?, ?, ?, 'linked')")
-        .run(accountId, customer.email, customer.fullName, customer.id);
-      db.prepare("UPDATE customer_web_access SET account_id = ?, updated_at = ? WHERE customer_id = ?")
-        .run(accountId, FIXED_NOW, customer.id);
-      return { accountId, customerId: customer.id, accessId: accessIdForCustomer(db, customer.id) };
-    });
+    // No synthetic linked web accounts: only the live server may issue verified
+    // account UUIDs. Dealers remain eligible for desktop pricing and orders;
+    // their web access can be linked after real customer registration.
 
     // Online catalog publication for part of the catalog.
     let publicationCount = 0;
@@ -428,9 +421,9 @@ export const marketDealerPack = {
         suppliers: 2,
         purchaseOrders: 1,
         orders: 4,
-        dealerOrders: 3,
+        dealerOrders: 0,
         dealerAccessEligible: true,
-        dealerCatalogProducts: publicationCount,
+        dealerCatalogProducts: 0,
         creditBalanceMinor: 100000,
         benefitRules: 2,
         pointBalanceMinor: 5000,
@@ -445,8 +438,7 @@ export const marketDealerPack = {
         orderConfirmed: order2.id,
         orderFulfilled: order3.id,
         orderCancelled: order4.id,
-        saleCredit: "sale_md_credit_1",
-        accounts
+        saleCredit: "sale_md_credit_1"
       }
     };
   }

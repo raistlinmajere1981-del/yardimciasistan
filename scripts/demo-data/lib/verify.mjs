@@ -306,7 +306,9 @@ function checkMarketDealer({ db, dbPath, pack }) {
   check("dealerAccess.accessId", () => access?.accessId ?? "", pack.expected.ids.dealerAccessA);
   check("dealerProjection.enabled", () => projection.enabled, true);
   check("dealerProjection.dealers", () => projection.dealers.filter((dealer) => dealer.enabled).length, 2);
-  check("dealerProjection.catalog", () => projection.catalogs.length, 2);
+  check("dealerProjection.unlinkedAccounts", () => db.prepare("SELECT COUNT(*) AS count FROM web_customer_accounts").get().count, 0);
+  check("dealerProjection.unboundCustomers", () => db.prepare("SELECT COUNT(*) AS count FROM customer_web_access WHERE account_id <> ''").get().count, 0);
+  check("dealerProjection.catalog", () => projection.catalogs.length, 0);
   check("dealerProjection.catalogProducts", () => projection.catalogs[0]?.products.length ?? 0, expected.dealerCatalogProducts);
   check("dealerProjection.orderHistory", () => projection.order_history.find((entry) => entry.access_id === access?.accessId)?.orders.length ?? 0, expected.dealerOrders);
   check("price.dealerA", () => price.unitPrice, 520);
