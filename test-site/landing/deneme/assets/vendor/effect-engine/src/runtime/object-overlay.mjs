@@ -1,3 +1,5 @@
+import {bindMotionLayer} from './object-motion.mjs';
+import {createInteractionProgress} from './interaction-progress.mjs';
 import {ticker as sharedTicker} from './ticker.mjs';
 import {seededRandom} from './random.mjs';
 import {effectCanvasStyle,depthZIndex,sortByDepth} from './object-scene.mjs';
@@ -93,6 +95,14 @@ export function createObjectOverlay(objectElement, config, options={}) {
   const layers=[];
   try{
     selected.forEach((effect,index)=>{
+      if(effect.output==='motion'){
+        const motion=bindMotionLayer(objectElement,effect);
+        try{
+          const instance=effect.create({params:effect.params});
+          layers.push({effect,motion,instance,width:1,height:1,pixelCount:0});
+        }catch(error){motion.destroy();throw error;}
+        return;
+      }
       const canvas=documentRef.createElement('canvas');
       canvas.className='object-effect-overlay';
       canvas.setAttribute('aria-hidden','true');
@@ -106,44 +116,51 @@ export function createObjectOverlay(objectElement, config, options={}) {
         const ctx=canvas.getContext('2d',{alpha:true});
         if(!ctx)throw new Error('Canvas 2D unavailable');
         const instance=effect.create({random:seededRandom(`${config.seed??1}:${effect.seed??index}`),params:effect.params});
-        layers.push({effect,canvas,ctx,instance,width:0,height:0,scale:1,pixelCount:0});
+        const interaction=effect.type==='glow'&&['hover','click'].includes(effect.trigger)
+          ?createInteractionProgress({trigger:effect.trigger,...effect.interaction}):null;
+        if(interaction)instance.setProgress(0);
+        layers.push({effect,canvas,ctx,instance,interaction,width:0,height:0,scale:1,pixelCount:0});
       }catch(error){
         canvas.remove?.();
         throw error;
       }
     });
   }catch(error){
-    layers.forEach(layer=>{layer.instance?.destroy?.();layer.canvas.remove();});
+    layers.forEach(layer=>{layer.instance?.destroy?.();layer.motion?.destroy();layer.canvas?.remove();});
     releasePosition();
     throw error;
   }
+  let completed=false;
   let disposed=false,visible=false,pageActive=true,ready=false,unsubscribe=null,everConnected=objectElement.isConnected;
   let elapsed=0,frames=0,cost=0,totalCost=0,slowFrames=0,paused=false,cssVisible=styleVisible(objectElement);
   const removers=[];
   const listen=(target,event,callback)=>{target?.addEventListener?.(event,callback);removers.push(()=>target?.removeEventListener?.(event,callback));};
   function clearLayer(layer){
+    if(layer.motion){layer.motion.reset();return;}
     layer.ctx.setTransform(1,0,0,1,0,0);
     layer.ctx.clearRect(0,0,layer.canvas.width,layer.canvas.height);
   }
   function clear(){for(const layer of layers)clearLayer(layer);}
   function stop(){
     unsubscribe?.();unsubscribe=null;
-    for(const layer of layers)layer.canvas.style.display='none';
+    for(const layer of layers)layer.canvas&&(layer.canvas.style.display='none');
     clear();
   }
   function sync(){
-    const run=!disposed&&!paused&&enabled&&ready&&visible&&pageActive&&!documentRef.hidden&&!media.matches&&cssVisible;
+    const hasActiveLayer=layers.some(layer=>!layer.interaction||(
+      options.interactive===true&&layer.interaction.state().active));
+    const run=!completed&&!disposed&&!paused&&enabled&&ready&&visible&&pageActive&&!documentRef.hidden&&!media.matches&&cssVisible&&hasActiveLayer;
     if(!run){
       // Paused frames are repainted without advancing time; all other gates stop work.
-      if(paused&&ready&&visible&&enabled&&!disposed&&!media.matches&&pageActive&&!documentRef.hidden&&cssVisible){
+      if(!completed&&paused&&ready&&visible&&enabled&&!disposed&&!media.matches&&pageActive&&!documentRef.hidden&&cssVisible){
         unsubscribe?.();unsubscribe=null;
-        for(const layer of layers)layer.canvas.style.display='block';
+        for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
         draw(0);
       }else stop();
       return;
     }
     if(!unsubscribe){
-      for(const layer of layers)layer.canvas.style.display='block';
+      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
       unsubscribe=ticker.add(draw,fps);
     }
   }
@@ -162,19 +179,32 @@ export function createObjectOverlay(objectElement, config, options={}) {
     const start=globalThis.performance?.now?.()??Date.now();
     elapsed+=dt;
     for(const layer of layers){
+      if(layer.motion){
+        if(!layer.motion.connected()){destroy();return;}
+        try{layer.instance.update(dt);layer.motion.apply(layer.instance.motion());}catch(error){destroy();throw error;}
+        continue;
+      }
       clearLayer(layer);
       if(!layer.width||!layer.height)continue;
+      if(layer.interaction){
+        const {progress}=layer.interaction.tick(dt);
+        layer.instance.setProgress(progress);
+        if(progress<=0)continue;
+      }
       layer.ctx.setTransform(layer.scale,0,0,layer.scale,0,0);
       try{
         layer.instance.update(dt);
         layer.instance.render(layer.ctx,{elapsed,width:layer.width,height:layer.height,pixelScale:layer.scale,placement:layer.effect.placement});
       }catch(error){destroy();throw error;}
     }
+    if(layers.every(layer=>layer.instance.isComplete?.()===true)){completed=true;stop();}
     frames++;
     cost=(globalThis.performance?.now?.()??Date.now())-start;
     totalCost+=cost;
     slowFrames=cost>6?slowFrames+1:Math.max(0,slowFrames-1);
     if(slowFrames>=30&&fps>15){fps=15;dprLimit=1;slowFrames=0;stop();resize();}
+    if(layers.some(layer=>layer.interaction)&&!layers.some(layer=>!layer.interaction||(
+      options.interactive===true&&layer.interaction.state().active)))sync();
   }
   function resize(){
     if(disposed)return;
@@ -186,6 +216,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
     dpr=Math.min(globalThis.devicePixelRatio||1,dprLimit);
     const budget=Math.max(1,(policy.maxPixels||1200000)/Math.max(1,layers.length));
     for(const layer of layers){
+      if(layer.motion){layer.width=width;layer.height=height;continue;}
       const cssWidth=width*layer.effect.params.width,cssHeight=height*layer.effect.params.height;
       if(!(cssWidth>0)||!(cssHeight>0)){layer.width=layer.height=0;layer.pixelCount=0;continue;}
       const scale=Math.max(.01,Math.min(dpr,Math.sqrt(budget/Math.max(1,cssWidth*cssHeight))));
@@ -218,28 +249,49 @@ export function createObjectOverlay(objectElement, config, options={}) {
     }
   }
   listen(globalThis.window,'resize',resize);
-  listen(documentRef,'visibilitychange',sync);
-  listen(media,'change',sync);
-  listen(globalThis.window,'pagehide',()=>{pageActive=false;sync();});
+  listen(documentRef,'visibilitychange',()=>{if(documentRef.hidden)resetInteractive();sync();});
+  const resetInteractive=()=>{
+    for(const layer of layers)if(layer.interaction){layer.interaction.reset();layer.instance.setProgress(0);}
+  };
+  if(options.interactive===true&&layers.some(layer=>layer.interaction)){
+    // The effect canvas can live in a non-interactive photographic host while
+    // the user's real input remains on the existing button. Both are owned by
+    // the same site interaction. No synthetic clicks or duplicate controls.
+    const eventTarget=options.interactionTarget??objectElement;
+    if(typeof eventTarget?.addEventListener!=='function')throw new Error('Interactive effect target is missing.');
+    const target=(mode,action)=>{
+      for(const layer of layers)if(layer.interaction&&layer.effect.trigger===mode)layer.interaction[action]();
+      sync();
+    };
+    listen(eventTarget,'pointerenter',()=>target('hover','enter'));
+    listen(eventTarget,'pointerleave',()=>target('hover','leave'));
+    listen(eventTarget,'focusin',()=>target('hover','enter'));
+    listen(eventTarget,'focusout',()=>target('hover','leave'));
+    listen(eventTarget,'click',()=>target('click','click'));
+  }
+  listen(media,'change',()=>{if(media.matches)resetInteractive();sync();});
+  listen(globalThis.window,'pagehide',()=>{pageActive=false;resetInteractive();sync();});
   listen(globalThis.window,'pageshow',()=>{pageActive=true;resize();});
   function destroy(){
     if(disposed)return;
     disposed=true;
+    resetInteractive();
     stop();
     observer?.disconnect();resizeObserver?.disconnect();mutationObserver?.disconnect();
     removers.forEach(remove=>remove());
     for(const layer of layers){
       layer.instance.destroy?.();
-      layer.canvas.remove?.();
-      layer.canvas.width=layer.canvas.height=1;
+      layer.motion?.destroy();
+      layer.canvas?.remove?.();
+      if(layer.canvas)layer.canvas.width=layer.canvas.height=1;
     }
     releasePosition();
   }
   let enabled=options.enabled!==false;
   try{resize();}catch(error){destroy();throw error;}
   return {
-    canvas:layers[0]?.canvas??null,
-    canvases:layers.map(layer=>layer.canvas),
+    canvas:layers.find(layer=>layer.canvas)?.canvas??null,
+    canvases:layers.flatMap(layer=>layer.canvas?[layer.canvas]:[]),
     refresh:resize,
     refreshVisibility,
     destroy,
@@ -248,12 +300,18 @@ export function createObjectOverlay(objectElement, config, options={}) {
       if(!ready||disposed||media.matches)return;
       if(!Number.isFinite(seconds)||seconds<elapsed||seconds>60)throw new RangeError('renderAt requires elapsed ≤ seconds ≤ 60');
       paused=true;unsubscribe?.();unsubscribe=null;
-      for(const layer of layers)layer.canvas.style.display='block';
+      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
       while(seconds-elapsed>.000001)draw(Math.min(1/24,seconds-elapsed));
       if(!frames)draw(0);
     },
-    setEnabled(value){if(!disposed){enabled=Boolean(value);sync();}},
-    inspect(){return {running:Boolean(unsubscribe),disposed,ready,visible,styleVisible:cssVisible,reducedMotion:media.matches,frames,elapsed,fps,dpr,pixelCount:layers.reduce((sum,layer)=>sum+layer.pixelCount,0),objectId,paused,
+    setEnabled(value){if(!disposed){enabled=Boolean(value);if(!enabled)resetInteractive();sync();}},
+    triggerEffect(effectId){
+      if(disposed||!enabled)return false;
+      const layer=layers.find(item=>item.effect.id===effectId&&item.effect.trigger==='click'&&item.interaction);
+      if(!layer)return false;
+      layer.interaction.click();sync();return true;
+    },
+    inspect(){return {running:Boolean(unsubscribe),disposed,ready,visible,styleVisible:cssVisible,reducedMotion:media.matches,frames,elapsed,fps,dpr,pixelCount:layers.reduce((sum,layer)=>sum+layer.pixelCount,0),objectId,paused,interactions:layers.filter(layer=>layer.interaction).map(layer=>({effectId:layer.effect.id,trigger:layer.effect.trigger,...layer.interaction.state()})),
       costMs:cost,avgCostMs:frames?totalCost/frames:0,effects:layers.map(layer=>layer.instance.inspect?.())};},
   };
 }
@@ -266,18 +324,19 @@ export function bindObjectScene(scene, resolveObject, options={}) {
     throw new Error(`Scene binding mismatch: expected “${options.expectedSceneId}”, compiled scene is “${compiled.sceneId??''}”.`);
   const ids=[...new Set(compiled.effects.map(effect=>effect.objectId))];
   const overlays=new Map(), unresolved=[];
-  for(const id of ids){
+  try{for(const id of ids){
     const element=typeof resolveObject==='function'?resolveObject(id):resolveObject instanceof Map?resolveObject.get(id):resolveObject?.[id];
     if(!element){unresolved.push(id);continue;}
     assertIdentity(element,id,compiled.sceneId);
     overlays.set(id,createObjectOverlay(element,compiled,{...options,objectId:id}));
-  }
+  }}catch(error){for(const overlay of overlays.values())overlay.destroy();throw error;}
   return {
     sceneId:compiled.sceneId,
     overlays,
     inspect:()=>({sceneId:compiled.sceneId,unresolved:[...unresolved],overlays:[...overlays].map(([objectId,overlay])=>({objectId,...overlay.inspect()}))}),
     setEnabled(value){for(const overlay of overlays.values())overlay.setEnabled(value);},
     setPaused(value){for(const overlay of overlays.values())overlay.setPaused(value);},
+    triggerEffect(effectId){for(const overlay of overlays.values())if(overlay.triggerEffect(effectId))return true;return false;},
     refresh(){for(const overlay of overlays.values())overlay.refresh();},
     destroy(){for(const overlay of overlays.values())overlay.destroy();overlays.clear();},
   };

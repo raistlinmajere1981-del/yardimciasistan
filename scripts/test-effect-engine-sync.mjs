@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
-import {canonicalProvenance, checkCopy, moduleInventory, syncEngine, vendorRoot} from '../web-site-template/tools/sync-effect-engine.mjs';
+import {canonicalProvenance, checkCopy, moduleInventory, syncEngine, vendorRoot, canonicalEngineRoot} from '../web-site-template/tools/sync-effect-engine.mjs';
 import {compileObjectScene, defaultObjectParams} from '../web-site-template/public/assets/vendor/effect-engine/src/runtime/index.mjs';
 import {importProject} from '../web-site-template/public/assets/vendor/effect-engine/src/model/project.mjs';
 import {seededRandom} from '../web-site-template/public/assets/vendor/effect-engine/src/runtime/random.mjs';
 import {mountEffects} from '../web-site-template/public/assets/core/effects.mjs';
 
-const source = resolve(process.env.EFEKT_ATOLYESI_ROOT || '../EfektAtolyesi');
+const source = canonicalEngineRoot;
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'engine-sync-'));
   t.after(() => rmSync(root, {recursive: true, force: true}));
@@ -24,7 +24,7 @@ test('sync publishes deterministic exact bytes, removes stale files and check ne
   const bytes = readFileSync(join(destination, 'provenance.json'), 'utf8');
   assert.equal(first.format, 2);
   assert.equal(first.fingerprint.length, 64);
-  assert.equal(Object.keys(first.files).length, 23);
+  assert.equal(Object.keys(first.files).length, 24);
   checkCopy(destination, await canonicalProvenance(canonical));
   const random = join(destination, 'src/runtime/random.mjs');
   writeFileSync(random, readFileSync(random, 'utf8') + '\n// same version, different bytes\n');
@@ -70,9 +70,9 @@ test('canonical, template and Admin CI checks are read only and share provenance
   const provenance = await canonicalProvenance(source);
   checkCopy(vendorRoot, provenance);
   const admin = resolve('apps/admin-control-center');
-  const editorBefore = readFileSync(join(admin, 'public/effect-studio/scene.html'));
+  const editorBefore = readFileSync(join(admin, 'public/effect-studio/index.html'));
   checkCopy(join(admin, 'public/effect-studio'), provenance, {strict: false, provenancePath: join(admin, 'effect-engine-provenance.json')});
-  assert.deepEqual(readFileSync(join(admin, 'public/effect-studio/scene.html')), editorBefore);
+  assert.deepEqual(readFileSync(join(admin, 'public/effect-studio/index.html')), editorBefore);
 });
 
 function objectScene() {

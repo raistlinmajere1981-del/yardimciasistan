@@ -370,13 +370,6 @@ export function deployTargetScopeNote(targetId: string): string {
   return DEPLOY_TARGET_SCOPE_NOTES[targetId] ?? "";
 }
 
-/** Explicit, reviewed V2 source and existing deployment target. This is not
- * a general image-site publish mapping; only the dedicated V2 flow may use it. */
-export const BIRDESENGOR_EFFECT_SCENE_ID = "birdesengor:scene_v2";
-export const BIRDESENGOR_EFFECT_DEPLOY_TARGET_ID = "birdesengor-effects-v2";
-export type BirdesengorEffectPreflight = { ok: true; token: string; sourceHash: string;
-  changed: boolean; message: string; readiness: EffectReadiness };
-
 export type EffectImageScene = {
   format: string;
   version: number;
@@ -412,9 +405,6 @@ export type AdminBridge = {
   saveEffectScene(id: string, scene: EffectScene, sourceHash?: string): Promise<EffectStudioSave>;
   publishEffectScene(id: string): Promise<EffectStudioPublish>;
   prepareEffectScene(id: string): Promise<EffectStudioPublish>;
-  preflightBirdesengorEffect(id: string): Promise<BirdesengorEffectPreflight>;
-  cancelBirdesengorEffect(): Promise<boolean>;
-  deployBirdesengorEffect(id: string, token: string): Promise<{ ok: true; siteUrl: string; message: string }>;
   getOverview(): Promise<OverviewSnapshot>;
   getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
   syncInstallationCredential(installationId: string): Promise<{ ok: boolean; changed: boolean; verifiedLive: boolean; message: string }>;

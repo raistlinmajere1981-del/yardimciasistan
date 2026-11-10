@@ -11,8 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test:credentials": "tsc -p tsconfig.electron.json && node --test ../../scripts/test-admin-credentials.mjs",
     "test:verification": "tsc -p tsconfig.electron.json && node --test ../../scripts/test-admin-verification-progress.mjs",
-    "predev": "node scripts/sync-effect-studio.mjs --check",
-    "prebuild": "node scripts/sync-effect-studio.mjs --check",
+    "predev": "node scripts/sync-effect-studio.mjs",
+    "prebuild": "node scripts/sync-effect-studio.mjs",
     "prebuild:check": "node scripts/sync-effect-studio.mjs --check",
     "effect:sync": "node scripts/sync-effect-studio.mjs",
     "effect:check": "node scripts/sync-effect-studio.mjs --check"

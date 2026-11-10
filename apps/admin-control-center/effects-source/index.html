@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Efekt Atölyesi — Sahne düzenleyici</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="src/editor/main.mjs"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><h1>Efekt Atölyesi</h1><p>Fotoğraftan yaşayan sahneye</p></div><span class="version">1.1</span></div>
+    <nav class="file-actions" aria-label="Proje işlemleri">
+      <button type="button" id="open-photo">Fotoğraf aç</button><input id="photo-file" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" aria-label="Fotoğraf dosyası">
+      <button type="button" id="open-project">Proje aç</button><input id="project-file" class="visually-hidden" type="file" accept=".json,application/json" aria-label="JSON proje dosyası">
+      <button type="button" id="export" class="primary">JSON dışa aktar <span aria-hidden="true">↗</span></button>
+    </nav>
+  </header>
+  <main class="workspace">
+    <aside class="panel library" aria-label="Sahne katmanları">
+      <section class="zone-library" aria-labelledby="zones-heading">
+        <div class="section-title"><h2 id="zones-heading">Alanlar</h2><span id="zone-count" class="count">0</span></div>
+        <p class="help">Bir alan seçin. Köşeleri sürükleyerek sınırlarını belirleyin.</p>
+        <div id="zones" class="item-list" aria-label="Alan listesi"></div>
+        <button type="button" id="add-zone" class="full dashed" title="Çokgen alan ekle">＋ Alan</button>
+      </section>
+      <section class="effect-library" aria-labelledby="effects-heading">
+        <div class="section-title"><h2 id="effects-heading">Efektler</h2><span id="effect-count" class="count">0</span></div>
+        <p class="help">Çizim sırası yukarıdan aşağıya.</p>
+        <div id="effects" class="item-list" aria-label="Efekt listesi"></div>
+        <div class="effect-add">
+          <label class="field"><span>Efekt türü</span><select id="effect-type" title="Eklenecek efekt türü"></select></label>
+          <button type="button" id="add-effect" class="full" title="Seçili alana efekt ekle">＋ Ekle</button>
+        </div>
+      </section>
+      <div class="library-bottom"><button type="button" id="reset" class="text-button">↺ Seçili örneği yükle</button><p><a href="?example=gideros">Gideros örneği</a> · <a href="?example=blacksea">BlackSea örneği</a></p><p>Çevrimdışı · Hesap gerekmez<br>Dosyalarınız bu cihazda kalır.</p></div>
+    </aside>
+    <section class="stage-column" aria-label="Canlı önizleme">
+      <div class="stage-heading"><div><span class="eyebrow">ÇALIŞMA ALANI</span><h2 id="photo-name">Gideros</h2></div></div>
+      <div class="preview-toolbar" role="toolbar" aria-label="Görsel araçları">
+        <h2 class="embedded-only">Canlı görsel</h2>
+        <div class="toolbar-group"><button type="button" id="play" title="Önizlemeyi oynat veya duraklat" aria-pressed="true">Ⅱ Duraklat</button><button type="button" id="compare" title="Efektli ve orijinal görseli karşılaştır" aria-pressed="false">Önce / sonra</button></div>
+        <div class="history-actions"><button type="button" id="undo" title="Geri al (Ctrl/⌘ Z)" aria-label="Geri al">↶</button><button type="button" id="redo" title="Yinele (Ctrl/⌘ Shift Z)" aria-label="Yinele">↷</button></div>
+        <div class="toolbar-group"><label class="check" title="Alan sınırlarını göster"><input id="guides" type="checkbox" checked> Alanlar</label><label class="fit-control"><span class="visually-hidden">Fotoğraf yerleşimi</span><select id="fit"><option value="contain">Sığdır</option><option value="cover">Doldur</option></select></label></div>
+      </div>
+      <div id="preview-host" class="preview-host">
+        <img id="photo" alt="Gideros örnek fotoğrafı" draggable="false">
+        <svg id="guides-svg" xmlns="http://www.w3.org/2000/svg" aria-label="Bölge çokgenleri ve köşe tutamaçları"></svg>
+        <span id="comparison-badge" class="comparison-badge" hidden>ÖNCE · Efektler kapalı</span>
+        <div id="stats" class="stats" role="status">Motor hazırlanıyor…</div>
+      </div>
+      <p id="solo-status" class="help" role="status" hidden></p>
+      <div class="stage-caption"><span id="dimensions">1818 × 1228 · Orijinal koordinatlar</span><span>Çokgeni seç · Köşeyi sürükle</span></div>
+      <div id="status" class="status" role="status" aria-live="polite">Örnek sahne yükleniyor…</div>
+      <details class="photo-credit"><summary>Örnek fotoğrafın kaynağı ve lisansı</summary><p id="credit-text"></p><p id="gideros-license"><a href="https://commons.wikimedia.org/wiki/File:Gideros_Bay1.jpg" target="_blank" rel="noreferrer">Makalp · Gideros Bay1 (2007)</a> · <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="license noreferrer">CC BY-SA 3.0</a>. Fotoğraf WebP olarak yeniden kodlanmıştır. Yalnızca örnek sahnedir.</p></details>
+    </section>
+    <aside class="panel inspector" aria-label="Bölge ve efekt ayarları">
+      <div class="panel-heading"><h2>İnce ayarlar</h2></div>
+      <div class="inspector-switch" aria-label="Düzenlenecek öğe"><button id="inspect-effect" type="button" aria-pressed="true">Efekt</button><button id="inspect-zone" type="button" aria-pressed="false">Alan</button></div>
+      <section id="zone-inspector"></section>
+      <div class="divider"></div>
+      <section id="effect-inspector"></section>
+      <div class="divider"></div>
+      <details class="scene-settings"><summary>Sahne</summary>
+      <label class="field">Sahne adı<input id="scene-name" maxlength="160"></label>
+      <label class="field">Sahne tohumu<input id="scene-seed" maxlength="120" spellcheck="false"></label>
+      <p class="help">Aynı tohum + aynı sahne = aynı başlangıç. Her düzenlemede önizleme başa döner.</p>
+      <button type="button" id="restart" class="full">↺ Aynı tohumla baştan oynat</button>
+      </details>
+      <p class="help">Köşeler klavyede ok tuşlarıyla da taşınır. Shift: 10 piksel. Ctrl/⌘ Z: geri al.</p>
+    </aside>
+  </main>
+  <footer class="app-footer"><span>EFEKT ATÖLYESİ <span class="muted">/ Bağımsız sahne motoru</span></span><span>v1 sahne biçimi · Canvas 2D + SVG</span></footer>
+  <noscript>Bu yerel düzenleyiciyi kullanmak için JavaScript’i etkinleştirin.</noscript>
+</body>
+</html>

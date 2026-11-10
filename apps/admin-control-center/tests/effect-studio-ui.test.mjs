@@ -8,7 +8,7 @@ import { chromium } from "@playwright/test";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const dist = resolve(here, "../dist-renderer");
-const fixture = JSON.parse(readFileSync(resolve(here, "../../../../EfektAtolyesi/examples/gideros.scene.json"), "utf8"));
+const fixture = JSON.parse(readFileSync(resolve(here, "../effects-source/examples/gideros.scene.json"), "utf8"));
 const browserPath = "/usr/bin/brave";
 const MIME = {
   ".html": "text/html; charset=utf-8",

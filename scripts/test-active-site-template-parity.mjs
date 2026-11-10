@@ -6,7 +6,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {canonicalProvenance, checkCopy} from '../web-site-template/tools/sync-effect-engine.mjs';
+import {canonicalProvenance, checkCopy, canonicalEngineRoot} from '../web-site-template/tools/sync-effect-engine.mjs';
 const main=resolve(dirname(fileURLToPath(import.meta.url)),'..'), workspace=resolve(main,'..');
 const template=join(main,'web-site-template');
 const json=p=>JSON.parse(readFileSync(p,'utf8'));
@@ -25,11 +25,11 @@ function php(args) {
  assert.equal(result.status,0,result.stderr||result.stdout||String(result.error));
  assert.equal(result.stderr,'','Unexpected PHP diagnostics'); return result.stdout;
 }
-test('canonical + Admin + actual EfektAtolyesi provenance and independent themes', async()=>{
- assert.equal(manifest.template_version,'0.8.0'); assert.equal(Object.keys(manifest.common).length,90);
+test('canonical + Admin + Channel Foundry engine provenance and independent themes', async()=>{
+ assert.equal(manifest.template_version,'0.8.0'); assert.equal(Object.keys(manifest.common).length,95);
  assert.equal(hash(join(template,'public/assets/core/widget.js')),widgetSha);
- const provenance=await canonicalProvenance(join(workspace,'EfektAtolyesi'));
- assert.equal(Object.keys(provenance.files).length,19);
+ const provenance=await canonicalProvenance(canonicalEngineRoot);
+ assert.equal(Object.keys(provenance.files).length,24);
  checkCopy(join(template,'public/assets/vendor/effect-engine'),provenance);
  checkCopy(join(main,'apps/admin-control-center/public/effect-studio'),provenance,{strict:false,provenancePath:join(main,'apps/admin-control-center/effect-engine-provenance.json')});
  const themes=sites.map(site=>hash(join(site.root,site.demo?'assets/site/theme.css':'public/assets/site/theme.css')));

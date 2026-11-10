@@ -1,0 +1,167 @@
+{
+  "format": "efekt-atolyesi",
+  "version": 1,
+  "name": "Gideros · Işık ve su",
+  "seed": "gundogdu-gideros-1",
+  "photo": {
+    "src": "assets/gideros-1-1818.webp",
+    "width": 1818,
+    "height": 1228,
+    "name": "Gideros Bay1 · 2007",
+    "credit": "© Makalp · 30 Haziran 2007 · Gideros Bay1, Wikimedia Commons · CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/). WebP yeniden kodlama; yalnız yerel örnek."
+  },
+  "zones": [
+    {
+      "id": "water",
+      "name": "Açık su",
+      "visible": true,
+      "points": [
+        [
+          890,
+          720
+        ],
+        [
+          1120,
+          670
+        ],
+        [
+          1378,
+          671
+        ],
+        [
+          1430,
+          720
+        ],
+        [
+          1365,
+          814
+        ],
+        [
+          1190,
+          879
+        ],
+        [
+          995,
+          956
+        ],
+        [
+          820,
+          998
+        ],
+        [
+          795,
+          930
+        ],
+        [
+          870,
+          825
+        ]
+      ]
+    },
+    {
+      "id": "sunlight",
+      "name": "Güneş yolu",
+      "visible": true,
+      "points": [
+        [
+          1420,
+          622
+        ],
+        [
+          1478,
+          615
+        ],
+        [
+          1500,
+          635
+        ],
+        [
+          1480,
+          685
+        ],
+        [
+          1425,
+          740
+        ],
+        [
+          1340,
+          805
+        ],
+        [
+          1220,
+          855
+        ],
+        [
+          1100,
+          905
+        ],
+        [
+          965,
+          965
+        ],
+        [
+          845,
+          1000
+        ],
+        [
+          760,
+          1005
+        ],
+        [
+          780,
+          935
+        ],
+        [
+          900,
+          855
+        ],
+        [
+          1040,
+          775
+        ],
+        [
+          1200,
+          700
+        ],
+        [
+          1360,
+          650
+        ]
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "waves-1",
+      "type": "offshore",
+      "zoneId": "water",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 155,
+        "speed": 2.85,
+        "opacity": 1.15,
+        "length": 1,
+        "travel": 1,
+        "breakProbability": 0.06,
+        "crestLines": true,
+        "breaking": true
+      }
+    },
+    {
+      "id": "sun-1",
+      "type": "shimmer",
+      "zoneId": "sunlight",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 140,
+        "speed": 1.45,
+        "opacity": 1.15,
+        "bandOpacity": 0.69,
+        "length": 1,
+        "drift": 1
+      }
+    }
+  ]
+}

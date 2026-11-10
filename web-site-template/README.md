@@ -202,7 +202,7 @@ kataloğuna bağlıdır; ikinci hedef dil sözlüğü yoktur.
 ## Efekt Atölyesi
 
 Varsayılan `effects: []` ve manifest yok: adaptör, sahne, motor, Canvas veya animasyon döngüsü
-yoktur. Statik `<img>` normal çalışır. Canonical kaynak `EfektAtolyesi/src/{runtime,registry,model}`
+yoktur. Statik `<img>` normal çalışır. Canonical kaynak `ChannelFoundry/packages/effect-engine/src/{runtime,registry,model}`
 dizinleridir; başka sitedeki vendor kopyası kullanılmaz.
 
 Efekt yalnız site sahibinin hard-coded statik tasarım görselinde kullanılır. Ürün, oda/masa,
@@ -243,8 +243,8 @@ Dinamik galeri kayıtlarına efekt slotu yazılmaz.
 Bakımda motor kopyasını yenileme:
 
 ```bash
-node tools/sync-effect-engine.mjs /path/to/EfektAtolyesi
-node tools/sync-effect-engine.mjs --check /path/to/EfektAtolyesi
+node tools/sync-effect-engine.mjs
+node tools/sync-effect-engine.mjs --check
 ```
 
 İlk komut açık kaynak yazarlığı adımıdır; build/test tarafından çağrılmaz. Araç kaynak
@@ -267,7 +267,7 @@ node apps/admin-control-center/scripts/sync-effect-studio.mjs --check
 node --test scripts/test-effect-engine-sync.mjs
 ```
 
-CI'da canonical checkout yolu `EFEKT_ATOLYESI_ROOT` ile verilebilir; Admin'in Git dışı
+CI'da canonical checkout yolu `ChannelFoundry package root` ile verilebilir; Admin'in Git dışı
 snapshot'ı önce açık `npm run effect:sync -w @yardimci-asistan/admin-control-center` adımıyla
 üretilir. Bu adım tam editörü (`scene.html`, `scene.css`, `src`, `assets`, `examples` dahil)
 kopyalar; yerel editör değişikliklerini önce inceleyin. Zaten aynı motoru taşıyan snapshot

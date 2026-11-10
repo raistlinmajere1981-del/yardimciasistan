@@ -2,9 +2,7 @@ import { spawn } from "node:child_process";
 import { join, resolve } from "node:path";
 
 export function runEffectStudio(repoRoot: string, action: "list" | "load" | "save" | "prepare" | "activate" | "inspect" | "publish", args: unknown = {}) {
-  const studioRoot = process.env.EFEKT_ATOLYESI_ROOT
-    ? resolve(process.env.EFEKT_ATOLYESI_ROOT)
-    : resolve(repoRoot, "..", "EfektAtolyesi");
+  const studioRoot = resolve(repoRoot, "apps", "admin-control-center", "effects-source");
   const script = join(studioRoot, "scripts", "admin-studio.mjs");
   return new Promise<unknown>((resolveResult, reject) => {
     const child = spawn("node", [script, action], {

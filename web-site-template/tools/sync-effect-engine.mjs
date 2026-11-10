@@ -5,6 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 
 export const templateRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const vendorRoot = join(templateRoot, 'public/assets/vendor/effect-engine');
+export const canonicalEngineRoot = resolve(templateRoot, '../../../ChannelFoundry/packages/effect-engine');
 const parts = ['model', 'registry', 'runtime'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const json = value => JSON.stringify(value, null, 2) + '\n';
@@ -73,7 +74,7 @@ export async function canonicalProvenance(source) {
     || ['flame', 'glow', 'smoke'].some(name => typeof engine.objectEffectRegistry?.[name]?.create !== 'function'
       || !engine.objectEffectRegistry[name].targetKinds.includes('sceneObject'))) throw new Error('Incompatible engine API, semantic major or scene schema');
   if (JSON.stringify(moduleInventory(source)) !== JSON.stringify(files)) throw new Error('Canonical source changed during validation');
-  return {format: 2, source: 'EfektAtolyesi', version: engine.ENGINE_VERSION, compatibility: {engine_major: 1, photo_scene: 1, object_scene: 2, object_kind: 'objectScene'}, algorithm: 'sha256', fingerprint, files};
+  return {format: 2, source: 'ChannelFoundry', version: engine.ENGINE_VERSION, compatibility: {engine_major: 1, photo_scene: 1, object_scene: 2, object_kind: 'objectScene'}, algorithm: 'sha256', fingerprint, files};
 }
 
 export function checkCopy(destination, provenance, {strict = true, provenancePath = join(destination, 'provenance.json')} = {}) {
@@ -111,8 +112,8 @@ export async function syncEngine(source, destination = vendorRoot) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), check = args[0] === '--check';
-  const source = args[check ? 1 : 0];
-  if (!source || args.length !== (check ? 2 : 1) || source.startsWith('--')) throw new Error('Usage: sync-effect-engine.mjs [--check] /path/to/EfektAtolyesi');
+  const source = args[check ? 1 : 0] || canonicalEngineRoot;
+  if (args.length > (check ? 2 : 1) || source.startsWith('--')) throw new Error('Usage: sync-effect-engine.mjs [--check] [/path/to/ChannelFoundry/packages/effect-engine]');
   const provenance = check ? await canonicalProvenance(resolve(source)) : await syncEngine(resolve(source));
   if (check) checkCopy(vendorRoot, provenance);
   console.log(`effect-engine-${check ? 'check' : 'sync'}-ok: ${provenance.version}, ${Object.keys(provenance.files).length} modules, ${provenance.fingerprint}`);

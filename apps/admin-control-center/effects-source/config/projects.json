@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "blacksea",
+      "name": "BlackSea Pansiyon",
+      "directory": "blacksea_web",
+      "siteUrl": "https://blackseapansiyon.com/",
+      "images": [
+        {
+          "id": "hero",
+          "name": "Ana sayfa · Cide hero",
+          "photo": "public/assets/site/img/hero/cide-ai-desktop-clean.webp",
+          "photoRef": "assets/blacksea-desktop-1536.webp",
+          "width": 1536,
+          "height": 1024,
+          "scene": "public/assets/site/scenes/hero.scene.json",
+          "upload": {
+            "type": "natro-ftp",
+            "credentialId": "blacksea-natro",
+            "remote": "public/assets/site/scenes/hero.scene.json"
+          },
+          "publicSceneUrl": "https://blackseapansiyon.com/assets/site/scenes/hero.scene.json"
+        }
+      ]
+    },
+    {
+      "id": "gundogdu",
+      "name": "Gündoğdu Pansiyon",
+      "directory": "gundogdu_web",
+      "siteUrl": "https://yardimciasistangunduodu.alwaysdata.net/",
+      "images": [
+        {
+          "id": "hero",
+          "name": "Ana sayfa · Gideros hero",
+          "photo": "assets/site/img/gideros-1-1818.webp",
+          "photoRef": "assets/site/img/gideros-1-1818.webp",
+          "width": 1818,
+          "height": 1228,
+          "scene": "assets/site/scenes/hero.scene.json",
+          "upload": {
+            "type": "ssh-rsync",
+            "host": "yardimciasistangunduodu@ssh-yardimciasistangunduodu.alwaysdata.net",
+            "remote": "/home/yardimciasistangunduodu/www/assets/site/scenes/hero.scene.json"
+          },
+          "publicSceneUrl": "https://yardimciasistangunduodu.alwaysdata.net/assets/site/scenes/hero.scene.json"
+        },
+        {
+          "id": "rooms_hero",
+          "name": "Odalar · Gideros Bay2",
+          "photo": "assets/site/img/gideros-2-1275.webp",
+          "photoRef": "assets/site/img/gideros-2-1275.webp",
+          "width": 1275,
+          "height": 941,
+          "scene": "assets/site/scenes/rooms_hero.scene.json"
+        },
+        {
+          "id": "restaurant_hero",
+          "name": "Restoran · Gideros Koyu",
+          "photo": "assets/site/img/hero-restaurant.webp",
+          "photoRef": "assets/site/img/hero-restaurant.webp",
+          "width": 696,
+          "height": 455,
+          "scene": "assets/site/scenes/restaurant_hero.scene.json"
+        },
+        {
+          "id": "menu_hero",
+          "name": "QR Menü · Cide Limanı",
+          "photo": "assets/site/img/hero-menu.webp",
+          "photoRef": "assets/site/img/hero-menu.webp",
+          "width": 604,
+          "height": 402,
+          "scene": "assets/site/scenes/menu_hero.scene.json"
+        },
+        {
+          "id": "about_hero",
+          "name": "Hakkımızda · Çukurçal / Küre Dağları",
+          "photo": "assets/site/img/hero-about-cide-landscape.webp",
+          "photoRef": "assets/site/img/hero-about-cide-landscape.webp",
+          "width": 1600,
+          "height": 1200,
+          "scene": "assets/site/scenes/about_hero.scene.json"
+        },
+        {
+          "id": "gallery_hero",
+          "name": "Galeri · Cide Ovası",
+          "photo": "assets/site/img/hero-gallery.webp",
+          "photoRef": "assets/site/img/hero-gallery.webp",
+          "width": 1600,
+          "height": 1051,
+          "scene": "assets/site/scenes/gallery_hero.scene.json"
+        },
+        {
+          "id": "announcements_hero",
+          "name": "Duyurular · Cide Sahili",
+          "photo": "assets/site/img/hero-announcements.webp",
+          "photoRef": "assets/site/img/hero-announcements.webp",
+          "width": 696,
+          "height": 500,
+          "scene": "assets/site/scenes/announcements_hero.scene.json"
+        },
+        {
+          "id": "reviews_hero",
+          "name": "Yorumlar · Çayüstü",
+          "photo": "assets/site/img/hero-reviews.webp",
+          "photoRef": "assets/site/img/hero-reviews.webp",
+          "width": 1280,
+          "height": 960,
+          "scene": "assets/site/scenes/reviews_hero.scene.json"
+        },
+        {
+          "id": "contact_hero",
+          "name": "İletişim · Eski Cide Evleri",
+          "photo": "assets/site/img/hero-contact.webp",
+          "photoRef": "assets/site/img/hero-contact.webp",
+          "width": 697,
+          "height": 499,
+          "scene": "assets/site/scenes/contact_hero.scene.json"
+        }
+      ]
+    }
+  ]
+}

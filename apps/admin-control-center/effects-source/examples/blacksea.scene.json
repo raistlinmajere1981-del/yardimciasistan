@@ -1,0 +1,195 @@
+{
+  "format": "efekt-atolyesi",
+  "version": 1,
+  "name": "BlackSea · Su ve ışık örneği",
+  "seed": "blacksea-studio-1",
+  "photo": {
+    "src": "assets/blacksea-desktop-1536.webp",
+    "width": 1536,
+    "height": 1024,
+    "name": "BlackSea Cide masaüstü",
+    "credit": "BlackSea site fotoğrafı; kullanım hakkı siteye bağlıdır. Yalnız yerel düzenleme örneği."
+  },
+  "zones": [
+    {
+      "id": "water-0",
+      "name": "Su 1",
+      "visible": true,
+      "points": [
+        [
+          510,
+          305
+        ],
+        [
+          700,
+          278
+        ],
+        [
+          950,
+          262
+        ],
+        [
+          1180,
+          247
+        ],
+        [
+          1380,
+          236
+        ],
+        [
+          1528,
+          230
+        ],
+        [
+          1528,
+          815
+        ],
+        [
+          1420,
+          805
+        ],
+        [
+          1220,
+          767
+        ],
+        [
+          1180,
+          720
+        ],
+        [
+          1080,
+          700
+        ],
+        [
+          910,
+          675
+        ],
+        [
+          770,
+          642
+        ],
+        [
+          640,
+          617
+        ],
+        [
+          540,
+          577
+        ],
+        [
+          460,
+          505
+        ],
+        [
+          370,
+          420
+        ],
+        [
+          500,
+          400
+        ]
+      ]
+    },
+    {
+      "id": "water-1",
+      "name": "Su 2",
+      "visible": true,
+      "points": [
+        [
+          200,
+          327
+        ],
+        [
+          320,
+          307
+        ],
+        [
+          470,
+          305
+        ],
+        [
+          580,
+          292
+        ],
+        [
+          610,
+          304
+        ],
+        [
+          580,
+          337
+        ],
+        [
+          500,
+          356
+        ],
+        [
+          360,
+          342
+        ]
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "water-0-offshore",
+      "type": "offshore",
+      "zoneId": "water-0",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 155,
+        "speed": 2.85,
+        "opacity": 1.15,
+        "length": 1,
+        "travel": 1,
+        "breakProbability": 0.06,
+        "crestLines": true,
+        "breaking": true
+      }
+    },
+    {
+      "id": "water-0-sunlight",
+      "type": "sunlight",
+      "zoneId": "water-0",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 110,
+        "opacity": 1.1,
+        "drift": 1,
+        "length": 1
+      }
+    },
+    {
+      "id": "water-1-offshore",
+      "type": "offshore",
+      "zoneId": "water-1",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 155,
+        "speed": 2.85,
+        "opacity": 1.15,
+        "length": 1,
+        "travel": 1,
+        "breakProbability": 0.06,
+        "crestLines": true,
+        "breaking": true
+      }
+    },
+    {
+      "id": "water-1-sunlight",
+      "type": "sunlight",
+      "zoneId": "water-1",
+      "enabled": true,
+      "seed": "1",
+      "params": {
+        "count": 110,
+        "opacity": 1.1,
+        "drift": 1,
+        "length": 1
+      }
+    }
+  ]
+}
