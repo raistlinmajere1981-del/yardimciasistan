@@ -101,7 +101,7 @@ export const objectEffectRegistry = Object.freeze({
   },
   glow: {
     label:'Işık halesi', description:'Nesne çevresinde yumuşak, nabız atan sıcak ışık.', create:createGlow,
-    targetKinds:['sceneObject'], placement:'center',
+    targetKinds:['sceneObject'], placement:'center', allowedTriggers:['ambient','hover','click'],
     controls:[...objectCommon,number('pulse','Nabız',.2,0,1,.01)],
     presets:{
       Sakin:{width:.28,height:.28,opacity:.4,speed:.4,pulse:.1},
@@ -127,3 +127,12 @@ export const objectEffectRegistry = Object.freeze({
   },
 });
 export const defaultObjectParams = type => Object.fromEntries(objectEffectRegistry[type].controls.map(c=>[c.key,c.default]));
+
+// Existing documents have no trigger field. Their implicit default must remain
+// unchanged; only reversible glow currently supports interactive trigger choices.
+export const effectTrigger = effect => effect?.trigger??(
+  objectEffectRegistry[effect?.type]?.trigger==='pulse'?'click':'ambient'
+);
+export const allowedEffectTriggers = type => objectEffectRegistry[type]?.allowedTriggers??[
+  objectEffectRegistry[type]?.trigger==='pulse'?'click':'ambient'
+];

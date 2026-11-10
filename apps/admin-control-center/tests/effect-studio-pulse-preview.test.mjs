@@ -5,6 +5,7 @@ import {createReadStream,existsSync,statSync,mkdirSync} from 'node:fs';
 import {extname,resolve,sep} from 'node:path';
 import {chromium} from '@playwright/test';
 import {siteSceneSource} from '../../../../EfektAtolyesi/scripts/birdesengor-site.mjs';
+import {objectEffectRegistry} from '../../../../EfektAtolyesi/src/registry/effects.mjs';
 
 // Load exactly the source packet used by Admin. No draft/stage/publish writes.
 test('Admin source editor previews one finite canonical pulse and preserves Round 1 sliders/profiles',{timeout:60000},async()=>{
@@ -25,8 +26,9 @@ test('Admin source editor previews one finite canonical pulse and preserves Roun
     const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/scene.html?embedded=1`);
     await page.waitForFunction(()=>Boolean(window.__sceneEditor));await page.evaluate(packet=>window.postMessage(packet,location.origin),packet);
-    await page.waitForFunction(()=>window.__sceneEditor.getScene()?.effects.length===9);
-    assert.equal(await page.locator('.scene-object canvas').count(),3,'pulse slots stay dormant');
+    await page.waitForFunction(()=>window.__sceneEditor.getScene()?.effects.length===13);
+    const nonPulseCount=state.scene.effects.filter(effect=>effect.enabled&&objectEffectRegistry[effect.type].trigger!=='pulse').length;
+    assert.equal(await page.locator('.scene-object canvas').count(),nonPulseCount,'only ambient and reversible slots mount; pulse slots stay dormant');
     for(const id of ['guardian-sword-left','guardian-sword-right','water-basin']){
       await page.locator(`#object-select-${id}`).click();
       assert.equal(await page.locator('#basic-duration').count(),1);

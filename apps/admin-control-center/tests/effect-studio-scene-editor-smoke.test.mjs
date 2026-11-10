@@ -39,12 +39,42 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
     page.on("pageerror",error=>pageErrors.push(error.message));
     page.on("console",message=>{if(message.type()==="error")consoleErrors.push(message.text());});
     await page.goto(`http://127.0.0.1:${port}/scene.html`,{waitUntil:"networkidle"});
-    await page.waitForFunction(()=>window.__sceneEditor?.getScene?.()?.objects?.length===6);
+    await page.waitForFunction(()=>window.__sceneEditor?.getScene?.()?.objects?.length===5);
 
     assert.equal(await page.evaluate(()=>window.__sceneEditor.getScene().sceneId),"birdesengor-study-v2");
-    assert.equal(await page.locator(".scene-object").count(),6);
+    assert.equal(await page.locator(".scene-object").count(),5);
+    assert.equal(await page.locator('[data-scene-object="quill"], #object-select-quill').count(),0);
+    assert.ok(!await page.evaluate(()=>window.__sceneEditor.getScene().objects.some(object=>object.id==='quill')));
     assert.equal(await page.locator(".scene-marker").count(),3);
     assert.match(await page.locator(".scene-local-warning").innerText(),/Yerel önizleme · canlı yayın ayrı/i);
+
+    // Select a reversible light effect. OnHover must rewind from its current frame.
+    await page.locator("#object-select-candle").click();
+    await page.locator("#effect-select-glow-1").click();
+    const trigger=page.locator("#effect-trigger");
+    assert.deepEqual(await trigger.locator("option").allTextContents(),[
+      "Sürekli","OnHover · Üzerine gelme","OnClick · Tıklama"
+    ]);
+    assert.equal(await trigger.inputValue(),"ambient");
+    await trigger.selectOption("hover");
+    assert.equal(await page.evaluate(()=>window.__sceneEditor.getScene().effects.find(e=>e.id==="glow-1").trigger),"hover");
+    assert.equal(await page.locator("#interaction-enterMs").inputValue(),"240");
+    await page.locator("#interaction-enterMs").fill("300");
+    await page.locator("#interaction-enterMs").dispatchEvent("change");
+    await page.locator("#stage-object-candle").dispatchEvent("pointerenter");
+    await page.waitForFunction(()=>window.__sceneEditor.inspect()?.overlays?.some(o=>
+      o.objectId==="candle"&&o.interactions?.some(i=>i.effectId==="glow-1"&&i.progress>0)
+    ));
+    await page.locator("#stage-object-candle").dispatchEvent("pointerleave");
+    await page.waitForFunction(()=>window.__sceneEditor.inspect()?.overlays?.some(o=>
+      o.objectId==="candle"&&o.interactions?.some(i=>i.effectId==="glow-1"&&i.progress===0)
+    ));
+    await trigger.selectOption("click");
+    await page.locator("#preview-interaction-click").click();
+    await page.waitForFunction(()=>window.__sceneEditor.inspect()?.overlays?.some(o=>
+      o.objectId==="candle"&&o.interactions?.some(i=>i.effectId==="glow-1"&&i.progress>0)
+    ));
+    await trigger.selectOption("ambient");
 
     // Choose the candle and its named wick anchor.
     await page.locator("#object-list .scene-row-select",{hasText:"Mum"}).click();
@@ -172,7 +202,7 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
     assert.equal(await page.locator('#object-list button').count(),1);
     assert.equal(await page.locator('#effect-list button[aria-pressed=true]').textContent(),'Alev');
     await page.locator('#object-filter').selectOption('all');
-    assert.equal(await page.locator('#object-list button').count(),6);
+    assert.equal(await page.locator('#object-list button').count(),5);
     const overflow=await page.evaluate(()=>({
       document:document.documentElement.scrollWidth-document.documentElement.clientWidth,
       body:document.body.scrollWidth-document.body.clientWidth

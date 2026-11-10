@@ -157,10 +157,13 @@ test("current site scene supports reviewed staging and explicitly confirmed live
     assert.equal(await frame.locator('.scene-object').count(), 14, 'internal drawing quill is not a separate scene object');
     assert.equal(await frame.locator('[data-scene-object="quill"]').count(), 0);
     assert.equal(await frame.locator('#object-list button', { hasText: 'Divit' }).count(), 0);
-    assert.equal(packet.scene.objects.length, 15, 'the publication binding remains intact');
-    assert.equal(packet.scene.effects.length, 9);
-    assert.equal(packet.readiness.enabledCount, 9);
-    assert.equal(packet.readiness.mountedCount, 9);
+    assert.equal(packet.scene.objects.length, 14, 'source inventory contains only room objects');
+    assert.ok(!packet.scene.objects.some(object => object.id === 'quill'));
+    assert.ok(!packet.scene.objects.flatMap(object => object.anchors).some(anchor => anchor.id === 'quill.tip'));
+    assert.equal(await frame.locator('#object-count').innerText(), '14');
+    assert.equal(packet.scene.effects.length, 13);
+    assert.equal(packet.readiness.enabledCount, 13);
+    assert.equal(packet.readiness.mountedCount, 13);
     assert.equal(packet.readiness.ready, true);
     for (const id of ['camcorder', 'rolled-rug', 'incense-burner']) {
       assert.equal(await frame.locator(`[data-scene-object="${id}"]`).count(), 0);
@@ -169,6 +172,15 @@ test("current site scene supports reviewed staging and explicitly confirmed live
     const currentScene = await sceneFrame.evaluate(() => window.__sceneEditor.getScene());
     assert.deepEqual(currentScene.objects, packet.scene.objects);
     assert.deepEqual(currentScene.effects, packet.scene.effects);
+    // The canonical site now owns four reversible focus-object effect slots.
+    await frame.locator('#object-select-research-journal').click();
+    await frame.locator('#effect-select-research-journal-seal-hover').click();
+    assert.equal(await frame.locator('#effect-trigger').inputValue(), 'hover');
+    assert.equal(await frame.locator('#interaction-enterMs').inputValue(), '260');
+    assert.equal(await frame.locator('#interaction-leaveMs').inputValue(), '210');
+    await frame.locator('#object-select-community-journal').click();
+    await frame.locator('#effect-select-community-journal-tree-hover').click();
+    assert.equal(await frame.locator('#effect-trigger').inputValue(), 'hover');
 
     const prepare = page.getByRole("button", { name: "Site dosyasına hazırla" });
     assert.equal(await prepare.isDisabled(), true, "unsaved/unmounted effects cannot stage");
@@ -275,6 +287,21 @@ test("current site scene supports reviewed staging and explicitly confirmed live
       sceneAfterDrag.effects.find(effect => effect.id === "smoke-1").target.offset);
     assert.equal(saved.scene.objects.find(object => object.id === "candle").pose.x,
       fixture.objects.find(object => object.id === "candle").pose.x);
+
+    assert.deepEqual(saved.scene.objects, packet.scene.objects, 'saving preserves the exact source inventory');
+    for (const id of saved.scene.objects.map(object => object.id)) {
+      await frame.locator(`#object-select-${id}`).click();
+      assert.equal(await frame.locator(`#object-select-${id}`).getAttribute('aria-pressed'), 'true');
+    }
+    // Reopen the saved JSON through the embedded editor's real load protocol.
+    await page.evaluate(packet => document.querySelector('iframe[title="Yerel V2 nesne sahnesi düzenleyici"]').contentWindow.postMessage({
+      type: 'studio:load', requestId: 'quill-ownership-roundtrip', ...packet,
+    }, '*'), { ...packet, scene: saved.scene });
+    await sceneFrame.waitForFunction(() => window.__sceneEditor.getScene().effects.find(effect => effect.id === 'flame-1').params.opacity === .42);
+    assert.deepEqual(await sceneFrame.evaluate(() => window.__sceneEditor.getScene()), saved.scene);
+    assert.equal(await frame.locator('[data-scene-object="quill"]').count(), 0);
+    await frame.locator('#object-select-candle').click();
+    await frame.locator('#effect-select-flame-1').click();
 
     // CSS-hidden candle and parent stop the ticker even while intersecting.
     await sceneFrame.evaluate(() => { document.querySelector('[data-scene-object="candle"]').style.visibility = "hidden"; });

@@ -1196,3 +1196,12 @@ node scripts/smoke-settings-platform.mjs
 - Evidence: 225 web unit tests; 39 canonical targeted tests; 5 sync tests; synced editor + built Admin shell (2 tests), TypeScript and renderer build passed. Desktop 1920/1366, mobile 390/320, reduced-motion and old sword/water pulses passed. Test saves are browser-memory/temporary fixtures.
 - Report and screenshots: `/home/raistlin/ChannelFoundry/docs/BIRDESENGOR_SCENE_PENDULUM_REVIEW.md`; `channels/birdesengor/web/artifacts/scene-pendulum/`.
 - Next bounded slice: owner visual review; any commit/push/live deployment still needs separate authorization. Live community account/email acceptance was not run.
+
+
+### 2026-11-10 — BirDeSenGör Divit sahipliği temizliği
+
+- Codex session `01a1c55d-4918-7070-9eb4-3e42d478c567`; mevcut branch/worktree korundu. Alt ajan/OpenCode, commit, push veya deploy yok. ChannelFoundry web'deki mevcut tütsülük değişiklikleri korundu.
+- Efekt Atölyesi gerçek kaynak envanteri artık 14 oda nesnesidir; `quill` / `quill.tip` oda/efekt modelinden ve bağımsız editör örneğinden çıkarıldı. Kanonik editörün `isInternalWorkshopPart` istisnası kaldırıldı. Yayın kimliği web'in atölye alanındaki `VEFK_WORKSHOP.pen` sözleşmesinde aynı kalır; gerçek Divit geometrisi/animasyonu değişmedi.
+- Bu repo dosyaları: `apps/admin-control-center/tests/effect-studio-{admin-scene-ui,scene-editor-smoke}.test.mjs` ve bu kayıt. `effect:sync` mevcut araçla çalıştırıldı; canonical/public/dist editör ve örnek dosyaları eşit, 23 motor modülü provenance kontrolü PASS. Admin üretim derlemesi ve iki tarayıcı testi PASS; listeleme, tüm nesneleri seçme, kaydet/yeniden aç, mevcut parametreler ve 390 px bağımsız editör sınandı. Gerçek Admin taslakları değiştirilmedi.
+- Ana rapor: `/home/raistlin/ChannelFoundry/docs/QUILL_OWNERSHIP_ACCEPTANCE.md`; tam dosya listesi/loglar `channels/birdesengor/web/artifacts/quill-ownership/`. Web 232/232, Studio 60/60 ve kanonik efekt 34/34 hedefli testler PASS; güncellenen fikstürlerin etkilenen testleri yeniden PASS. Güncel çizim, DOC1/DOC2, 32 kayıt, tütsülük ve foundation tarayıcı kontrolleri PASS. Optik/hız/okuma, tekrar, kare sonunda bekle ve 1/5/32 katalog koşuları da dört masaüstü/mobil/reduced-motion koşulunda PASS. Gerçek Studio DB/WAL/SHM/yayın hash kontrolleri değişmedi.
+- Sonraki sınırlı adım: kullanıcının diğer yerel değişikliklerle birlikte gözden geçirmesi. Yayın ve üyelik verisine yazılmadı; son karar olmadan commit/push/deploy yapılmaz.

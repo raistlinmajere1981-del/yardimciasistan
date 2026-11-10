@@ -1,4 +1,4 @@
-import {effectRegistry,objectEffectRegistry,defaultParams} from '../registry/effects.mjs';
+import {effectRegistry,objectEffectRegistry,defaultParams,effectTrigger,allowedEffectTriggers} from '../registry/effects.mjs';
 import {isSimplePolygon} from './geometry.mjs';
 export const FORMAT='efekt-atolyesi';
 export const SCHEMA_VERSION=1;
@@ -88,8 +88,15 @@ function validateObjectScene(scene) {
     objects.set(item.id,{...item,anchorIds:anchors});
   }
   for(const effect of scene.effects) {
-    keys(effect,['id','type','target','enabled','seed','params'],'Efekt'); unique(effect.id);
+    keys(effect,['id','type','target','enabled','seed','params','trigger','interaction'],'Efekt'); unique(effect.id);
     if(!Object.hasOwn(objectEffectRegistry,effect.type)) fail(`Bilinmeyen nesne efekti türü: ${effect.type}. Desteklenenler: ${Object.keys(objectEffectRegistry).join(', ')}. Mevcut proje korundu.`);
+    if(effect.trigger!==undefined&&!allowedEffectTriggers(effect.type).includes(effectTrigger(effect)))fail('Bu efekt türünde tetikleme desteklenmiyor.');
+    if(effect.interaction!==undefined){
+      if(!['hover','click'].includes(effectTrigger(effect)))fail('Etkileşim süresi yalnız Hover veya Click için kullanılabilir.');
+      keys(effect.interaction,['enterMs','leaveMs'],'Etkileşim süresi');
+      integer(effect.interaction.enterMs,80,2000,'Efekt ileri süresi (ms)');
+      integer(effect.interaction.leaveMs,80,2000,'Efekt geri süresi (ms)');
+    }
     keys(effect.target,['kind','objectId','anchorId','offset','scale','depth','layerId'],'Efekt hedefi');
     if(effect.target.kind!=='sceneObject') fail('Nesne efektleri yalnızca kind “sceneObject” hedefleyebilir.');
     const targetObject=objects.get(effect.target.objectId);

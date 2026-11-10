@@ -1,5 +1,5 @@
 import {validateProject,OBJECT_SCENE_VERSION,OBJECT_SCENE_KIND} from '../model/project.mjs';
-import {objectEffectRegistry} from '../registry/effects.mjs';
+import {objectEffectRegistry,effectTrigger} from '../registry/effects.mjs';
 import {findAnchor} from './object-scene.mjs';
 
 // Separate from compileScene so v1 output stays byte-for-byte stable. The
@@ -12,7 +12,7 @@ export function compileObjectScene(scene) {
   const effects=scene.effects.filter(effect=>effect.enabled&&byId.get(effect.target.objectId)?.visible).map(effect=>{
     const object=byId.get(effect.target.objectId), registry=objectEffectRegistry[effect.type], anchor=findAnchor(object,effect.target.anchorId);
     return {
-      id:effect.id, objectId:object.id,
+      id:effect.id, type:effect.type, objectId:object.id, trigger:effectTrigger(effect), interaction:effect.interaction?{...effect.interaction}:null,
       anchor:{x:anchor.x,y:anchor.y},
       offset:{...effect.target.offset},
       scale:effect.target.scale, depth:effect.target.depth,
