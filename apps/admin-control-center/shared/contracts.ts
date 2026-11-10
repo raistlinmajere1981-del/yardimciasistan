@@ -399,8 +399,10 @@ export type EffectObjectScene = {
 };
 export type EffectScene = EffectImageScene | EffectObjectScene;
 export type EffectReadiness = { ready: boolean; effectCount: number; enabledCount: number; mountedCount: number; problems: string[] };
+export type EffectPreviewObject = { objectId: string; image: string;
+  layers: { id: string; image: string; box: { x: number; y: number; width: number; height: number } }[] };
 export type EffectStudioLoad = { scene: EffectScene; source: "draft" | "installed" | "new"; message?: string;
-  sourceHash?: string; previewImage?: string; siteSource?: boolean; readiness?: EffectReadiness };
+  sourceHash?: string; previewImage?: string; previewObjects?: EffectPreviewObject[]; siteSource?: boolean; readiness?: EffectReadiness };
 export type EffectStudioSave = { ok: boolean; message: string; effectCount: number; readiness?: EffectReadiness };
 export type EffectStudioPublish = { ok: boolean; message: string; siteUrl: string; sourceHash?: string; readiness?: EffectReadiness };
 

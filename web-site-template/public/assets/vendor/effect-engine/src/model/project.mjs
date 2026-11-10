@@ -66,7 +66,7 @@ function validateObjectScene(scene) {
   const unique = id => {string(id,'Kimlik',120); if(ids.has(id)) fail(`Tekrarlanan kimlik: ${id}`); ids.add(id);};
   const objects=new Map();
   for(const item of scene.objects) {
-    keys(item,['id','name','visible','pose','anchors'],'Nesne'); unique(item.id); string(item.name,'Nesne adı'); bool(item.visible,'Nesne görünürlüğü');
+    keys(item,['id','name','visible','pose','anchors','motionLayers'],'Nesne'); unique(item.id); string(item.name,'Nesne adı'); bool(item.visible,'Nesne görünürlüğü');
     keys(item.pose,['x','y','width','height','rotation','depth'],'Nesne konumu');
     const pose=item.pose;
     num(pose.x,0,1,'Nesne X'); num(pose.y,0,1,'Nesne Y');
@@ -81,16 +81,23 @@ function validateObjectScene(scene) {
       if(anchors.has(anchor.id)) fail(`Tekrarlanan bağlantı kimliği: ${anchor.id}`); anchors.add(anchor.id);
       num(anchor.x,0,1,'Bağlantı X'); num(anchor.y,0,1,'Bağlantı Y');
     }
+    if(item.motionLayers!==undefined){
+      if(!Array.isArray(item.motionLayers)||item.motionLayers.length>20||new Set(item.motionLayers).size!==item.motionLayers.length)fail('Geçersiz hareket katmanları.');
+      for(const id of item.motionLayers)if(typeof id!=='string'||! /^[a-z][a-z0-9-]{0,79}$/.test(id))fail('Geçersiz hareket katmanı kimliği.');
+    }
     objects.set(item.id,{...item,anchorIds:anchors});
   }
   for(const effect of scene.effects) {
     keys(effect,['id','type','target','enabled','seed','params'],'Efekt'); unique(effect.id);
     if(!Object.hasOwn(objectEffectRegistry,effect.type)) fail(`Bilinmeyen nesne efekti türü: ${effect.type}. Desteklenenler: ${Object.keys(objectEffectRegistry).join(', ')}. Mevcut proje korundu.`);
-    keys(effect.target,['kind','objectId','anchorId','offset','scale','depth'],'Efekt hedefi');
+    keys(effect.target,['kind','objectId','anchorId','offset','scale','depth','layerId'],'Efekt hedefi');
     if(effect.target.kind!=='sceneObject') fail('Nesne efektleri yalnızca kind “sceneObject” hedefleyebilir.');
     const targetObject=objects.get(effect.target.objectId);
     if(!targetObject) fail(`Efektin nesnesi bulunamadı: ${effect.target.objectId}`);
     if(!targetObject.anchorIds.has(effect.target.anchorId)) fail(`Efektin bağlantı noktası bulunamadı: ${effect.target.anchorId}`);
+    if(objectEffectRegistry[effect.type].output==='motion'){
+      if(!targetObject.motionLayers?.includes(effect.target.layerId))fail('Hareket hedef katmanı nesnede tanımlı olmalı.');
+    }else if(effect.target.layerId!==undefined)fail('Yalnız hareket efekti alt katman hedefleyebilir.');
     keys(effect.target.offset,['x','y'],'Efekt kaydırması');
     num(effect.target.offset.x,-5,5,'Efekt kaydırma X'); num(effect.target.offset.y,-5,5,'Efekt kaydırma Y');
     num(effect.target.scale,.01,10,'Efekt ölçeği'); num(effect.target.depth,-100,100,'Efekt derinliği');
@@ -101,6 +108,12 @@ function validateObjectScene(scene) {
       if(c.kind==='boolean') bool(effect.params[c.key],c.label);
       else {num(effect.params[c.key],c.min,c.max,c.label);if(c.step===1&&!Number.isInteger(effect.params[c.key])) fail(`${c.label}: tam sayı gerekli.`);}
     }
+  }
+  const motionSlots=new Set();
+  for(const effect of scene.effects.filter(e=>e.enabled&&objectEffectRegistry[e.type].output==='motion')){
+    const key=JSON.stringify([effect.target.objectId,effect.target.layerId]);
+    if(motionSlots.has(key))fail('Bir hareket katmanına yalnız bir etkin efekt bağlanabilir.');
+    motionSlots.add(key);
   }
   return scene;
 }

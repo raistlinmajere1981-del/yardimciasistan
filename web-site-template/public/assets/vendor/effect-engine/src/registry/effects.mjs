@@ -3,6 +3,9 @@ import {createOffshore} from '../runtime/effects/offshore.mjs';
 import {createShimmer} from '../runtime/effects/shimmer.mjs';
 import {createFlame} from '../runtime/effects/flame.mjs';
 import {createGlow} from '../runtime/effects/glow.mjs';
+import {createMetalGlint} from '../runtime/effects/metal-glint.mjs';
+import {createWaterRipple} from '../runtime/effects/water-ripple.mjs';
+import {createPendulumSway} from '../runtime/effects/pendulum-sway.mjs';
 import {createSmoke} from '../runtime/effects/smoke.mjs';
 import {polygonBounds} from '../model/geometry.mjs';
 
@@ -53,7 +56,7 @@ export const defaultParams = type => Object.fromEntries(effectRegistry[type].con
 
 // Object-scene effects never share the image/zone registry above. Validation and
 // compilation select the registry from the explicit document version, so a v1
-// file cannot name flame/glow/smoke and a v2 file cannot name water effects.
+// file cannot name flame/glow/smoke and a v2 file cannot name v1 photo effects.
 const objectCommon = [
   number('width','Genişlik',.12,.01,.9,.01),
   number('height','Yükseklik',.3,.01,1,.01),
@@ -61,6 +64,28 @@ const objectCommon = [
   number('speed','Hız',1,.05,3,.05),
 ];
 export const objectEffectRegistry = Object.freeze({
+  'pendulum-sway': {
+    label:'Sarkaç Salınımı', description:'Sabit askıdan başlayan, giderek sönen açısal hareket.',
+    create:createPendulumSway, targetKinds:['sceneObject'], placement:'center', trigger:'pulse', output:'motion',
+    controls:[number('amplitude','Açı (derece)',3,.1,15,.1),number('frequency','Frekans (Hz)',2,.2,5,.1),number('damping','Sönümleme (s⁻¹)',2.7,.5,8,.1),number('duration','Süre (s)',1.8,.5,5,.1),number('speed','Hız',1,.25,3,.05)],
+    presets:{Sakin:{amplitude:1.5,frequency:1.6,damping:3.2,duration:1.5,speed:1},Doğal:{amplitude:3,frequency:2,damping:2.7,duration:1.8,speed:1},Canlı:{amplitude:5,frequency:2.2,damping:2.2,duration:2.4,speed:1}},
+    compile(object,target,params){return {...params,amplitude:params.amplitude*target.scale};},
+  },
+  'metal-glint': {
+    label:'Metal ağzı yansıması', description:'Bıçak maskesinde tek, dar ve sıcak ışık geçişi.', create:createMetalGlint,
+    targetKinds:['sceneObject'], placement:'center', trigger:'pulse',
+    controls:[number('width','Yol genişliği',.2,.01,1,.01),number('height','Yol boyu',.84,.01,1,.01),number('opacity','Şiddet',.38,0,1,.01),number('speed','Hız',1,.8,1.2,.05),number('duration','Süre (s)',1.2,1.1,1.2,.05),number('angle','Bıçak yönü (derece)',0,-180,180,1),number('bladeWidth','Bıçak eni',.12,.02,.5,.01),number('band','Işık bandı',.22,.1,.4,.01)],
+    presets:{Sakin:{opacity:.25,speed:1,band:.18},Doğal:{opacity:.38,speed:1,band:.22},Canlı:{opacity:.55,speed:1,band:.28}},
+    compile(object,target,params){return {...params,width:params.width*target.scale,height:params.height*target.scale};},
+  },
+  'water-ripple': {
+    label:'Su halkası', description:'Eliptik su yüzeyinde merkezden yayılan iki ince halka.', create:createWaterRipple,
+    targetKinds:['sceneObject'], placement:'center', trigger:'pulse',
+    controls:[number('width','Yüzey genişliği',.94,.01,1,.01),number('height','Yüzey yüksekliği',.5,.01,1,.01),number('opacity','Şiddet',.32,0,1,.01),number('speed','Hız',1,.8,1.2,.05),number('duration','Süre (s)',1.2,1.1,1.2,.05),number('angle','Yüzey dönüşü (derece)',0,-30,30,1),number('spread','Yayılım',.92,.5,1,.01)],
+    presets:{Sakin:{opacity:.2,speed:1,spread:.85},Doğal:{opacity:.32,speed:1,spread:.92},Canlı:{opacity:.46,speed:1,spread:1}},
+    compile(object,target,params){return {...params,width:params.width*target.scale,height:params.height*target.scale};},
+  },
+
   flame: {
     label:'Alev', description:'Nesneye bağlı, hareketli ve sivri alev silueti.', create:createFlame,
     targetKinds:['sceneObject'], placement:'bottom',

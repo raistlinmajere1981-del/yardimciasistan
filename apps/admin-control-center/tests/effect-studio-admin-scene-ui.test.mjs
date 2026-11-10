@@ -110,13 +110,13 @@ test("current site scene supports reviewed staging and explicitly confirmed live
         prepareEffectScene: async (id) => {
           window.__prepareCalls.push(id);
           return { ok: true, message: "Yerel site kaynak dosyası hazırlandı. Canlı yayın ayrı.", siteUrl: "", sourceHash: "staged-revision",
-            readiness: { ready: true, effectCount: 6, enabledCount: 0, mountedCount: 0, problems: [] } };
+            readiness: { ready: true, effectCount: sitePacket.scene.effects.length, enabledCount: 0, mountedCount: 0, problems: [] } };
         },
         publishEffectScene: async () => ({ ok: true, message: "published", siteUrl: "https://demo.example.test" }),
         preflightBirdesengorEffect: async id => {
           window.__birdesengorPreflightCalls.push(id);
           return { ok: true, token: "reviewed-one-time-token", sourceHash: "revised-site-source", changed: true,
-            message: "Ön kontrol başarılı", readiness: { ready: true, effectCount: 6, enabledCount: 0, mountedCount: 6, problems: [] } };
+            message: "Ön kontrol başarılı", readiness: { ready: true, effectCount: sitePacket.scene.effects.length, enabledCount: 0, mountedCount: sitePacket.scene.effects.length, problems: [] } };
         },
         cancelBirdesengorEffect: async () => { window.__birdesengorCancelCalls++; return true; },
         deployBirdesengorEffect: async (id, token) => {
@@ -150,9 +150,23 @@ test("current site scene supports reviewed staging and explicitly confirmed live
     assert.ok(sceneFrame, "scene editor frame is loaded");
     await sceneFrame.waitForFunction(() => Boolean(window.__sceneEditor?.getScene?.()));
     assert.equal(await frame.locator('[data-scene-object="candle"]').count(), 1);
-    assert.equal(await frame.locator(".scene-marker").count(), 6);
+    assert.equal(await frame.locator(".scene-marker").count(), packet.scene.effects.length,
+      "Source scene renders one marker per approved effect slot");
     assert.equal(await frame.locator('[data-scene-object="vefk-stand"]').count(), 1);
     assert.equal(await frame.locator('[data-scene-object="parchment"]').count(), 0);
+    assert.equal(await frame.locator('.scene-object').count(), 15);
+    assert.equal(packet.scene.effects.length, 9);
+    assert.equal(packet.readiness.enabledCount, 7);
+    assert.equal(packet.readiness.mountedCount, 9);
+    assert.equal(packet.readiness.ready, true);
+    for (const id of ['camcorder', 'rolled-rug', 'incense-burner']) {
+      assert.equal(await frame.locator(`[data-scene-object="${id}"]`).count(), 0);
+    }
+    assert.equal(await frame.locator('#object-list button', {hasText: 'Ahşap Tütsülük'}).count(), 1);
+    const currentScene = await sceneFrame.evaluate(() => window.__sceneEditor.getScene());
+    assert.deepEqual(currentScene.objects, packet.scene.objects);
+    assert.deepEqual(currentScene.effects, packet.scene.effects);
+
     const prepare = page.getByRole("button", { name: "Site dosyasına hazırla" });
     assert.equal(await prepare.isDisabled(), true, "unsaved/unmounted effects cannot stage");
     await sceneFrame.waitForFunction(() => document.querySelector("#scene-photo").naturalWidth > 0);
@@ -164,7 +178,7 @@ test("current site scene supports reviewed staging and explicitly confirmed live
       return { ratio: stage.width / stage.height, photoWidth: photo.width, stageWidth: stage.width,
         candleX: (candle.x - stage.x - 1) / (stage.width - 2), candleWidth: candle.width / (stage.width - 2) };
     });
-    assert.ok(Math.abs(alignment.ratio - 1600 / 900) < .01);
+    assert.ok(Math.abs(alignment.ratio - 2) < .01, 'the photographic scene preview keeps its 2:1 aspect ratio');
     assert.ok(Math.abs(alignment.photoWidth - alignment.stageWidth) <= 2);
     assert.ok(Math.abs(alignment.candleX - fixture.objects.find(o => o.id === "candle").pose.x) < .003);
     assert.ok(Math.abs(alignment.candleWidth - fixture.objects.find(o => o.id === "candle").pose.width) < .003);
@@ -174,11 +188,14 @@ test("current site scene supports reviewed staging and explicitly confirmed live
     await frame.locator("#show-guides").click();
     assert.equal(await frame.locator("#show-guides").getAttribute("aria-pressed"), "false");
     await frame.locator("#show-guides").click();
+    await frame.locator("#advanced-settings summary").click();
     assert.equal(await frame.locator("#scene-id-line").innerText(), "sceneId: birdesengor-study-v2 · 1600 × 900");
 
     // Select the candle's named anchor and exercise the real canonical overlay.
     await frame.locator("#object-list button", { hasText: "Mum" }).click();
-    assert.equal(await frame.locator('#object-inspector input[type="number"]').first().isDisabled(), true);
+    assert.equal(await frame.locator('#object-inspector input').count(), 0);
+    assert.equal(await frame.locator('#object-list input[type="checkbox"]').count(), 0);
+    assert.equal(await frame.locator('#add-effect-controls').isHidden(), true);
     await frame.locator("#effect-list button").first().waitFor();
     assert.equal(await frame.locator("#effect-list button").count(), 3);
     await frame.locator("#effect-list button", { hasText: "Alev" }).click();
@@ -212,6 +229,13 @@ test("current site scene supports reviewed staging and explicitly confirmed live
 
     // Change the flame intensity through the registry control.
     await frame.locator("#effect-list button", { hasText: "Alev" }).click();
+    await frame.getByRole('button',{name:'Hafif',exact:true}).click();
+    assert.equal(await frame.locator('#effect-profile').innerText(),'Hafif');
+    const actualPreset=await sceneFrame.evaluate(async()=>{
+      const {objectEffectRegistry}=await import('/effect-studio/src/registry/effects.mjs');
+      return objectEffectRegistry.flame.presets.Sakin;
+    });
+    assert.deepEqual(await sceneFrame.evaluate(()=>window.__sceneEditor.getScene().effects.find(effect=>effect.id==='flame-1').params),actualPreset);
     const opacity = frame.getByLabel("Opaklık");
     await opacity.fill("0.42");
     await opacity.press("Tab");
@@ -259,9 +283,21 @@ test("current site scene supports reviewed staging and explicitly confirmed live
     await sceneFrame.evaluate(() => { document.querySelector('[data-scene-object="candle"]').style.visibility = ""; });
     await sceneFrame.waitForFunction(() => window.__sceneEditor.inspect().overlays.some(overlay => overlay.running));
 
-    await page.screenshot({ path: "/tmp/birdesengor-effect-studio.png" });
+    await frame.locator('#advanced-settings summary').click();
+    for(const size of [{width:1920,height:1080},{width:1366,height:768}]){
+      await page.setViewportSize(size);
+      await page.waitForTimeout(200);
+      assert.equal(await frame.locator('#basic-opacity').isVisible(),true);
+      const dimensions=await sceneFrame.evaluate(()=>({w:innerWidth,doc:document.documentElement.scrollWidth,h:innerHeight,body:document.body.scrollHeight}));
+      assert.ok(dimensions.doc<=dimensions.w+1);
+      assert.ok(dimensions.body<=dimensions.h+1);
+      await page.screenshot({path:`/tmp/birdesengor-effect-round1-admin-${size.width}.png`});
+    }
     // Only saved, valid drafts may use the separate prepare IPC; no publish.
-    for (const owner of ["candle", "incense-burner", "incense-holder"]) {
+    // The current site includes click-triggered sword/water slots in addition
+    // to candle/incense. The readiness mock below only accepts a zero-enabled
+    // draft, so switch off every source-owned effect rather than an old fixed list.
+    for (const owner of new Set(packet.scene.effects.map(effect => effect.target.objectId))) {
       await sceneFrame.evaluate(id => window.__sceneEditor.selectObject(id), owner);
       for (const checkbox of await frame.locator('#effect-list input[type="checkbox"]').all()) {
         await checkbox.uncheck();
@@ -300,6 +336,10 @@ test("current site scene supports reviewed staging and explicitly confirmed live
       clientWidth: document.documentElement.clientWidth
     }));
     assert.ok(overflow.scrollWidth <= overflow.clientWidth + 1, `390px scene editor overflows: ${JSON.stringify(overflow)}`);
+
+    await frame.getByRole('tab',{name:'Efekt ayarları'}).click();
+    assert.equal(await frame.locator('#effect-inspector').isVisible(),true);
+    await page.screenshot({path:'/tmp/birdesengor-effect-round1-admin-390.png'});
 
     // Switching back to an image target swaps the iframe document and preserves
     // the image editor's publish action without cross-frame save leakage.

@@ -24,7 +24,7 @@ test('sync publishes deterministic exact bytes, removes stale files and check ne
   const bytes = readFileSync(join(destination, 'provenance.json'), 'utf8');
   assert.equal(first.format, 2);
   assert.equal(first.fingerprint.length, 64);
-  assert.equal(Object.keys(first.files).length, 19);
+  assert.equal(Object.keys(first.files).length, 23);
   checkCopy(destination, await canonicalProvenance(canonical));
   const random = join(destination, 'src/runtime/random.mjs');
   writeFileSync(random, readFileSync(random, 'utf8') + '\n// same version, different bytes\n');

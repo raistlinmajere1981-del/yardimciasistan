@@ -1,3 +1,4 @@
+import {bindMotionLayer} from './object-motion.mjs';
 import {ticker as sharedTicker} from './ticker.mjs';
 import {seededRandom} from './random.mjs';
 import {effectCanvasStyle,depthZIndex,sortByDepth} from './object-scene.mjs';
@@ -93,6 +94,14 @@ export function createObjectOverlay(objectElement, config, options={}) {
   const layers=[];
   try{
     selected.forEach((effect,index)=>{
+      if(effect.output==='motion'){
+        const motion=bindMotionLayer(objectElement,effect);
+        try{
+          const instance=effect.create({params:effect.params});
+          layers.push({effect,motion,instance,width:1,height:1,pixelCount:0});
+        }catch(error){motion.destroy();throw error;}
+        return;
+      }
       const canvas=documentRef.createElement('canvas');
       canvas.className='object-effect-overlay';
       canvas.setAttribute('aria-hidden','true');
@@ -113,37 +122,39 @@ export function createObjectOverlay(objectElement, config, options={}) {
       }
     });
   }catch(error){
-    layers.forEach(layer=>{layer.instance?.destroy?.();layer.canvas.remove();});
+    layers.forEach(layer=>{layer.instance?.destroy?.();layer.motion?.destroy();layer.canvas?.remove();});
     releasePosition();
     throw error;
   }
+  let completed=false;
   let disposed=false,visible=false,pageActive=true,ready=false,unsubscribe=null,everConnected=objectElement.isConnected;
   let elapsed=0,frames=0,cost=0,totalCost=0,slowFrames=0,paused=false,cssVisible=styleVisible(objectElement);
   const removers=[];
   const listen=(target,event,callback)=>{target?.addEventListener?.(event,callback);removers.push(()=>target?.removeEventListener?.(event,callback));};
   function clearLayer(layer){
+    if(layer.motion){layer.motion.reset();return;}
     layer.ctx.setTransform(1,0,0,1,0,0);
     layer.ctx.clearRect(0,0,layer.canvas.width,layer.canvas.height);
   }
   function clear(){for(const layer of layers)clearLayer(layer);}
   function stop(){
     unsubscribe?.();unsubscribe=null;
-    for(const layer of layers)layer.canvas.style.display='none';
+    for(const layer of layers)layer.canvas&&(layer.canvas.style.display='none');
     clear();
   }
   function sync(){
-    const run=!disposed&&!paused&&enabled&&ready&&visible&&pageActive&&!documentRef.hidden&&!media.matches&&cssVisible;
+    const run=!completed&&!disposed&&!paused&&enabled&&ready&&visible&&pageActive&&!documentRef.hidden&&!media.matches&&cssVisible;
     if(!run){
       // Paused frames are repainted without advancing time; all other gates stop work.
-      if(paused&&ready&&visible&&enabled&&!disposed&&!media.matches&&pageActive&&!documentRef.hidden&&cssVisible){
+      if(!completed&&paused&&ready&&visible&&enabled&&!disposed&&!media.matches&&pageActive&&!documentRef.hidden&&cssVisible){
         unsubscribe?.();unsubscribe=null;
-        for(const layer of layers)layer.canvas.style.display='block';
+        for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
         draw(0);
       }else stop();
       return;
     }
     if(!unsubscribe){
-      for(const layer of layers)layer.canvas.style.display='block';
+      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
       unsubscribe=ticker.add(draw,fps);
     }
   }
@@ -162,6 +173,11 @@ export function createObjectOverlay(objectElement, config, options={}) {
     const start=globalThis.performance?.now?.()??Date.now();
     elapsed+=dt;
     for(const layer of layers){
+      if(layer.motion){
+        if(!layer.motion.connected()){destroy();return;}
+        try{layer.instance.update(dt);layer.motion.apply(layer.instance.motion());}catch(error){destroy();throw error;}
+        continue;
+      }
       clearLayer(layer);
       if(!layer.width||!layer.height)continue;
       layer.ctx.setTransform(layer.scale,0,0,layer.scale,0,0);
@@ -170,6 +186,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
         layer.instance.render(layer.ctx,{elapsed,width:layer.width,height:layer.height,pixelScale:layer.scale,placement:layer.effect.placement});
       }catch(error){destroy();throw error;}
     }
+    if(layers.every(layer=>layer.instance.isComplete?.()===true)){completed=true;stop();}
     frames++;
     cost=(globalThis.performance?.now?.()??Date.now())-start;
     totalCost+=cost;
@@ -186,6 +203,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
     dpr=Math.min(globalThis.devicePixelRatio||1,dprLimit);
     const budget=Math.max(1,(policy.maxPixels||1200000)/Math.max(1,layers.length));
     for(const layer of layers){
+      if(layer.motion){layer.width=width;layer.height=height;continue;}
       const cssWidth=width*layer.effect.params.width,cssHeight=height*layer.effect.params.height;
       if(!(cssWidth>0)||!(cssHeight>0)){layer.width=layer.height=0;layer.pixelCount=0;continue;}
       const scale=Math.max(.01,Math.min(dpr,Math.sqrt(budget/Math.max(1,cssWidth*cssHeight))));
@@ -230,16 +248,17 @@ export function createObjectOverlay(objectElement, config, options={}) {
     removers.forEach(remove=>remove());
     for(const layer of layers){
       layer.instance.destroy?.();
-      layer.canvas.remove?.();
-      layer.canvas.width=layer.canvas.height=1;
+      layer.motion?.destroy();
+      layer.canvas?.remove?.();
+      if(layer.canvas)layer.canvas.width=layer.canvas.height=1;
     }
     releasePosition();
   }
   let enabled=options.enabled!==false;
   try{resize();}catch(error){destroy();throw error;}
   return {
-    canvas:layers[0]?.canvas??null,
-    canvases:layers.map(layer=>layer.canvas),
+    canvas:layers.find(layer=>layer.canvas)?.canvas??null,
+    canvases:layers.flatMap(layer=>layer.canvas?[layer.canvas]:[]),
     refresh:resize,
     refreshVisibility,
     destroy,
@@ -248,7 +267,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
       if(!ready||disposed||media.matches)return;
       if(!Number.isFinite(seconds)||seconds<elapsed||seconds>60)throw new RangeError('renderAt requires elapsed ≤ seconds ≤ 60');
       paused=true;unsubscribe?.();unsubscribe=null;
-      for(const layer of layers)layer.canvas.style.display='block';
+      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
       while(seconds-elapsed>.000001)draw(Math.min(1/24,seconds-elapsed));
       if(!frames)draw(0);
     },
@@ -266,12 +285,12 @@ export function bindObjectScene(scene, resolveObject, options={}) {
     throw new Error(`Scene binding mismatch: expected “${options.expectedSceneId}”, compiled scene is “${compiled.sceneId??''}”.`);
   const ids=[...new Set(compiled.effects.map(effect=>effect.objectId))];
   const overlays=new Map(), unresolved=[];
-  for(const id of ids){
+  try{for(const id of ids){
     const element=typeof resolveObject==='function'?resolveObject(id):resolveObject instanceof Map?resolveObject.get(id):resolveObject?.[id];
     if(!element){unresolved.push(id);continue;}
     assertIdentity(element,id,compiled.sceneId);
     overlays.set(id,createObjectOverlay(element,compiled,{...options,objectId:id}));
-  }
+  }}catch(error){for(const overlay of overlays.values())overlay.destroy();throw error;}
   return {
     sceneId:compiled.sceneId,
     overlays,

@@ -223,7 +223,7 @@ export function EffectStudio() {
       try {
         const data = await window.adminControlCenter.loadEffectScene(selected);
         if (token !== loadToken.current) return;
-        await request("studio:load", { scene: data.scene, previewImage: data.previewImage, siteSource: data.siteSource });
+        await request("studio:load", { scene: data.scene, previewImage: data.previewImage, previewObjects: data.previewObjects, siteSource: data.siteSource });
         if (token !== loadToken.current) return;
         activeTarget.current = selected;
         setLoaded(true);

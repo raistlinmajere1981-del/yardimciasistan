@@ -17,6 +17,7 @@ export function compileObjectScene(scene) {
       offset:{...effect.target.offset},
       scale:effect.target.scale, depth:effect.target.depth,
       placement:registry.placement,
+      output:registry.output??'canvas', layerId:effect.target.layerId,
       seed:`${effect.id}:${effect.seed}`,
       create:registry.create,
       params:registry.compile(object,effect.target,effect.params),

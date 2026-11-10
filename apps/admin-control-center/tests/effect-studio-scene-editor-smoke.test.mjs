@@ -48,6 +48,7 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
 
     // Choose the candle and its named wick anchor.
     await page.locator("#object-list .scene-row-select",{hasText:"Mum"}).click();
+    await page.locator("#advanced-settings summary").click();
     const anchorSelect=page.getByLabel("Adlandırılmış bağlantı noktası");
     await anchorSelect.selectOption("candle.flame-base");
     assert.equal(await anchorSelect.inputValue(),"candle.flame-base");
@@ -83,7 +84,22 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
 
     // Change the flame intensity through the canonical registry control.
     await page.locator("#effect-list button",{hasText:"Alev"}).click();
-    await page.locator('#effect-inspector input[aria-label="Opaklık"]').evaluate(input=>{
+    await page.getByRole("button",{name:"Doğal",exact:true}).click();
+    assert.equal(await page.locator("#effect-profile").innerText(),"Doğal");
+    const canonical=await page.evaluate(async()=>{
+      const {objectEffectRegistry}=await import('/src/registry/effects.mjs');
+      return objectEffectRegistry.flame.presets.Doğal;
+    });
+    assert.deepEqual(await page.evaluate(()=>window.__sceneEditor.getScene().effects.find(item=>item.id==="flame-1").params),canonical);
+    await page.locator('#basic-opacity').focus();
+    await page.locator('#basic-opacity').press('ArrowLeft');
+    assert.equal(await page.locator('#basic-opacity').evaluate(input=>input===document.activeElement),true);
+    assert.equal(await page.locator('#effect-profile').innerText(),"Özel");
+    await page.locator('#undo').click();
+    assert.equal(await page.locator('#effect-profile').innerText(),"Doğal");
+    await page.locator('#redo').click();
+    assert.equal(await page.locator('#effect-profile').innerText(),"Özel");
+    await page.locator('#effect-advanced input[aria-label="Opaklık"]').evaluate(input=>{
       input.value="0.7";
       input.dispatchEvent(new Event("change",{bubbles:true}));
     });
@@ -142,6 +158,21 @@ test("scene editor smoke: candle drag, opacity, v2 roundtrip, visibility and 390
     // Compact layout has no horizontal page overflow.
     await page.setViewportSize({width:390,height:844});
     await page.waitForTimeout(250);
+    // Re-import may retain the last selected smoke effect. Explicitly choose the
+    // flame before asserting its opacity control on the compact mobile panel.
+    await page.getByRole('tab',{name:'Nesneler',exact:true}).click();
+    await page.locator('#object-select-candle').click();
+    await page.getByRole('tab',{name:'Efekt ayarları'}).click();
+    await page.locator('#effect-select-flame-1').click();
+    assert.equal(await page.locator('#effect-inspector').isVisible(),true);
+    await page.locator('#basic-opacity').evaluate(input=>{input.value='.65';input.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(await page.evaluate(()=>window.__sceneEditor.getScene().effects.find(item=>item.id==='flame-1').params.opacity),.65);
+    await page.getByRole('tab',{name:'Nesneler',exact:true}).click();
+    await page.locator('#object-filter').selectOption('effects');
+    assert.equal(await page.locator('#object-list button').count(),1);
+    assert.equal(await page.locator('#effect-list button[aria-pressed=true]').textContent(),'Alev');
+    await page.locator('#object-filter').selectOption('all');
+    assert.equal(await page.locator('#object-list button').count(),6);
     const overflow=await page.evaluate(()=>({
       document:document.documentElement.scrollWidth-document.documentElement.clientWidth,
       body:document.body.scrollWidth-document.body.clientWidth
