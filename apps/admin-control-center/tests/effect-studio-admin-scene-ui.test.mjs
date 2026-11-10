@@ -154,9 +154,12 @@ test("current site scene supports reviewed staging and explicitly confirmed live
       "Source scene renders one marker per approved effect slot");
     assert.equal(await frame.locator('[data-scene-object="vefk-stand"]').count(), 1);
     assert.equal(await frame.locator('[data-scene-object="parchment"]').count(), 0);
-    assert.equal(await frame.locator('.scene-object').count(), 15);
+    assert.equal(await frame.locator('.scene-object').count(), 14, 'internal drawing quill is not a separate scene object');
+    assert.equal(await frame.locator('[data-scene-object="quill"]').count(), 0);
+    assert.equal(await frame.locator('#object-list button', { hasText: 'Divit' }).count(), 0);
+    assert.equal(packet.scene.objects.length, 15, 'the publication binding remains intact');
     assert.equal(packet.scene.effects.length, 9);
-    assert.equal(packet.readiness.enabledCount, 7);
+    assert.equal(packet.readiness.enabledCount, 9);
     assert.equal(packet.readiness.mountedCount, 9);
     assert.equal(packet.readiness.ready, true);
     for (const id of ['camcorder', 'rolled-rug', 'incense-burner']) {
