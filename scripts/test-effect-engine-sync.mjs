@@ -66,13 +66,15 @@ test('reject unsafe paths, unexpected source/dependencies and incompatible API w
   assert.deepEqual(readdirSync(root).sort(), ['alias', 'canonical', 'vendor']);
 });
 
-test('canonical, template and Admin CI checks are read only and share provenance', {timeout: 120000}, async () => {
+test('canonical engine is local, matches template and needs no Admin snapshot', {timeout: 120000}, async () => {
   const provenance = await canonicalProvenance(source);
+  assert.equal(provenance.source,'YardimciAsistan');
+  assert.ok(source.endsWith('/YardimciAsistan/packages/effect-engine'));
   checkCopy(vendorRoot, provenance);
-  const admin = resolve('apps/admin-control-center');
-  const editorBefore = readFileSync(join(admin, 'public/effect-studio/index.html'));
-  checkCopy(join(admin, 'public/effect-studio'), provenance, {strict: false, provenancePath: join(admin, 'effect-engine-provenance.json')});
-  assert.deepEqual(readFileSync(join(admin, 'public/effect-studio/index.html')), editorBefore);
+  const editor=readFileSync(join(source,'src/editor/main.mjs'),'utf8');
+  assert.match(editor,/mountPhotoEditor/);
+  assert.doesNotMatch(editor,/postMessage/);
+  assert.equal(readFileSync('apps/admin-control-center/package.json','utf8').includes('sync-effect-studio.mjs'),false);
 });
 
 function objectScene() {

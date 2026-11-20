@@ -21,15 +21,15 @@ test('Admin cannot edit or deploy the BirDeSenGör object scene',async()=>{
   assert.equal(existsSync(join(admin,'public/effect-studio/scene.html')),false);
 });
 
-test('both YA copies use one exact Channel Foundry SHA256 provenance and photo editor',async()=>{
-  assert.ok(canonicalEngineRoot.endsWith('/ChannelFoundry/packages/effect-engine'));
+test('complete photo editor is owned and built inside YardimciAsistan',async()=>{
+  assert.ok(canonicalEngineRoot.endsWith('/YardimciAsistan/packages/effect-engine'));
   const expected=await canonicalProvenance(canonicalEngineRoot);
-  assert.equal(expected.source,'ChannelFoundry');
+  assert.equal(expected.source,'YardimciAsistan');
   assert.equal(Object.keys(expected.files).length,24);
   checkCopy(vendorRoot,expected);
-  checkCopy(join(admin,'public/effect-studio'),expected,{
-    strict:false,provenancePath:join(admin,'effect-engine-provenance.json'),
-  });
-  assert.ok(read('effects-source/index.html').includes('src/editor/main.mjs'));
-  assert.ok(read('public/effect-studio/index.html').includes('src/editor/main.mjs'));
+  assert.ok(readFileSync(join(canonicalEngineRoot,'src/editor/main.mjs'),'utf8').includes('mountPhotoEditor'));
+  assert.doesNotMatch(readFileSync(join(canonicalEngineRoot,'src/editor/main.mjs'),'utf8'),/postMessage|window.parent/);
+  assert.equal(existsSync(join(admin,'effects-source/index.html')),false);
+  assert.equal(existsSync(join(admin,'scripts/sync-effect-studio.mjs')),false);
+  assert.doesNotMatch(read('src/EffectStudio.tsx'),/iframe|postMessage|effect-studio\/index.html/);
 });

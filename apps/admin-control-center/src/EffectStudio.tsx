@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudUpload, RefreshCw, Save, Waves } from "lucide-react";
+import { CloudUpload, RefreshCw, Save, Waves, PanelLeft, PanelRight } from "lucide-react";
+import { EffectPhotoEditorView } from "./EffectPhotoEditorView";
+import { mountPhotoEditor } from "../../../packages/effect-engine/src/editor/main.mjs";
 import { effectSiteDeployTarget } from "../shared/contracts";
-import type { DeploymentTargetSnapshot, EffectScene, EffectStudioProject, EffectReadiness } from "../shared/contracts";
+import type { DeploymentTargetSnapshot, EffectScene, EffectStudioProject } from "../shared/contracts";
 import "./effect-studio.css";
 
-type StudioPacket = {
-  type: string;
-  requestId?: number;
-  scene?: EffectScene;
-  message?: string;
-};
-type Pending = { resolve: (value: StudioPacket) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
+type PhotoEditorApi = ReturnType<typeof mountPhotoEditor>;
 type StoredSelection = { siteId: string; imageId: string };
 
 const SELECTION_KEY = "effect-studio.selection";
@@ -41,12 +37,11 @@ export function EffectStudio() {
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState("Projeler okunuyor…");
   const [error, setError] = useState("");
-  const [readiness, setReadiness] = useState<EffectReadiness>();
-  const [savedDraft, setSavedDraft] = useState(false);
   const sourceHash = useRef<string | undefined>(undefined);
-  const frame = useRef<HTMLIFrameElement>(null);
-  const pending = useRef(new Map<number, Pending>());
-  const counter = useRef(0);
+  const editorHost = useRef<HTMLDivElement>(null);
+  const editor = useRef<PhotoEditorApi | null>(null);
+  const [hideLeft, setHideLeft] = useState(false);
+  const [hideRight, setHideRight] = useState(false);
   const changeCount = useRef(0);
   const savedCount = useRef(0);
   const activeTarget = useRef("");
@@ -77,21 +72,30 @@ export function EffectStudio() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  // Clear old iframe replies when editor state is reset.
-  useEffect(() => {
-    loadToken.current++;
-    activeTarget.current = "";
-    setReady(false);
-    setLoaded(false);
-    setDirty(false);
-    setError("");
+  const markDirty = useCallback(() => {
+    changeCount.current++;
+    setDirty(true);
+    setStatus("Düzenleniyor…");
     if (autoTimer.current) clearTimeout(autoTimer.current);
-    for (const task of pending.current.values()) {
-      clearTimeout(task.timer);
-      task.reject(new Error("Düzenleyici değişti."));
-    }
-    pending.current.clear();
+    autoTimer.current = setTimeout(() => { void saveCurrent.current().catch(() => {}); }, 1600);
   }, []);
+
+  // React owns the editor's entire lifetime. Engine timers, pointer listeners,
+  // ResizeObserver and keyboard shortcuts are disposed on navigation/unmount.
+  useEffect(() => {
+    const host = editorHost.current;
+    if (!host) return;
+    const instance = mountPhotoEditor(host, { onChange: markDirty });
+    editor.current = instance;
+    setReady(true);
+    return () => {
+      loadToken.current++;
+      activeTarget.current = "";
+      if (autoTimer.current) clearTimeout(autoTimer.current);
+      instance.destroy();
+      editor.current = null;
+    };
+  }, [markDirty]);
 
   useEffect(() => {
     if (!siteId || !selected) return;
@@ -119,19 +123,16 @@ export function EffectStudio() {
     return () => { active = false; };
   }, []);
 
-  const request = useCallback((type: string, payload: Record<string, unknown> = {}) => {
-    return new Promise<StudioPacket>((resolve, reject) => {
-      const target = frame.current?.contentWindow;
-      if (!target || !ready) { reject(new Error("Düzenleyici henüz hazır değil.")); return; }
-      const requestId = ++counter.current;
-      const timer = setTimeout(() => {
-        pending.current.delete(requestId);
-        reject(new Error("Düzenleyici yanıt vermedi."));
-      }, 15000);
-      pending.current.set(requestId, { resolve, reject, timer });
-      target.postMessage({ type, requestId, ...payload }, "*");
-    });
-  }, [ready]);
+  const request = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
+    const instance = editor.current;
+    if (!instance) throw new Error("Düzenleyici henüz hazır değil.");
+    if (type === "studio:get") return { scene: instance.snapshot() as EffectScene };
+    if (type === "studio:load") {
+      await instance.load(payload.scene);
+      return {};
+    }
+    throw new Error("Desteklenmeyen efekt editör işlemi.");
+  }, []);
 
   const save = useCallback(async () => {
     if (!activeTarget.current || !loaded) return;
@@ -143,13 +144,11 @@ export function EffectStudio() {
       try {
         const packet = await request("studio:get");
         if (!packet.scene) throw new Error("Düzenlenecek sahne bulunamadı.");
-        const result = await window.adminControlCenter.saveEffectScene(targetId, packet.scene, sourceHash.current);
+        await window.adminControlCenter.saveEffectScene(targetId, packet.scene, sourceHash.current);
         if (activeTarget.current === targetId) {
           savedCount.current = revision;
           setDirty(changeCount.current !== savedCount.current);
           setStatus("Yerel taslak kaydedildi.");
-          setSavedDraft(true);
-          setReadiness(result.readiness);
           setError("");
         }
       } catch (e) {
@@ -172,44 +171,10 @@ export function EffectStudio() {
   saveCurrent.current = save;
 
   useEffect(() => {
-    const handler = (event: MessageEvent<StudioPacket>) => {
-      if (event.source !== frame.current?.contentWindow || !event.data || typeof event.data.type !== "string") return;
-      const data = event.data;
-      if (data.type === "studio:ready") { setReady(true); return; }
-      if (data.type === "studio:dirty") {
-        changeCount.current++;
-        setDirty(true);
-        setStatus("Düzenleniyor…");
-        if (autoTimer.current) clearTimeout(autoTimer.current);
-        autoTimer.current = setTimeout(() => { void saveCurrent.current().catch(() => {}); }, 1600);
-        return;
-      }
-      if (data.requestId !== undefined) {
-        const task = pending.current.get(data.requestId);
-        if (task) {
-          pending.current.delete(data.requestId);
-          clearTimeout(task.timer);
-          if (data.type === "studio:error") task.reject(new Error(data.message || "Düzenleyici hatası"));
-          else task.resolve(data);
-        }
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => {
-      window.removeEventListener("message", handler);
-      if (autoTimer.current) clearTimeout(autoTimer.current);
-      for (const task of pending.current.values()) { clearTimeout(task.timer); task.reject(new Error("Atölye kapandı.")); }
-      pending.current.clear();
-    };
-  }, []);
-
-  useEffect(() => {
     if (!ready || !selected) { setLoaded(false); return; }
     const token = ++loadToken.current;
     setLoaded(false);
     setDirty(false);
-    setSavedDraft(false);
-    setReadiness(undefined);
     sourceHash.current = undefined;
     setError("");
     setStatus("Görsel ve sahne açılıyor…");
@@ -224,8 +189,6 @@ export function EffectStudio() {
         activeTarget.current = selected;
         setLoaded(true);
         sourceHash.current = data.sourceHash;
-        setReadiness(data.readiness);
-        setSavedDraft(data.source === "draft");
         setStatus(data.message || (data.source === "draft" ? "Kayıtlı taslak açıldı." : data.source === "new" ? "Yeni sahne hazır." : "Site sahnesi açıldı."));
       } catch (e) {
         if (token !== loadToken.current) return;
@@ -337,6 +300,8 @@ export function EffectStudio() {
       </div>
       {target && <span className="effects-publication" title={publicationTitle}>{publicationLabel}</span>}
       <div className="effects-buttons">
+        <button title={hideLeft ? "Alanlar panelini göster" : "Alanlar panelini gizle"} aria-label="Alanlar paneli" aria-pressed={!hideLeft} onClick={() => setHideLeft(value => !value)}><PanelLeft size={15}/></button>
+        <button title={hideRight ? "Özellikler panelini göster" : "Özellikler panelini gizle"} aria-label="Özellikler paneli" aria-pressed={!hideRight} onClick={() => setHideRight(value => !value)}><PanelRight size={15}/></button>
         <button disabled={!loaded || working} title={saveTitle} onClick={() => void save().catch(() => {})}><Save size={15}/> {working ? "İşleniyor…" : "Kaydet"}</button>
         {target && <button className="effects-publish" disabled={Boolean(publishBlocked)} title={publishBlocked || publicationTitle}
           onClick={() => void publish()}><CloudUpload size={15}/> Siteye yayınla</button>}
@@ -347,13 +312,7 @@ export function EffectStudio() {
     </div>
     <div className="effects-body">
       <section className="effects-stage" aria-label="Efekt düzenleyici" aria-busy={!loaded && Boolean(selected)}>
-        <iframe ref={frame} title="Fotoğraf efekt düzenleyicisi"
-          src="./effect-studio/index.html?embedded=1"
-          onLoad={() => {
-            setReady(false);
-            frame.current?.contentWindow?.postMessage({ type: "studio:hello" }, "*");
-          }}
-        />
+        <EffectPhotoEditorView hostRef={editorHost} hideLeft={hideLeft} hideRight={hideRight}/>
         {(!loaded || !selected) && <div className="effects-loading">{error || (!selected ? selectedProject?.note || "Bir görsel seçin." : "")}</div>}
       </section>
     </div>

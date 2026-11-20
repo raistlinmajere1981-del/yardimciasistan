@@ -202,7 +202,7 @@ kataloğuna bağlıdır; ikinci hedef dil sözlüğü yoktur.
 ## Efekt Atölyesi
 
 Varsayılan `effects: []` ve manifest yok: adaptör, sahne, motor, Canvas veya animasyon döngüsü
-yoktur. Statik `<img>` normal çalışır. Canonical kaynak `ChannelFoundry/packages/effect-engine/src/{runtime,registry,model}`
+yoktur. Statik `<img>` normal çalışır. Canonical kaynak `YardimciAsistan/packages/effect-engine/src/{runtime,registry,model}`
 dizinleridir; başka sitedeki vendor kopyası kullanılmaz.
 
 Efekt yalnız site sahibinin hard-coded statik tasarım görselinde kullanılır. Ürün, oda/masa,
@@ -260,22 +260,23 @@ envanteridir; `fingerprint`, envanter sırasındaki her `path:sha256\n` satırı
 SHA-256'sıdır. `--check` kaynak, envanter ve provenance'ın tam eşitliğini salt okunur sınar;
 bozuk hash, eksik/fazla modül veya aynı sürümde değişen baytlar hata verir.
 
-Yardımcı Asistan kökünden Admin ve şablonu birlikte kontrol edin:
+Yardımcı Asistan kendi sürümlü packages/effect-engine kaynağına sahiptir. Admin
+düzenleyicisi aynı depodaki src/editor modülünü doğrudan React içinde çalıştırır;
+iframe veya ChannelFoundry senkronizasyonu yoktur. Kontroller:
 
-```bash
-node apps/admin-control-center/scripts/sync-effect-studio.mjs --check
+~~~bash
+node web-site-template/tools/sync-effect-engine.mjs --check
+npm run typecheck -w @yardimci-asistan/admin-control-center
 node --test scripts/test-effect-engine-sync.mjs
-```
+node --test apps/admin-control-center/tests/effect-studio-ui.test.mjs
+~~~
 
-CI'da canonical checkout yolu `ChannelFoundry package root` ile verilebilir; Admin'in Git dışı
-snapshot'ı önce açık `npm run effect:sync -w @yardimci-asistan/admin-control-center` adımıyla
-üretilir. Bu adım tam editörü (`scene.html`, `scene.css`, `src`, `assets`, `examples` dahil)
-kopyalar; yerel editör değişikliklerini önce inceleyin. Zaten aynı motoru taşıyan snapshot
-için `node apps/admin-control-center/scripts/sync-effect-studio.mjs --write-provenance`
-yalnız Admin `effect-engine-provenance.json` kaydını yazar, editöre dokunmaz. Admin'in dev/build
-kancaları yalnız `--check` çalıştırır. Kontroller otomatik onarım yapmaz. Bilinçli kaynak
-yenilemesinden sonra son adım `node tools/manifest.mjs --write`, ardından
-`node tools/manifest.mjs` olmalıdır (şablon dizininden); sürüm otomatik artırılmaz.
+Yalnız bilinçli ve test edilmiş motor değişikliğinde
+node web-site-template/tools/sync-effect-engine.mjs komutu kullanılır. Bu komut
+ortak vendor kopyasını kanonik kaynaktan SHA-256 envanteri ile üretir. Ardından
+node web-site-template/tools/manifest.mjs --write komutuyla ortak şablonun
+manifesti yenilenir. Aktif site deploy'ları ayrıca onaylanır. Admin build/dev
+kaynak değiştirmez; test kontrolleri salt okunurdur.
 
 Vendor v2 nesne runtime'ını içerir; statik fotoğraf adaptörünün bağlama sözleşmesi hâlâ v1
 fotoğraf sahnesidir. V2 DOM nesne bağlama ve siteye yayın ayrı entegrasyon işidir; v2 JSON

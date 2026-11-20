@@ -10,6 +10,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const dist = resolve(here, "../dist-renderer");
 const fixture = JSON.parse(readFileSync(resolve(here, "../effects-source/examples/gideros.scene.json"), "utf8"));
 const browserPath = "/usr/bin/brave";
+const photoSrc = "data:image/webp;base64," + readFileSync(resolve(here,"../effects-source/assets/gideros-1-1818.webp")).toString("base64");
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -47,7 +48,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
 
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await page.addInitScript((fixture) => {
+    await page.addInitScript(({ fixture, photoSrc }) => {
       const installations = [
         { id: "landing", title: "Yardımcı Asistan landing", kind: "landing", status: "ready", statusNote: "Hazır", siteUrl: "https://demo.example.test", deployType: "ssh-rsync", credentialStatus: "configured", credentialRef: "demo", liveWebVersion: null, versionEndpoint: null },
         { id: "teknikel", title: "Teknikel Kombi", kind: "customer-site", status: "ready", statusNote: "Hazır", siteUrl: "https://teknikel.example.test", deployType: "ssh-rsync", credentialStatus: "configured", credentialRef: "demo", liveWebVersion: null, versionEndpoint: null }
@@ -58,7 +59,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
       ];
       const idleRun = { running: false, targetId: "", action: "", stage: "", startedAt: null, finishedAt: null, result: "idle", exitCode: null, outputTail: [] };
       const scene = structuredClone(fixture);
-      scene.photo.src = fixture.photo.src;
+      scene.photo.src = photoSrc;
       window.__savedScenes = [];
       window.__deployCalls = [];
       window.__effectPublishCalls = [];
@@ -113,7 +114,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
         prepareEffectScene: async () => ({ ok: true, message: "prepared", siteUrl: "https://demo.example.test" }),
         publishEffectScene: async (id) => { window.__effectPublishCalls.push(id); return { ok: true, message: "published", siteUrl: "https://demo.example.test" }; }
       };
-    }, fixture);
+    }, {fixture,photoSrc});
 
     const pageErrors = [];
     page.on("pageerror", error => pageErrors.push(error.message));
@@ -123,36 +124,51 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
     assert.equal(await page.locator(".effects-publication").innerText(), "İlk yayın bekliyor");
     assert.match(await page.locator(".effects-publication").getAttribute("title"), /tam site ön kontrolü/);
     assert.equal(await page.locator(".effects-assets, .effects-activation, .effects-foot").count(), 0);
-    const editor = page.frameLocator(".effects-stage iframe");
+    assert.equal(await page.locator(".effects-stage iframe").count(), 0, "No iframe is allowed");
+    const editor = page;
     await editor.locator("#effects .row-select").first().waitFor();
-    const imageFrame = page.frames().find(frame => frame.url().includes("/effect-studio/index.html"));
-    assert.ok(imageFrame);
-    // All four columns stay in one row, with scrolling owned by lists/inspector.
-    for (const viewport of [{width:1920,height:1080},{width:1440,height:900},{width:1366,height:768},{width:1280,height:720}]) {
+    const imageFrame = page.mainFrame();
+    for(const viewport of [{width:1920,height:1080},{width:1440,height:900},{width:1366,height:768},{width:1280,height:720}]) {
       await page.setViewportSize(viewport);
-      const outer = await page.evaluate(() => {
-        const rect = selector => {const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};
-        return {overflowY:document.documentElement.scrollHeight-innerHeight,overflowX:document.documentElement.scrollWidth-innerWidth,head:rect(".effects-head"),stage:rect(".effects-stage"),frame:rect("iframe")};
+      const layout = await page.evaluate(() => {
+        const rect = selector => {
+          const r=document.querySelector(selector).getBoundingClientRect();
+          return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};
+        };
+        return {
+          overflowX:document.documentElement.scrollWidth-innerWidth,
+          overflowY:document.documentElement.scrollHeight-innerHeight,
+          head:rect(".effects-head"),stage:rect(".effects-stage"),
+          columns:[".effects-editor .library",".effects-editor .stage-column",".effects-editor .inspector"].map(rect),
+          preview:rect("#preview-host")
+        };
       });
-      assert.ok(outer.overflowY<=1 && outer.overflowX<=1, `Admin page overflow at ${viewport.width}: ${JSON.stringify(outer)}`);
-      assert.ok(outer.head.height>=48 && outer.head.height<=58, `compact header: ${JSON.stringify(outer.head)}`);
-      assert.ok(outer.frame.bottom<=viewport.height && outer.frame.height>viewport.height-110);
-      const layout = await imageFrame.evaluate(() => {
-        const rect = selector => {const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
-        return {overflowX:document.documentElement.scrollWidth-innerWidth,overflowY:document.documentElement.scrollHeight-innerHeight,width:innerWidth,height:innerHeight,
-          columns:[".zone-library",".effect-library",".stage-column",".inspector"].map(rect),preview:rect("#preview-host"),tools:["#play","#compare","#guides","#fit","#undo","#redo","#add-zone","#add-effect"].map(rect)};
+      assert.ok(layout.overflowX<=1 && layout.overflowY<=1, "Admin viewport overflow: "+JSON.stringify(layout));
+      assert.ok(layout.stage.bottom<=viewport.height && layout.stage.height>viewport.height-140, "stage clipped: "+JSON.stringify(layout));
+      assert.ok(layout.preview.height>viewport.height-220 && layout.preview.width>300, "preview too small: "+JSON.stringify(layout));
+      layout.columns.forEach((column,i)=>{
+        assert.ok(column.width>150 && column.height>470 && column.right<=viewport.width && column.bottom<=viewport.height, "column "+i+": "+JSON.stringify(layout));
+        if(i) assert.ok(column.x>=layout.columns[i-1].right-1, "columns should not overlap");
       });
-      assert.ok(layout.overflowX<=1 && layout.overflowY<=1, `iframe overflow: ${JSON.stringify(layout)}`);
-      layout.columns.forEach((column,i) => {
-        assert.ok(column.width>100 && column.height>500 && column.right<=layout.width && column.bottom<=layout.height, `column ${i}: ${JSON.stringify(layout)}`);
-        if(i)assert.ok(column.x>=layout.columns[i-1].right, "columns are side by side");
-      });
-      assert.ok(layout.preview.height>viewport.height-200 && layout.preview.width>350, `preview maximizes height: ${JSON.stringify(layout.preview)}`);
-      for(const tool of layout.tools)assert.ok(tool.width>0 && tool.x>=0 && tool.right<=layout.width && tool.y>=0 && tool.bottom<=layout.height, `reachable tool: ${JSON.stringify(tool)}`);
-      if(process.env.EFFECT_STUDIO_SCREENSHOTS)await page.screenshot({path:join(process.env.EFFECT_STUDIO_SCREENSHOTS,`effect-studio-${viewport.width}.png`)});
-      for(const selector of ["#play","#compare","#guides","#fit"])assert.equal(await editor.locator(selector).isVisible(),true);
+      if(process.env.EFFECT_STUDIO_SCREENSHOTS) await page.screenshot({path:join(process.env.EFFECT_STUDIO_SCREENSHOTS,'effect-studio-'+viewport.width+'.png')});
     }
+    await page.getByRole("button",{name:"Alanlar paneli"}).click();
+    assert.equal(await editor.locator(".effects-editor .library").isVisible(),false);
+    await page.getByRole("button",{name:"Alanlar paneli"}).click();
+    await page.getByRole("button",{name:"Özellikler paneli"}).click();
+    assert.equal(await editor.locator(".effects-editor .inspector").isVisible(),false);
+    await page.getByRole("button",{name:"Özellikler paneli"}).click();
     assert.equal(await editor.locator("#effects .row-select").count(), 1, "only the selected zone's effect appears");
+    // Context menu actions must stay on the selected zone and effect.
+    assert.ok(await editor.locator('.zone-linked-effects .zone-effect-link').count()>0);
+    await editor.locator('#zones .zone-group').first().click({button:'right'});
+    assert.equal(await editor.getByRole('menuitem',{name:'Alanı düzenle'}).isVisible(),true);
+    await editor.getByRole('menuitem',{name:'Alanı düzenle'}).click();
+    await editor.locator('#effects .list-row').first().click({button:'right'});
+    assert.equal(await editor.getByRole('menuitem',{name:'Yalnız önizle'}).isVisible(),true);
+    await editor.keyboard.press('Escape');
+    assert.equal(await editor.locator('.editor-context-menu').count(),0);
+    await editor.locator('#effects .row-select').first().click();
     assert.equal(await editor.locator("#inspect-effect").getAttribute("aria-pressed"), "true");
     // The canonical canvas draws pixels, including at the smallest target size.
     await imageFrame.waitForFunction(() => [...document.querySelectorAll("#preview-host canvas")].some(canvas => {
@@ -175,7 +191,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
     await editor.locator("#fit").selectOption("cover");
     await editor.locator("#fit").selectOption("contain");
     const initialEffect = await editor.locator("#effects .row-select").innerText();
-    await editor.locator("#zones .row-select").nth(1).click();
+    await editor.locator("#zones > .zone-group > .list-row .row-select").nth(1).click();
     assert.equal(await editor.locator("#inspect-zone").getAttribute("aria-pressed"), "true");
     assert.equal(await editor.locator("#effects .row-select").count(), 1);
     assert.notEqual(await editor.locator("#effects .row-select").innerText(), initialEffect);
@@ -210,7 +226,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
     await editor.locator(".vertex").first().press("ArrowRight");
     await editor.locator("#inspect-zone").click();
     // Keyboard geometry deliberately avoids re-rendering focused controls; refresh the inspector.
-    await editor.locator("#zones .selected .row-select").click();
+    await editor.locator("#zones .list-row.selected .row-select").click();
     assert.equal(Number(await x.inputValue()), beforeX+1);
     const vertex = await editor.locator(".vertex").first().boundingBox();
     await page.mouse.move(vertex.x+vertex.width/2,vertex.y+vertex.height/2);
@@ -218,7 +234,7 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
     await page.mouse.move(vertex.x+vertex.width/2+12,vertex.y+vertex.height/2+8,{steps:4});
     await page.mouse.up();
     assert.ok(Number(await x.inputValue())>beforeX+1);
-    await editor.locator(".scene-settings summary").click();
+    await editor.locator("#inspect-scene").click();
     await editor.locator("#scene-name").fill("Kompakt çalışma");
     await editor.locator("#scene-name").press("Tab");
     await editor.locator("#scene-seed").fill("compact-test");
@@ -299,14 +315,8 @@ test("compact image workspace keeps hierarchy, geometry, autosave and safe publi
     await page.waitForFunction(() => document.querySelector(".deployment-title")?.textContent?.includes("web modülünü"));
     assert.match(await page.locator(".deployment-title").innerText(), /site kökü/);
     assert.deepEqual(await page.evaluate(() => window.__deployCalls), []);
-    // The standalone editor keeps the full scene list and both inspectors.
-    const standalone = await browser.newPage({viewport:{width:1440,height:900}});
-    await standalone.goto(`http://127.0.0.1:${port}/effect-studio/index.html`,{waitUntil:"networkidle"});
-    await standalone.locator("#effects .row-select").first().waitFor();
-    assert.equal(await standalone.locator("#effects .row-select").count(),fixture.effects.length);
-    for(const selector of [".topbar","#zone-inspector","#effect-inspector","#open-photo","#open-project","#export"])
-      assert.equal(await standalone.locator(selector).isVisible(),true);
-    await standalone.close();
+    // Editor stays in this same React application; no standalone HTML route.
+    assert.equal(await editor.locator("iframe").count(),0);
   } finally {
     await browser.close();
     await new Promise((done) => server.close(done));

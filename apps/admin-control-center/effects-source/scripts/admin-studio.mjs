@@ -4,8 +4,8 @@ import {dirname,resolve,join,sep,basename} from "node:path";
 import {fileURLToPath} from "node:url";
 import {randomUUID,createHash} from "node:crypto";
 import {spawn,execFileSync} from "node:child_process";
-import {importProject,exportProject,validateProject,MAX_FILE_BYTES} from "../../public/effect-studio/src/model/project.mjs";
-import {compileScene} from "../../public/effect-studio/src/runtime/index.mjs";
+import {importProject,exportProject,validateProject,MAX_FILE_BYTES} from "../../../../packages/effect-engine/src/model/project.mjs";
+import {compileScene} from "../../../../packages/effect-engine/src/runtime/index.mjs";
 import {discoverSiteProjects} from "./site-projects.mjs";
 
 const studioRoot=resolve(dirname(fileURLToPath(import.meta.url)),"..");

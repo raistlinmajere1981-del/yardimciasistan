@@ -1,16 +1,30 @@
-# Yardımcı Asistan Site Efekt Atölyesi
+# Yardımcı Asistan — Efekt Atölyesi V2
 
-Admin yalnız kendi web sitelerinin fotoğraf efektlerini düzenler ve yönetir. BirDeSenGör nesne sahnesi ve yayın yetkisi Channel Foundry Sahne Atölyesi'ne devredildi.
+Kaynak sahibi: packages/effect-engine/src/ (model, registry, runtime ve editor).
+Bu kaynak Yardımcı Asistan reposuna aittir. ChannelFoundry ve BirDeSenGör
+ayrı projelerdir: Admin bu projelerin kaynak kodunu okumaz veya değiştirmez.
 
-Kanonik motor ve editör kaynağı: ChannelFoundry/packages/effect-engine/src. Admin site fotoğraf bağlama ve yayın servisi apps/admin-control-center/effects-source altındadır.
+Admin: src/EffectStudio.tsx + src/EffectPhotoEditorView.tsx. Editör React
+ağacında tek çalışma alanı olarak monte edilir. Her montaj kendi önizlemesini,
+tarihçesini, pointer, ResizeObserver ve klavye aboneliklerini tutar; ayrılırken
+hepsini kapatır. iframe ve postMessage kullanılmaz.
 
-Fotoğraf editörü HTML/CSS, görseller ve örnekleri Admin effects-source içindedir. Ortak model, registry, runtime ve editör JavaScript'i her zaman Channel Foundry'den snapshot alınır.
+Yayın sahibi: effects-source/scripts/admin-studio.mjs ve Admin
+electron/services/effect-* hizmetleri. Yalnız izinli site fotoğrafı ve
+v1 fotoğraf sahnesi düzenlenir; v2 nesne sahnesi ChannelFoundry kapsamındadır.
+İlk etkinleştirme için tam site deploy ön kontrolü, sonraki yayınlarda yalnız
+sahne güncellemesi korunur. Yayın açık kullanıcı onayı gerektirir.
+Kaynak fotoğraf hash'i, sahne doğrulaması, otomatik yerel taslak kaydı
+ve site yayın manifestleri aynı güvenlik sınırındadır.
 
-Motor snapshot: node web-site-template/tools/sync-effect-engine.mjs
-Admin snapshot: node apps/admin-control-center/scripts/sync-effect-studio.mjs
-Salt okunur doğrulama: aynı komutlar --check ile.
+Motoru eşitleme (açık işlem):
+node web-site-template/tools/sync-effect-engine.mjs
 
-Siteyi aktifleştirmek ve yayınlamak yalnız ilgili Admin deployment yetkisiyle mümkündür. Fotoğrafın nasıl gösterileceği siteye özeldir. Eski bağımsız EfektAtolyesi deposu çalışma zincirinde kullanılmaz ve yerel checkout kaldırılmıştır.
+Salt okunur doğrulama:
+node web-site-template/tools/sync-effect-engine.mjs --check
 
+Admin predev/prebuild yalnız kontrol çalıştırır; başka repo veya editör
+snapshot kopyalama yolu yoktur. Gerçek sitelere deploy bu çalışmanın dışındadır.
 
-Temiz checkout sırasında predev/prebuild, Admin'in ignored public/effect-studio kopyasını sürümlü kaynaktan otomatik kurar. Genel site şablon motoru ise açık senkron adımıyla sabitlenir. Yayın doğrulamasında --check komutu hiçbir dosya yazmaz.
+Kabul: Admin typecheck/build, test-effect-ownership.mjs,
+test-effect-engine-sync.mjs, effect-studio-ui.test.mjs.

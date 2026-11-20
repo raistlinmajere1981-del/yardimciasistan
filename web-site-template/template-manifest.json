@@ -72,7 +72,7 @@
     "public/assets/core/table-orders.js": "91af9e07cc32692ae68cc4751d02345fe69515874bf25380705a3ccf760eb5fe",
     "public/assets/core/traffic.mjs": "bdf1db77359516684b03f01326e6c51001269e9c28fa15c1ac7260d01e58bfe1",
     "public/assets/core/widget.js": "7984a72b2c7c5caee57dcb5856c0f634679cdcbc7fff62ac7eb2cb3d2947d5e6",
-    "public/assets/vendor/effect-engine/provenance.json": "2bc9acbe32db402a42d5b6fdf266477491aef01ce775553b33ce14db2ba02d9b",
+    "public/assets/vendor/effect-engine/provenance.json": "af31f0f6e0ee4189a9fc07dadbb56a3f59c7609b589a2ee4e309c3ca4e2a5871",
     "public/assets/vendor/effect-engine/src/model/geometry.mjs": "a91b131a51a9e5615024022ca092b253d15682968a49ff43bc4440161268dccd",
     "public/assets/vendor/effect-engine/src/model/project.mjs": "1baf2f5c8ebf486eac739a01eb2d12f16c0c90d3ba76022c77a8f7608155993a",
     "public/assets/vendor/effect-engine/src/registry/effects.mjs": "1fb0938acffac484c96445eb1a5713aa39cbd7a6205f6a7bd54e7441ce88dd83",
@@ -98,9 +98,9 @@
     "public/assets/vendor/effect-engine/src/runtime/random.mjs": "6e266469e0d1ddcd14a1bf00992a5ca7d496ff09f7b797ed6bafefc5dc1f5deb",
     "public/assets/vendor/effect-engine/src/runtime/ticker.mjs": "8ece31ef291c6a05171a8d6cbd1f917f5d4d662183fb58614c503666231a37dc",
     "public/index.php": "2bb71f46101948a020c95af04fe993351ac47904f7107d302441e7bf32390049",
-    "README.md": "96577ea94369e7652ec63207578802858b5a44ef0b6b43203bc50c0fedc2c424",
+    "README.md": "e767abaa081695cfdeb2cf9790fc6f6b12b279449bda97ca2613ca66517adf0f",
     "tools/manifest.mjs": "55b1725635965b3b72a11e215ae23988333567e5fad53921fac17191bea38b8f",
-    "tools/sync-effect-engine.mjs": "8492689ad700044e46147f0a04ab3578527b54841ad01571008dc4f610b1ae77",
+    "tools/sync-effect-engine.mjs": "4ad1d779ecc796c9f5d3f8c731472da4bd3990edc12c93f407f2fe539ffdefed",
     "tools/update-plan.mjs": "da5ddbd42d62b73a9bac5ce6d5ecdd7405b19266107cf9ec2d4f306093ee46d5"
   }
 }

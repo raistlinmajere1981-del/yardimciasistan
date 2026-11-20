@@ -25,13 +25,13 @@ function php(args) {
  assert.equal(result.status,0,result.stderr||result.stdout||String(result.error));
  assert.equal(result.stderr,'','Unexpected PHP diagnostics'); return result.stdout;
 }
-test('canonical + Admin + Channel Foundry engine provenance and independent themes', async()=>{
+test('local canonical engine and independent site themes', async()=>{
  assert.equal(manifest.template_version,'0.8.0'); assert.equal(Object.keys(manifest.common).length,95);
  assert.equal(hash(join(template,'public/assets/core/widget.js')),widgetSha);
  const provenance=await canonicalProvenance(canonicalEngineRoot);
  assert.equal(Object.keys(provenance.files).length,24);
  checkCopy(join(template,'public/assets/vendor/effect-engine'),provenance);
- checkCopy(join(main,'apps/admin-control-center/public/effect-studio'),provenance,{strict:false,provenancePath:join(main,'apps/admin-control-center/effect-engine-provenance.json')});
+ assert.equal(provenance.source,'YardimciAsistan');
  const themes=sites.map(site=>hash(join(site.root,site.demo?'assets/site/theme.css':'public/assets/site/theme.css')));
  assert.equal(new Set(themes).size,4,'Each site retains its own theme');
  for(const site of sites) assert.ok(!Object.keys(manifest.common).some(p=>/^(site\/|locales\/|public\/assets\/site\/)/.test(p)),site.name+' owned paths outside manifest');
