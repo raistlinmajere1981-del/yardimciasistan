@@ -10,7 +10,7 @@ import { ChoiceChips } from "../ui/ChoiceChips";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
-type CustomerFilter = "all" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
+type CustomerFilter = "all" | "commercial" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
 
 interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
@@ -44,7 +44,7 @@ export function CustomersWorkspace({
   const [searchText, setSearchText] = usePageViewState("customers.search", "");
   const [filter, setFilter] = usePageViewState<CustomerFilter>("customers.filter", "all");
   const paged = Boolean(window.yardimciDesktop?.listCustomers);
-  const [pageData, setPageData] = useState<{items: typeof customers; total: number; matched: number; hasDealers?:boolean; context?:{stays:typeof stays; reservations:typeof reservations; notifications:typeof notifications}}>({items:[],total:0,matched:0});
+  const [pageData, setPageData] = useState<{items: typeof customers; total: number; matched: number; hasDealers?:boolean; hasCommercial?:boolean; context?:{stays:typeof stays; reservations:typeof reservations; notifications:typeof notifications}}>({items:[],total:0,matched:0});
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
   const [pushedRevision, setPushedRevision] = useState(0);
@@ -77,7 +77,8 @@ export function CustomersWorkspace({
     return () => {current=false;clearTimeout(timer);};
   }, [customers, filter, offset, paged, pushedRevision, revision, searchText]);
   const listCustomers = paged ? pageData.items : customers;
-  const hasDealerCustomers = wholesaleEnabled && (paged ? pageData.hasDealers !== false : customers.some(customer=>Boolean(customer.commercialProfile)));
+  const hasCommercialCustomers = paged ? pageData.hasCommercial === true : customers.some(customer => Boolean(customer.commercialProfile));
+  const hasDealerCustomers = wholesaleEnabled && (paged ? pageData.hasDealers === true : customers.some(customer => customer.commercialProfile?.dealerStatus === "active"));
   const hasStayCustomers = staysEnabled;
   const hasReservationCustomers = reservationsEnabled;
 
@@ -116,7 +117,7 @@ export function CustomersWorkspace({
       customer.email,
       customer.identityNumber,
       customer.notes,
-      ...(wholesaleEnabled && customer.commercialProfile ? [
+      ...(customer.commercialProfile ? [
         customer.commercialProfile.companyName,
         customer.commercialProfile.taxOffice,
         customer.commercialProfile.taxNumber,
@@ -129,20 +130,22 @@ export function CustomersWorkspace({
     if (paged) return true;
     const searchOk = row.haystack.includes(searchText.trim().toLocaleLowerCase("tr-TR"));
     if (!searchOk) return false;
-    if (filter === "dealers") return Boolean(row.customer.commercialProfile);
+    if (filter === "commercial") return Boolean(row.customer.commercialProfile);
+    if (filter === "dealers") return row.customer.commercialProfile?.dealerStatus === "active";
     if (filter === "staying") return Boolean(row.activeStay);
     if (filter === "reserved") return row.activeReservations.length > 0 || Boolean(row.plannedStay);
     if (filter === "kbs_pending") return row.kbsState === "pending";
     if (filter === "kbs_failed") return row.kbsState === "failed";
     return true;
-  }), [listCustomers, paged, filter, kbsOverview.enabled, listNotifications, listReservations, searchText, listStays, wholesaleEnabled]);
+  }), [listCustomers, paged, filter, kbsOverview.enabled, listNotifications, listReservations, searchText, listStays]);
 
   useEffect(() => {
+    if (filter === "commercial" && !hasCommercialCustomers) setFilter("all");
     if (filter === "dealers" && !hasDealerCustomers) setFilter("all");
     if (filter === "staying" && !hasStayCustomers) setFilter("all");
     if (filter === "reserved" && !hasReservationCustomers) setFilter("all");
     if ((filter === "kbs_pending" || filter === "kbs_failed") && !kbsOverview.enabled) setFilter("all");
-  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled, setFilter]);
+  }, [filter, hasCommercialCustomers, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled, setFilter]);
 
   const pageScroll = usePageViewScroll(`customers.scroll`, rows.length);
   return <section className="panel customers-workspace" aria-label="Müşteri yönetimi">
@@ -157,7 +160,7 @@ export function CustomersWorkspace({
         <input
           value={searchText}
           onChange={(event) => {setSearchText(event.target.value);setOffset(0);}}
-          placeholder={wholesaleEnabled
+          placeholder={hasCommercialCustomers
             ? "Ad, telefon, firma, vergi no veya not"
             : hasStayCustomers
               ? "Ad, telefon, kimlik, not veya oda"
@@ -171,6 +174,7 @@ export function CustomersWorkspace({
         onChange={value=>{setFilter(value);setOffset(0);}}
         options={[
           { id: "all", label: "Tümü" },
+          ...(hasCommercialCustomers ? [{ id: "commercial" as const, label: "Ticari" }] : []),
           ...(hasDealerCustomers ? [{ id: "dealers" as const, label: "Bayiler" }] : []),
           ...(hasStayCustomers ? [{ id: "staying" as const, label: "Konaklayanlar" }] : []),
           ...(hasReservationCustomers ? [{ id: "reserved" as const, label: "Rezervasyonu Olanlar" }] : []),
@@ -209,11 +213,12 @@ export function CustomersWorkspace({
             <span className="customer-record-row__phone">{customer.phone || "Telefon yok"}</span>
             {row.roomText && <span><BedDouble size={14} aria-hidden="true" />{row.roomText}</span>}
             {row.activeReservations.length > 0 && <span><CalendarClock size={14} aria-hidden="true" />{row.activeReservations.length} aktif rezervasyon</span>}
-            {wholesaleEnabled && customer.commercialProfile && <>
+            {customer.commercialProfile && <>
+              <StatusBadge tone="neutral">Ticari</StatusBadge>
               <span>{customer.commercialProfile.companyName}</span>
-              <StatusBadge tone={dealerTone(customer.commercialProfile.dealerStatus)}>
+              {wholesaleEnabled && customer.commercialProfile.dealerStatus === "active" && <StatusBadge tone={dealerTone(customer.commercialProfile.dealerStatus)}>
                 {dealerLabel(customer.commercialProfile.dealerStatus)}
-              </StatusBadge>
+              </StatusBadge>}
             </>}
             {kbsOverview.enabled && row.activeStay && <StatusBadge tone={kbsTone(row.kbsState)}>{kbsLabel(row.kbsState)}</StatusBadge>}
           </>}

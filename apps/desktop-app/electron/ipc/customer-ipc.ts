@@ -81,8 +81,11 @@ export function registerCustomerIpcHandlers(options: {
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    if (input.commercialProfile !== undefined) {
-      assertCapability(BUSINESS_CAPABILITIES.WHOLESALE, "Bayi / Toptan Satış bu işletmede etkin değil.");
+    // Commercial tax identity is not dealer privilege. Dealer status/prices
+    // are gated even for a forged IPC payload.
+    if (input.commercialProfile && (input.commercialProfile.dealerStatus === "active"
+      || (input.commercialProfile.priceGroup && input.commercialProfile.priceGroup !== "retail"))) {
+      assertCapability(BUSINESS_CAPABILITIES.WHOLESALE, "Bayi yetkilendirmesi için Toptan Satış etkin olmalı.");
     }
     return finalizeCustomerMutation(getDatabase().saveCustomer(input));
   });

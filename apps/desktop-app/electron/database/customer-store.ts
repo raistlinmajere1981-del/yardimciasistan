@@ -23,7 +23,7 @@ import { normalizeBoolean } from "./request-utils.js";
 
 export interface CustomerListQuery {
   search?: string;
-  filter?: "all" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
+  filter?: "all" | "commercial" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
   limit?: number;
   offset?: number;
   id?: string;
@@ -39,7 +39,8 @@ function customerPredicate(db: DatabaseSync, query: CustomerListQuery) {
       OR EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id JOIN rooms r ON r.id=cs.room_id WHERE sg.customer_id=customers.id AND cs.deleted_at='' AND instr(customer_search_text(r.name || ' ' || r.number), ?) > 0))`);
     args.push(query.search.trim().toLocaleLowerCase("tr-TR"), query.search.trim().toLocaleLowerCase("tr-TR"));
   }
-  if (query.filter === "dealers") conditions.push("commercial.customer_id IS NOT NULL");
+  if (query.filter === "commercial") conditions.push("commercial.customer_id IS NOT NULL");
+  if (query.filter === "dealers") conditions.push("commercial.dealer_status = 'active'");
   if (query.filter === "staying") conditions.push("EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id WHERE sg.customer_id=customers.id AND sg.status='checked_in' AND cs.status='checked_in' AND cs.deleted_at='')");
   if (query.filter === "reserved") conditions.push("(EXISTS (SELECT 1 FROM reservations r WHERE r.customer_id=customers.id AND r.deleted_at='' AND r.status IN ('pending','approved')) OR EXISTS (SELECT 1 FROM stay_guests sg JOIN customer_room_stays cs ON cs.id=sg.stay_id WHERE sg.customer_id=customers.id AND sg.status='planned' AND cs.deleted_at=''))");
   if (query.filter === "kbs_pending" || query.filter === "kbs_failed") {
@@ -54,8 +55,10 @@ export function listCustomersPage(db: DatabaseSync, query: CustomerListQuery = {
   const matched = Number(db.prepare(`SELECT COUNT(*) n FROM customers LEFT JOIN customer_commercial_profiles commercial ON commercial.customer_id=customers.id WHERE ${predicate.where}`).get(...predicate.args)!.n);
   const items=getCustomers(db,query), ids=items.map(customer=>customer.id), caps=new Set(readEnabledBusinessCapabilities(db));
   const hasDealers=Boolean(db.prepare(`SELECT 1 FROM customers c JOIN customer_commercial_profiles p ON p.customer_id=c.id AND p.business_id=c.business_id
+    WHERE c.deleted_at='' AND p.dealer_status='active' AND c.business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1) LIMIT 1`).get());
+  const hasCommercial=Boolean(db.prepare(`SELECT 1 FROM customers c JOIN customer_commercial_profiles p ON p.customer_id=c.id AND p.business_id=c.business_id
     WHERE c.deleted_at='' AND c.business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1) LIMIT 1`).get());
-  return { items, total, matched, hasDealers, context: {
+  return { items, total, matched, hasCommercial, hasDealers, context: {
     stays:caps.has(C.ACCOMMODATION_STAYS)?getCustomerRoomStays(db,"active",ids):[],
     reservations:caps.has(C.ACCOMMODATION_RESERVATIONS)||caps.has(C.FOOD_RESERVATIONS)?getReservations(db,"active",ids):[],
     notifications:caps.has(C.ACCOMMODATION_STAYS)?getHospitalityNotifications(db,ids):[]

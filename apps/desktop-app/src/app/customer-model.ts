@@ -93,17 +93,15 @@ export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = 
     fatherName: form.fatherName,
     issuingAuthority: form.issuingAuthority,
     address: form.address,
-    ...(wholesaleEnabled ? {
-      commercialProfile: form.commercialProfileEnabled ? {
+    commercialProfile: form.commercialProfileEnabled ? {
         companyName: form.commercialCompanyName,
         taxOffice: form.commercialTaxOffice,
         taxNumber: form.commercialTaxNumber,
         authorizedPerson: form.commercialAuthorizedPerson,
-        dealerStatus: form.commercialDealerStatus,
-        priceGroup: form.commercialPriceGroup,
+        dealerStatus: wholesaleEnabled ? form.commercialDealerStatus : "inactive",
+        priceGroup: wholesaleEnabled && form.commercialDealerStatus === "active" ? form.commercialPriceGroup : "retail",
         paymentTermDays: Number(form.commercialPaymentTermDays)
       } : null
-    } : {})
   };
 }
 

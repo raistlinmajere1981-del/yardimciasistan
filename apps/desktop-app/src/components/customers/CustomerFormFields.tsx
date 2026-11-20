@@ -175,7 +175,7 @@ export function CustomerFormFields({
     <>
       <DetailSectionCard title="Temel bilgiler">
         <div className="form-grid form-grid--compact">
-          <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
+          <label className="form-field form-field--medium">{form.commercialProfileEnabled ? "Müşteri / firma adı" : "Ad soyad"}<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
           <label className="form-field form-field--short">Telefon<PhoneInput value={form.phone} onChange={(value) => update("phone", value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium customer-note-field">Not<textarea aria-label="Not" rows={1} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
@@ -183,8 +183,8 @@ export function CustomerFormFields({
         </div>
       </DetailSectionCard>
 
-      {wholesaleEnabled && form.commercialProfileEnabled && (
-        <CustomerCommercialProfileFields form={form} onChange={onChange} />
+      {form.commercialProfileEnabled && (
+        <CustomerCommercialProfileFields form={form} wholesaleEnabled={wholesaleEnabled} onChange={onChange} />
       )}
 
       <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
@@ -208,14 +208,14 @@ export function CustomerFormFields({
             <Sparkles size={15} aria-hidden="true" />{analysisState === "loading" ? "Okunuyor" : "Dosyadan AI ile Doldur"}
           </ActionButton>
           <div className="customer-identity-quick-actions__flags">
-            {wholesaleEnabled && <label className="form-check">
+            {<label className="form-check">
               <input
                 type="checkbox"
                 checked={form.commercialProfileEnabled}
                 disabled={identityActionsDisabled}
                 onChange={event => updateCommercialProfile(event.target.checked)}
               />
-              <strong>Ticari / bayi müşterisi</strong>
+              <strong>Ticari müşteri</strong>
             </label>}
             <label className="form-check customer-birthday-toggle">
               <input

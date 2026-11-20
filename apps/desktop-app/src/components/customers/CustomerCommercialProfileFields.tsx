@@ -4,6 +4,7 @@ import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
 
 interface CustomerCommercialProfileFieldsProps {
   form: CustomerFormState;
+  wholesaleEnabled?: boolean;
   onChange: (form: CustomerFormState) => void;
 }
 
@@ -16,9 +17,10 @@ function priceGroupForDealerStatus(
 
 export function CustomerCommercialProfileFields({
   form,
+  wholesaleEnabled = false,
   onChange
 }: CustomerCommercialProfileFieldsProps) {
-  const priceGroup = priceGroupForDealerStatus(form.commercialDealerStatus, form.commercialPriceGroup);
+  const priceGroup = priceGroupForDealerStatus(wholesaleEnabled ? form.commercialDealerStatus : "inactive", form.commercialPriceGroup);
 
   useEffect(() => {
     if (form.commercialPriceGroup !== priceGroup) {
@@ -70,40 +72,28 @@ export function CustomerCommercialProfileFields({
               onChange={(event) => update("commercialTaxNumber", event.target.value)}
             />
           </label>
+          {wholesaleEnabled && <>
           <label className="form-field form-field--medium">
-            Bayi durumu
-            <select
-              aria-label="Bayi durumu"
-              value={form.commercialDealerStatus}
-              onChange={(event) => {
+            Bayi yetkisi
+            <select aria-label="Bayi yetkisi" value={form.commercialDealerStatus}
+              onChange={event => {
                 const status = event.target.value as CustomerFormState["commercialDealerStatus"];
-                onChange({
-                  ...form,
-                  commercialDealerStatus: status,
-                  commercialPriceGroup: priceGroupForDealerStatus(status, form.commercialPriceGroup)
-                });
-              }}
-            >
-              <option value="active">Aktif</option>
-              <option value="inactive">Pasif</option>
+                onChange({ ...form, commercialDealerStatus: status,
+                  commercialPriceGroup: priceGroupForDealerStatus(status, form.commercialPriceGroup) });
+              }}>
+              <option value="inactive">Bayi değil</option>
+              <option value="active">Aktif bayi</option>
             </select>
           </label>
-          <label className="form-field form-field--medium">
-            Fiyat grubu
-            <select
-              aria-label="Fiyat grubu"
-              value={priceGroup}
-              onChange={(event) => update(
-                "commercialPriceGroup",
-                event.target.value as CustomerFormState["commercialPriceGroup"]
-              )}
-            >
-              {form.commercialDealerStatus === "active" ? <>
-                <option value="dealer_a">Bayi A</option>
-                <option value="dealer_b">Bayi B</option>
-              </> : <option value="retail">Perakende</option>}
+          {form.commercialDealerStatus === "active" && <label className="form-field form-field--medium">
+            Bayi fiyat grubu
+            <select aria-label="Bayi fiyat grubu" value={priceGroup}
+              onChange={event => update("commercialPriceGroup", event.target.value as CustomerFormState["commercialPriceGroup"])}>
+              <option value="dealer_a">Bayi A</option>
+              <option value="dealer_b">Bayi B</option>
             </select>
-          </label>
+          </label>}
+          </>}
           <label className="form-field form-field--short">
             Ödeme vadesi (gün)
             <input
