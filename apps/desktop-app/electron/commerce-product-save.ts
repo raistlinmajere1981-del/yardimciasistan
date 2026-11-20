@@ -48,7 +48,8 @@ function validate(databasePath: string, db: DatabaseSync, input: SaveProductDeta
   if (!input?.product || !["keep", "manual", "clear", "external"].includes(input.imageMode)) throw new Error("Ürün taslağı geçersiz.");
   const capabilities = readEnabledBusinessCapabilities(db);
   if (!capabilities.includes(BUSINESS_CAPABILITIES.CATALOG)) throw new Error("Ürün kataloğu bu işletmede etkin değil.");
-  if ((input.product.trackInventory !== false || input.stock) && !capabilities.includes(BUSINESS_CAPABILITIES.INVENTORY)) throw new Error("Stok takibi bu işletmede etkin değil.");
+  if (input.stock && !capabilities.includes(BUSINESS_CAPABILITIES.INVENTORY))
+    throw new Error("Stok hareketi için Stok takibi etkin olmalı.");
   if ((input.photos !== undefined || input.isPublished !== undefined || input.isFeatured !== undefined || input.featuredOrder !== undefined) && !capabilities.includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) throw new Error("Ürün fotoğraf yönetimi ve web yayını için Online Satış etkin olmalı.");
   if (input.isPublished !== undefined && typeof input.isPublished !== "boolean") throw new Error("Ürün yayın bilgisi geçersiz.");
   if ((input.isFeatured !== undefined && typeof input.isFeatured !== "boolean")
@@ -59,12 +60,18 @@ function validate(databasePath: string, db: DatabaseSync, input: SaveProductDeta
   if (!business) throw new Error("Aktif işletme bulunamadı.");
   const businessId = String(business.id);
   const productId = String(input.product.id ?? "").trim();
+  if (input.product.trackInventory !== false && !capabilities.includes(BUSINESS_CAPABILITIES.INVENTORY)) {
+    const previous = productId
+      ? db.prepare("SELECT track_inventory FROM catalog_products WHERE id=? AND business_id=? AND deleted_at=''").get(productId,businessId)
+      : undefined;
+    if (Number(previous?.track_inventory) !== 1) throw new Error("Stok takibini etkinleştirmek için Stok servisini açın.");
+  }
   if (productId) assertProductPhotoRevision(db, { productId, expectedRevision: input.sourcePhotoRevision });
   else if (input.sourcePhotoRevision !== "") throw new Error("Yeni ürün fotoğraf revizyonu boş olmalı.");
   const categoryId = String(input.product.categoryId ?? "").trim();
   if (categoryId && !db.prepare("SELECT 1 FROM catalog_categories WHERE id=? AND business_id=? AND deleted_at=''").get(categoryId, businessId)) throw new Error("Seçilen ürün kategorisi bulunamadı.");
   if (!String(input.product.name ?? "").trim()) throw new Error("Ürün adı gerekli.");
-  for (const field of ["salePrice", "purchasePrice", "dealerPriceA", "dealerPriceB", "taxRate", "minimumQuantity"] as const) {
+  for (const field of ["salePrice", "purchasePrice", "dealerPriceA", "dealerPriceB", "taxRate", "minimumQuantity", "idealQuantity"] as const) {
     const value = input.product[field];
     if (value != null && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) throw new Error("Ürün fiyatı veya stok eşiği geçersiz.");
   }

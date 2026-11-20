@@ -160,6 +160,7 @@ CREATE TABLE catalog_categories (
   parent_id TEXT NOT NULL DEFAULT '',
   name TEXT NOT NULL,
   code TEXT NOT NULL DEFAULT '',
+  default_tax_rate REAL NOT NULL DEFAULT 20 CHECK (default_tax_rate >= 0 AND default_tax_rate <= 100),
   sort_order INTEGER NOT NULL DEFAULT 0,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL,
@@ -188,6 +189,7 @@ CREATE TABLE catalog_products (
   tax_rate REAL NOT NULL DEFAULT 0,
   track_inventory INTEGER NOT NULL DEFAULT 1 CHECK (track_inventory IN (0, 1)),
   minimum_quantity REAL NOT NULL DEFAULT 0 CHECK (minimum_quantity >= 0),
+  ideal_quantity REAL NOT NULL DEFAULT 0 CHECK (ideal_quantity >= 0),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   -- Original import assets belong to the canonical product image archive; no separate gallery owner.
   image_original_assets_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(image_original_assets_json)),

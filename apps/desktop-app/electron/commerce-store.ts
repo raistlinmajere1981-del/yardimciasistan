@@ -72,6 +72,7 @@ export interface SaveCatalogProductInput {
   trackInventory?: boolean;
   isActive?: boolean;
   minimumQuantity?: number;
+  idealQuantity?: number;
   imageSourceUrl?: string;
   dataSource?: string;
   sourceProductUrl?: string;
@@ -257,6 +258,7 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     taxRate: Number(row.tax_rate ?? 0),
     trackInventory: Number(row.track_inventory ?? 0) === 1,
     minimumQuantity: Number(row.minimum_quantity ?? 0),
+    idealQuantity: Number(row.ideal_quantity ?? 0),
     isActive: Number(row.is_active ?? 0) === 1,
     imageAssetPath: String(row.image_asset_path ?? ""),
     imageSourceUrl: String(row.image_source_url ?? ""),
@@ -603,10 +605,18 @@ export function saveCatalogProductInTransaction(
   const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
   const currency = normalizeCurrency(input.currency);
   const unit = normalizeUnit(input.unit);
-  const taxRate = Math.max(0, Math.min(100, Number(input.taxRate ?? 0)));
-  const trackInventory = input.trackInventory !== false;
-  const isActive = input.isActive !== false;
   const categoryId = String(input.categoryId ?? "").trim();
+  const category = categoryId ? database.prepare("SELECT default_tax_rate FROM catalog_categories WHERE id=? AND business_id=? AND deleted_at=''")
+    .get(categoryId,businessId) : null;
+  if (categoryId && !category) throw new Error("Seçilen ürün kategorisi bulunamadı.");
+  const taxRate = Number(input.taxRate ?? existing?.tax_rate ?? category?.default_tax_rate ?? 20);
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) throw new Error("KDV oranı geçersiz.");
+  const idealQuantity = Number(input.idealQuantity ?? existing?.ideal_quantity ?? 0);
+  if (!Number.isFinite(idealQuantity) || idealQuantity < 0 || idealQuantity > 1_000_000_000) throw new Error("İdeal stok miktarı geçersiz.");
+  const trackInventory = input.trackInventory !== false;
+  if (trackInventory && !isInventoryTrackingEnabled(database) && Number(existing?.track_inventory ?? 0) !== 1)
+    throw new Error("Stok takibini etkinleştirmek için Stok servisini açın.");
+  const isActive = input.isActive !== false;
   if (input.quickAccessEnabled !== undefined && typeof input.quickAccessEnabled !== "boolean") throw new Error("Hızlı erişim tercihi geçersiz.");
 
   try {
@@ -614,10 +624,10 @@ export function saveCatalogProductInTransaction(
       INSERT INTO catalog_products (
         id, business_id, category_id, name, brand, sku, barcode, description,
         sale_price, dealer_price_a, dealer_price_b, purchase_price, currency, unit, tax_rate,
-        track_inventory, minimum_quantity, is_active, image_asset_path, image_source_url,
+        track_inventory, minimum_quantity, ideal_quantity, is_active, image_asset_path, image_source_url,
         data_source, source_product_url, data_license, image_license, source_fetched_at,
         created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         category_id = excluded.category_id,
         name = excluded.name,
@@ -634,6 +644,7 @@ export function saveCatalogProductInTransaction(
         tax_rate = excluded.tax_rate,
         track_inventory = excluded.track_inventory,
         minimum_quantity = excluded.minimum_quantity,
+        ideal_quantity = excluded.ideal_quantity,
         is_active = excluded.is_active,
         image_asset_path = excluded.image_asset_path,
         image_source_url = excluded.image_source_url,
@@ -647,7 +658,7 @@ export function saveCatalogProductInTransaction(
     `).run(
       id, businessId, categoryId, name, brand, sku, barcode, description,
       salePrice, dealerPriceA, dealerPriceB, purchasePrice, currency, unit, taxRate,
-      trackInventory ? 1 : 0, Math.max(0, roundQuantity(Number(input.minimumQuantity ?? existing?.minimum_quantity ?? 0))), isActive ? 1 : 0,
+      trackInventory ? 1 : 0, Math.max(0, roundQuantity(Number(input.minimumQuantity ?? existing?.minimum_quantity ?? 0))), roundQuantity(idealQuantity), isActive ? 1 : 0,
       imageAssetPath, imageSourceUrl, dataSource, sourceProductUrl,
       dataLicense, imageLicense, sourceFetchedAt,
       String(existing?.created_at ?? now), now
@@ -667,7 +678,7 @@ export function saveCatalogProductInTransaction(
     if (!existing) database.prepare("UPDATE catalog_products SET sort_order = (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM catalog_products WHERE business_id = ? AND id <> ? AND deleted_at = '') WHERE id = ?")
       .run(businessId, id, id);
 
-    if (trackInventory) {
+    if (trackInventory && isInventoryTrackingEnabled(database)) {
       const locationId = ensurePrimaryLocation(database, businessId, now);
       database.prepare(`
         INSERT INTO inventory_balances (product_id, location_id, quantity, updated_at)

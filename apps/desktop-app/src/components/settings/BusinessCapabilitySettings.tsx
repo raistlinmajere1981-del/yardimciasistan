@@ -44,7 +44,7 @@ export function BusinessProfileOptionEditor({
   const webAvailable = useWebAvailability();
   const options = profile.optionalCapabilities.filter(capability => isWebCapabilityVisible(capability, webAvailable));
   // Expose user-visible prerequisites as checked and locked instead of hiding them.
-  const visiblePrerequisites = new Set<BusinessCapability>([C.MARKETING_STUDIO, C.RETAIL_PURCHASING]);
+  const visiblePrerequisites = new Set<BusinessCapability>([C.MARKETING_STUDIO, C.RETAIL_PURCHASING, C.INVENTORY]);
   const independentOptions = options.filter(capability =>
     visiblePrerequisites.has(capability) || getEnabledBusinessCapabilityDependents(capability, selectedCapabilities).length === 0);
   const requiredPrerequisites = new Set([...visiblePrerequisites].filter(capability =>
@@ -64,10 +64,11 @@ export function BusinessProfileOptionEditor({
                 aria-label={CAPABILITY_LABELS[capability] ?? capability}
                 value={capability}
                 checked={selectedCapabilities.includes(capability) || requiredPrerequisites.has(capability)}
-                disabled={requiredPrerequisites.has(capability)}
+                disabled={requiredPrerequisites.has(capability) && capability !== C.INVENTORY}
                 onChange={(event) => onChange(toggleBusinessProfileOption(profileId, selectedCapabilities, capability, event.target.checked))}
               />
               <span>{CAPABILITY_LABELS[capability] ?? capability}</span>
+              {capability === C.INVENTORY && requiredPrerequisites.has(capability) && <small>Stok takibi kapatılırsa stok gerektiren satın alma ve tedarikçi yetenekleri de kapanır.</small>}
               {capability !== C.MESSAGING_CAMPAIGNS && selectedCapabilities.includes(capability) && options.some(option =>
                 !visiblePrerequisites.has(option) && getEnabledBusinessCapabilityDependents(option, [capability]).length > 0) && (
                 <small>{options.filter(option => !visiblePrerequisites.has(option) && getEnabledBusinessCapabilityDependents(option, [capability]).length > 0)

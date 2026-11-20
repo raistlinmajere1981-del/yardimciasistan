@@ -37,6 +37,7 @@ interface CategoryFormState {
   parentId: string;
   name: string;
   code: string;
+  defaultTaxRate: string;
   isActive: boolean;
 }
 
@@ -57,7 +58,7 @@ interface MarketProductsWorkspaceProps {
 }
 
 function emptyCategoryForm(): CategoryFormState {
-  return { id: "", parentId: "", name: "", code: "", isActive: true };
+  return { id: "", parentId: "", name: "", code: "", defaultTaxRate: "20", isActive: true };
 }
 
 function CategoryFormFields({ form, categories, onChange, showActive = true }: {
@@ -69,6 +70,10 @@ function CategoryFormFields({ form, categories, onChange, showActive = true }: {
   return <>
     <label className="form-field form-field--fluid">Kategori adı<input value={form.name} onChange={event => onChange({ ...form, name: event.target.value })} /></label>
     <label className="form-field form-field--fluid">Kod<input value={form.code} onChange={event => onChange({ ...form, code: event.target.value })} /></label>
+    <label className="form-field form-field--fluid">Varsayılan KDV %
+      <input aria-label="Varsayılan KDV %" type="number" min="0" max="100" step="0.01" value={form.defaultTaxRate}
+        onChange={event=>onChange({...form,defaultTaxRate:event.target.value})} />
+    </label>
     <label className="form-field form-field--fluid form-field--span">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={form.parentId} placeholder="Ana kategori" onChange={parentId => onChange({ ...form, parentId })} options={categories.filter(category => category.id !== form.id).map(category => ({ id: category.id, label: category.name }))} /></label>
     {showActive && <label className="form-check"><input type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif kategori</label>}
   </>;
@@ -228,6 +233,7 @@ export function MarketProductsWorkspace({
       parentId: category.parentId,
       name: category.name,
       code: category.code,
+      defaultTaxRate: String(category.defaultTaxRate),
       isActive: category.isActive
     });
   }
@@ -242,6 +248,7 @@ export function MarketProductsWorkspace({
         parentId: form.parentId,
         name: form.name,
         code: form.code,
+        defaultTaxRate: Number(form.defaultTaxRate),
         isActive: form.isActive
       });
       await onReload();
@@ -340,7 +347,7 @@ export function MarketProductsWorkspace({
                   data-sort-kind="categories" data-sort-id={category.id}>
                   <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${category.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps("categories", category.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
                   <div className="market-list-row">
-                  <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"} · {categoryProductCounts[category.id] ?? 0} ürün</small></span>
+                  <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"} · KDV %{category.defaultTaxRate} · {categoryProductCounts[category.id] ?? 0} ürün</small></span>
                   <StatusBadge tone={category.isActive ? "success" : "neutral"}>{category.isActive ? "Aktif" : "Pasif"}</StatusBadge>
                   </div>
                   <div className="market-record-actions"><ActionButton variant="secondary" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => editCategory(category)}>Düzenle</ActionButton><ActionButton variant="danger" disabled={busy || mutationBusy || catalog.loading || Boolean(catalog.error)} onClick={() => setPendingDelete({ kind: "categories", id: category.id, name: category.name })}>Sil</ActionButton></div>

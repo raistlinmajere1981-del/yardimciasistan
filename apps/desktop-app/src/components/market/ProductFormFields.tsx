@@ -230,7 +230,11 @@ export function ProductFormFields({
         </span>
       </label>}
 
-      {retailFieldsEnabled && <label className="form-field form-field--fluid">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => onChange({ ...form, categoryId })} options={categories.filter(category => category.isActive || category.id === form.categoryId).map(category => ({ id: category.id, label: category.isActive ? category.name : `${category.name} (Pasif)`, disabled: !category.isActive }))} /></label>}
+      {retailFieldsEnabled && <label className="form-field form-field--fluid">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => {
+          const selected=categories.find(category=>category.id===categoryId);
+          onChange({ ...form, categoryId,
+            taxRate: !form.taxRateManual ? String(selected?.defaultTaxRate ?? 20) : form.taxRate });
+        }} options={categories.filter(category => category.isActive || category.id === form.categoryId).map(category => ({ id: category.id, label: category.isActive ? category.name : `${category.name} (Pasif)`, disabled: !category.isActive }))} /></label>}
       <label className="form-field form-field--fluid">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       </ProductFieldSection>
       <ProductFieldSection grouped={Boolean(renderSections)} title="Fiyatlandırma" className="market-product-prices">
@@ -244,10 +248,15 @@ export function ProductFormFields({
       </>}
       {purchasingEnabled && <label className="form-field form-field--fluid">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>}
       <label className="form-field form-field--short">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
-      <label className="form-field form-field--short">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
+      <label className="form-field form-field--short">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value, taxRateManual:true })} /></label>
+      {form.categoryId && <ActionButton variant="secondary" size="sm" type="button" disabled={disabled}
+        onClick={()=>onChange({...form,taxRate:String(categories.find(category=>category.id===form.categoryId)?.defaultTaxRate ?? 20),taxRateManual:false})}>
+        Kategori KDV'sini uygula
+      </ActionButton>}
       </ProductFieldSection>
       {!renderSections && inventoryEnabled && form.trackInventory && <ProductFieldSection grouped={Boolean(renderSections)} title="Stok kuralları">
       <label className="form-field form-field--fluid">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>
+      <label className="form-field form-field--fluid">İdeal stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.idealQuantity} onChange={(event) => onChange({ ...form, idealQuantity: event.target.value })} /></label>
       </ProductFieldSection>}
       <ProductFieldSection grouped={Boolean(renderSections)} title="Açıklama">
       <label className="form-field form-field--fluid form-field--span">Açıklama<textarea disabled={disabled} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>

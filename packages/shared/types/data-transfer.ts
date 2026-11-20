@@ -16,7 +16,7 @@ export const PRODUCT_TRANSFER_FIELDS: Record<string, string> = {
   id: "Uygulama kimliği", name: "Ürün adı", category: "Kategori", categoryPath: "Kategori yolu", brand: "Marka", sku: "Stok kodu", barcode: "Barkod", description: "Açıklama",
   currency: "Para birimi", unit: "Birim", taxRate: "KDV oranı", salePrice: "Perakende fiyatı (brüt)", purchasePrice: "Alış fiyatı",
   dealerPriceA: "Bayi A fiyatı", dealerPriceB: "Bayi B fiyatı", onlineSalesPublished: "Webde yayınla", trackInventory: "Stok takibi",
-  minimumQuantity: "Minimum miktar", stockQuantity: "Mevcut stok", image: "Görsel", sourceId: "Kaynak kimliği", sourceProductUrl: "Kaynak URL", imageSourceUrl: "Görsel URL",
+  minimumQuantity: "Minimum miktar", idealQuantity: "İdeal stok", stockQuantity: "Mevcut stok", image: "Görsel", sourceId: "Kaynak kimliği", sourceProductUrl: "Kaynak URL", imageSourceUrl: "Görsel URL",
   menuCategory: "Menü kategorisi", menuPriceOverride: "Menü fiyatı", allergens: "Alerjenler", tags: "Etiketler", menuAvailable: "Menüde mevcut", menuFeatured: "Öne çıkan", menuHideOutOfStock: "Stok yokken gizle", menuConsumption: "Menü stok tüketimi", menuSortOrder: "Menü sırası"
 };
 export const CUSTOMER_TRANSFER_FIELDS: Record<string, string> = {

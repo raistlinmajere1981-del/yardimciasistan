@@ -228,7 +228,7 @@ function assertRuntimeCatalogProductSave(databasePath: string, input: SaveCatalo
     BUSINESS_CAPABILITIES.CATALOG,
     "Ürün kataloğu bu işletmede etkin değil."
   );
-  if (input.trackInventory !== false) {
+  if (input.trackInventory !== false && !input.id) {
     requireCapability(
       databasePath,
       BUSINESS_CAPABILITIES.INVENTORY,

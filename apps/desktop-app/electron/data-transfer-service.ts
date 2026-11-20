@@ -145,7 +145,7 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
           if (entity !== "customers") {
             const old = matchProduct(db,values); row.existingId = String(old?.id ?? ""); row.baseline=old?String(old.updated_at):""; row.newId = row.existingId || `product_${randomUUID()}`;
             row.view.status = old ? preferences.conflicts === "skip" ? "skip" : "update" : "new";
-            row.view.before = old ? stringifyRecord({id:old.id,name:old.name,category:db.prepare("SELECT name FROM catalog_categories WHERE id=?").get(String(old.category_id))?.name,brand:old.brand,sku:old.sku,barcode:old.barcode,description:old.description,salePrice:old.sale_price,purchasePrice:old.purchase_price,dealerPriceA:old.dealer_price_a,dealerPriceB:old.dealer_price_b,currency:old.currency,unit:old.unit,taxRate:old.tax_rate,trackInventory:Number(old.track_inventory)===1,minimumQuantity:old.minimum_quantity,sourceProductUrl:old.source_product_url}) : {};
+            row.view.before = old ? stringifyRecord({id:old.id,name:old.name,category:db.prepare("SELECT name FROM catalog_categories WHERE id=?").get(String(old.category_id))?.name,brand:old.brand,sku:old.sku,barcode:old.barcode,description:old.description,salePrice:old.sale_price,purchasePrice:old.purchase_price,dealerPriceA:old.dealer_price_a,dealerPriceB:old.dealer_price_b,currency:old.currency,unit:old.unit,taxRate:old.tax_rate,trackInventory:Number(old.track_inventory)===1,minimumQuantity:old.minimum_quantity,idealQuantity:old.ideal_quantity,sourceProductUrl:old.source_product_url}) : {};
             if (row.view.status === "skip") row.view.reasons.push("Eşleşen kayıt korundu.");
             const oldMenu = old ? db.prepare(`SELECT m.*, c.name menu_category FROM menu_product_entries m
               JOIN menu_categories c ON c.id=m.category_id WHERE m.product_id=? AND m.deleted_at=''`).get(row.existingId) : undefined;
@@ -155,7 +155,7 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
               menuConsumption:oldMenu.stock_consumption_quantity,menuSortOrder:oldMenu.sort_order}));
             if (entity === "menu" && preferences.menuCategoryId === "__source__" && !values.menuCategory?.trim()) throw new Error("Menü kategorisi eksik; soldan bir hedef kategori seçin veya Menü kategorisi kolonunu eşleyin.");
             const numeric: Record<string,number|undefined> = {};
-            for (const key of ["salePrice","purchasePrice","dealerPriceA","dealerPriceB","taxRate","minimumQuantity","stockQuantity"]) {
+            for (const key of ["salePrice","purchasePrice","dealerPriceA","dealerPriceB","taxRate","minimumQuantity","idealQuantity","stockQuantity"]) {
               numeric[key] = transferNumber(values[key] ?? "");
               if (numeric[key] !== undefined && (numeric[key] < 0 || (key === "taxRate" && numeric[key] > 100))) throw new Error(`${fields[key]} sınır dışında.`);
             }
@@ -191,7 +191,7 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
               salePrice: numeric.salePrice ?? Number(old?.sale_price ?? 0), purchasePrice: numeric.purchasePrice ?? Number(old?.purchase_price ?? 0),
               dealerPriceA: numeric.dealerPriceA ?? (old?.dealer_price_a == null ? null : Number(old.dealer_price_a)), dealerPriceB: numeric.dealerPriceB ?? (old?.dealer_price_b == null ? null : Number(old.dealer_price_b)),
               currency: values.currency || String(old?.currency ?? "TRY"), unit: unit as NonNullable<SaveCatalogProductInput["unit"]>, taxRate: numeric.taxRate ?? Number(old?.tax_rate ?? 0),
-              trackInventory: tracking ?? (old ? Number(old.track_inventory) === 1 : false), minimumQuantity: numeric.minimumQuantity ?? Number(old?.minimum_quantity ?? 0),
+              trackInventory: tracking ?? (old ? Number(old.track_inventory) === 1 : false), minimumQuantity: numeric.minimumQuantity ?? Number(old?.minimum_quantity ?? 0), idealQuantity: numeric.idealQuantity ?? Number(old?.ideal_quantity ?? 0),
               isActive: old ? Number(old.is_active) === 1 : preferences.activate, onlineSalesPublished: preferences.publish && row.view.publishable,
               dataSource: "data-transfer", sourceProductUrl: source, imageSourceUrl: values.imageSourceUrl || (/^https:\/\//.test(values.image ?? "") ? values.image! : String(old?.image_source_url ?? ""))
             };
@@ -236,14 +236,15 @@ export function createTransferPlan(databasePath: string, entity: TransferEntity,
             }) : {};
             if (row.view.status === "skip") row.view.reasons.push("Eşleşen müşteri korundu.");
             const commercial = previous?.commercialProfile;
-            if (["companyName","dealerStatus","priceGroup","taxNumber","taxOffice"].some(k=>Boolean(values[k])) && !caps.has(C.WHOLESALE)) throw new Error("Bayi profili için Toptan Satış etkin olmalı.");
+            if ((values.dealerStatus === "active" || ["dealer_a","dealer_b"].includes(values.priceGroup ?? "")) && !caps.has(C.WHOLESALE))
+              throw new Error("Bayi yetkisi ve fiyat grubu için Toptan Satış etkin olmalı.");
             const input = { ...previous, ...(old ? {id:row.existingId} : {}), fullName:values.fullName || previous?.fullName || "", phone:values.phone ?? previous?.phone ?? "", email:values.email ?? previous?.email ?? "", address:values.address ?? previous?.address ?? "", notes:values.notes ?? previous?.notes ?? "", birthdayMessageEnabled: previous?.birthdayMessageEnabled ?? false } as SaveCustomerInput;
             if (!old) delete input.id;
             for (const key of IDENTITY_TRANSFER_FIELDS) if (values[key] !== undefined) Object.assign(input,{[key]:values[key]});
             if (values.companyName || commercial) input.commercialProfile = {
               companyName: values.companyName || commercial?.companyName || "", taxOffice:values.taxOffice ?? commercial?.taxOffice ?? "", taxNumber:values.taxNumber ?? commercial?.taxNumber ?? "",
-              authorizedPerson:values.authorizedPerson ?? commercial?.authorizedPerson ?? "", dealerStatus:(values.dealerStatus || commercial?.dealerStatus || "inactive") as "active"|"inactive",
-              priceGroup:(values.priceGroup || commercial?.priceGroup || "retail") as "retail"|"dealer_a"|"dealer_b", paymentTermDays:transferNumber(values.paymentTermDays ?? "") ?? commercial?.paymentTermDays ?? 0
+              authorizedPerson:values.authorizedPerson ?? commercial?.authorizedPerson ?? "", dealerStatus:(caps.has(C.WHOLESALE) ? (values.dealerStatus || commercial?.dealerStatus || "inactive") : "inactive") as "active"|"inactive",
+              priceGroup:(caps.has(C.WHOLESALE) ? (values.priceGroup || commercial?.priceGroup || "retail") : "retail") as "retail"|"dealer_a"|"dealer_b", paymentTermDays:transferNumber(values.paymentTermDays ?? "") ?? commercial?.paymentTermDays ?? 0
             };
             else delete input.commercialProfile;
             const normalized = normalizeCustomerInput(input); if (!normalized.ok) throw new Error(normalized.message);
@@ -315,9 +316,9 @@ export function collectTransferExport(databasePath: string, options: TransferExp
         const customers = getCustomers(db,{limit:200,offset,...(options.scope === "filtered" ? {search:options.search ?? "",filter:options.customerFilter ?? "all"} : {})});
         for (const c of customers) {
           const record: TransferRecord = { id:c.id,fullName:c.fullName,phone:c.phone,email:c.email,address:c.address,notes:c.notes };
-          if (caps.has(C.WHOLESALE) && c.commercialProfile) {
+          if (c.commercialProfile) {
             const p = c.commercialProfile;
-            Object.assign(record,{companyName:p.companyName,taxOffice:p.taxOffice,taxNumber:p.taxNumber,authorizedPerson:p.authorizedPerson,dealerStatus:p.dealerStatus,priceGroup:p.priceGroup,paymentTermDays:String(p.paymentTermDays)});
+            Object.assign(record,{companyName:p.companyName,taxOffice:p.taxOffice,taxNumber:p.taxNumber,authorizedPerson:p.authorizedPerson,...(caps.has(C.WHOLESALE) ? {dealerStatus:p.dealerStatus,priceGroup:p.priceGroup} : {}),paymentTermDays:String(p.paymentTermDays)});
           }
           if (options.includeIdentity) for (const key of IDENTITY_TRANSFER_FIELDS) record[key] = String(c[key as keyof typeof c] ?? "");
           records.push(record);
@@ -342,7 +343,7 @@ export function collectTransferExport(databasePath: string, options: TransferExp
       const categoryPath = (id:string) => { const names:string[] = [], seen=new Set<string>();let current=paths.get(id);while(current && !seen.has(String(current.id))){seen.add(String(current.id));names.unshift(String(current.name));current=paths.get(String(current.parent_id));}return names.join(" > "); };
       for (const p of products) {
         const record = stringifyRecord({ id:p.id,name:p.name,category:p.category,categoryPath:categoryPath(String(p.category_id)),brand:p.brand,sku:p.sku,barcode:p.barcode,description:p.description,
-          salePrice:p.sale_price,purchasePrice:p.purchase_price,currency:p.currency,unit:p.unit,taxRate:p.tax_rate,trackInventory:Number(p.track_inventory)===1,minimumQuantity:p.minimum_quantity,stockQuantity:p.stock_quantity,
+          salePrice:p.sale_price,purchasePrice:p.purchase_price,currency:p.currency,unit:p.unit,taxRate:p.tax_rate,trackInventory:Number(p.track_inventory)===1,minimumQuantity:p.minimum_quantity,idealQuantity:p.ideal_quantity,stockQuantity:p.stock_quantity,
           sourceId:p.id,sourceProductUrl:p.source_product_url,imageSourceUrl:p.image_source_url,onlineSalesPublished:Number(p.is_published)===1,
           menuCategory:p.menu_category,menuPriceOverride:p.price_override,allergens:(JSON.parse(String(p.allergens_json ?? "[]")) as string[]).join("|"),tags:(JSON.parse(String(p.tags_json ?? "[]")) as string[]).join("|"),menuAvailable:Number(p.is_available)===1,
           menuFeatured:Number(p.is_featured)===1,menuHideOutOfStock:Number(p.hide_when_out_of_stock)===1,menuConsumption:p.stock_consumption_quantity,menuSortOrder:p.menu_sort_order,
@@ -356,7 +357,8 @@ export function collectTransferExport(databasePath: string, options: TransferExp
       }
     }
     const fields = options.entity === "customers" ? CUSTOMER_TRANSFER_FIELDS : PRODUCT_TRANSFER_FIELDS;
-    const headers = Object.keys(fields).filter(h=>(options.entity !== "customers" || options.includeIdentity || !IDENTITY_TRANSFER_FIELDS.includes(h)) && (caps.has(C.WHOLESALE) || !["dealerPriceA","dealerPriceB","companyName","taxOffice","taxNumber","authorizedPerson","dealerStatus","priceGroup","paymentTermDays"].includes(h)));
+    const headers = Object.keys(fields).filter(h=>(options.entity !== "customers" || options.includeIdentity || !IDENTITY_TRANSFER_FIELDS.includes(h))
+      && (caps.has(C.WHOLESALE) || !["dealerPriceA","dealerPriceB","dealerStatus","priceGroup"].includes(h)));
     return { headers,records,images:records.reduce((sum,r)=>{const originals=JSON.parse(r._originalAssets || "[]") as unknown[];return sum+(originals.length || (r._assetPath || r.imageSourceUrl ? 1 : 0));},0) };
   } finally { db.close(); }
 }

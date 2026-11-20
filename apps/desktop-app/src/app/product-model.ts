@@ -24,6 +24,8 @@ export interface ProductFormState {
   unit: CommerceUnit;
   taxRate: string;
   minimumQuantity: string;
+  idealQuantity: string;
+  taxRateManual: boolean;
   trackInventory: boolean;
   isActive: boolean;
   quickAccessEnabled: boolean;
@@ -62,8 +64,10 @@ export function emptyProductForm(inventoryEnabled = true): ProductFormState {
     purchasePrice: "",
     currency: "TRY",
     unit: "piece",
-    taxRate: "0",
+    taxRate: "20",
     minimumQuantity: "0",
+    idealQuantity: "0",
+    taxRateManual: false,
     trackInventory: inventoryEnabled,
     isActive: true,
     quickAccessEnabled: false,
@@ -98,6 +102,8 @@ export function toProductForm(
     unit: product.unit,
     taxRate: String(product.taxRate),
     minimumQuantity: String(minimumQuantity),
+    idealQuantity: String(product.idealQuantity ?? 0),
+    taxRateManual: true,
     trackInventory: product.trackInventory,
     isActive: product.isActive,
     quickAccessEnabled: product.quickAccessEnabled ?? false,
@@ -141,6 +147,7 @@ export function productFormToSaveInput(form: ProductFormState) {
     unit: form.unit,
     taxRate: Number(form.taxRate),
     minimumQuantity: Number(form.minimumQuantity),
+    idealQuantity: Number(form.idealQuantity),
     trackInventory: form.trackInventory,
     isActive: form.isActive,
     quickAccessEnabled: form.quickAccessEnabled,
@@ -177,6 +184,8 @@ export function applyProductLookupCandidate(
     name: form.name.trim() ? form.name : candidate.name,
     brand: form.brand.trim() ? form.brand : candidate.brand,
     categoryId: form.categoryId || matchedCategoryId,
+    taxRate: !form.categoryId && matchedCategoryId && !form.taxRateManual
+      ? String(categories.find(category=>category.id===matchedCategoryId)?.defaultTaxRate ?? 20) : form.taxRate,
     description: form.description.trim() ? form.description : quantityDescription,
     imageSourceUrl: candidate.imageUrl,
     dataSource: candidate.provider,

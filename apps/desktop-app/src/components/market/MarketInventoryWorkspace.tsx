@@ -1,4 +1,5 @@
 import { MarketCatalogPicker } from "./MarketCatalogPicker";
+import { StockReplenishmentPanel } from "./StockReplenishmentPanel";
 import { Save } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
@@ -166,6 +167,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange, refres
           {movements.length === 0 && <p className="market-muted">Bu ürün için stok hareketi yok.</p>}
         </div>
       </section>
+      <StockReplenishmentPanel refreshRevision={refreshRevision}/>
     </div>
   );
 }

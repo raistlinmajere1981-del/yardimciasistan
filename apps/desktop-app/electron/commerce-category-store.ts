@@ -16,6 +16,7 @@ export interface SaveCatalogCategoryInput {
   parentId?: string;
   name: string;
   code?: string;
+  defaultTaxRate?: number;
   sortOrder?: number;
   isActive?: boolean;
 }
@@ -64,6 +65,7 @@ function mapCategory(row: Record<string, unknown>): CatalogCategory {
     parentId: String(row.parent_id ?? ""),
     name: String(row.name ?? ""),
     code: String(row.code ?? ""),
+    defaultTaxRate: Number(row.default_tax_rate ?? 20),
     sortOrder: normalizeSortOrder(row.sort_order),
     isActive: Number(row.is_active ?? 0) === 1,
     createdAt: String(row.created_at ?? ""),
@@ -171,17 +173,21 @@ export function saveCatalogCategoryInTransaction(database: DatabaseSync, input: 
     const sortOrder = input.sortOrder === undefined
       ? Number(existing?.sort_order ?? (database.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM catalog_categories WHERE business_id = ? AND deleted_at = ''").get(businessId) as { value: number }).value)
       : normalizeSortOrder(input.sortOrder);
+    const defaultTaxRate = input.defaultTaxRate === undefined ? Number(existing?.default_tax_rate ?? 20) : Number(input.defaultTaxRate);
+    if (!Number.isFinite(defaultTaxRate) || defaultTaxRate < 0 || defaultTaxRate > 100)
+      throw new Error("Kategori KDV oranı 0 ile 100 arasında olmalı.");
     assertValidParentChain(database, businessId, id, parentId);
 
     database.prepare(`
       INSERT INTO catalog_categories (
-        id, business_id, parent_id, name, code, sort_order,
+        id, business_id, parent_id, name, code, default_tax_rate, sort_order,
         is_active, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         parent_id = excluded.parent_id,
         name = excluded.name,
         code = excluded.code,
+        default_tax_rate = excluded.default_tax_rate,
         sort_order = excluded.sort_order,
         is_active = excluded.is_active,
         updated_at = excluded.updated_at,
@@ -192,6 +198,7 @@ export function saveCatalogCategoryInTransaction(database: DatabaseSync, input: 
       parentId,
       name,
       code,
+      defaultTaxRate,
       sortOrder,
       isActive ? 1 : 0,
       String(existing?.created_at ?? now),

@@ -115,6 +115,7 @@ export interface DesktopCommerceBridge {
   reorderProductPhotos: (input: import("@yardimci-asistan/shared").ReorderProductPhotosInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
   setProductPhotoCover: (input: import("@yardimci-asistan/shared").SelectProductPhotoInput) => Promise<import("@yardimci-asistan/shared").ProductPhotoCollection>;
 
+  listStockReplenishment: () => Promise<import("./stock-replenishment").StockReplenishmentRow[]>;
   getInventoryBalance: (productId: string, locationId?: string) => Promise<InventoryBalance>;
   listInventoryMovements: (options?: ListInventoryMovementsOptions) => Promise<InventoryMovement[]>;
   applyInventoryMovement: (input: ApplyInventoryMovementInput) => Promise<InventoryMovement>;

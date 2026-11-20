@@ -419,6 +419,8 @@ export function ProductWorkspace({
   const stockPanel = inventoryEnabled && form.trackInventory && <DetailSectionCard title="Stok" className="market-product-stock-update">
     <strong>Mevcut stok: {balance?.quantity ?? (creating || !product?.trackInventory ? 0 : "—")} {form.unit}</strong>
     <label className="form-field form-field--fluid form-field--span">Minimum stok<input type="number" min="0" step="0.0001" value={form.minimumQuantity} disabled={mutationBusy} onChange={event => setForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
+    <label className="form-field form-field--fluid form-field--span">İdeal stok<input type="number" min="0" step="0.0001" value={form.idealQuantity} disabled={mutationBusy} onChange={event => setForm(current => ({ ...current, idealQuantity: event.target.value }))} /></label>
+    <small>Sipariş önerisi ideal stoktan mevcut stok düşülerek hesaplanır; minimum stok yalnız kritik seviye uyarısıdır.</small>
     <label className="form-field form-field--fluid form-field--span">İşlem<select aria-label="Stok işlemi" value={stockOperation} disabled={stockDisabled} onChange={event => { setStockOperation(event.target.value as typeof stockOperation); stockOperationId.current = crypto.randomUUID(); }}>
       <option value="add">Ekle</option><option value="remove">Çıkar</option><option value="count">Fiziksel Sayım</option>
     </select></label>

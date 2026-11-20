@@ -1,4 +1,5 @@
 import { manageOrderPayment } from "./commerce-order-payment";
+import { listStockReplenishment } from "./stock-replenishment";
 import { app, ipcMain, safeStorage } from "electron";
 import { CommerceBenefitsKey } from "./commerce-benefits-key";
 import { CommerceBenefitsError } from "./commerce-benefits-engine";
@@ -198,6 +199,9 @@ export function registerCommerceIpcHandlers(options: {
     read(() => getRuntimeProductImageDataUrl(databasePath(), productId))
   );
 
+  ipcMain.handle("commerce:inventory:replenishment", () =>
+    read(() => listStockReplenishment(databasePath()))
+  );
   ipcMain.handle("commerce:inventory:getBalance", (_event, productId: string, locationId?: string) =>
     read(() => getRuntimeInventoryBalance(databasePath(), productId, locationId))
   );

@@ -31,6 +31,21 @@ for (const profile of getBusinessProfiles()) {
   });
 }
 
+test("market inventory toggle safely drops purchasing and suppliers but keeps catalog/sales", () => {
+  const roots=[C.INVENTORY,C.RETAIL_PURCHASING,C.RETAIL_SUPPLIERS];
+  const selected=toggleBusinessProfileOption("market",roots,C.INVENTORY,false);
+  assert.deepEqual(selected,[]);
+  const capabilities=getBusinessProfileSelectionCapabilities("market",selected);
+  assert.equal(capabilities.includes(C.INVENTORY),false);
+  assert.equal(capabilities.includes(C.RETAIL_PURCHASING),false);
+  assert.equal(capabilities.includes(C.RETAIL_SUPPLIERS),false);
+  assert.equal(capabilities.includes(C.CATALOG),true);
+  assert.equal(capabilities.includes(C.SALES),true);
+  assert.equal(validateBusinessCapabilitySet(capabilities).length,0);
+  const restore=toggleBusinessProfileOption("market",selected,C.INVENTORY,true);
+  assert.equal(getBusinessProfileSelectionCapabilities("market",restore).includes(C.INVENTORY),true);
+});
+
 test("diamond: Orders survives either channel and disappears after both roots close", () => {
   let roots = toggleBusinessProfileOption("market", [], C.ONLINE_SALES, true);
   roots = toggleBusinessProfileOption("market", roots, C.WHOLESALE, true);

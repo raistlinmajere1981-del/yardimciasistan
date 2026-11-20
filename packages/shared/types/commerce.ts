@@ -52,6 +52,7 @@ export interface CatalogCategory {
   name: string;
   parentId: string;
   code: string;
+  defaultTaxRate: number;
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
@@ -80,6 +81,7 @@ export interface CatalogProduct {
   taxRate: number;
   trackInventory: boolean;
   minimumQuantity?: number;
+  idealQuantity?: number;
   isActive: boolean;
   imageAssetPath: string;
   imageSourceUrl: string;
