@@ -5,11 +5,12 @@ import {join} from 'node:path';
 import {createRequire} from 'node:module';
 import {extractFile} from '@electron/asar';
 import {extractVerifiedImage, validatePe} from './windows-native-image.mjs';
+import {assertVcRuntime, vcRuntimePath} from '../prepare-desktop-windows-vc-runtime.mjs';
 
 const require = createRequire(import.meta.url);
 
 // Extract exact archive members to private temporary files; never trust an old win-unpacked directory.
-export async function verifyWindowsInstallerPayload(installer, arch, {tool, expected, imageVersion, appVersion, payloadArchive = false} = {}) {
+export async function verifyWindowsInstallerPayload(installer, arch, {tool, expected, imageVersion, appVersion, payloadArchive = false, expectedVcRuntime} = {}) {
   if (!['x64', 'ia32'].includes(arch)) throw Error('Geçersiz Windows mimarisi.');
   const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
   tool ??= await builderRequire('app-builder-lib/out/toolsets/7zip').getPath7za();
@@ -33,6 +34,14 @@ export async function verifyWindowsInstallerPayload(installer, arch, {tool, expe
     extract(payload, `resources/native-image/image.win32-${arch}-msvc.node`, native, 64 * 1024 * 1024, '7z');
     const bytes = readFileSync(native);
     validatePe(bytes, arch);
+    if (expectedVcRuntime) {
+      const vc=join(temp,'VC_redist.exe');
+      extract(payload, 'resources/vc-runtime/VC_redist.' + arch + '.exe', vc, 45 * 1024 * 1024, '7z');
+      const vcBytes=readFileSync(vc);
+      assertVcRuntime(vcBytes, arch);
+      if (!vcBytes.equals(expectedVcRuntime)) throw Error('Windows installer Visual C++ payload differs from pinned redistributable.');
+    }
+
     if (!expected || !bytes.equals(expected)) throw Error('Windows kurucu native image lockfile ile uyuşmuyor.');
     const asar = join(temp, 'app.asar');
     extract(payload, 'resources/app.asar', asar, 512 * 1024 * 1024, '7z');
@@ -51,5 +60,7 @@ export async function verifyWindowsReleaseNative(root, installer, arch, appVersi
   if (!main?.version || entry?.version !== main.version || main.optionalDependencies?.[`@napi-rs/${name}`] !== main.version) throw Error('Windows native image lockfile sürümü uyuşmuyor.');
   const tarball = readFileSync(join(root, 'apps/desktop-app/resources/native-image', `${name}-${main.version}.tgz`));
   const expected = extractVerifiedImage(tarball, entry, arch, main.version);
-  await verifyWindowsInstallerPayload(installer, arch, {expected, imageVersion:main.version, appVersion});
+  const expectedVcRuntime = readFileSync(vcRuntimePath(arch));
+  assertVcRuntime(expectedVcRuntime, arch);
+  await verifyWindowsInstallerPayload(installer, arch, {expected, expectedVcRuntime, imageVersion:main.version, appVersion});
 }

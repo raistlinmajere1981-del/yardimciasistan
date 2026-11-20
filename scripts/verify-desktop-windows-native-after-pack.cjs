@@ -14,6 +14,12 @@ module.exports = async function verifyWindowsNativeAfterPack(context) {
   const expected = readFileSync(join(root, 'apps/desktop-app/resources/native-image', file));
   const actual = readFileSync(join(context.appOutDir, 'resources/native-image', file));
   if (!actual.equals(expected)) throw Error('Paketlenmiş Windows native image doğrulanamadı.');
+  const {assertVcRuntime, vcRuntimePath} = await import('./prepare-desktop-windows-vc-runtime.mjs');
+  const expectedVc = readFileSync(vcRuntimePath(arch));
+  assertVcRuntime(expectedVc, arch);
+  const actualVc = readFileSync(join(context.appOutDir, 'resources/vc-runtime', 'VC_redist.' + arch + '.exe'));
+  if (!actualVc.equals(expectedVc)) throw Error('Paketlenmiş Microsoft VC++ çalışma zamanı doğrulanamadı.');
+
   const asar = join(context.appOutDir, 'resources/app.asar');
   const packageJson = JSON.parse(extractFile(asar, 'node_modules/@napi-rs/image/package.json').toString());
   const appJson = JSON.parse(extractFile(asar, 'package.json').toString());

@@ -72,6 +72,23 @@ cd /home/raistlin/YardimciWorkspace/YardimciAsistan
    olmalıdır; eksikse Windows paket hazırlığını yeniden çalıştırın. 7-Zip aracı
    electron-builder toolset'inden sağlanır.
 
+   Windows 2.4 hazırlığında Microsoft Visual C++ Redistributable x64/x86
+   kurucuları NSIS içeriğine çevrimdışı eklenir. Dosyalar
+   apps/desktop-app/resources/vc-runtime/ altına önceden indirilir ve
+   scripts/prepare-desktop-windows-vc-runtime.mjs içindeki sabit SHA-256
+   değerleriyle doğrulanır. Yayımlanacak kurucu, Microsoft'un imzalı
+   yeniden dağıtım lisans/dağıtım koşullarına uygun paketlenmelidir.
+   Kurulum mevcut çalışma zamanını HKLM VC Runtimes kaydından kontrol eder;
+   eksikse x64/x86 mimarisine uygun VC_redist dosyasını sessiz çalıştırır.
+   Çalışma zamanı kurulamazsa uygulama kurulumunu durdurur. NSIS kurucusunun
+   içinden redist paketi de açılarak SHA-256 ve mimari eşitliği doğrulanır.
+
+   Visual C++ kaynak pinleri değişirse önce Microsoft kaynağı ve dosya imzası
+   yeniden incelenip SHA-256 değerleri kontrollü olarak güncellenmelidir.
+   Kullanıcının Windows makinesindeki runtime'ın gerçekten kurulabildiğini
+   ve startup'ta native image modülünü yüklediğini temiz Windows 11
+   testiyle kabul edeceğiz.
+
    Bu statik denetim Windows'ta açılışı kanıtlamaz: yayın öncesi her iki mimariyi
    uygun temiz Windows ortamında kurup uygulama açılışını ve görsel işlemesini elle
    doğrulayın. `--dir` paketi ve Linux üstündeki testler bu kontrolün yerine geçmez.

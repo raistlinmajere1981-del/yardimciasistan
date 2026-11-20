@@ -41,6 +41,8 @@ apps/desktop-app/resources/android/*
 
 # Generated, lockfile-verified Windows image binaries and download cache
 apps/desktop-app/resources/native-image/
+# Pinned Microsoft VC++ runtime EXEs stay in local build cache
+apps/desktop-app/resources/vc-runtime/
 
 # Local admin/deploy credential backend (never commit secrets)
 config/credentials.local.json

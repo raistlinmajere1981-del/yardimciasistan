@@ -46,6 +46,10 @@ win:
       to: native-image
       filter:
         - 'image.win32-${arch}-msvc.node'
+    - from: resources/vc-runtime
+      to: vc-runtime
+      filter:
+        - 'VC_redist.${arch}.exe'
   target:
     - target: nsis
       arch:
