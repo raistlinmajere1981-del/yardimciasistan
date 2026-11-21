@@ -138,7 +138,9 @@ export function useCustomerController({
       return;
     }
 
-    const result = request.request_type === "table_order" && status === "__accept_qr_order"
+    const result = request.request_type === "room_order" && status === "__accept_qr_room_order"
+      ? await window.yardimciDesktop.acceptQrRoomOrderRequest(request.id)
+      : request.request_type === "table_order" && status === "__accept_qr_order"
       ? await window.yardimciDesktop.acceptQrTableOrderRequest(request.id)
       : await window.yardimciDesktop.updateRequestStatus({ requestId: request.id, status });
     if (!result.ok) {

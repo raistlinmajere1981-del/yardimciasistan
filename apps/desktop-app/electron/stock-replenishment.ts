@@ -17,10 +17,9 @@ export interface StockReplenishmentRow {
 }
 const roundQuantity = (value: number) => Math.round((value + Number.EPSILON) * 10000) / 10000;
 
-export function listStockReplenishment(databasePath: string): StockReplenishmentRow[] {
-  const db = new DatabaseSync(databasePath);
-  try {
-    db.exec("PRAGMA busy_timeout=5000; PRAGMA query_only=ON; BEGIN");
+function readStockReplenishment(db: DatabaseSync, limit: number): {
+  rows: StockReplenishmentRow[]; truncated: boolean
+} {
     const enabled = readEnabledBusinessCapabilities(db);
     if (!enabled.includes(C.INVENTORY)) throw new Error("Stok takibi bu işletmede etkin değil.");
     const businessId = String(db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1").get()?.id ?? "");
@@ -33,10 +32,9 @@ export function listStockReplenishment(databasePath: string): StockReplenishment
       " LEFT JOIN inventory_locations l ON l.id=b.location_id AND l.business_id=p.business_id AND l.deleted_at='' AND l.is_active=1" +
       " WHERE p.business_id=? AND p.deleted_at='' AND p.is_active=1 AND p.track_inventory=1 AND p.ideal_quantity>0" +
       " GROUP BY p.id HAVING COALESCE(SUM(CASE WHEN l.id IS NOT NULL THEN b.quantity ELSE 0 END),0)<p.ideal_quantity" +
-      " ORDER BY c.name COLLATE NOCASE,p.name COLLATE NOCASE,p.id LIMIT 10001"
-    ).all(businessId);
-    if (records.length > 10000) throw new Error("10.000 satırı aşan sipariş listesi için kategori seçimi gerekli.");
-    return records.map(row => {
+      " ORDER BY c.name COLLATE NOCASE,p.name COLLATE NOCASE,p.id LIMIT ?"
+    ).all(businessId, limit + 1);
+    return {truncated: records.length > limit, rows: records.slice(0,limit).map(row => {
       const quantity = roundQuantity(Number(row.stock_quantity));
       const idealQuantity = roundQuantity(Number(row.ideal_quantity));
       return {
@@ -45,6 +43,30 @@ export function listStockReplenishment(databasePath: string): StockReplenishment
         quantity,minimumQuantity:roundQuantity(Number(row.minimum_quantity)),idealQuantity,
         suggestedQuantity:roundQuantity(Math.max(0,idealQuantity-quantity))
       };
-    });
+    })};
+}
+
+function withStockRead<T>(databasePath: string, select: (db: DatabaseSync) => T): T {
+  const db = new DatabaseSync(databasePath);
+  try {
+    db.exec("PRAGMA busy_timeout=5000; PRAGMA query_only=ON; BEGIN");
+    return select(db);
   } finally { db.close(); }
+}
+
+/** Desktop returns the whole list, preserving the existing 10,000-row guard. */
+export function listStockReplenishment(databasePath: string): StockReplenishmentRow[] {
+  return withStockRead(databasePath,db => {
+    const result = readStockReplenishment(db, 10000);
+    if (result.truncated) throw new Error("10.000 satırı aşan sipariş listesi için kategori seçimi gerekli.");
+    return result.rows;
+  });
+}
+
+/** Bounded Android summary, from the very same SQL and multi-location sum.
+ * A truncated flag prevents the phone falsely claiming to export all deficits. */
+export function listAndroidStockReplenishment(databasePath: string): {
+  rows: StockReplenishmentRow[]; truncated: boolean
+} {
+  return withStockRead(databasePath,db => readStockReplenishment(db, 1200));
 }

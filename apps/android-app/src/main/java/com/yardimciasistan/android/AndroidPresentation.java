@@ -157,6 +157,8 @@ final class AndroidPresentation {
     if ("breakfast_request".equals(value)) return "Kahvaltı talebi";
     if ("price_question".equals(value)) return "Fiyat sorusu";
     if ("location_question".equals(value)) return "Konum sorusu";
+    if ("table_order".equals(value)) return "Masa QR siparişi";
+    if ("room_order".equals(value)) return "Oda QR siparişi";
     if ("qr_menu_question".equals(value)) return "Menü sorusu";
     if ("general_info".equals(value)) return "Bilgi talebi";
     return "Diğer talep";

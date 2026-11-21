@@ -210,7 +210,10 @@ export function useSettingsDrafts(
 
   async function saveService(id: SetupServiceId): Promise<SettingsOperationResult> {
     if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
-    if (!serviceDirty(id)) return { ok: true, changed: false };
+    // A toggle can save in its own change handler, before React has rendered
+    // the next form state. The synchronous draft ref is the persistence source.
+    if (!settingsFieldsDirty(draftRef.current, baselineRef.current, serviceSettingsFields[id]))
+      return { ok: true, changed: false };
     savingRef.current = true;
     setBusy(true);
     try {

@@ -18,7 +18,7 @@ const YA_PUBLIC_ORDER_MAX_BODY_BYTES = 16384;
  */
 function ya_public_guard_enforce(string $bucket, int $maxBodyBytes = YA_PUBLIC_GUARD_MAX_BODY_BYTES): void
 {
-    if (in_array($bucket, ['order','table_order','checkout_quote','order_payment'], true)) {
+    if (in_array($bucket, ['order','table_order','room_order','checkout_quote','order_payment'], true)) {
         ya_public_guard_apply_cors();
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
             header('Allow: POST');
@@ -129,7 +129,7 @@ function ya_public_guard_policy(string $bucket): ?array
 {
     // Restaurant guests commonly share one Wi-Fi egress IP. The default eight
     // web-order submissions per ten minutes is too restrictive for table service.
-    if ($bucket === 'table_order') return [
+    if (in_array($bucket, ['table_order', 'room_order'], true)) return [
         'subject_windows' => [
             ['seconds' => 600, 'limit' => 100, 'retry_after' => 120],
             ['seconds' => 86400, 'limit' => 600, 'retry_after' => 900]

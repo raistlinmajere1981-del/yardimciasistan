@@ -17,5 +17,7 @@
   "table_order.currency_error": "Aynı siparişte farklı para birimleri kullanılamaz.",
   "table_order.demo_ready": "Demo Masa B3 · Sipariş simülasyonu",
   "table_order.demo_send": "Simülasyonu tamamla",
-  "table_order.demo_done": "Demo tamamlandı. Gerçek sipariş veya talep gönderilmedi."
+  "table_order.demo_done": "Demo tamamlandı. Gerçek sipariş veya talep gönderilmedi.",
+  "room_order.cart_title": "Oda siparişi",
+  "room_order.invalid": "Oda QR kodu geçersiz veya sipariş kapalı."
 }

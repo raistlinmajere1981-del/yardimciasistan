@@ -9,16 +9,20 @@ type IncomingItem = {
   unit_price: number; currency: string; name: string;
 };
 
-export function acceptQrTableOrderRequest(db: DatabaseSync, requestId: string): { ok: true; message: string; orderId: string } | { ok: false; message: string } {
+export function acceptQrTableOrderRequest(db: DatabaseSync, requestId: string, inOwnerTransaction = false): { ok: true; message: string; orderId: string } | { ok: false; message: string } {
   if (!requestId.trim()) return { ok: false, message: "Onaylanacak sipariş talebi seçilmedi." };
-  db.exec("BEGIN IMMEDIATE");
+  const begin = inOwnerTransaction ? "SAVEPOINT qr_table_accept" : "BEGIN IMMEDIATE";
+  const commit = inOwnerTransaction ? "RELEASE qr_table_accept" : "COMMIT";
+  const rollback = inOwnerTransaction
+    ? "ROLLBACK TO qr_table_accept; RELEASE qr_table_accept" : "ROLLBACK";
+  db.exec(begin);
   try {
     const request = db.prepare(
       "SELECT id, request_type, status, table_id, order_items_json, accepted_order_id, created_at FROM requests WHERE id = ? AND deleted_at = ''"
     ).get(requestId) as Record<string, unknown> | undefined;
     if (!request || request.request_type !== "table_order") throw new Error("Masadan sipariş talebi bulunamadı.");
     if (request.status === "approved" && request.accepted_order_id) {
-      db.exec("COMMIT");
+      db.exec(commit);
       return { ok: true, message: "Sipariş daha önce adisyona aktarıldı.", orderId: String(request.accepted_order_id) };
     }
     if (!["new", "seen", "waiting_owner"].includes(String(request.status))) {
@@ -79,10 +83,10 @@ export function acceptQrTableOrderRequest(db: DatabaseSync, requestId: string): 
       type: "request.status_changed", entityType: "request", entityId: requestId,
       payload: { previous_status: request.status, status: "approved", order_id: opened.order.id }, now
     });
-    db.exec("COMMIT");
+    db.exec(commit);
     return { ok: true, message: "Masa siparişi mevcut adisyona aktarıldı.", orderId: opened.order.id };
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(rollback);
     return { ok: false, message: error instanceof Error ? error.message : "Sipariş onaylanamadı." };
   }
 }

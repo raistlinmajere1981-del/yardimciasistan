@@ -134,6 +134,7 @@ try {
     table_id: tables[0].id,
     date: "2036-05-20",
     time: "19:30",
+    duration_minutes: 180,
     guest_count: 2,
     notes: "Android masa rezervasyonu"
   }));
@@ -146,16 +147,39 @@ try {
   assert.equal(tableReservation.reservationType, "table");
   assert.deepEqual(tableReservation.tableIds, [tables[0].id]);
   assert.equal(tableReservation.time, "19:30");
+  assert.equal(tableReservation.durationMinutes,180,"Snapshot must retain 3-hour slot");
+  const durationRow = new DatabaseSync(database.databasePath,{readOnly:true});
+  try {
+    assert.equal(Number(durationRow.prepare("SELECT duration_minutes FROM reservations WHERE id=?").get(tableReservation.id).duration_minutes),180);
+  } finally { durationRow.close(); }
+
+  const invalidDurations = [29, 481, 1.5, "120", null, -1];
+  for(const [index,invalid] of invalidDurations.entries()) {
+    const result=database.applyAndroidAction(action(
+      "android_table_bad_duration_"+index, "reservation_table_create",{
+        customer_id:customerId,table_id:tables[1].id,date:"2036-05-22",
+        time:"19:00",duration_minutes:invalid,guest_count:2,notes:"Invalid duration"
+      }));
+    assert.equal(result.ok,false,"Duration rejected: "+JSON.stringify(invalid));
+  }
+  const invalidRoomDuration=database.applyAndroidAction(action(
+    "android_room_with_table_duration_01","reservation_room_create",{
+      customer_id:customerId,room_id:rooms[0].id,
+      start_date:"2036-06-10",end_date:"2036-06-12",
+      duration_minutes:120,guest_count:2,notes:"Wrong scope"
+    }));
+  assert.equal(invalidRoomDuration.ok,false,"Room reservation must not accept table duration");
 
   const tableConflict = database.applyAndroidAction(action("android_table_reservation_conflict_001", "reservation_table_create", {
     customer_id: customerId,
     table_id: tables[0].id,
     date: "2036-05-20",
-    time: "19:30",
+    time: "21:30",
+    duration_minutes: 60,
     guest_count: 1,
     notes: "Çakışma"
   }));
-  assert.equal(tableConflict.ok, false, "Aynı masa/tarih/saat çakışması reddedilmeli");
+  assert.equal(tableConflict.ok, false, "Farklı başlangıç saati olsa da 180 dakikalık dolu aralığa giren rezervasyon reddedilmeli");
 
   const tableUpdateGuestCount = Math.max(
     1,
@@ -167,6 +191,7 @@ try {
     table_id: tables[1].id,
     date: "2036-05-20",
     time: "20:00",
+    duration_minutes: 90,
     guest_count: tableUpdateGuestCount,
     notes: "Masa ve saat değişti"
   }));
@@ -176,6 +201,20 @@ try {
   assert.deepEqual(movedTableReservation?.tableIds, [tables[1].id]);
   assert.equal(movedTableReservation?.time, "20:00");
   assert.equal(movedTableReservation?.guestCount, tableUpdateGuestCount);
+  assert.equal(movedTableReservation?.durationMinutes,90,"Duration survives update and snapshot");
+
+  const legacyUpdate=database.applyAndroidAction(action(
+    "android_table_legacy_duration_update_001","reservation_table_update",{
+      reservation_id:tableReservation.id,
+      expected_updated_at:movedTableReservation.updatedAt,
+      table_id:tables[1].id,date:"2036-05-20",
+      time:"20:30",guest_count:tableUpdateGuestCount,notes:"Legacy keeps selected minutes"
+    }));
+  assert.equal(legacyUpdate.ok,true,legacyUpdate.message);
+  dashboard=database.getDashboardData();
+  const legacyTableReservation=dashboard.reservations.find(row=>row.id===tableReservation.id);
+  assert.equal(legacyTableReservation?.durationMinutes,90,
+    "Old phone omitting duration preserves existing selected interval");
 
   const staleUpdate = database.applyAndroidAction(action("android_table_reservation_stale_001", "reservation_table_update", {
     reservation_id: tableReservation.id,

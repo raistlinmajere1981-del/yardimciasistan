@@ -213,21 +213,29 @@ export function AndroidDevicesSection({
         </div>
       </div>
 
-      <p className="form-status">
-        Companion APK’sını resmî Yardımcı Asistan demo sitesinin indirme bölümünden telefona indirip açın.
-        Android isterse indirdiğiniz tarayıcı veya dosya yöneticisi için “Bilinmeyen uygulamaları yükle” iznini onaylayın.
-        Güncelleme için aynı bölümdeki yeni APK’yı açın; mevcut uygulama ve verileriniz korunur.
-      </p>
-      <p className="form-status">Aynı Wi-Fi ağına veya USB internet paylaşımına bağlanıp Companion ile HTTPS QR kodunu okutun. Web bağlantısı isteğe bağlıdır.</p>
-
       {availableDevices.length === 0 ? (
-        <div className="android-devices-empty">
-          <Smartphone size={22} aria-hidden="true" />
-          <div>
-            <strong>Henüz telefon yok.</strong>
-            <span>Telefonu bağlamak için QR gösterin.</span>
+        <>
+          <ol className="android-device-setup-steps" aria-label="Telefon kurulum adımları">
+            <li>
+              Companion APK’sını{" "}
+              <a href="https://yardimciasistan.alwaysdata.net/kurulum/" target="_blank"
+                rel="noopener noreferrer" onClick={event => {
+                  if (!window.yardimciDesktop?.openExternal) return;
+                  event.preventDefault();
+                  void window.yardimciDesktop.openExternal("https://yardimciasistan.alwaysdata.net/kurulum/");
+                }}>Kurulum sayfasından</a>{" "}indirip yükleyin.
+            </li>
+            <li>Android sorarsa “Bilinmeyen uygulamaları yükle” iznini onaylayın.</li>
+            <li>Güncelleme için yeni APK’yı mevcut uygulamanın üzerine yükleyebilirsiniz.</li>
+          </ol>
+          <div className="android-devices-empty">
+            <Smartphone size={22} aria-hidden="true" />
+            <div>
+              <strong>Henüz telefon yok.</strong>
+              <span>Bağlanan telefonlar burada listelenir.</span>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <div className="android-device-list">
           {availableDevices.map((device) => {

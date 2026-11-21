@@ -253,7 +253,24 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
   }
 
   const categoryName = text(payload.category);
-  const categoryId = categoryName ? findCategoryIdByName(context.db, categoryName) : "";
+  const suppliedCategoryId = text(payload.category_id);
+  const categoryId = suppliedCategoryId || (categoryName ? findCategoryIdByName(context.db, categoryName) : "");
+  // Never silently save to the wrong tax band if a category was removed or
+  // the phone has a stale snapshot. The desktop is the catalog authority.
+  if (categoryName && !categoryId) {
+    return { ok: false, message: "Kategori eşleşmedi. Telefon ürün listesini yenileyip yeniden deneyin." };
+  }
+  if (categoryId) {
+    const category = context.db.prepare(
+      "SELECT id FROM catalog_categories WHERE id=? AND business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1) AND is_active=1 AND deleted_at=''"
+    ).get(categoryId);
+    if (!category) return { ok: false, message:"Seçilen kategori artık etkin değil. Listeyi yenileyin." };
+  }
+  if (payload.tax_rate !== undefined &&
+      (typeof payload.tax_rate !== "number" || !Number.isFinite(payload.tax_rate)
+        || payload.tax_rate < 0 || payload.tax_rate > 100)) {
+    return { ok: false, message:"Ürün KDV oranı 0–100 arasında olmalı." };
+  }
   const trackInventory = payload.track_inventory === true;
 
   const product = saveCatalogProductInTransaction(context.db, {
@@ -267,7 +284,9 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     salePrice: Number(payload.sale_price ?? 0),
     currency: text(payload.currency) || "TRY",
     unit: normalizeCommerceUnit(text(payload.unit)),
-    taxRate: 0,
+    // Without a manual override the canonical commerce writer resolves the
+    // current category default (or 20% when the product is uncategorized).
+    ...(payload.tax_rate !== undefined ? { taxRate: payload.tax_rate } : {}),
     trackInventory,
     minimumQuantity: 0,
     isActive: true,
@@ -287,7 +306,8 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     brand: product.brand,
     data_source: product.dataSource,
     category_name: categoryName,
-    category_matched: Boolean(categoryId)
+    category_matched: Boolean(categoryId),
+    tax_rate:product.taxRate
   });
   context.queueSnapshot();
 

@@ -34,6 +34,7 @@ interface RestaurantReservationFormState {
   date: string;
   time: string;
   guestCount: number;
+  durationMinutes: number;
   notes: string;
 }
 
@@ -53,6 +54,7 @@ function createInitialForm(
     date: localDateKey(),
     time: "19:00",
     guestCount: 2,
+    durationMinutes: 120,
     notes: ""
   };
 }
@@ -95,6 +97,7 @@ export function ManualRestaurantReservationEditor({
         date: form.date,
         time: form.time,
         guestCount: form.guestCount,
+        durationMinutes: form.durationMinutes,
         notes: form.notes
       });
       if (!result.ok) {
@@ -152,6 +155,11 @@ export function ManualRestaurantReservationEditor({
       />
     </div>
 
+    <label className="form-field form-field--short">Masa kullanım süresi
+      <select value={form.durationMinutes} onChange={e => setForm(current => ({ ...current, durationMinutes: Number(e.target.value) }))}>
+        {[60,90,120,150,180,240].map(duration => <option value={duration} key={duration}>{duration} dakika</option>)}
+      </select>
+    </label>
     <div className="form-field form-field--xs">
       <span>Saat</span>
       <TimePicker

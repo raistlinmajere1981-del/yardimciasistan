@@ -1501,17 +1501,17 @@ async function runMarketOnly(baseUrl) {
   relaunchApp();
 
   let xml = await waitForUiCondition(
-    (candidate) => candidate.includes('text="Market"')
+    (candidate) => candidate.includes('text="Satış"')
       && !candidate.includes('text="Pansiyon"')
       && !candidate.includes('text="Restoran"'),
     12000,
     "Saf Market profili Android navigation'a uygulanmadı."
   );
   assertNotContains(xml, ['text="Pansiyon"', 'text="Restoran"', 'text="Müşteri"']);
-  tap(centerOf(findClickableBoundsByText(xml, "Market")));
+  tap(centerOf(findClickableBoundsByText(xml, "Satış")));
   xml = await waitForUiCondition(
-    (candidate) => candidate.includes("Saha işlemleri")
-      && candidate.includes("Kasa Barkod Modu")
+    (candidate) => candidate.includes("Kasa Barkod Modu")
+      && candidate.includes("İdeal Stok Eksikleri")
       && candidate.includes("Barkod Tara")
       && candidate.includes("Stok Say")
       && candidate.includes("Mal Kabul")
@@ -1520,7 +1520,7 @@ async function runMarketOnly(baseUrl) {
     "Market ana ekranı açılamadı."
   );
   assertContains(xml, [
-    "MARKET", "Saha işlemleri", "Kasa Barkod Modu", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün"
+    "Satış", "Kasa Barkod Modu", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün"
   ]);
   assertNotContains(xml, ["Bekleyen sipariş", "Satışı Tamamla"]);
   captureScreenshot("market-home.png");
@@ -1558,7 +1558,7 @@ async function runMarketOnly(baseUrl) {
   );
   assertContains(xml, ["KASA BARKOD MODU", "Son taranan", "Modu Kapat"]);
   tap(centerOf(findClickableBoundsByText(xml, "Modu Kapat")));
-  await waitForUiText("Saha işlemleri", 5000);
+  await waitForUiText("Kasa Barkod Modu", 5000);
 
   scrollToBottom();
   xml = await waitForUiCondition(
@@ -1583,7 +1583,7 @@ async function runMarketOnly(baseUrl) {
   );
   assertContains(xml, ["Barkod Tara", "Ürün Seç", "Ürün seçilmedi"]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await waitForUiText("Saha işlemleri", 5000);
+  await waitForUiText("Kasa Barkod Modu", 5000);
 
   xml = dumpUi("market-home-before-receiving.xml");
   tap(centerOf(findClickableBoundsByText(xml, "Mal Kabul")));
@@ -1603,7 +1603,7 @@ async function runMarketOnly(baseUrl) {
   );
   scrollToTop();
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await waitForUiText("Saha işlemleri", 5000);
+  await waitForUiText("Kasa Barkod Modu", 5000);
 
   await enterMarketBarcode("8699999999999");
   xml = await waitForUiCondition(
@@ -1631,7 +1631,7 @@ async function runMarketOnly(baseUrl) {
   assertContains(productCreateBottomXml, ["Alış fiyatı (isteğe bağlı)", "Satış fiyatı (isteğe bağlı)", "Kategori (isteğe bağlı)", "Not", "Ürünü Kaydet"]);
   captureScreenshot("market-product-create-bottom.png");
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
-  await waitForUiText("Saha işlemleri", 5000);
+  await waitForUiText("Kasa Barkod Modu", 5000);
 
   await enterMarketBarcode("8690000000001");
   xml = await waitForUiCondition(

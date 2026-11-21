@@ -1,5 +1,6 @@
 import type { DocumentOutputManagementBridge } from "@yardimci-asistan/shared";
 import type { TranslationBridge } from "@yardimci-asistan/shared";
+import type { SeoEditorSnapshot, SeoFields, SeoPageKey, SeoProposal, SeoActionResult } from "@yardimci-asistan/shared";
 import type { BenefitsManagementBridge, TableOrderBenefitsBridge } from "@yardimci-asistan/shared";
 import type { BusinessMessagingBridge, MarketingShareBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
@@ -204,6 +205,9 @@ type AiApiKeyRevealResult =
   | { ok: false; message: string };
 
 export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsManagementBridge, TableOrderBenefitsBridge, TranslationBridge, MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
+  getSeoSnapshot: () => Promise<SeoActionResult<SeoEditorSnapshot>>;
+  saveSeoSource: (page: SeoPageKey, fields: SeoFields, expectedUpdatedAt: string) => Promise<SeoActionResult<void>>;
+  suggestSeoCopy: (page: SeoPageKey, language: string) => Promise<SeoActionResult<SeoProposal>>;
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
@@ -329,6 +333,7 @@ export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsM
   convertRequestToReservation: (requestId: string) => Promise<RequestReservationConversionResult>;
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
   acceptQrTableOrderRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
+  acceptQrRoomOrderRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
   getDealerWebAccess: (customerId: string) => Promise<import("@yardimci-asistan/shared").DealerWebAccess | null>;
@@ -392,8 +397,11 @@ export interface DesktopBridge extends DocumentOutputManagementBridge, BenefitsM
   pushMenu: () => Promise<PushMenuResult>;
   pushAndroidSnapshot: () => Promise<PushAndroidSnapshotResult>;
   pushAiSettings: () => Promise<PushAiSettingsResult>;
-  getQrMenuWebPublication: () => Promise<{ enabled: boolean; ordersEnabled: boolean; tables: Array<{id: string; name: string; area: string; token: string}> }>;
+  getQrMenuWebPublication: () => Promise<{ enabled: boolean; ordersEnabled: boolean; roomOrdersEnabled:boolean;
+    tables: Array<{id: string; name: string; area: string; token: string}>;
+    rooms: Array<{id:string;name:string;number:string;token:string}> }>;
   setQrTableOrdersEnabled: (enabled: boolean) => Promise<{ ok: boolean; message: string; enabled: boolean; tables: Array<{id: string; name: string; area: string; token: string}> }>;
+  setQrRoomOrdersEnabled: (enabled: boolean) => Promise<{ok:boolean;message:string;enabled:boolean;rooms:Array<{id:string;name:string;number:string;token:string}>}>;
   setQrMenuWebPublication: (enabled: boolean) => Promise<{ ok: boolean; message: string; enabled: boolean }>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
   saveMenuProductEntry: (input: SaveMenuProductEntryInput) => Promise<DesktopMenuSaveResult>;
@@ -459,6 +467,10 @@ const bridge: DesktopBridge = {
   listCompanionPointDevices: () => invokeWhenUnlocked("benefits:companionDevices"),
   grantCompanionPointAccess: input => invokeWhenUnlocked("benefits:companionGrant", input),
   revokeCompanionPointAccess: input => invokeWhenUnlocked("benefits:companionRevoke", input),
+  getSeoSnapshot: () => invokeWhenUnlocked("seo:snapshot"),
+  saveSeoSource: (page: SeoPageKey, fields: SeoFields, expectedUpdatedAt: string) =>
+    invokeWhenUnlocked("seo:save", page, fields, expectedUpdatedAt),
+  suggestSeoCopy: (page: SeoPageKey, language: string) => invokeWhenUnlocked("seo:suggest", page, language),
   getTranslationSettings: () => invokeWhenUnlocked("translation:settings"),
   saveTranslationSettings: input => invokeWhenUnlocked("translation:saveSettings", input),
   getTranslation: (identity, language) => invokeWhenUnlocked("translation:get", identity, language),
@@ -741,6 +753,7 @@ const bridge: DesktopBridge = {
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
   acceptQrTableOrderRequest: (requestId: string) => ipcRenderer.invoke("request:acceptQrOrder", requestId),
+  acceptQrRoomOrderRequest: (requestId: string) => ipcRenderer.invoke("request:acceptQrRoomOrder", requestId),
   deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
   getDealerWebAccess: (customerId) => invokeWhenUnlocked("dealer:access:get", customerId),
   changeDealerWebAccess: (customerId, action) => invokeWhenUnlocked("dealer:access:change", customerId, action),
@@ -838,6 +851,7 @@ const bridge: DesktopBridge = {
   pushAiSettings: () => ipcRenderer.invoke("sync:pushAiSettings"),
   getQrMenuWebPublication: () => ipcRenderer.invoke("menu:getWebPublication"),
   setQrTableOrdersEnabled: (enabled: boolean) => ipcRenderer.invoke("menu:setTableOrders", enabled),
+  setQrRoomOrdersEnabled: (enabled: boolean) => ipcRenderer.invoke("menu:setRoomOrders", enabled),
   setQrMenuWebPublication: (enabled: boolean) => ipcRenderer.invoke("menu:setWebPublication", enabled),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
   saveMenuProductEntry: (input: SaveMenuProductEntryInput) => invokeWhenUnlocked<DesktopMenuSaveResult>("menu:saveEntry", input),

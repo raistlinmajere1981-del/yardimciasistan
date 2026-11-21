@@ -10,6 +10,29 @@ import org.junit.Test;
 
 public final class AndroidReservationRulesTest {
   @Test
+  public void tableReservationDurationDefaultsTo120AndRespects30To480MinuteLimits() throws Exception {
+    assertFalse(ReservationEditorDialog.validTableDuration(29));
+    assertTrue(ReservationEditorDialog.validTableDuration(30));
+    assertTrue(ReservationEditorDialog.validTableDuration(120));
+    assertTrue(ReservationEditorDialog.validTableDuration(480));
+    assertFalse(ReservationEditorDialog.validTableDuration(481));
+    assertFalse(ReservationEditorDialog.validTableDuration(0));
+
+    OperationData.ReservationRecord legacy=OperationData.ReservationRecord.fromJson(
+        new JSONObject().put("reservation_type","table").put("time","19:00"));
+    assertEquals(120,legacy.durationMinutes);
+    OperationData.ReservationRecord shortSlot=OperationData.ReservationRecord.fromJson(
+        new JSONObject().put("reservation_type","table").put("duration_minutes",30));
+    assertEquals(30,shortSlot.durationMinutes);
+    OperationData.ReservationRecord longSlot=OperationData.ReservationRecord.fromJson(
+        new JSONObject().put("reservation_type","table").put("duration_minutes",480));
+    assertEquals(480,longSlot.durationMinutes);
+    OperationData.ReservationRecord invalid=OperationData.ReservationRecord.fromJson(
+        new JSONObject().put("reservation_type","table").put("duration_minutes",900));
+    assertEquals(120,invalid.durationMinutes);
+  }
+
+  @Test
   public void reservationCreatePermissionKeepsEmptyRestaurantReservationModeVisible() {
     OperationData data = authorizedData();
     data.permissions.add("reservation.view");

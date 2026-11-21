@@ -92,14 +92,30 @@ export function projectAndroidOperationsSnapshot(
   const customers = has(C.CUSTOMERS)
     ? source.customers.map((customer) => ({
         ...customer,
+        commercial_profile: customer.commercial_profile
+          ? {
+              ...customer.commercial_profile,
+              dealer_status: has(C.WHOLESALE) ? customer.commercial_profile.dealer_status : "inactive" as const,
+              price_group: has(C.WHOLESALE) ? customer.commercial_profile.price_group : "retail" as const,
+              payment_term_days: has(C.WHOLESALE) ? customer.commercial_profile.payment_term_days : 0
+            }
+          : null,
         identity_number: "",
         document_serial_number: "",
         reservation_count: reservations.filter((reservation) => reservation.customer_id === customer.id).length,
         stay_count: stays.filter((stay) => stay.customer_id === customer.id).length
       }))
     : [];
+  const qrOrderEnabled = has(C.QR_MENU) && has(C.FOOD_MENU) && has(C.FOOD_ORDERS);
   const requests = requestsEnabled
-    ? source.requests.map((request) => ({
+    ? source.requests.filter(request => {
+        if (request.request_type === "table_order")
+          return qrOrderEnabled && has(C.FOOD_TABLES);
+        if (request.request_type === "room_order")
+          return qrOrderEnabled && has(C.ACCOMMODATION_STAYS) && has(C.ACCOMMODATION_FOLIO)
+            && has(C.ACCOMMODATION_ROOMS);
+        return true;
+      }).map(request => ({
         ...request,
         ai_summary: has(C.AI) ? request.ai_summary : "",
         ai_suggested_reply: has(C.AI) ? request.ai_suggested_reply : "",
@@ -232,6 +248,10 @@ export function projectAndroidMarketSnapshot(
     : [];
 
   return {
+    categories: catalogEnabled ? (source.categories ?? []) : [],
+    replenishment: catalogEnabled && inventoryEnabled
+      ? source.replenishment ?? {rows:[],truncated:false}
+      : {rows:[],truncated:false},
     product_data: productData,
     summary: {
       today_sale_count: salesEnabled ? source.summary.today_sale_count : 0,

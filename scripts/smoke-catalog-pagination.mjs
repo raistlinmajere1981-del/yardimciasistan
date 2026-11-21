@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
@@ -25,6 +26,7 @@ try {
     phone: "", whatsapp: "", email: "", address: "", webModuleUrl: "https://example.test", syncSecret: "fixture-secret", autoSyncEnabled: false,
     aiEnabled: false, aiProvider: "openai_compatible", aiService: "openai", aiProjectName: "", aiModel: "", aiModelOptions: [], aiBaseUrl: "https://api.openai.com/v1", aiTimeoutSeconds: 30,
     aiApiKey: "", clearAiApiKey: false, servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: [] }).ok, true);
+  enableFixtureStockTracking(database);
   const path = database.databasePath;
   const firstCategory = runtime.saveRuntimeCatalogCategory(path, { name: "Tekler" });
   const secondCategory = runtime.saveRuntimeCatalogCategory(path, { name: "Çiftler" });

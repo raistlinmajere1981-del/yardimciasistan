@@ -97,6 +97,17 @@ final class AndroidActionPolicy {
         return "Güncel oda hesabı gerekli. Veriyi yenileyip tekrar deneyin.";
       }
     }
+    if ("qr_table_order_accept".equals(actionType) || "qr_room_order_accept".equals(actionType)
+        || "qr_order_reject".equals(actionType)) {
+      if (actionPayload == null || !hasOnlyKeys(actionPayload,
+          new String[]{"request_id","expected_updated_at"})) {
+        return "QR sipariş işlemi desteklenmeyen alan içeriyor.";
+      }
+      OperationData.RequestRecord request = data.requestById(actionPayload.optString("request_id",""));
+      if (!AndroidUiRules.isQrOrderRequest(request) || actionPayload.optString("expected_updated_at","").isEmpty()
+          || !actionPayload.optString("expected_updated_at","").equals(request.updatedAt))
+        return "Güncel QR siparişini yenileyip tekrar deneyin.";
+    }
     if (KbsUiRules.isAction(actionType)) return KbsUiRules.validationError(data, actionType, actionPayload);
     return "";
   }
@@ -142,6 +153,19 @@ final class AndroidActionPolicy {
     String marketPermission = MarketUiRules.requiredPermissionForAction(type);
     if (marketPermission != null) {
       return data.hasPermission(marketPermission);
+    }
+    if (type.startsWith("customer_request_") &&
+        !("qr_order_reject".equals(type))) {
+      OperationData.RequestRecord request = data.requestById(payload.optString("request_id", ""));
+      if (AndroidUiRules.isQrOrderRequest(request)) return false;
+    }
+    if ("qr_table_order_accept".equals(type) || "qr_room_order_accept".equals(type)
+        || "qr_order_reject".equals(type)) {
+      OperationData.RequestRecord request = data.requestById(payload.optString("request_id", ""));
+      if (!AndroidUiRules.isQrOrderRequest(request)) return false;
+      if ("qr_table_order_accept".equals(type) && !"table_order".equals(request.type)
+          || "qr_room_order_accept".equals(type) && !"room_order".equals(request.type)) return false;
+      return AndroidUiRules.canDecideQrOrder(data, request, !"qr_order_reject".equals(type));
     }
     if ("customer_request_convert_to_reservation".equals(type)) {
       OperationData.RequestRecord request = data.requestById(
@@ -250,7 +274,12 @@ final class AndroidActionPolicy {
       case "customer_request_mark_answered":
         return "customer.mark_answered";
       case "customer_request_reject":
+      case "qr_order_reject":
         return "customer.reject";
+      case "qr_table_order_accept":
+        return "table_order.add_item";
+      case "qr_room_order_accept":
+        return "room_folio.add_menu_item";
       case "customer_request_convert_to_reservation":
         return "customer.convert_to_reservation";
       case "reservation_room_create":

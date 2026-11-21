@@ -172,3 +172,24 @@ test("stock suggestion sums real balances, includes above-minimum shortfall and 
     assert.deepEqual(stocking.listStockReplenishment(f.path),[]);
   }finally {f.close();enabled=["commerce.inventory"];}
 });
+
+test("Android replenishment is bounded, explicitly truncated and uses the same stock SQL",()=>{
+  const f=fixture();
+  try {
+    const insert=f.db.prepare("INSERT INTO catalog_products(id,business_id,name,ideal_quantity,track_inventory,created_at,updated_at) VALUES(?,'biz',?,1,1,'t','t')");
+    f.db.exec("BEGIN IMMEDIATE");
+    for(let i=0;i<1203;i++) {
+      const id="mobile-stocking-"+String(i).padStart(4,"0");
+      insert.run(id,"Ürün "+String(i).padStart(4,"0"));
+    }
+    f.db.exec("COMMIT");
+    const full=stocking.listStockReplenishment(f.path);
+    const mobile=stocking.listAndroidStockReplenishment(f.path);
+    assert.equal(full.length,1203);
+    assert.equal(mobile.rows.length,1200);
+    assert.equal(mobile.truncated,true);
+    assert.deepEqual(mobile.rows,full.slice(0,1200));
+    assert.equal(Number(f.db.prepare("SELECT COUNT(*) n FROM inventory_movements").get().n),0);
+    assert.equal(Number(f.db.prepare("SELECT COUNT(*) n FROM purchase_orders").get().n),0);
+  }finally{f.close();}
+});

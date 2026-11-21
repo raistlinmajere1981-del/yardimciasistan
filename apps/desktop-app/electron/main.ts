@@ -3,6 +3,7 @@ import { registerDocumentOutputIpcHandlers } from "./ipc/document-output-ipc";
 import { registerDataTransferIpc } from "./ipc/data-transfer-ipc";
 import { PublicTranslationService } from "./public-translation-service";
 import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
+import { registerSeoIpc } from "./ipc/seo-ipc";
 import { cleanupOrphanProductImages } from "./product-data-service";
 import { MarketingAnalyticsService } from "./marketing/analytics-service";
 import { registerMarketingAnalyticsIpc } from "./ipc/marketing-analytics-ipc";
@@ -615,6 +616,12 @@ function registerIpcHandlers() {
   registerDocumentOutputIpcHandlers({ installationId: () => getDocumentPrinterInstallationId(app.getPath("userData")), databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, isTrustedRendererUrl: isTrustedDesktopRendererUrl });
   registerDataTransferIpc({ databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, onMutation: () => { syncCoordinator?.scheduleSoon(); } });
   registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => getSyncCoordinator().scheduleSoon(0, true)});
+  registerSeoIpc({database:getDatabase, assertUnlocked:assertAppSessionUnlocked,
+    onChanged:() => {
+      // SEO source updates also enter the existing automatic translation queue.
+      publicTranslationService.reconcile();
+      getSyncCoordinator().scheduleSoon(0, true);
+    }});
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerWebTrafficIpc({ config: () => getWebSyncConfig(getDatabase().getSetupData()), assertUnlocked: assertAppSessionUnlocked });

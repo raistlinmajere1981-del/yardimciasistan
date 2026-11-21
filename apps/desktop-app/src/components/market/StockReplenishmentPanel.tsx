@@ -58,10 +58,10 @@ export function StockReplenishmentPanel({ refreshRevision = 0 }: { refreshRevisi
     };
     frame.srcdoc=html;
   }
-  return <section className="market-panel market-stock-replenishment" aria-label="İdeal stok sipariş listesi" style={{gridColumn:"1 / -1"}}>
+  return <section className="market-panel market-stock-replenishment" aria-label="İdeal stok sipariş listesi">
     <header className="market-panel-heading"><span>Satın Alma Planlama</span><h2>İdeal Stok Eksikleri</h2>
       <p>Her ürün için önerilen miktar = İdeal stok − Mevcut stok. Minimum stok yalnız uyarı eşiğidir.</p></header>
-    <div className="market-form-actions" style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"end"}}>
+    <div className="market-form-actions market-stock-replenishment__filters">
       <label className="form-field">Kategori
         <select value={categoryId} onChange={e=>setCategoryId(e.target.value)}>
           <option value="">Tüm kategoriler</option>
@@ -77,12 +77,12 @@ export function StockReplenishmentPanel({ refreshRevision = 0 }: { refreshRevisi
     </div>
     {error && <p role="alert">{error}</p>}
     <p role="status" className="market-muted">{loading?"Stok önerileri hesaplanıyor…":filtered.length+" ürün için sipariş önerisi · Toplam "+rows.length+" eksik ürün"}</p>
-    <div style={{maxHeight:350,overflow:"auto"}}>
-      <table className="market-stock-replenishment-table" style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+    <div className="market-stock-replenishment__scroll">
+      <table className="market-stock-replenishment-table">
         <thead><tr><th>Kategori</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>İdeal</th><th>Sipariş</th></tr></thead>
         <tbody>
           {filtered.slice(0,250).map(row=><tr key={row.productId}>
-            <td>{row.categoryName}</td><td>{row.name}<small style={{display:"block"}}>{row.sku}</small></td>
+            <td>{row.categoryName}</td><td>{row.name}<small className="market-stock-replenishment__sku">{row.sku}</small></td>
             <td>{row.quantity} {row.unit}</td><td>{row.minimumQuantity}</td>
             <td>{row.idealQuantity}</td><td><strong>{row.suggestedQuantity} {row.unit}</strong></td>
           </tr>)}

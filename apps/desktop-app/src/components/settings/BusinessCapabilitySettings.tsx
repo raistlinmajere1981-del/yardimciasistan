@@ -58,18 +58,17 @@ export function BusinessProfileOptionEditor({
       ) : (
         <div className="settings-profile-option-list">
           {independentOptions.map((capability) => (
-            <label className="settings-profile-option" key={capability}>
+            <label className={requiredPrerequisites.has(capability) ? "settings-profile-option is-required" : "settings-profile-option"} key={capability}>
               <input
                 type="checkbox"
                 aria-label={CAPABILITY_LABELS[capability] ?? capability}
                 value={capability}
                 checked={selectedCapabilities.includes(capability) || requiredPrerequisites.has(capability)}
-                disabled={requiredPrerequisites.has(capability) && capability !== C.INVENTORY}
+                disabled={requiredPrerequisites.has(capability)}
                 onChange={(event) => onChange(toggleBusinessProfileOption(profileId, selectedCapabilities, capability, event.target.checked))}
               />
               <span>{CAPABILITY_LABELS[capability] ?? capability}</span>
-              {capability === C.INVENTORY && requiredPrerequisites.has(capability) && <small>Stok takibi kapatılırsa stok gerektiren satın alma ve tedarikçi yetenekleri de kapanır.</small>}
-              {capability !== C.MESSAGING_CAMPAIGNS && selectedCapabilities.includes(capability) && options.some(option =>
+              {capability !== C.MESSAGING_CAMPAIGNS && capability !== C.INVENTORY && selectedCapabilities.includes(capability) && options.some(option =>
                 !visiblePrerequisites.has(option) && getEnabledBusinessCapabilityDependents(option, [capability]).length > 0) && (
                 <small>{options.filter(option => !visiblePrerequisites.has(option) && getEnabledBusinessCapabilityDependents(option, [capability]).length > 0)
                   .map(option => CAPABILITY_LABELS[option]).join(", ")} dahil</small>

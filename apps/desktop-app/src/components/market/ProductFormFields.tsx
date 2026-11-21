@@ -213,7 +213,8 @@ export function ProductFormFields({
       <label className="form-field form-field--fluid form-field--span">Ürün adı<input disabled={disabled} value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></label>
       <label className="form-field form-field--fluid">Marka<input disabled={disabled} value={form.brand} onChange={(event) => onChange({ ...form, brand: event.target.value })} /></label>
       {retailFieldsEnabled && <label className="form-field form-field--fluid">SKU<input disabled={disabled} value={form.sku} onChange={(event) => onChange({ ...form, sku: event.target.value })} /></label>}
-      {retailFieldsEnabled && <label className="form-field form-field--fluid form-field--span">
+      <div className="market-product-barcode-description form-field--span">
+      {retailFieldsEnabled && <label className="form-field form-field--fluid">
         Barkod
         <span className="market-inline-field">
           <input disabled={disabled} value={form.barcode} onChange={(event) => onChange({ ...form, barcode: normalizeBarcodeIdentity(event.target.value, 80) })} />
@@ -229,6 +230,10 @@ export function ProductFormFields({
           </ActionButton>}
         </span>
       </label>}
+      <label className="form-field form-field--fluid">Açıklama<textarea
+        disabled={disabled} rows={2} value={form.description}
+        onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
+      </div>
 
       {retailFieldsEnabled && <label className="form-field form-field--fluid">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => {
           const selected=categories.find(category=>category.id===categoryId);
@@ -238,6 +243,7 @@ export function ProductFormFields({
       <label className="form-field form-field--fluid">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       </ProductFieldSection>
       <ProductFieldSection grouped={Boolean(renderSections)} title="Fiyatlandırma" className="market-product-prices">
+      {purchasingEnabled && <label className="form-field form-field--fluid">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>}
       <label className="form-field form-field--fluid">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice}
         onBlur={onSalePriceBlur} aria-invalid={salePriceError ? true : undefined} aria-describedby={salePriceError ? salePriceErrorId : undefined}
         onChange={(salePrice) => onChange({ ...form, salePrice })} />
@@ -246,7 +252,6 @@ export function ProductFormFields({
         <label className="form-field form-field--fluid">Bayi A fiyatı<MoneyInput aria-label="Bayi A fiyatı" disabled={disabled} value={form.dealerPriceA} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceA) => onChange({ ...form, dealerPriceA })} /></label>
         <label className="form-field form-field--fluid">Bayi B fiyatı<MoneyInput aria-label="Bayi B fiyatı" disabled={disabled} value={form.dealerPriceB} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceB) => onChange({ ...form, dealerPriceB })} /></label>
       </>}
-      {purchasingEnabled && <label className="form-field form-field--fluid">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>}
       <label className="form-field form-field--short">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
       <label className="form-field form-field--short">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value, taxRateManual:true })} /></label>
       {form.categoryId && <ActionButton variant="secondary" size="sm" type="button" disabled={disabled}
@@ -258,9 +263,6 @@ export function ProductFormFields({
       <label className="form-field form-field--fluid">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>
       <label className="form-field form-field--fluid">İdeal stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.idealQuantity} onChange={(event) => onChange({ ...form, idealQuantity: event.target.value })} /></label>
       </ProductFieldSection>}
-      <ProductFieldSection grouped={Boolean(renderSections)} title="Açıklama">
-      <label className="form-field form-field--fluid form-field--span">Açıklama<textarea disabled={disabled} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
-      </ProductFieldSection>
     </div>;
 
   const media = showMedia && <section aria-label="Ürün görseli" aria-busy={previewLoading} className={`form-stack market-product-media${renderSections ? " panel detail-section-card" : ""}`}>

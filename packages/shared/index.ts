@@ -5,6 +5,7 @@ export * from "./utils/ai-model-capabilities";
 export * from "./types/business-ai-context";
 export * from "./types/business-ai-policy";
 export * from "./types/business-web-context";
+export * from "./types/seo";
 export * from "./types/business-ai-catalog";
 export * from "./types/business-capabilities";
 export * from "./types/business-service-ownership";

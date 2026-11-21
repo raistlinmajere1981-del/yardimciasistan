@@ -1,5 +1,5 @@
 /** Desktop translation owner; publication languages are unrelated to spoken languages. */
-export const PUBLIC_TRANSLATION_KINDS = ["business", "room", "table", "menu_category", "menu_product", "catalog_category", "catalog_product", "gallery", "marketing", "site_text"] as const;
+export const PUBLIC_TRANSLATION_KINDS = ["business", "room", "table", "menu_category", "menu_product", "catalog_category", "catalog_product", "gallery", "marketing", "site_text", "seo"] as const;
 export type PublicTranslationKind = typeof PUBLIC_TRANSLATION_KINDS[number];
 export interface TranslationSettings {
   enabled: boolean;

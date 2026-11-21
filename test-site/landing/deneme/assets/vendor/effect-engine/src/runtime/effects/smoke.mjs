@@ -7,7 +7,8 @@ const PUFF_LAYERS=[[1.9,.14],[1.25,.24],[.72,.5]];
 // so an object resize never changes the simulation; all randomness happens at
 // spawn. Transparency comes from layered low-alpha circles, not filters.
 export function createSmoke({random, params}) {
-  let enabled=params.enabled!==false, disposed=false, active=0, clock=0;
+  const enabled=params.enabled!==false;
+  let disposed=false, active=0, clock=0;
   const particles=[];
   function respawn(particle,initial=false){
     const life=between(random,2.4,5.2);

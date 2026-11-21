@@ -55,7 +55,18 @@ try {
     await expect(remove).toBeFocused();
     const style = await remove.evaluate(el => { const s=getComputedStyle(el); return {outline:s.outlineStyle,background:s.backgroundColor}; });
     assert.equal(style.outline, "solid");
-    colors.push(style.background);
+    // Appearance transitions are asynchronous; compare after the button reaches
+    // the selected scheme's own semantic surface rather than sampling the prior frame.
+    const expectedBackground = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = "var(--color-bg-panel)";
+      document.body.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    await expect.poll(() => remove.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(expectedBackground);
+    colors.push(expectedBackground);
     const targets = await dialog.locator(".action-button, .icon-button").evaluateAll(elements => elements.map(el => ({label:el.getAttribute("aria-label")||el.textContent,rect:el.getBoundingClientRect()})).filter(({rect}) => rect.width < 44 || rect.height < 44).map(({label}) => label));
     assert.deepEqual(targets, [], `${scheme}/${density}: full action targets`);
     const preview = dialog.getByAltText("Oran örneği");

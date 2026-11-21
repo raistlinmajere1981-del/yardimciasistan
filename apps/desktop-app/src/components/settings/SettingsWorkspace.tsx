@@ -1,6 +1,7 @@
 import { PrintManagementWorkspace } from "./PrintManagementWorkspace";
 import { TranslationSettingsSection, useTranslationSettings } from "./TranslationSettingsSection";
 import { LanguageManagementWorkspace } from "./LanguageManagementWorkspace";
+import { SeoManagementWorkspace } from "./SeoManagementWorkspace";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES as C, isBusinessServiceAvailable } from "@yardimci-asistan/shared";
@@ -71,6 +72,8 @@ interface PendingTransition {
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const { registerPageLeaveGuard } = props;
   const [serviceOpen, setServiceOpen] = useState<string | null>(null);
+  const androidPreferenceSavingRef = useRef(false);
+  const [androidPreferenceError, setAndroidPreferenceError] = useState("");
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
@@ -89,6 +92,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const translations = useTranslationSettings(initialized);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [seoOpen, setSeoOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const printingEnabled = isSettingsSectionVisible(printSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
@@ -131,6 +135,35 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const businessBusy = drafts.busy || profile.saving || webConnecting;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities, webAvailable)
     .filter(result => initialized || result.category === "business" || result.id === "settings-web");
+
+  async function saveAndroidPreference(key: "androidEnabled" | "localNetworkEnabled", enabled: boolean) {
+    if (androidPreferenceSavingRef.current || drafts.busy || guardBusy) return;
+    androidPreferenceSavingRef.current = true;
+    setAndroidPreferenceError("");
+    // The shared draft owner updates its ref synchronously, so saveService reads
+    // this new value but only commits Android's two persisted settings fields.
+    drafts.setDraft(current => ({ ...current, [key]: enabled }));
+    try {
+      const result = await drafts.saveService("settings-android");
+      if (!result.ok) {
+        setAndroidPreferenceError(result.message || "Android tercihi kaydedilemedi.");
+        reportAppStatus("error", result.message || "Android tercihi kaydedilemedi.");
+        return;
+      }
+      if (key === "androidEnabled" && !enabled) androidPermissions.discard();
+      reportAppStatus("success", result.message
+        || (enabled ? "Android bağlantısı etkinleştirildi." : "Android bağlantısı kapatıldı."));
+      // Saved settings are now visible to the same open dialog. Refresh any
+      // registered devices without requiring users to close and reopen it.
+      void props.onDashboardRefresh?.().catch(() =>
+        reportAppStatus("error", "Telefon listesi yenilenemedi. Yenile düğmesini kullanabilirsiniz."));
+    } catch {
+      setAndroidPreferenceError("Android ayarı kaydedilemedi. Kaydet ile tekrar deneyebilirsiniz.");
+      reportAppStatus("error", "Android ayarı kaydedilemedi.");
+    } finally {
+      androidPreferenceSavingRef.current = false;
+    }
+  }
 
   function serviceOwner(id: string): ServiceSettingsOwner {
     if (id === "settings-translation") return {dirty:translations.dirty,busy:translations.loading || translations.saving,savedEnabled:translations.saved.enabled,save:translations.save,discard:translations.discard};
@@ -328,7 +361,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
             resetVersion={drafts.webResetVersion}
             onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
             disabled={drafts.busy || guardBusy} initialized={initialized}
-            onChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
+            onChange={web => drafts.setDraft(form => ({ ...form, ...web }))}
+            onOpenSeo={initialized && webAvailable ? () => setSeoOpen(true) : undefined} />
           <section className="settings-panel settings-structure">
             <div className="settings-panel-header"><h2>İşletme Yapısı ve Özellikler</h2></div>
             <div id="settings-structure-content">
@@ -374,6 +408,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   }}
                   form={drafts.form}
                   onFormChange={drafts.setDraft}
+                  onAndroidPreferenceChange={(key, enabled) => { void saveAndroidPreference(key, enabled); }}
+                  savedAndroidEnabled={drafts.canonical.androidEnabled}
+                  savedLocalNetworkEnabled={drafts.canonical.localNetworkEnabled}
+                  androidPreferenceError={androidPreferenceError}
                   enabledCapabilities={capabilities}
                   androidPermissionGroups={androidPermissions.draft}
                   onAndroidPermissionGroupsChange={androidPermissions.update}
@@ -453,6 +491,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       {printOpen && <PrintManagementWorkspace initialized={initialized} whatsappEnabled={drafts.canonical.whatsappEnabled} onClose={() => setPrintOpen(false)} />}
       {layoutOpen && <BusinessLayoutOverlay kind={layoutOpen} controller={layout} onClose={() => setLayoutOpen(null)} />}
       {languageOpen && <LanguageManagementWorkspace settings={translations.saved} onClose={() => setLanguageOpen(false)} />}
+      {seoOpen && <SeoManagementWorkspace onClose={() => setSeoOpen(false)} />}
       {webAvailable && galleryOpen && <BusinessGalleryOverlay onClose={() => setGalleryOpen(false)} />}
       {profileRestartConfirmation && <ConfirmDialog
         tone="warning"

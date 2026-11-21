@@ -1,17 +1,32 @@
 <?php declare(strict_types=1); namespace YaSite;
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
- $publication = $view['publication']; ?>
+ $publication = $view['publication']; $seo = seo_page_meta($site,$view); $indexable=seo_is_indexable($view); ?>
 <!doctype html>
 <html lang="<?= e($site['language']['code']) ?>" dir="<?= e($site['language']['direction']) ?>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?= e($view['title']) ?> · <?= e($publication['name'] ?: t($site, 'site.title')) ?></title>
+  <title><?= e($seo['title']) ?></title>
   <?php $favicon = favicon_url($site, $site['favicon'] ?? ''); if ($favicon !== ''): ?><link rel="icon" href="<?= e($favicon) ?>"><?php endif; ?>
-  <?php if ($publication['description'] !== ''): ?><meta name="description" content="<?= e($publication['description']) ?>"><?php endif; ?>
+  <?php if ($seo['description'] !== ''): ?><meta name="description" content="<?= e($seo['description']) ?>"><?php endif; ?>
   <?php if ($view['canonical'] !== ''): ?><link rel="canonical" href="<?= e($view['canonical']) ?>"><?php endif; ?>
-  <?php if ((in_array($view['page'], ['missing','account'], true) || !empty($view['pages'][$view['page']]['internal']) || ($view['page'] === 'menu' && ($view['table_token'] ?? '') !== ''))): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
-  <?php if ($view['page'] === 'menu' && ($view['table_token'] ?? '') !== ''): ?><meta name="referrer" content="no-referrer"><?php endif; ?>
+  <?php if ((in_array($view['page'], ['missing','account'], true) || !empty($view['pages'][$view['page']]['internal']) || ($view['page'] === 'menu' && (($view['table_token'] ?? '') !== '' || ($view['room_token'] ?? '') !== '')))): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+  <?php if ($view['page'] === 'menu' && (($view['table_token'] ?? '') !== '' || ($view['room_token'] ?? '') !== '')): ?><meta name="referrer" content="no-referrer"><?php endif; ?>
+  <?php if ($indexable): ?>
+    <?php $alternates=seo_alternate_urls($site,$view,$view['page'],text(($view['room'] ?? $view['table'])['id'] ?? ''),text($view['menu_category'] ?? '')); ?>
+    <?php foreach ($alternates as $code=>$url): ?><link rel="alternate" hreflang="<?= e($code) ?>" href="<?= e($url) ?>">
+    <?php endforeach; ?>
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="<?= e(str_replace('-','_',$site['language']['locale'])) ?>">
+    <meta property="og:title" content="<?= e($seo['ogTitle']) ?>">
+    <?php if ($seo['ogDescription'] !== ''): ?><meta property="og:description" content="<?= e($seo['ogDescription']) ?>"><?php endif; ?>
+    <meta property="og:url" content="<?= e($view['canonical']) ?>">
+    <?php if ($seo['image'] !== ''): ?><meta property="og:image" content="<?= e($seo['image']) ?>"><?php endif; ?>
+    <meta name="twitter:card" content="<?= $seo['image'] !== '' ? 'summary_large_image' : 'summary' ?>">
+    <meta name="twitter:title" content="<?= e($seo['ogTitle']) ?>">
+    <?php if ($seo['ogDescription'] !== ''): ?><meta name="twitter:description" content="<?= e($seo['ogDescription']) ?>"><?php endif; ?>
+    <?php if ($seo['image'] !== ''): ?><meta name="twitter:image" content="<?= e($seo['image']) ?>"><?php endif; ?>
+  <?php endif; ?>
   <?php $structured = structured_data($site, $view); if ($structured !== []): ?><script type="application/ld+json"><?= json_html($structured) ?></script><?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'core/site.css')) ?>">
   <?php if ($view['page'] === 'catalog' && is_file($site['root'] . '/public/assets/site/catalog.css')): ?>
@@ -19,7 +34,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
   <?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset($site, 'site/theme.css')) ?>">
   <?php if (isset($view['pages']['cart'])): ?><link rel="stylesheet" href="<?= e(asset($site, 'core/shopping.css')) ?>"><?php endif; ?>
-  <?php if ($view['page'] === 'menu' && !empty($publication['features']['table_orders'])): ?>
+  <?php if ($view['page'] === 'menu' && (!empty($publication['features']['table_orders']) || !empty($publication['features']['room_orders']))): ?>
     <link rel="stylesheet" href="<?= e(asset($site, 'core/table-orders.css')) ?>">
   <?php endif; ?>
 </head>
@@ -53,7 +68,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_co
     <script src="<?= e(asset($site, 'core/commerce.js')) ?>" defer></script>
     <script src="<?= e(asset($site, 'core/shopping.js')) ?>" data-api-base="<?= e($site['module_path']) ?>/api/" defer></script>
   <?php endif; ?>
-  <?php if ($view['page'] === 'menu' && !empty($publication['features']['table_orders']) && $view['table_token'] !== ''): ?>
+  <?php if ($view['page'] === 'menu' && (!empty($publication['features']['table_orders']) || !empty($publication['features']['room_orders'])) && ($view['table_token'] !== '' || ($view['room_token'] ?? '') !== '')): ?>
     <script src="<?= e(asset($site, 'core/table-orders.js')) ?>" defer></script>
   <?php endif; ?>
   <?php if ($view['page'] === 'catalog'): ?>

@@ -1,4 +1,5 @@
 import { getCustomer, saveCustomer } from "./database/customer-store";
+import { DEFAULT_TABLE_RESERVATION_MINUTES, findAvailableRestaurantTable } from "./database/table-reservation-availability.js";
 import type { DatabaseSync } from "node:sqlite";
 import {
   canConvertRequestToReservation,
@@ -308,7 +309,22 @@ export function convertRequestToReservation(
     };
   }
 
-  const existingReservation = db.prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1").get(id) as { id?: string } | undefined;
+  const existingReservation = db.prepare("SELECT id, table_ids_json, status FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
+    .get(id) as { id?: string; table_ids_json?: string; status?: string } | undefined;
+  if (reservationType === "table" && existingReservation?.status === "approved") {
+    return { ok: true, message: "Bu talep daha önce masa rezervasyonuna dönüştürülmüş.", reservationId: existingReservation.id! };
+  }
+  const reservationDate = String(request.start_date ?? "");
+  const reservationTime = String(request.time ?? "");
+  const guestCount = Number(request.guest_count ?? 0);
+  let assignedTable: { id: string; name: string; capacity: number } | null = null;
+  if (reservationType === "table") {
+    assignedTable = findAvailableRestaurantTable(db, reservationDate, reservationTime, guestCount,
+      DEFAULT_TABLE_RESERVATION_MINUTES, existingReservation?.id ?? "");
+    if (!assignedTable) {
+      return { ok: false, message: "Talep edilen zaman aralığı ve kişi sayısı için uygun masa bulunamadı. Talep onaylanmadı; farklı saat veya masa değerlendirin." };
+    }
+  }
   const now = context.now ?? new Date().toISOString();
   const reservationId = existingReservation?.id || context.newReservationId || createId("reservation_");
   const title = buildReservationTitle(request, reservationType);
@@ -330,6 +346,7 @@ export function convertRequestToReservation(
             end_date,
             time,
             guest_count,
+            duration_minutes,
             adult_count,
             child_count,
             room_ids_json,
@@ -340,7 +357,7 @@ export function convertRequestToReservation(
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, 'not_required', ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             customer_id = excluded.customer_id,
             reservation_type = excluded.reservation_type,
@@ -350,8 +367,10 @@ export function convertRequestToReservation(
             end_date = excluded.end_date,
             time = excluded.time,
             guest_count = excluded.guest_count,
+            duration_minutes = excluded.duration_minutes,
             adult_count = excluded.adult_count,
             child_count = excluded.child_count,
+            table_ids_json = excluded.table_ids_json,
             notes = excluded.notes,
             price_note = excluded.price_note,
             updated_at = excluded.updated_at,
@@ -368,8 +387,10 @@ export function convertRequestToReservation(
         String(request.end_date ?? ""),
         String(request.time ?? ""),
         Number(request.guest_count ?? 1),
+        DEFAULT_TABLE_RESERVATION_MINUTES,
         Number(request.adult_count ?? 0),
         Number(request.child_count ?? 0),
+        JSON.stringify(assignedTable ? [assignedTable.id] : []),
         buildReservationNotes(request),
         "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
         now,
@@ -407,7 +428,8 @@ export function convertRequestToReservation(
       payload: {
         request_id: id,
         customer_id: customerId,
-        reservation_type: reservationType
+        reservation_type: reservationType,
+        ...(assignedTable ? { table_id: assignedTable.id, duration_minutes: DEFAULT_TABLE_RESERVATION_MINUTES } : {})
       },
       now
     });
@@ -420,7 +442,9 @@ export function convertRequestToReservation(
 
   return {
     ok: true,
-    message: existingReservation ? "Mevcut rezervasyon onaylandı." : "Talep rezervasyona çevrildi ve onaylandı.",
+    message: assignedTable
+      ? "Talep onaylandı. " + assignedTable.name + " masası rezervasyona atandı."
+      : existingReservation ? "Mevcut rezervasyon onaylandı." : "Talep rezervasyona çevrildi ve onaylandı.",
     reservationId
   };
 }
@@ -442,6 +466,7 @@ export function upsertSyncedRequests(
       source,
       request_type,
       table_id,
+      room_id, order_token_hash,
       order_items_json,
       status,
       customer_name,
@@ -462,7 +487,7 @@ export function upsertSyncedRequests(
       created_at,
       updated_at,
       sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       customer_name = excluded.customer_name,
       customer_phone = excluded.customer_phone,
@@ -485,13 +510,15 @@ export function upsertSyncedRequests(
       // Replay must not recreate a deleted/detached customer either.
       const existing = db.prepare("SELECT customer_id FROM requests WHERE id = ?").get(request.id) as { customer_id: string } | undefined;
       const customerId = existing ? existing.customer_id
-        : ["dealer_application", "table_order"].includes(request.request_type) ? "" : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
+        : ["dealer_application", "table_order", "room_order"].includes(request.request_type) ? "" : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
       statement.run(
         request.id,
         customerId,
         request.source,
         request.request_type,
         request.table_id ?? "",
+        request.room_id ?? "",
+        request.order_token_hash ?? "",
         JSON.stringify(request.order_items ?? []),
         request.status,
         request.customer_name,

@@ -135,6 +135,9 @@ export function projectLocalAndroidSnapshotForDevice(
   if (permissions.has("market.product.view")) {
     market.products = source.market.products;
     market.primary_location_id = source.market.primary_location_id ?? "";
+    if (source.business_capabilities.includes(BUSINESS_CAPABILITIES.INVENTORY)) {
+      market.replenishment = source.market.replenishment ?? {rows:[],truncated:false};
+    }
   }
   if (permissions.has("market.product_create")) {
     market.product_data = source.market.product_data;
@@ -163,7 +166,18 @@ export function projectLocalAndroidSnapshotForDevice(
       active_menu_categories: menuAllowed ? source.summary.active_menu_categories : 0,
       available_menu_items: menuAllowed ? source.summary.available_menu_items : 0 },
     customers: customerManagementAllowed
-      ? source.customers.map(customer => ({ ...customer, identity_number: "", document_serial_number: "" }))
+      ? source.customers.map(customer => ({
+          ...customer, identity_number: "", document_serial_number: "",
+          commercial_profile: customer.commercial_profile ? {
+            ...customer.commercial_profile,
+            dealer_status: source.business_capabilities.includes(BUSINESS_CAPABILITIES.WHOLESALE)
+              ? customer.commercial_profile.dealer_status : "inactive",
+            price_group: source.business_capabilities.includes(BUSINESS_CAPABILITIES.WHOLESALE)
+              ? customer.commercial_profile.price_group : "retail",
+            payment_term_days: source.business_capabilities.includes(BUSINESS_CAPABILITIES.WHOLESALE)
+              ? customer.commercial_profile.payment_term_days : 0
+          } : null
+        }))
       : paidSaleCustomerPickerAllowed
         ? source.customers.map(customer => ({
             id: customer.id,

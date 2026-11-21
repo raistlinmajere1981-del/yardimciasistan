@@ -8,7 +8,7 @@ import { ActionButton } from "../ui/ActionButton";
 
 type TestState = "unchecked" | "testing" | "verified" | "failed";
 
-export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb, onEnabledChange, trafficEnabled, onTrafficChange, onVerified, onBusyChange, resetVersion, disabled, initialized }: {
+export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb, onEnabledChange, trafficEnabled, onTrafficChange, onVerified, onBusyChange, resetVersion, disabled, initialized, onOpenSeo }: {
   canonical: WebConnectionSettings;
   web: WebConnectionSettings;
   onChange: (web: WebConnectionSettings) => void;
@@ -21,6 +21,7 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
   resetVersion: number;
   disabled: boolean;
   initialized: boolean;
+  onOpenSeo?: (() => void) | undefined;
 }) {
   const [reveal, setReveal] = useState(false);
   const [savedEvidence, setSavedEvidence] = useState<{ url: string; secret: string; state: TestState }>(() => ({
@@ -120,6 +121,8 @@ export function WebSettingsSection({ canonical, web, onChange, enabled: usesWeb,
     <section id="settings-web" tabIndex={-1} className="settings-panel settings-web-panel" aria-label="Web bağlantısı">
       <div className="settings-panel-header settings-web-heading">
         <h2>Web bağlantısı</h2>
+        {onOpenSeo && <ActionButton id="settings-seo-button" variant="secondary" size="sm"
+          onClick={onOpenSeo}>SEO Yönetimi</ActionButton>}
         {usesWeb && <StatusBadge className="settings-web-indicator" role="status"
           tone={displayState === "verified" ? "success" : displayState === "failed" ? "danger" : displayState === "testing" ? "info" : displayState === "draft" ? "warning" : "neutral"}>{status}</StatusBadge>}
         <label className="settings-web-choice settings-web-enable">

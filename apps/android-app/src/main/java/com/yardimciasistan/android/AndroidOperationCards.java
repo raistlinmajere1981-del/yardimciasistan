@@ -67,7 +67,8 @@ final class AndroidOperationCards {
         UiKit.badge(activity, formatRequestStatus(request.status), requestTone(request.status))));
     card.addView(UiKit.text(
         activity,
-        formatRequestType(request.type) + " · " + requestDate(request),
+        formatRequestType(request.type) + (request.qrOrder != null ? " · " + request.qrOrder.sourceLabel : "")
+            + " · " + requestDate(request),
         12,
         UiKit.MUTED,
         Typeface.NORMAL
@@ -107,7 +108,9 @@ final class AndroidOperationCards {
     card.addView(UiKit.recordHeader(activity, request.customerName, 16, formatRequestType(request.type),
         UiKit.badge(activity, formatRequestStatus(request.status), requestTone(request.status))));
 
-    String meta = requestDate(request);
+    String meta = request.qrOrder != null
+        ? request.qrOrder.sourceLabel + " · " + request.qrOrder.items.size() + " kalem · " + requestDate(request)
+        : requestDate(request);
     if (request.guestCount > 0) {
       meta += " · " + request.guestCount + " kişi";
     }

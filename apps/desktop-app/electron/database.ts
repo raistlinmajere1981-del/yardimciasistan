@@ -1,4 +1,6 @@
 import { acceptQrTableOrderRequest as acceptStoredQrTableOrderRequest } from "./table-order-request-acceptance.js";
+import { acceptQrRoomOrderRequest as acceptStoredQrRoomOrderRequest } from "./room-order-request-acceptance.js";
+import { getQrRoomOrderConfig as getStoredQrRoomOrderConfig, setQrRoomOrdersEnabled as setStoredQrRoomOrdersEnabled, listQrOrderRooms as getStoredQrOrderRooms } from "./database/qr-room-order-config.js";
 import { getQrTableOrderConfig as getStoredQrTableOrderConfig, setQrTableOrdersEnabled as setStoredQrTableOrdersEnabled, listQrOrderTables as getStoredQrOrderTables } from "./database/qr-table-order-config.js";
 import { importOrderPaymentNotice } from "./commerce-order-payment";
 import { getTableOrderBenefitsState, previewTableOrderBenefits, settleTableOrderBenefits, type TableBenefitsAuthority } from "./table-order-benefits";
@@ -39,6 +41,8 @@ import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from 
 import { listRuntimeShipmentsForOrder, getRuntimeShipment, createRuntimeShipmentForOrder, updateRuntimeShipmentStatus, createRuntimeOrder } from "./commerce-runtime";
 import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
+import { readSeoPages, saveSeoSource, publicSeoPages } from "./database/seo-page-store.js";
+import type { SeoPageKey, SeoFields } from "@yardimci-asistan/shared";
 import { getPublicRoomAvailabilityInput } from "./database/public-room-availability-store";
 import { beginRestoreReconciliation, getRestoreReconciliationStatus, saveRestoreActivationExpectation, finishRestoreActivation, finishRestoreReplay, replayRetainedWebOrder } from "./database/restore-reconciliation-store";
 import {
@@ -313,6 +317,11 @@ export class DesktopDatabase {
   }
 
   translations() { return new PublicTranslationStore(this.db, () => publishedGallery(this.userDataPath), () => getWebSyncConfig(this.getSetupData()).baseUrl.trim().replace(/\/+$/, "")); }
+  getSeoPages() { return readSeoPages(this.db); }
+  saveSeoSource(page: SeoPageKey, fields: SeoFields, updatedAt: string) {
+    return saveSeoSource(this.db, page, fields, updatedAt);
+  }
+  getSeoPublication() { return publicSeoPages(this.db); }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
     return readEnabledBusinessCapabilities(this.db);
@@ -517,6 +526,11 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  acceptQrRoomOrderRequest(requestId: string): DesktopStatusUpdateResult {
+    const result = acceptStoredQrRoomOrderRequest(this.db, requestId);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   acceptQrTableOrderRequest(requestId: string): DesktopStatusUpdateResult {
@@ -1214,6 +1228,12 @@ export class DesktopDatabase {
 
   getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
     const menu = getStoredQrMenuPublication(this.db);
+    menu.room_orders_enabled = getStoredQrRoomOrderConfig(this.db).enabled
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.FOOD_MENU)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.QR_MENU)
+      && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.REQUESTS);
     menu.table_orders_enabled = getStoredQrTableOrderConfig(this.db).enabled
       && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.FOOD_ORDERS)
       && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.FOOD_TABLES)
@@ -1230,6 +1250,9 @@ export class DesktopDatabase {
   getQrTableOrderConfig() { return getStoredQrTableOrderConfig(this.db); }
   setQrTableOrdersEnabled(enabled: boolean) { setStoredQrTableOrdersEnabled(this.db, enabled); }
   listQrOrderTables() { return getStoredQrOrderTables(this.db); }
+  getQrRoomOrderConfig() { return getStoredQrRoomOrderConfig(this.db); }
+  setQrRoomOrdersEnabled(enabled: boolean) { setStoredQrRoomOrdersEnabled(this.db, enabled); }
+  listQrOrderRooms() { return getStoredQrOrderRooms(this.db); }
 
   getQrMenuWebPublicationEnabled(): boolean {
     return getStoredQrMenuWebPublicationEnabled(this.db);

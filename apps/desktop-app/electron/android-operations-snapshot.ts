@@ -3,6 +3,7 @@ import { supportsSttModel, isSupportedSttBaseUrl } from "@yardimci-asistan/share
 import type { AndroidOperationsSnapshot } from "@yardimci-asistan/sync-core";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
+import { projectAndroidQrOrderPreview } from "./android-qr-order-preview.js";
 import {
   DesktopDatabase,
   type DesktopDashboardData
@@ -110,7 +111,18 @@ export function createAndroidOperationsSnapshot(
             : "",
         updated_at: task.updatedAt
       })),
-    requests: dashboardData.requests.slice(0, 300).map((request) => ({
+    requests: dashboardData.requests.slice(0, 300).map((request) => {
+      const preview = projectAndroidQrOrderPreview(
+        request,
+        dashboardData.rooms.filter(room => room.isActive).map(room => ({
+          id: room.id, name: room.name, number: room.number
+        })),
+        dashboardData.tables.filter(table => table.isActive).map(table => ({
+          id: table.id, name: table.name
+        }))
+      );
+      return {
+      ...(preview ? {qr_order: preview} : {}),
       id: request.id,
       customer_id: request.customer_id,
       request_type: request.request_type,
@@ -129,8 +141,18 @@ export function createAndroidOperationsSnapshot(
       priority: request.priority,
       created_at: request.created_at,
       updated_at: request.updated_at
-    })),
+      };
+    }),
     customers: scopedCustomers.map((customer) => ({
+      commercial_profile: customer.commercialProfile ? {
+        company_name: customer.commercialProfile.companyName,
+        tax_office: customer.commercialProfile.taxOffice,
+        tax_number: customer.commercialProfile.taxNumber,
+        authorized_person: customer.commercialProfile.authorizedPerson,
+        dealer_status: customer.commercialProfile.dealerStatus,
+        price_group: customer.commercialProfile.priceGroup,
+        payment_term_days: customer.commercialProfile.paymentTermDays
+      } : null,
       id: customer.id,
       full_name: customer.fullName,
       phone: customer.phone,
@@ -218,6 +240,9 @@ export function createAndroidOperationsSnapshot(
       end_date: reservation.endDate,
       time: reservation.time,
       guest_count: reservation.guestCount,
+      ...(["table","breakfast"].includes(reservation.reservationType)
+        ? {duration_minutes:reservation.durationMinutes}
+        : {}),
       room_ids: reservation.roomIds,
       table_ids: reservation.tableIds,
       notes: reservation.notes,

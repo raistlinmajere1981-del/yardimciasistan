@@ -70,7 +70,9 @@ export function createCurrentBusinessWebContext(database: DesktopDatabase): Busi
     trafficEnabled: database.getSetupData().trafficEnabled !== false,
     dealerApplicationEnabled: database.getSetupData().dealerPortalEnabled && database.getSetupData().dealerApplicationEnabled
       && database.getEnabledBusinessCapabilities().includes("commerce.wholesale") && database.getEnabledBusinessCapabilities().includes("customer.requests"),
+    seo: database.getSeoPublication(),
     localization: database.translations().localization([
+      ...Object.entries(database.getSeoPublication().pages).map(([id, fields]) => ({kind:"seo" as const,id,fields})),
       {kind: "business", id: businessId, fields: {description: profile.description, about_text: profile.aboutText ?? "", directions_note: profile.directionsNote, policy_note: profile.policyNote, payment_note: profile.paymentNote}},
       ...gallery.map(g => ({kind: "gallery" as const, id: g.id, fields: {title: g.title}}))
     ], true),

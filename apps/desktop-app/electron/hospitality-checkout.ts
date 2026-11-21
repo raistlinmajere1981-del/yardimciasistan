@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { insertDatabaseEvent } from "./database/event-store.js";
 import { refreshRoomStatusFromStays } from "./room-state-service.js";
+import { queueRoomOrderPublicationIfEnabled } from "./database/qr-room-order-config.js";
 
 interface CheckoutOrigin {
   now?: string;
@@ -52,6 +53,7 @@ function checkoutInTransaction(db: DatabaseSync, target: CheckoutTarget, now: st
   if (departing) {
     db.prepare(`UPDATE customer_room_stays SET status = 'checked_out', checked_out_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?`).run(now, now, stayId!);
     refreshRoomStatusFromStays(db, stay.room_id, now, true);
+    queueRoomOrderPublicationIfEnabled(db,now);
   }
   const financial = folio ? closeFolioIfSettled(db, folio.id, now) : { closed: false, remainingMinor: 0 };
   // Repeated checkout after payment is an explicit financial-close request. It never releases the room again.

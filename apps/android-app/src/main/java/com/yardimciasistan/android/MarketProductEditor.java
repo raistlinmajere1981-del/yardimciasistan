@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.text.InputType;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -28,7 +29,9 @@ final class MarketProductEditor {
   private String productCreateUnit = "piece";
   private String productCreatePurchasePrice = "";
   private String productCreateSalePrice = "";
-  private String productCreateCategory = "";
+  private String productCreateCategoryId = "";
+  private boolean productCreateTaxRateManual = false;
+  private String productCreateTaxRate = "";
   private String productCreateNote = "";
   private String productCreateImageUrl = "";
   private String productCreateDataSource = "";
@@ -97,8 +100,42 @@ final class MarketProductEditor {
     purchase.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     ui.bind(purchase, productCreatePurchasePrice, value -> productCreatePurchasePrice = value);
     CatalogProductCreateFields.salePrice(page, productCreateSalePrice, value -> productCreateSalePrice = value);
-    EditText category = UiKit.labeledInput(context, page, "Kategori (isteğe bağlı)", "");
-    ui.bind(category, productCreateCategory, value -> productCreateCategory = value);
+    // Select an authoritative catalog ID; never guess a category from free
+    // text after syncing. The desktop still validates the ID when applying.
+    java.util.List<OperationData.MarketCategory> categories = snapshot.get().market.categories;
+    String[] labels = new String[categories.size() + 1];
+    labels[0] = "Kategorisiz";
+    int selected = 0;
+    double defaultTax = 20;
+    for (int i = 0; i < categories.size(); i++) {
+      OperationData.MarketCategory item = categories.get(i);
+      labels[i + 1] = item.name + " · KDV %" + item.defaultTaxRate;
+      if (item.id.equals(productCreateCategoryId)) {
+        selected = i + 1;
+        defaultTax = item.defaultTaxRate;
+      }
+    }
+    final double selectedDefaultTax = defaultTax;
+    ui.addSelectionDialog(page, "Kategori", labels, selected, position -> {
+      productCreateCategoryId = position == 0 ? "" : categories.get(position - 1).id;
+      listener.onRenderRequested();
+    });
+    page.addView(UiKit.text(context, "Kategori varsayılanı: KDV %" + selectedDefaultTax,
+        12, UiKit.MUTED, Typeface.NORMAL));
+    CheckBox customTax = new CheckBox(context);
+    customTax.setText("KDV oranını elle değiştir");
+    customTax.setChecked(productCreateTaxRateManual);
+    customTax.setOnCheckedChangeListener((button, checked) -> {
+      productCreateTaxRateManual = checked;
+      if (checked && productCreateTaxRate.isEmpty()) productCreateTaxRate = String.valueOf(selectedDefaultTax);
+      listener.onRenderRequested();
+    });
+    page.addView(customTax);
+    if (productCreateTaxRateManual) {
+      EditText tax = UiKit.labeledInput(context, page, "Manuel KDV %", "Örn. 10");
+      tax.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+      ui.bind(tax, productCreateTaxRate, value -> productCreateTaxRate = value);
+    }
     EditText note = ui.labeledMultiline(page, "Not", "Ürün açıklaması / not");
     ui.bind(note, productCreateNote, value -> productCreateNote = value);
 
@@ -120,9 +157,13 @@ final class MarketProductEditor {
           productCreateUnit,
           productCreatePurchasePrice,
           productCreateSalePrice,
-          productCreateCategory,
+          "",
           productCreateNote
       );
+      payload.put("category_id", productCreateCategoryId);
+      if (productCreateTaxRateManual) {
+        payload.put("tax_rate", MarketUiRules.taxRateOverride(productCreateTaxRate));
+      }
       payload.put(
           "track_inventory",
           snapshot.get().hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
@@ -163,7 +204,9 @@ final class MarketProductEditor {
     productCreateUnit = "piece";
     productCreatePurchasePrice = "";
     productCreateSalePrice = "";
-    productCreateCategory = "";
+    productCreateCategoryId = "";
+    productCreateTaxRateManual = false;
+    productCreateTaxRate = "";
     productCreateNote = "";
     productCreateImageUrl = "";
     productCreateDataSource = "";

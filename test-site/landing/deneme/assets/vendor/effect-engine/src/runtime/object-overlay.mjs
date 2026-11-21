@@ -143,7 +143,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
   function clear(){for(const layer of layers)clearLayer(layer);}
   function stop(){
     unsubscribe?.();unsubscribe=null;
-    for(const layer of layers)layer.canvas&&(layer.canvas.style.display='none');
+    for(const layer of layers)if(layer.canvas)layer.canvas.style.display='none';
     clear();
   }
   function sync(){
@@ -154,13 +154,13 @@ export function createObjectOverlay(objectElement, config, options={}) {
       // Paused frames are repainted without advancing time; all other gates stop work.
       if(!completed&&paused&&ready&&visible&&enabled&&!disposed&&!media.matches&&pageActive&&!documentRef.hidden&&cssVisible){
         unsubscribe?.();unsubscribe=null;
-        for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
+        for(const layer of layers)if(layer.canvas)layer.canvas.style.display='block';
         draw(0);
       }else stop();
       return;
     }
     if(!unsubscribe){
-      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
+      for(const layer of layers)if(layer.canvas)layer.canvas.style.display='block';
       unsubscribe=ticker.add(draw,fps);
     }
   }
@@ -300,7 +300,7 @@ export function createObjectOverlay(objectElement, config, options={}) {
       if(!ready||disposed||media.matches)return;
       if(!Number.isFinite(seconds)||seconds<elapsed||seconds>60)throw new RangeError('renderAt requires elapsed ≤ seconds ≤ 60');
       paused=true;unsubscribe?.();unsubscribe=null;
-      for(const layer of layers)layer.canvas&&(layer.canvas.style.display='block');
+      for(const layer of layers)if(layer.canvas)layer.canvas.style.display='block';
       while(seconds-elapsed>.000001)draw(Math.min(1/24,seconds-elapsed));
       if(!frames)draw(0);
     },

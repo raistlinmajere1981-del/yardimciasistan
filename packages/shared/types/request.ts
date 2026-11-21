@@ -8,6 +8,7 @@ export type RequestType =
   | "breakfast_request"
   | "qr_menu_question"
   | "table_order"
+  | "room_order"
   | "location_question"
   | "price_question"
   | "other";
@@ -32,6 +33,9 @@ export interface CustomerRequest extends TimestampedRecord {
   source: RecordSource;
   request_type: RequestType;
   table_id?: string;
+  room_id?: string;
+  order_token_hash?: string;
+  accepted_folio_id?: string;
   order_items?: Array<{ menu_entry_id: string; quantity: number; note: string; name: string; unit_price: number; currency: string }>;
   accepted_order_id?: string;
   status: RequestStatus;

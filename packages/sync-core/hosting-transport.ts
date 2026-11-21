@@ -362,6 +362,7 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
     business_context: {
       version: options.context.version,
       ...(options.context.localization ? {localization: options.context.localization} : {}),
+      ...(options.context.seo ? {seo: options.context.seo} : {}),
       business_name: options.context.businessName,
       profile_id: options.context.profileId,
       profile_label: options.context.profileLabel,

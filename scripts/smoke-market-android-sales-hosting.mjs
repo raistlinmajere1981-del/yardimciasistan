@@ -11,8 +11,8 @@ const body = name => {
 };
 const functions = ["ya_sync_enqueue_android_action", "ya_sync_android_action_types", "ya_sync_android_permissions",
   "ya_sync_android_management_action_permission", "ya_sync_android_action_permission", "ya_sync_android_action_capability_allowed",
-  "ya_sync_android_capabilities_include", "ya_sync_android_folio_charge_permissions_allowed", "ya_sync_android_market_financial_permissions_allowed",
-  "ya_sync_android_financial_intent_matches", "ya_sync_public_android_action", "ya_sync_empty_android_market", "ya_sync_sanitize_android_market",
+  "ya_sync_android_capabilities_include", "ya_sync_android_folio_charge_permissions_allowed", "ya_sync_android_qr_permissions_allowed", "ya_sync_android_snapshot_record", "ya_sync_android_market_financial_permissions_allowed",
+  "ya_sync_android_financial_intent_matches", "ya_sync_public_android_action", "ya_sync_empty_android_market", "ya_sync_sanitize_android_replenishment", "ya_sync_sanitize_android_market",
   "ya_sync_sanitize_android_credit_accounts", "ya_sync_android_market_for_permissions", "ya_sync_sanitize_business_capabilities",
   "ya_sync_commerce_unit", "ya_sync_string", "ya_sync_string_array", "ya_sync_bool", "ya_sync_int", "ya_sync_float"];
 const root = mkdtempSync(join(tmpdir(), "yardimci-mobile-hosting-"));

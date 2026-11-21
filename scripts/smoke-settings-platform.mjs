@@ -155,7 +155,6 @@ try {
       await page.setViewportSize({ width, height: 928 });
       for (const id of expectedServices) {
         const detail = await manage(id);
-        if (id === 'settings-android') await detail.getByRole('switch').check();
         const layout = await detail.evaluate(node => {
           const box = node.getBoundingClientRect();
           const body = node.querySelector('.workspace-frame__body');
@@ -299,43 +298,50 @@ try {
   await expect(overlay.getByLabel('Canlı kontrol durumu')).not.toHaveText('Hazır');
   expect(await page.evaluate(() => window.settingsCalls.some(c => /send.*kbs|kbs.*send/.test(c.kind)))).toBe(false);
   await cancel();
-  // Service availability allows configuration; device actions require committed Android activation.
+  // One Android toggle commits its own settings immediately and keeps this
+  // editor open. It must not persist the unsaved company/profile edits.
   expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).not.toContain('service.android');
   await search.fill('Telefon Kurulumu');
   await expect(page.locator('.settings-search-results').getByRole('button')).toHaveCount(0);
   await search.fill('');
   overlay = await manage('settings-android');
   await expect(overlay.locator('#settings-devices')).toHaveCount(0);
+  const callsBeforeAndroid = (await setupCalls()).length;
   await overlay.getByRole('switch').check();
+  await expect.poll(() => page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(true);
+  await expect(overlay).toBeVisible();
+  await expect(overlay.getByRole('switch')).toBeChecked();
   await expect(overlay.locator('#settings-devices')).toBeVisible();
-  await expect(overlay).toContainText('Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.');
-  await expect(overlay.getByRole('button', { name: 'Personel Yap', exact: true })).toBeDisabled();
-  await expect(overlay.getByRole('button', { name: 'Kaldır', exact: true })).toBeDisabled();
-  expect(await page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(false);
-  await overlay.getByRole('switch').uncheck();
-  await expect(overlay.locator('#settings-devices')).toHaveCount(0);
-  await cancel();
-  overlay = await manage('settings-android');
-  await expect(overlay.getByRole('switch')).not.toBeChecked();
-  await overlay.getByRole('switch').check();
-  await serviceSave();
-  expect(await page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(true);
-  expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain('service.android');
-  await expect(page.locator('#settings-android').getByRole('img')).toHaveAttribute('data-state', 'active');
-  overlay = await manage('settings-android');
-  expect(await overlay.locator('.android-device-permission-grid input').count()).toBeGreaterThan(0);
+  await expect(overlay).not.toContainText('Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.');
+  await expect.poll(() => page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain('service.android');
   await expect(overlay.getByRole('button', { name: 'Kaldır', exact: true })).toBeEnabled();
+  expect((await setupCalls()).length).toBe(callsBeforeAndroid + 1, 'No explicit Save required for Android enablement');
+  expect((await setupCalls()).at(-1).input.businessName).toBe('Unsaved business');
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Still unsaved');
+
+  // Local pairing preference also auto-commits in the same open dialog.
+  await overlay.getByLabel('Yerel ağ bağlantısı').check();
+  await expect.poll(() => page.evaluate(() => window.persistedSettings().localNetworkEnabled)).toBe(true);
+  await expect(overlay.getByRole('button', { name: 'Telefon eşleştir · QR göster' })).toBeVisible();
+  await expect(overlay.locator('.settings-service-detail-status')).not.toContainText('Bekliyor');
+  await expect(page.locator('#settings-android').getByRole('img')).toHaveAttribute('data-state', 'active');
+  expect(await overlay.locator('.android-device-permission-grid input').count()).toBeGreaterThan(0);
   if (process.env.SETTINGS_UI_CAPTURE_DIR) {
     await page.setViewportSize({ width: 1649, height: 928 });
     await overlay.screenshot({ path: resolve(process.env.SETTINGS_UI_CAPTURE_DIR, 'android-enabled.png') });
     await page.setViewportSize({ width: 1440, height: 900 });
   }
+  // Disabling is symmetrical: it persists without accidentally revoking phones.
   await overlay.getByRole('switch').uncheck();
+  await expect.poll(() => page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(false);
+  await expect(overlay).toBeVisible();
   await expect(overlay.locator('#settings-devices')).toHaveCount(0);
   await cancel();
   overlay = await manage('settings-android');
-  await expect(overlay.getByRole('switch')).toBeChecked();
-  await expect(overlay.locator('#settings-devices')).toBeVisible();
+  await expect(overlay.getByRole('switch')).not.toBeChecked();
+  await overlay.getByRole('switch').check();
+  await expect.poll(() => page.evaluate(() => window.persistedSettings().servicePreferences.android)).toBe(true);
+  await expect(overlay.getByRole('button', { name: 'Telefon eşleştir · QR göster' })).toBeVisible();
   await cancel();
   // Synonyms and titles may differ. Both paths must open the canonical service owner.
   for (const [term, resultTitle, overlayTitle] of [

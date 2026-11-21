@@ -35,6 +35,7 @@ const {
   listMarketCartDrafts,
   listRuntimeInventoryMovements,
   saveRuntimeCatalogProduct,
+  saveRuntimeCatalogCategory,
   saveRuntimeSupplier
 } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const {
@@ -306,6 +307,9 @@ try {
       1
     );
 
+    const taxCategory = saveRuntimeCatalogCategory(database.databasePath, {
+      name: "Atıştırmalık", defaultTaxRate: 10, isActive: true
+    });
     const productsBeforeCreate = activeProductCount(sqlite);
     const productCreateResult = database.applyAndroidAction(action(
       "market-product-create",
@@ -315,7 +319,7 @@ try {
         name: "Bilinmeyen Barkod Ürünü",
         brand: "Smoke Brand",
         sku: "M71-PHONE",
-        category: "Atıştırmalık",
+        category_id: taxCategory.id,
         purchase_price: 4.5,
         sale_price: 7.5,
         currency: "TRY",
@@ -334,7 +338,7 @@ try {
     assert.equal(activeProductCount(sqlite), productsBeforeCreate + 1);
     const actionProduct = sqlite.prepare(`
       SELECT name, brand, sku, barcode, purchase_price, sale_price, unit, track_inventory,
-             image_asset_path, image_source_url, data_source, source_product_url,
+             category_id, tax_rate, image_asset_path, image_source_url, data_source, source_product_url,
              data_license, image_license, source_fetched_at
       FROM catalog_products
       WHERE barcode = ? AND deleted_at = ''
@@ -353,6 +357,8 @@ try {
     assert.equal(actionProduct.sale_price, 7.5);
     assert.equal(actionProduct.unit, "piece");
     assert.equal(actionProduct.track_inventory, 1);
+    assert.equal(actionProduct.category_id, taxCategory.id);
+    assert.equal(actionProduct.tax_rate, 10, "Android product inherits its current category VAT");
     assert.equal(receiptById(sqlite, "market-product-create"), 1);
 
     const duplicateProduct = database.applyAndroidAction(action(
@@ -369,6 +375,28 @@ try {
     assert.match(duplicateProduct.message, /barkod.*kayıtlı/i);
     assert.equal(activeProductCount(sqlite), productsBeforeCreate + 1);
     assert.equal(receiptById(sqlite, "market-product-create-duplicate"), 0);
+
+    const manual = database.applyAndroidAction(action("market-product-manual-tax", "market_product_create", {
+      barcode:"8690000007200",name:"Manuel vergi ürünü",unit:"piece",
+      category_id:taxCategory.id,tax_rate:7.5,track_inventory:false
+    }));
+    assert.equal(manual.ok,true,manual.message);
+    assert.equal(sqlite.prepare("SELECT tax_rate FROM catalog_products WHERE barcode='8690000007200'").get()?.tax_rate,7.5);
+    const uncategorized = database.applyAndroidAction(action("market-product-no-category", "market_product_create", {
+      barcode:"8690000007201",name:"Kategorisiz ürün",unit:"piece",track_inventory:false
+    }));
+    assert.equal(uncategorized.ok,true,uncategorized.message);
+    assert.equal(sqlite.prepare("SELECT tax_rate FROM catalog_products WHERE barcode='8690000007201'").get()?.tax_rate,20);
+    for(const [id,payload,pattern] of [
+      ["bad-category",{barcode:"8690000007202",name:"Kırık kategori",unit:"piece",category_id:"missing-category"},/kategori/i],
+      ["bad-rate",{barcode:"8690000007203",name:"Hatalı vergi",unit:"piece",category_id:taxCategory.id,tax_rate:101},/KDV/i],
+      ["bad-rate-text",{barcode:"8690000007204",name:"Metin vergi",unit:"piece",tax_rate:"abc"},/KDV/i]
+    ]) {
+      const result=database.applyAndroidAction(action("market-product-"+id,"market_product_create",payload));
+      assert.equal(result.ok,false,id);
+      assert.match(result.message,pattern);
+      assert.equal(receiptById(sqlite,"market-product-"+id),0);
+    }
 
     const salesBeforeCart = tableCount(sqlite, "commerce_sales");
     const movementsBeforeCart = tableCount(sqlite, "inventory_movements");
@@ -406,8 +434,36 @@ try {
       items: [{ productId: product.id, quantity: 1 }]
     });
     const today = String(sqlite.prepare("SELECT date('now', 'localtime') AS today").get().today);
+    // The Android suggestion must use the canonical multi-location stock
+    // calculation, not its primary-location product list.
+    const quantityAtPrimary = getRuntimeInventoryBalance(database.databasePath, product.id).quantity;
+    const businessId = String(sqlite.prepare("SELECT id FROM business WHERE deleted_at='' LIMIT 1").get().id);
+    sqlite.prepare("INSERT INTO inventory_locations(id,business_id,name,code,is_primary,is_active,created_at,updated_at) " +
+      "VALUES('replenishment-side-location',?,'İkinci Depo','SIDE',0,1,'t','t')").run(businessId);
+    sqlite.prepare("INSERT INTO inventory_balances(product_id,location_id,quantity,updated_at) VALUES(?,'replenishment-side-location',3,'t')")
+      .run(product.id);
+    sqlite.prepare("UPDATE catalog_products SET ideal_quantity=?,category_id=? WHERE id=?")
+      .run(quantityAtPrimary + 9,taxCategory.id,product.id);
+    const movementsBeforeSnapshot = tableCount(sqlite, "inventory_movements");
+    const purchasesBeforeSnapshot = tableCount(sqlite, "purchase_orders");
     const sourceSnapshot = createAndroidMarketSnapshotSource(database.databasePath, today);
+    assert.equal(tableCount(sqlite, "inventory_movements"),movementsBeforeSnapshot);
+    assert.equal(tableCount(sqlite, "purchase_orders"),purchasesBeforeSnapshot);
+    const suggested = sourceSnapshot.replenishment.rows.find(item=>item.product_id===product.id);
+    assert.ok(suggested,"The Android projection must contain an ideal-stock shortfall");
+    assert.equal(suggested.quantity,quantityAtPrimary+3);
+    assert.equal(suggested.minimum_quantity,2);
+    assert.equal(suggested.ideal_quantity,quantityAtPrimary+9);
+    assert.equal(suggested.suggested_quantity,6);
+    assert.equal(suggested.category_name,"Atıştırmalık");
+    assert.equal(sourceSnapshot.replenishment.truncated,false);
+    assert.deepEqual(Object.keys(suggested).sort(),[
+      "category_id","category_name","ideal_quantity","minimum_quantity",
+      "name","product_id","quantity","sku","suggested_quantity","unit"
+    ]);
     assert.equal(sourceSnapshot.product_data.enabled, true);
+    assert.deepEqual(sourceSnapshot.categories?.find(item=>item.id===taxCategory.id),
+      {id:taxCategory.id,name:"Atıştırmalık",default_tax_rate:10});
     assert.equal(sourceSnapshot.product_data.provider, "open_food_facts");
     assert.equal(sourceSnapshot.product_data.auto_search_unknown_barcode, true);
     assert.equal(sourceSnapshot.product_data.include_images, true);
@@ -445,7 +501,9 @@ try {
 
     const fullProjection = projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilitiesWithAndroid));
     assert.equal(fullProjection.product_data.enabled, true);
+    assert.equal(fullProjection.categories?.length,1);
     assert.equal(fullProjection.product_data.provider, "open_food_facts");
+    assert.equal(fullProjection.replenishment.rows.find(item=>item.product_id===product.id).suggested_quantity,6);
     assert.equal(fullProjection.products.find((item) => item.id === product.id)?.barcode, product.barcode);
     assert.equal(fullProjection.suppliers.length, 1);
     assert.equal(fullProjection.recent_purchases.length, 1);
@@ -456,6 +514,8 @@ try {
     );
     assert.equal(withoutCatalog.product_data.enabled, false);
     assert.deepEqual(withoutCatalog.products, []);
+    assert.deepEqual(withoutCatalog.categories, []);
+    assert.deepEqual(withoutCatalog.replenishment,{rows:[],truncated:false});
 
     const withoutBarcode = projectAndroidMarketSnapshot(
       sourceSnapshot,
@@ -484,6 +544,7 @@ try {
       capabilitySetWithout(C.INVENTORY, C.RETAIL_PURCHASING)
     );
     assert.equal(withoutInventory.summary.critical_stock_count, 0);
+    assert.deepEqual(withoutInventory.replenishment,{rows:[],truncated:false});
     assert.deepEqual(withoutInventory.summary.recent_stock_adjustments, []);
     assert.equal(withoutInventory.products.every((item) => (
       item.track_inventory === false

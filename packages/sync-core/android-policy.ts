@@ -452,6 +452,19 @@ export function androidActionAllowedByCapabilities(
       && (!["web-dealer", "desktop-wholesale"].includes(context.commerceOrderSource ?? "") || enabled.has(C.WHOLESALE))
       && (context.commerceOrderSource !== "web-online-sales" || enabled.has(C.ONLINE_SALES));
   }
+  if (["qr_table_order_accept", "qr_room_order_accept", "qr_order_reject"].includes(actionType)) {
+    const table = actionType === "qr_table_order_accept" ||
+      (actionType === "qr_order_reject" && context.requestType === "table_order");
+    const room = actionType === "qr_room_order_accept" ||
+      (actionType === "qr_order_reject" && context.requestType === "room_order");
+    if (!table && !room) return false;
+    const base = [C.CUSTOMERS,C.REQUESTS,C.QR_MENU,C.FOOD_MENU,C.FOOD_ORDERS];
+    const domain = table ? [C.FOOD_TABLES]
+      : [C.ACCOMMODATION_ROOMS,C.ACCOMMODATION_STAYS,C.ACCOMMODATION_FOLIO];
+    const permission = resolveAndroidActionPermission(actionType, context.payload ?? {});
+    return [...base,...domain].every(capability => enabled.has(capability))
+      && permission !== null && androidPermissionAllowedByCapabilities(permission, enabled);
+  }
   if (actionType === "customer_request_convert_to_reservation") {
     return canConvertRequestToReservation(enabled, context.requestType ?? "");
   }
@@ -518,6 +531,9 @@ export const ANDROID_ACTION_TYPES = [
   "customer_request_reopen",
   "customer_request_approve",
   "customer_request_reject",
+  "qr_table_order_accept",
+  "qr_room_order_accept",
+  "qr_order_reject",
   "customer_request_convert_to_reservation",
   "customer_request_delete",
   "customer_create",
@@ -584,6 +600,9 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   customer_request_reopen: "customer.respond",
   customer_request_approve: "customer.respond",
   customer_request_reject: "customer.reject",
+  qr_table_order_accept: "table_order.add_item",
+  qr_room_order_accept: "room_folio.add_menu_item",
+  qr_order_reject: "customer.reject",
   customer_request_convert_to_reservation: "customer.convert_to_reservation",
   customer_request_delete: "request.delete",
   customer_create: "customer.manage",

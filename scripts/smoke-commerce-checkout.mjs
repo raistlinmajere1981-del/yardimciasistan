@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import assert from 'node:assert/strict';
 import {cpSync,writeFileSync,readFileSync,mkdirSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
@@ -23,6 +24,7 @@ const expectedTotal=shipping ? 261.89 : 246.9, expectedMinor=Math.round(expected
 const widths=process.argv.includes('--desktop-ui') ? [390,768] : shipping || process.argv.includes('--common-template') || process.argv.includes('--mobile-only') ? [390] : [390,768,1440];
 const members=process.argv.includes('--members');
 const f=await accountFixture({smtp:members});
+enableFixtureStockTracking(f.database);
 let browser;
 try {
   cpSync(site,join(f.root,'canonical'),{recursive:true});

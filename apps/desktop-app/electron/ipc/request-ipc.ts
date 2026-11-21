@@ -76,6 +76,17 @@ export function registerRequestIpcHandlers(options: {
     return getDatabase().acceptQrTableOrderRequest(requestId);
   });
 
+  ipcMain.handle("request:acceptQrRoomOrder", (_event, requestId: string): DesktopStatusUpdateResult => {
+    options.assertUnlocked();
+    for (const capability of [
+      BUSINESS_CAPABILITIES.REQUESTS,BUSINESS_CAPABILITIES.CUSTOMERS,
+      BUSINESS_CAPABILITIES.QR_MENU,BUSINESS_CAPABILITIES.FOOD_MENU,
+      BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS,BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS,
+      BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO
+    ]) assertCapability(capability,"Odaya sipariş için gerekli işletme yeteneği etkin değil.");
+    return getDatabase().acceptQrRoomOrderRequest(requestId);
+  });
+
   ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");

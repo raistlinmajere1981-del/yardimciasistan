@@ -555,7 +555,20 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         }
     }
 
-    $publicRequests = array_values($requestsById);
+    // Hosting-only requests follow the same capability withdrawal as the
+    // desktop Android projection. An old QR request never bypasses a disabled
+    // table/room module merely because its web row remains in storage.
+    $publicRequests = array_values(array_filter($requestsById,
+        static function (array $request) use ($businessCapabilities): bool {
+            $type = ya_sync_string($request['request_type'] ?? '');
+            if (!in_array($type,['table_order','room_order'],true)) return true;
+            $base = ['service.android','core.customers','customer.requests',
+                'channel.qr_menu','food_service.menu','food_service.orders'];
+            $required = $type === 'table_order'
+                ? [...$base,'food_service.tables']
+                : [...$base,'accommodation.rooms','accommodation.stays','accommodation.folio'];
+            return ya_sync_android_capabilities_include($businessCapabilities,$required);
+        }));
     foreach ($publicRequests as &$publicRequest) {
         if (!$aiEnabled) {
             $publicRequest['ai_summary'] = '';
@@ -608,6 +621,17 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         && isset($businessCapabilities['core.reports']);
     $financeAllowed = isset($businessCapabilities['core.finance'])
         && in_array('finance.view', $permissionList, true);
+    $publicCustomers = $androidSnapshot['customers'];
+    if (!isset($businessCapabilities['commerce.wholesale'])) {
+        foreach ($publicCustomers as &$commercialCustomer) {
+            if (is_array($commercialCustomer['commercial_profile'] ?? null)) {
+                $commercialCustomer['commercial_profile']['dealer_status']='inactive';
+                $commercialCustomer['commercial_profile']['price_group']='retail';
+                $commercialCustomer['commercial_profile']['payment_term_days']=0;
+            }
+        }
+        unset($commercialCustomer);
+    }
     $roomFolioAllowed = in_array('room_folio.view', $permissionList, true);
     $menuAllowed = in_array('menu.view', $permissionList, true);
     $stockAllowed = in_array('menu.stock_view', $permissionList, true);
@@ -647,7 +671,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             ? ya_android_auth_voice_projection($androidSnapshot, $deviceId) : ['stt_available' => false],
         'daily_tasks' => $androidSnapshot['daily_tasks'],
         'requests' => $visibleRequests,
-        'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
+        'customers' => $customerManagementAllowed ? $publicCustomers : [],
         'kbs' => ya_kbs_for_device($androidSnapshot['kbs'] ?? null, $androidSnapshot['business_capabilities'], $permissionProfile,
             defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED),
         'customer_room_stays' => $customerManagementAllowed ? $androidSnapshot['customer_room_stays'] : [],
@@ -945,7 +969,8 @@ function ya_sync_enqueue_android_action(array $payload): void
             'message' => 'Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor.'
         ]);
     }
-    if (!ya_sync_android_folio_charge_permissions_allowed($actionType, $permissions)) {
+    if (!ya_sync_android_folio_charge_permissions_allowed($actionType, $permissions)
+        || !ya_sync_android_qr_permissions_allowed($actionType, $actionPayload, $permissions, $snapshot)) {
         ya_sync_response(403, ['ok' => false, 'code' => 'android_action_permission_denied',
             'message' => 'Oda hesabı ve menü görüntüleme yetkilerini kontrol edin.']);
     }
@@ -979,6 +1004,15 @@ function ya_sync_enqueue_android_action(array $payload): void
         }
     }
 
+    if (in_array($actionType, ['qr_table_order_accept','qr_room_order_accept','qr_order_reject'], true)
+        || in_array($financialReceipt['action_type'] ?? '',
+            ['qr_table_order_accept','qr_room_order_accept','qr_order_reject'], true)) {
+        if ($financialReceipt !== null
+            && !ya_sync_android_financial_intent_matches($financialReceipt,$actionType,$deviceId,$actionPayload)) {
+            ya_sync_response(409, ['ok'=>false,'code'=>'android_action_id_conflict',
+                'message'=>'İşlem kimliği farklı bir QR sipariş kararı için kullanılmış.']);
+        }
+    }
     if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
         if (!defined('YA_ANDROID_DEVICE_AUTHENTICATED') || !YA_ANDROID_DEVICE_AUTHENTICATED
             || !in_array('commerce_order.view', $permissions, true)) {
@@ -1027,6 +1061,14 @@ function ya_sync_enqueue_android_action(array $payload): void
             'error_message' => '',
             'processed_at' => ''
     ]);
+    if (in_array($actionType, ['qr_table_order_accept','qr_room_order_accept','qr_order_reject'], true)
+        || in_array($stored['action']['action_type'] ?? '',
+            ['qr_table_order_accept','qr_room_order_accept','qr_order_reject'], true)) {
+        if (!ya_sync_android_financial_intent_matches($stored['action'],$actionType,$deviceId,$actionPayload)) {
+            ya_sync_response(409, ['ok'=>false,'code'=>'android_action_id_conflict',
+                'message'=>'İşlem kimliği farklı bir QR sipariş kararı için kullanılmış.']);
+        }
+    }
     if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
         $queued = $stored['action'];
         if (($queued['action_type'] ?? '') !== $actionType || ($queued['device_id'] ?? '') !== $deviceId
@@ -1145,6 +1187,7 @@ function ya_sync_publish_menu(array $payload): void
     $publishedMenu = [
         'enabled' => ya_sync_bool($menu['enabled'] ?? true),
         'table_orders_enabled' => ya_sync_bool($menu['table_orders_enabled'] ?? false),
+        'room_orders_enabled' => ya_sync_bool($menu['room_orders_enabled'] ?? false),
         'categories' => $categories,
         'items' => $items,
         'updated_at' => $now
@@ -1306,6 +1349,7 @@ function ya_sync_publish_room_catalog(array $payload): void
         ya_sync_response(422, ['ok' => false, 'message' => 'Yayınlanacak oda kataloğu bulunamadı.']);
     }
 
+    $roomOrderEnabled = ya_sync_bool($candidate['roomOrderEnabled'] ?? false);
     $rooms = [];
     foreach (($candidate['rooms'] ?? []) as $rawRoom) {
         if (!is_array($rawRoom)) continue;
@@ -1343,7 +1387,10 @@ function ya_sync_publish_room_catalog(array $payload): void
             'nightly_price_minor' => max(0, ya_sync_int($rawRoom['nightly_price_minor'] ?? 0, 0)),
             'currency' => mb_substr(strtoupper(ya_sync_string($rawRoom['currency'] ?? 'TRY')), 0, 3),
             'sort_order' => max(0, ya_sync_int($rawRoom['sort_order'] ?? 0, 0)),
-            'media' => $media
+            'media' => $media,
+            ...($roomOrderEnabled && is_string($rawRoom['orderTokenHash'] ?? null)
+                && preg_match('/^[a-f0-9]{64}$/D', $rawRoom['orderTokenHash'])
+                ? ['orderTokenHash' => $rawRoom['orderTokenHash']] : [])
         ];
     }
 
@@ -1357,6 +1404,7 @@ function ya_sync_publish_room_catalog(array $payload): void
     $catalog = [
         'version' => 1,
         'enabled' => ya_sync_bool($candidate['enabled'] ?? true),
+        'roomOrderEnabled' => $roomOrderEnabled,
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'rooms' => $rooms
     ];
@@ -1627,6 +1675,25 @@ function ya_sync_publish_business_context(array $payload): void
     }
     usort($gallery, static fn(array $a, array $b): int => $a['sort_order'] <=> $b['sort_order']);
 
+    // Static, allowlisted public SEO sources; never accept an externally supplied canonical URL.
+    $seoPages = [];
+    $allowedSeoPages = ['home','about','rooms','restaurant','menu','catalog','gallery','announcements','reviews','contact'];
+    $allowedSeoFields = ['title'=>160,'description'=>500,'og_title'=>160,'og_description'=>500];
+    $candidatePages = $candidate['seo']['pages'] ?? [];
+    if (is_array($candidatePages)) {
+        foreach ($allowedSeoPages as $key) {
+            $raw = $candidatePages[$key] ?? null;
+            if (!is_array($raw)) continue;
+            $fields = [];
+            foreach ($allowedSeoFields as $field => $limit) {
+                $value = $raw[$field] ?? '';
+                $fields[$field] = is_string($value) && mb_check_encoding($value,'UTF-8') && !preg_match('/[<>\\x00-\\x1f]/u', $value)
+                    ? mb_substr(trim($value), 0, $limit) : '';
+            }
+            if (array_filter($fields, static fn(string $value): bool => $value !== '')) $seoPages[$key] = $fields;
+        }
+    }
+
     $publishedContext = [
         'version' => 1,
         'business_name' => mb_substr(ya_sync_string($candidate['business_name'] ?? ''), 0, 160),
@@ -1645,6 +1712,7 @@ function ya_sync_publish_business_context(array $payload): void
         'description' => mb_substr(ya_sync_string($candidate['description'] ?? ''), 0, 1600),
         'about_text' => mb_substr(ya_sync_string($candidate['aboutText'] ?? ''), 0, 8000),
         'gallery' => $gallery,
+        'seo' => ['version'=>1,'pages'=>$seoPages],
         'directions_note' => mb_substr(ya_sync_string($candidate['directions_note'] ?? ''), 0, 1200),
         'policy_note' => mb_substr(ya_sync_string($candidate['policy_note'] ?? ''), 0, 1200),
         'payment_note' => mb_substr(ya_sync_string($candidate['payment_note'] ?? ''), 0, 800),
@@ -1668,7 +1736,8 @@ function ya_sync_publish_business_context(array $payload): void
     // A deployment has a single public business; no private source fields are accepted.
     if (count($businessIds) === 1) $businessRecords[$businessIds[0]] = ['description','about_text','directions_note','policy_note','payment_note'];
     $publishedContext['localization'] = ya_public_localization($candidate['localization'] ?? null, [
-        'business' => $businessRecords, 'gallery' => ya_localization_records($gallery, 'id', ['title'])], true);
+        'business' => $businessRecords, 'gallery' => ya_localization_records($gallery, 'id', ['title']),
+        'seo' => array_fill_keys(array_keys($seoPages), array_keys($allowedSeoFields))], true);
     $publication = ya_sync_apply_publication($payload, 'business_context', $publishedContext, $candidate, $now);
 
     ya_sync_response(200, [
@@ -1985,6 +2054,8 @@ function ya_sync_public_request(array $record): array
         'source',
         'request_type',
         'table_id',
+        'room_id',
+        'order_token_hash',
         'order_items',
         'status',
         'customer_name',
@@ -2033,6 +2104,9 @@ function ya_sync_android_action_types(): array
         'customer_request_reopen',
         'customer_request_approve',
         'customer_request_reject',
+        'qr_table_order_accept',
+        'qr_room_order_accept',
+        'qr_order_reject',
         'customer_request_convert_to_reservation',
         'customer_request_delete',
         'customer_create',
@@ -2109,6 +2183,9 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'customer_request_reopen' => 'customer.respond',
         'customer_request_approve' => 'customer.respond',
         'customer_request_reject' => 'customer.reject',
+        'qr_table_order_accept' => 'table_order.add_item',
+        'qr_room_order_accept' => 'room_folio.add_menu_item',
+        'qr_order_reject' => 'customer.reject',
         'customer_request_convert_to_reservation' => 'customer.convert_to_reservation',
         'customer_request_delete' => 'request.delete',
         'customer_create' => 'customer.manage',
@@ -2198,6 +2275,27 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
     }
     if (str_starts_with($actionType, 'reservation_table_')) {
         return isset($capabilities['food_service.reservations']);
+    }
+    if (in_array($actionType, ['qr_table_order_accept', 'qr_room_order_accept', 'qr_order_reject'], true)) {
+        $request = ya_sync_android_snapshot_record($snapshot['requests'] ?? [],
+            'id', ya_sync_string($payload['request_id'] ?? ''));
+        $type = ya_sync_string($request['request_type'] ?? '');
+        $table = $type === 'table_order';
+        $room = $type === 'room_order';
+        if ((!$table && !$room)
+            || ($actionType === 'qr_table_order_accept' && !$table)
+            || ($actionType === 'qr_room_order_accept' && !$room)) return false;
+        $fields = array_keys($payload);
+        if (array_diff($fields, ['request_id','expected_updated_at'])) return false;
+        $version = ya_sync_string($payload['expected_updated_at'] ?? '');
+        if ($version === '' || $version !== ya_sync_string($request['updated_at'] ?? '')
+            || !in_array(ya_sync_string($request['status'] ?? ''), ['new','seen','waiting_owner'],true)) return false;
+        $required = ['service.android','core.customers','customer.requests','channel.qr_menu',
+            'food_service.menu','food_service.orders'];
+        $required = $table
+            ? [...$required,'food_service.tables']
+            : [...$required,'accommodation.rooms','accommodation.stays','accommodation.folio'];
+        return ya_sync_android_capabilities_include($capabilities,$required);
     }
     if ($actionType === 'customer_request_convert_to_reservation') {
         $request = ya_sync_android_snapshot_record(
@@ -2438,6 +2536,7 @@ function ya_sync_get_visible_android_actions(
                 || !in_array($requiredPermission, $permissions, true)
                 || !ya_sync_android_action_capability_allowed($actionType, $payload, $snapshot)
                 || !ya_sync_android_folio_charge_permissions_allowed($actionType, $permissions)
+                || !ya_sync_android_qr_permissions_allowed($actionType, $payload, $permissions, $snapshot)
                 || (str_starts_with($actionType, 'kbs_') && !ya_kbs_action_authorized($actionType, $snapshot, $permissionProfile,
                     defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED))
                 || (in_array($actionType, ['market_sale_complete', 'customer_credit_payment_add'], true)
@@ -2615,6 +2714,8 @@ function ya_sync_empty_android_market(): array
             'recent_receiving_count' => 0
         ],
         'products' => [],
+        'categories' => [],
+        'replenishment' => ['rows'=>[],'truncated'=>false],
         'suppliers' => [],
         'recent_purchases' => [],
 
@@ -2622,6 +2723,42 @@ function ya_sync_empty_android_market(): array
         'primary_location_id' => '',
         'customer_credit_accounts' => []
     ];
+}
+
+/** Only sanitized read-only stock deficits may cross the hosting boundary.
+ * No linked stock mutations, supplier orders or internal warehouse balances. */
+function ya_sync_sanitize_android_replenishment(mixed $value): array
+{
+    $result=['rows'=>[],'truncated'=>false];
+    if (!is_array($value)) return $result;
+    $rawRows = is_array($value['rows'] ?? null) ? $value['rows'] : [];
+    $result['truncated']=ya_sync_bool($value['truncated'] ?? false) || count($rawRows)>1200;
+    foreach (array_slice($rawRows,0,1200) as $raw) {
+        if (!is_array($raw)) continue;
+        $id = mb_substr(ya_sync_string($raw['product_id'] ?? ''),0,220);
+        $name = mb_substr(ya_sync_string($raw['name'] ?? ''),0,240);
+        if ($id === '' || $name === '') continue;
+        $values=[];
+        foreach (['quantity','minimum_quantity','ideal_quantity','suggested_quantity'] as $field) {
+            $number=$raw[$field] ?? null;
+            if (!is_int($number) && !is_float($number)) continue 2;
+            if (!is_finite((float)$number) || abs((float)$number)>1000000000) continue 2;
+            $values[$field]=round((float)$number,4);
+        }
+        if ($values['ideal_quantity']<=0 || $values['suggested_quantity']<=0
+            || abs($values['ideal_quantity']-$values['quantity']-$values['suggested_quantity'])>0.0002)
+            continue;
+        $result['rows'][] = [
+            'product_id'=>$id,
+            'name'=>$name,
+            'sku'=>mb_substr(ya_sync_string($raw['sku'] ?? ''),0,120),
+            'category_id'=>mb_substr(ya_sync_string($raw['category_id'] ?? ''),0,220),
+            'category_name'=>mb_substr(ya_sync_string($raw['category_name'] ?? 'Kategorisiz'),0,240),
+            'unit'=>ya_sync_commerce_unit($raw['unit'] ?? 'piece'),
+            ...$values
+        ];
+    }
+    return $result;
 }
 
 function ya_sync_sanitize_android_market(mixed $value): array
@@ -2658,6 +2795,16 @@ function ya_sync_sanitize_android_market(mixed $value): array
             'note' => mb_substr(ya_sync_string($rawAdjustment['note'] ?? ''), 0, 1000),
             'created_at' => ya_sync_string($rawAdjustment['created_at'] ?? '')
         ];
+    }
+
+    $categories=[];
+    foreach (array_slice(is_array($market['categories'] ?? null) ? $market['categories'] : [],0,500) as $category) {
+        if (!is_array($category)) continue;
+        $id=mb_substr(ya_sync_string($category['id'] ?? ''),0,220);
+        $name=mb_substr(ya_sync_string($category['name'] ?? ''),0,240);
+        $rate=ya_sync_float($category['default_tax_rate'] ?? 20,20);
+        if ($id === '' || $name === '' || $rate<0 || $rate>100) continue;
+        $categories[]=['id'=>$id,'name'=>$name,'default_tax_rate'=>$rate];
     }
 
     $products = [];
@@ -2785,6 +2932,8 @@ function ya_sync_sanitize_android_market(mixed $value): array
             'recent_receiving_count' => count($purchases)
         ],
         'products' => $products,
+        'categories' => $categories,
+        'replenishment' => ya_sync_sanitize_android_replenishment($market['replenishment'] ?? []),
         'suppliers' => $suppliers,
         'recent_purchases' => $purchases,
 
@@ -2833,9 +2982,16 @@ function ya_sync_android_market_for_permissions(array $market, array $permission
     if (in_array('market.product.view', $permissions, true)) {
         $result['products'] = $market['products'];
         $result['primary_location_id'] = $market['primary_location_id'] ?? '';
+        if (in_array('commerce.inventory',$capabilities,true)
+            && in_array('commerce.catalog',$capabilities,true)) {
+            $result['replenishment']=$market['replenishment'] ?? ['rows'=>[],'truncated'=>false];
+        }
     }
     if (in_array('market.product_create', $permissions, true)) {
         $result['product_data'] = $market['product_data'];
+        if (in_array('commerce.catalog',$capabilities,true)) {
+            $result['categories']=$market['categories'] ?? [];
+        }
     }
     if (in_array('market.receiving', $permissions, true)) {
         $result['suppliers'] = $market['suppliers'];
@@ -2868,6 +3024,20 @@ function ya_sync_android_financial_intent_matches(array $existing, string $type,
     };
     return ($existing['action_type'] ?? '') === $type && ($existing['device_id'] ?? '') === $deviceId
         && $ordered($existing['payload'] ?? []) === $ordered($payload);
+}
+
+function ya_sync_android_qr_permissions_allowed(string $actionType, array $payload,
+    array $permissions, array $snapshot): bool
+{
+    if (!in_array($actionType, ['qr_table_order_accept','qr_room_order_accept','qr_order_reject'],true))
+        return true;
+    $request = ya_sync_android_snapshot_record($snapshot['requests'] ?? [],
+        'id', ya_sync_string($payload['request_id'] ?? ''));
+    $table = ($request['request_type'] ?? '') === 'table_order';
+    $room = ($request['request_type'] ?? '') === 'room_order';
+    if (!$table && !$room) return false;
+    return in_array('menu.view',$permissions,true)
+        && in_array($table ? 'table_order.view' : 'room_folio.view',$permissions,true);
 }
 
 function ya_sync_android_folio_charge_permissions_allowed(string $actionType, array $permissions): bool
@@ -3225,9 +3395,64 @@ function ya_sync_sanitize_android_tasks(array $tasks): array
     return $records;
 }
 
+/** Safe Android projection for web-only requests AND desktop snapshots.
+ * Do not copy credentials, token hashes, menu IDs or stay/folio identifiers. */
+function ya_sync_sanitize_android_qr_preview(array $request): array
+{
+    $room = ($request['request_type'] ?? '') === 'room_order';
+    $kind = $room ? 'room' : 'table';
+    $raw = is_array($request['qr_order'] ?? null) ? $request['qr_order'] : [];
+    $sourceId = mb_substr(ya_sync_string($raw['source_id'] ?? ($room
+        ? ($request['room_id'] ?? '') : ($request['table_id'] ?? ''))),0,100);
+    $sourceLabel = mb_substr(ya_sync_string($raw['source_label'] ?? ''),0,100);
+    if ($sourceLabel === '') $sourceLabel = $room ? 'Oda (yeni sipariş)' : 'Masa (yeni sipariş)';
+    $base = [
+        'kind' => $kind,'source_id' => $sourceId,'source_label' => $sourceLabel,
+        'decision_ready' => ya_sync_bool($raw['decision_ready'] ?? false),
+        'items' => [],'total' => 0,'currency' => '','invalid_items' => true
+    ];
+    if (ya_sync_bool($raw['invalid_items'] ?? false)) return $base;
+    $inputItems = $raw['items'] ?? ($request['order_items'] ?? null);
+    if (is_string($inputItems) && strlen($inputItems) < 10000) {
+        $inputItems = json_decode($inputItems,true);
+    }
+    if (!is_array($inputItems) || count($inputItems)<1 || count($inputItems)>20) return $base;
+    $quantityTotal = 0;
+    $totalMinor = 0;
+    $currency = '';
+    foreach ($inputItems as $item) {
+        if (!is_array($item)) return $base;
+        $quantity = $item['quantity'] ?? null;
+        $price = $item['unit_price'] ?? null;
+        $itemCurrency = ya_sync_string($item['currency'] ?? '');
+        $note = $item['note'] ?? '';
+        if (!is_int($quantity) || $quantity < 1 || $quantity > 20
+            || !is_numeric($price) || (float)$price < 0 || (float)$price > 1000000
+            || !is_string($note) || mb_strlen($note)>500
+            || !preg_match('/^[A-Z]{3}$/D',$itemCurrency)) return $base;
+        $quantityTotal += $quantity;
+        if ($quantityTotal > 60 || ($currency !== '' && $currency !== $itemCurrency)) return $base;
+        $currency = $itemCurrency;
+        $lineMinor = (int)round((float)$price * 100);
+        $totalMinor += $lineMinor * $quantity;
+        if ($totalMinor > 10000000000) return $base;
+        $base['items'][] = [
+            'name' => mb_substr(ya_sync_string($item['name'] ?? 'Ürün') ?: 'Ürün',0,120),
+            'quantity' => $quantity,
+            'note' => mb_substr($note,0,300),
+            'unit_price' => $lineMinor/100,
+            'currency' => $currency
+        ];
+    }
+    $base['invalid_items'] = false;
+    $base['total'] = $totalMinor/100;
+    $base['currency'] = $currency;
+    return $base;
+}
+
 function ya_sync_sanitize_android_request(array $record): array
 {
-    return [
+    $request = [
         'id' => ya_sync_string($record['id'] ?? ''),
         'customer_id' => ya_sync_string($record['customer_id'] ?? ''),
         'request_type' => ya_sync_string($record['request_type'] ?? 'general_info') ?: 'general_info',
@@ -3248,6 +3473,10 @@ function ya_sync_sanitize_android_request(array $record): array
         'created_at' => ya_sync_string($record['created_at'] ?? ''),
         'updated_at' => ya_sync_string($record['updated_at'] ?? '')
     ];
+    if (in_array($request['request_type'],['table_order','room_order'],true)) {
+        $request['qr_order'] = ya_sync_sanitize_android_qr_preview($record);
+    }
+    return $request;
 }
 
 function ya_sync_sanitize_android_requests(mixed $records): array
@@ -3272,6 +3501,25 @@ function ya_sync_sanitize_android_requests(mixed $records): array
     return array_values($result);
 }
 
+function ya_sync_android_customer_commercial_profile(array $customer): ?array
+{
+    if (!is_array($customer['commercial_profile'] ?? null)) return null;
+    $raw = $customer['commercial_profile'];
+    $name = mb_substr(ya_sync_string($raw['company_name'] ?? ''),0,180);
+    if ($name === '') return null;
+    $status = ya_sync_string($raw['dealer_status'] ?? 'inactive');
+    $group = ya_sync_string($raw['price_group'] ?? 'retail');
+    return [
+        'company_name'=>$name,
+        'tax_office'=>mb_substr(ya_sync_string($raw['tax_office'] ?? ''),0,120),
+        'tax_number'=>mb_substr(ya_sync_string($raw['tax_number'] ?? ''),0,32),
+        'authorized_person'=>mb_substr(ya_sync_string($raw['authorized_person'] ?? ''),0,160),
+        'dealer_status'=>in_array($status,['inactive','active'],true) ? $status : 'inactive',
+        'price_group'=>in_array($group,['retail','dealer_a','dealer_b'],true) ? $group : 'retail',
+        'payment_term_days'=>max(0,min(3650,ya_sync_int($raw['payment_term_days'] ?? 0,0)))
+    ];
+}
+
 function ya_sync_sanitize_android_customers(mixed $records): array
 {
     if (!is_array($records)) {
@@ -3289,6 +3537,7 @@ function ya_sync_sanitize_android_customers(mixed $records): array
         }
         $result[$id] = [
             'id' => $id,
+            'commercial_profile' => ya_sync_android_customer_commercial_profile($record),
             'full_name' => $name,
             'phone' => ya_sync_string($record['phone'] ?? ''),
             'email' => ya_sync_string($record['email'] ?? ''),
@@ -3415,6 +3664,15 @@ function ya_sync_sanitize_android_reservations(mixed $records): array
             'end_date' => ya_sync_string($record['end_date'] ?? ''),
             'time' => ya_sync_string($record['time'] ?? ''),
             'guest_count' => max(0, ya_sync_int($record['guest_count'] ?? 0, 0)),
+            ...(
+                in_array(ya_sync_string($record['reservation_type'] ?? ''), ['table','breakfast'], true)
+                ? ['duration_minutes' => (
+                    is_int($record['duration_minutes'] ?? null)
+                    && $record['duration_minutes'] >= 30 && $record['duration_minutes'] <= 480
+                    ? $record['duration_minutes'] : 120
+                )]
+                : []
+            ),
             'room_ids' => ya_sync_string_array($record['room_ids'] ?? []),
             'table_ids' => ya_sync_string_array($record['table_ids'] ?? []),
             'notes' => ya_sync_string($record['notes'] ?? ''),

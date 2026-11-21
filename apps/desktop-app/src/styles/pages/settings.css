@@ -69,6 +69,15 @@
   margin: 0;
 }
 
+/* Dependencies stay visible but non-editable; avoid inline explanation blocks. */
+.settings-profile-option.is-required {
+  color: var(--color-text-muted);
+}
+.settings-profile-option.is-required input {
+  opacity: 0.6;
+  accent-color: var(--color-text-muted);
+}
+
 .business-public-profile-field-error,
 .setup-secret-error {
   color: var(--color-danger);

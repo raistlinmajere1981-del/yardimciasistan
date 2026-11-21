@@ -91,6 +91,7 @@ ya_business_response(200, [
         'address' => $address,
         'latitude' => is_numeric($publicContext['latitude'] ?? null) ? (float) $publicContext['latitude'] : null,
         'longitude' => is_numeric($publicContext['longitude'] ?? null) ? (float) $publicContext['longitude'] : null,
+        'seo' => is_array($publicContext['seo'] ?? null) ? $publicContext['seo'] : ['version'=>1,'pages'=>[]],
         'description' => ya_business_string($publicContext['description'] ?? ''),
         'about_text' => ya_business_string($publicContext['about_text'] ?? ''),
         'gallery' => is_array($publicContext['gallery'] ?? null) ? array_values($publicContext['gallery']) : [],

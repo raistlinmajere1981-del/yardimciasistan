@@ -15,6 +15,9 @@
   --color-text-muted: var(--neutral-500);
   --color-border: var(--neutral-200);
   --color-border-strong: var(--neutral-300);
+  /* Stable studio/product photography mat, independent of dark or light theme. */
+  --color-product-image-mat: #f7f7f5;
+  --color-product-image-edge: #d6dade;
   --color-focus: var(--coral-600);
   --color-accent: var(--coral-600);
   --color-accent-hover: var(--coral-700);

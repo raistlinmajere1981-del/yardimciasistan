@@ -8,6 +8,7 @@ import type { ApplyAndroidActionResult, DesktopAndroidActionFailure } from "./da
 import { insertDatabaseEvent } from "./database/event-store.js";
 import { updateRequestStatus } from "./database/request-store.js";
 import { saveCustomer } from "./database/customer-store.js";
+import { parseAndroidCustomerCommercial } from "./android-customer-commercial.js";
 import { applyInventoryMovementInTransaction, setInventoryCountInTransaction } from "./commerce-store.js";
 import { assignHospitalityStay, checkInHospitalityStay } from "./hospitality-entry-service.js";
 import { updateCustomerRoomStayStatus, updateReservationStatus } from "./stay-reservation-service.js";
@@ -69,6 +70,27 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
   if (action.action_type === "customer_credit_payment_add" && !permissions.includes("customer_credit.view")) {
     return { ok: false, message: "Bu cihazın cari görüntüleme yetkisi yok." };
   }
+  if (["qr_table_order_accept", "qr_room_order_accept", "qr_order_reject"].includes(action.action_type)) {
+    // QR actions are not generic request approvals. Mutating a linked folio
+    // or table requires domain read access in addition to the mapped write grant.
+    const requestId = androidPayloadString(action.payload, "request_id");
+    const request = requestId ? db.prepare(
+      "SELECT request_type FROM requests WHERE id=? AND deleted_at=''"
+    ).get(requestId) as {request_type?:string}|undefined : undefined;
+    const table = request?.request_type === "table_order";
+    const room = request?.request_type === "room_order";
+    if ((!table && !room)
+        || (action.action_type === "qr_table_order_accept" && !table)
+        || (action.action_type === "qr_room_order_accept" && !room)) {
+      return {ok:false,message:"QR sipariş türü eşleşmiyor."};
+    }
+    const required = table
+      ? ["table_order.view", "menu.view"]
+      : ["room_folio.view", "menu.view"];
+    if (!required.every(permission => permissions.includes(permission as typeof permissions[number]))) {
+      return {ok:false,message:"Bu cihazın QR sipariş ve hedef hesap görüntüleme yetkisi yok."};
+    }
+  }
   if (["room_folio_menu_item_add", "room_folio_manual_charge_add"].includes(action.action_type)) {
     if (!permissions.includes("room_folio.view")) {
       return { ok: false, message: "Bu cihazın oda hesabını görüntüleme yetkisi yok." };
@@ -99,7 +121,8 @@ function getAndroidActionCapabilityContext(db: DatabaseSync, action: AndroidSync
     const orderId = androidPayloadString(action.payload, "order_id");
     context.commerceOrderSource = orderId ? getCommerceOrderOperationState(db, orderId)?.source ?? "" : "";
   }
-  if (action.action_type === "customer_request_convert_to_reservation") {
+  if (action.action_type === "customer_request_convert_to_reservation" ||
+      action.action_type === "qr_order_reject") {
     const requestId = androidPayloadString(action.payload, "request_id");
     const request = requestId ? db.prepare("SELECT request_type FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { request_type?: unknown } | undefined : undefined;
     context.requestType = String(request?.request_type ?? "");
@@ -163,8 +186,11 @@ export function applyAndroidRequestStatus(db: DatabaseSync, action: AndroidSyncA
   now: string, enabledCapabilities: BusinessCapability[]): AndroidActionMutationResult {
   const id = androidPayloadString(action.payload, "request_id");
   if (!id) return { ok: false, message: "Güncellenecek talep seçilmemiş." };
-  const row = db.prepare("SELECT updated_at FROM requests WHERE id = ? AND deleted_at = ''").get(id) as { updated_at: string } | undefined;
+  const row = db.prepare("SELECT updated_at, request_type FROM requests WHERE id = ? AND deleted_at = ''").get(id) as { updated_at: string; request_type: string } | undefined;
   if (!row) return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+  if (["table_order","room_order"].includes(row.request_type)) {
+    return { ok:false, message:"QR siparişi genel talep işleminden değiştirilemez; QR sipariş kararını kullanın." };
+  }
   const conflict = getAndroidVersionConflict(action.payload, "expected_updated_at", row.updated_at, "Talep");
   if (conflict) return conflict;
   const result = updateRequestStatus(db, { requestId: id, status }, {
@@ -174,13 +200,18 @@ export function applyAndroidRequestStatus(db: DatabaseSync, action: AndroidSyncA
   return result.ok ? { ok: true, message: "Talep durumu telefondan güncellendi." } : result;
 }
 
-export function applyAndroidCustomerSave(db: DatabaseSync, action: AndroidSyncAction, now: string, updating: boolean): AndroidActionMutationResult {
+export function applyAndroidCustomerSave(db: DatabaseSync, action: AndroidSyncAction, now: string, updating: boolean,
+  enabledCapabilities: BusinessCapability[]): AndroidActionMutationResult {
   const customerId = updating ? androidPayloadString(action.payload, "customer_id") : createAndroidEntityId("customer_", action.id);
   const existing = updating ? db.prepare("SELECT updated_at,identity_number,document_serial_number FROM customers WHERE id = ? AND deleted_at = ''").get(customerId) as { updated_at: string; identity_number: string; document_serial_number: string } | undefined : undefined;
   if (updating && !existing) return { ok: false, message: "Güncellenecek müşteri masaüstü kayıtlarında bulunamadı." };
   const conflict = updating ? getAndroidVersionConflict(action.payload, "expected_updated_at", existing?.updated_at, "Müşteri") : null;
   if (conflict) return conflict;
+  const commercial = parseAndroidCustomerCommercial(db, action.payload, customerId,
+    enabledCapabilities.includes(BUSINESS_CAPABILITIES.WHOLESALE));
+  if (!commercial.ok) return commercial;
   const result = saveCustomer(db, {
+    ...(commercial.commercialProfile !== undefined ? {commercialProfile:commercial.commercialProfile} : {}),
     ...(updating ? { id: customerId } : {}), fullName: androidPayloadString(action.payload, "full_name"), phone: androidPayloadString(action.payload, "phone"),
     email: androidPayloadString(action.payload, "email"), notes: androidPayloadString(action.payload, "notes"),
     identityType: androidPayloadString(action.payload, "identity_type"), identityNumber: androidPayloadString(action.payload, "identity_number") || existing?.identity_number || "",

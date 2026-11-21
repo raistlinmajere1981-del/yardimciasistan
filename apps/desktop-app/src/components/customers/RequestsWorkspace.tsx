@@ -243,12 +243,18 @@ export function RequestsWorkspace({
                   {formatRequestStatus(selectedRequest.status)}
                 </StatusBadge>
                 <div className="action-row request-detail-header-actions">
+                  {selectedActionMode === "open" && selectedRequest.request_type === "room_order" && (
+                    <ActionButton variant="primary" size="sm" type="button"
+                      onClick={() => onUpdateStatus(selectedRequest, "__accept_qr_room_order")}>
+                      <CheckCircle2 size={16} aria-hidden="true" /> Oda Hesabına Aktar
+                    </ActionButton>
+                  )}
                   {selectedActionMode === "open" && selectedRequest.request_type === "table_order" && (
                     <ActionButton variant="primary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "__accept_qr_order")}>
                       <CheckCircle2 size={16} aria-hidden="true" /> Adisyona Aktar
                     </ActionButton>
                   )}
-                  {selectedActionMode === "open" && !["dealer_application", "table_order"].includes(selectedRequest.request_type) && (
+                  {selectedActionMode === "open" && !["dealer_application", "table_order", "room_order"].includes(selectedRequest.request_type) && (
                     <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
                       <CheckCircle2 size={16} aria-hidden="true" />
                       Cevaplandı İşaretle
@@ -291,13 +297,15 @@ export function RequestsWorkspace({
                 <dd>{formatCustomerSource(selectedRequest.source)}</dd>
               </div>
             </dl>
-            {selectedRequest.request_type === "table_order" && <div className="record-note" aria-label="Masa sipariş kalemleri">
-              <strong>Masa siparişi</strong>
+            {["table_order","room_order"].includes(selectedRequest.request_type) && <div className="record-note"
+              aria-label={selectedRequest.request_type==="room_order" ? "Oda sipariş kalemleri" : "Masa sipariş kalemleri"}>
+              <strong>{selectedRequest.request_type==="room_order" ? "Oda siparişi" : "Masa siparişi"}</strong>
               <ul>{(selectedRequest.order_items ?? []).map((item, index) => <li key={`${item.menu_entry_id}-${index}`}>
                 {item.name} × {item.quantity} · {item.unit_price} {item.currency}
                 {item.note && <span> · Not: {item.note}</span>}
               </li>)}</ul>
               {selectedRequest.accepted_order_id && <p>Adisyon: {selectedRequest.accepted_order_id}</p>}
+              {selectedRequest.accepted_folio_id && <p>Oda hesabı: {selectedRequest.accepted_folio_id}</p>}
             </div>}
             {selectedRequest.request_type === "dealer_application" && <DealerApplicationReview key={selectedRequest.id} request={selectedRequest} onApprove={onApproveDealer} />}
             <div className="record-note">

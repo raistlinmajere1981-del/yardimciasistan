@@ -1,4 +1,8 @@
 import { parseStoredStringArray } from "./string-array-utils.js";
+import {
+  DEFAULT_TABLE_RESERVATION_MINUTES,
+  findTableReservationConflict, normalizeTableReservationDuration
+} from "./table-reservation-availability.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type {
@@ -29,6 +33,7 @@ export function getReservations(db: DatabaseSync, scope: "recent" | "active" = "
           reservations.end_date,
           reservations.time,
           reservations.guest_count,
+          reservations.duration_minutes,
           reservations.adult_count,
           reservations.child_count,
           reservations.room_ids_json,
@@ -96,6 +101,7 @@ function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
     endDate: String(row.end_date ?? ""),
     time: String(row.time ?? ""),
     guestCount: Number(row.guest_count ?? 0),
+    durationMinutes: Number(row.duration_minutes ?? DEFAULT_TABLE_RESERVATION_MINUTES),
     adultCount: Number(row.adult_count ?? 0),
     childCount: Number(row.child_count ?? 0),
     roomIds: parseStoredStringArray(row.room_ids_json),
@@ -107,6 +113,11 @@ function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
   };
 }
 
+function existingFallbackDuration(db: DatabaseSync, id?: string): number | null {
+  if (!id) return null;
+  return normalizeTableReservationDuration(db.prepare("SELECT duration_minutes FROM reservations WHERE id=? AND deleted_at=''").get(id)?.duration_minutes);
+}
+
 export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveManualRestaurantReservationInput,
   context: DomainMutationContext & { reservationId?: string; newReservationId?: string } = {}): { ok: true; message: string } | { ok: false; message: string } {
   const customerId = String(input?.customerId ?? "").trim();
@@ -114,6 +125,7 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
   const date = normalizeDateInput(String(input?.date ?? ""));
   const time = normalizeTimeInput(String(input?.time ?? ""));
   const guestCount = normalizeInteger(input?.guestCount);
+  const durationMinutes = normalizeTableReservationDuration(input.durationMinutes ?? existingFallbackDuration(db, context.reservationId) ?? DEFAULT_TABLE_RESERVATION_MINUTES);
   const notes = normalizeLimitedText(input?.notes, 2000);
   const existing = context.reservationId ? db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
     .get(context.reservationId) as Record<string, unknown> | undefined : undefined;
@@ -130,7 +142,7 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
     }
   }
 
-  if (!customerId || !date || !time || guestCount < 1 || guestCount > 99) {
+  if (!customerId || !date || !time || durationMinutes === null || guestCount < 1 || guestCount > 99) {
     return { ok: false, message: "Müşteri, tarih, saat ve geçerli kişi sayısı zorunludur." };
   }
 
@@ -156,23 +168,9 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
       return { ok: false, message: `${String(table.name ?? "Masa")} en fazla ${capacity} kişi kapasitelidir.` };
     }
 
-    const sameSlotRows = db
-      .prepare(`
-          SELECT id, title, table_ids_json
-          FROM reservations
-          WHERE reservation_type IN ('table', 'breakfast')
-            AND status IN ('pending', 'approved')
-            AND start_date = ?
-            AND time = ?
-            AND deleted_at = ''
-        `)
-      .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
-    const conflict = sameSlotRows.find((row) => row.id !== context.reservationId && parseStoredStringArray(row.table_ids_json).includes(tableId));
+    const conflict = findTableReservationConflict(db, tableId, date, time, durationMinutes, context.reservationId);
     if (conflict) {
-      return {
-        ok: false,
-        message: `Seçilen masada ${date} ${time} için aktif rezervasyon var${conflict.title ? `: ${conflict.title}` : "."}`
-      };
+      return { ok: false, message: "Seçilen masada bu zaman aralığıyla çakışan rezervasyon var" + (conflict.title ? ": " + conflict.title : ".") };
     }
   }
 
@@ -184,8 +182,8 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
   db.exec("SAVEPOINT table_reservation");
   try {
     if (existing) {
-      db.prepare(`UPDATE reservations SET start_date = ?, end_date = ?, time = ?, guest_count = ?, adult_count = ?, child_count = ?, table_ids_json = ?, notes = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''`)
-        .run(date, date, time, guestCount, editableSource ? guestCount : Number(existing.adult_count ?? guestCount), editableSource ? 0 : Number(existing.child_count ?? 0), JSON.stringify(tableIds), notes, now, reservationId);
+      db.prepare(`UPDATE reservations SET start_date = ?, end_date = ?, time = ?, duration_minutes = ?, status = ?, guest_count = ?, adult_count = ?, child_count = ?, table_ids_json = ?, notes = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''`)
+        .run(date, date, time, durationMinutes, tableId ? "approved" : "pending", guestCount, editableSource ? guestCount : Number(existing.adult_count ?? guestCount), editableSource ? 0 : Number(existing.child_count ?? 0), JSON.stringify(tableIds), notes, now, reservationId);
       const previousTableId = previousTableIds[0] ?? "";
       const previous = previousTableId ? db.prepare("SELECT current_reservation_id FROM tables WHERE id = ? AND deleted_at = ''").get(previousTableId) as { current_reservation_id?: string } | undefined : undefined;
       const wasBound = previous?.current_reservation_id === reservationId;
@@ -196,19 +194,21 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
         .prepare(`
             INSERT INTO reservations (
               id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-              guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+              duration_minutes, guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
               payment_status, created_at, updated_at, deleted_at, sync_status
-            ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
+            ) VALUES (?, ?, ?, 'table', ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
               'not_required', ?, ?, '', 'local_only')
           `)
         .run(
           reservationId,
           context.androidAction ? `android:${context.androidAction.id}` : `manual:${reservationId}`,
           customerId,
+          tableId ? "approved" : "pending",
           `${customerName} - restoran rezervasyonu`,
           date,
           date,
           time,
+          durationMinutes,
           guestCount,
           guestCount,
           JSON.stringify(tableIds),
@@ -231,7 +231,8 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
         table_ids: tableIds,
         date,
         time,
-        guest_count: guestCount
+        guest_count: guestCount,
+        duration_minutes: durationMinutes
       },
       now
     });
@@ -244,8 +245,8 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
   return {
     ok: true,
     message: tableId
-      ? "Restoran rezervasyonu oluşturuldu ve masa planlandı."
-      : "Restoran rezervasyonu oluşturuldu. Masayı daha sonra atayabilirsiniz."
+      ? "Restoran rezervasyonu onaylandı ve masa planlandı."
+      : "Rezervasyon beklemede oluşturuldu. Masa atanıp onaylanmadan kesinleşmez."
   };
 }
 

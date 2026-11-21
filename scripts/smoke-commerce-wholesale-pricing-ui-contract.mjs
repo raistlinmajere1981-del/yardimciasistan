@@ -35,8 +35,8 @@ assert.match(
 );
 
 assert.match(customerModel, /commercialPriceGroup:\s*"retail" \| "dealer_a" \| "dealer_b"/);
-assert.match(customerFields, /aria-label="Fiyat grubu"/);
-for (const label of ["Perakende", "Bayi A", "Bayi B"]) {
+assert.match(customerFields, /aria-label="Bayi fiyat grubu"/);
+for (const label of ["Bayi değil", "Aktif bayi", "Bayi A", "Bayi B"]) {
   assert.match(customerFields, new RegExp(label));
 }
 

@@ -82,6 +82,23 @@ final class CustomerDetailDialog {
     listener.onPointActionCreated(pointAction);
     page.addView(pointAction);
 
+    if (customer.commercialProfile != null) {
+      OperationData.CommercialProfile commercial = customer.commercialProfile;
+      page.addView(sectionLabel("Ticari müşteri bilgileri"));
+      LinearLayout commercialDetails = UiKit.card(activity);
+      addOptionalDetail(commercialDetails,"Firma / unvan",commercial.companyName);
+      addOptionalDetail(commercialDetails,"Vergi dairesi",commercial.taxOffice);
+      addOptionalDetail(commercialDetails,"Vergi numarası",commercial.taxNumber);
+      addOptionalDetail(commercialDetails,"Yetkili kişi",commercial.authorizedPerson);
+      if (data.hasBusinessCapability("commerce.wholesale")) {
+        addOptionalDetail(commercialDetails,"Bayi durumu",
+            "active".equals(commercial.dealerStatus) ? "Aktif bayi" : "Bayi değil");
+        addOptionalDetail(commercialDetails,"Fiyat grubu",commercial.priceGroup);
+        addOptionalDetail(commercialDetails,"Ödeme vadesi",commercial.paymentTermDays+" gün");
+      }
+      page.addView(commercialDetails);
+    }
+
     if (hasCustomerIdentityDetails(customer)) {
       page.addView(sectionLabel("Kimlik bilgileri"));
       LinearLayout identityDetails = UiKit.card(activity);

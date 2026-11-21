@@ -285,7 +285,25 @@ function sitemap_xml(array $site, array $view): string
             }
         }
     }
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-    foreach (array_unique($urls) as $url) $xml .= '<url><loc>' . htmlspecialchars($url, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '</loc></url>';
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
+        . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">';
+    foreach (array_unique($urls) as $url) {
+        $xml .= '<url><loc>' . htmlspecialchars($url, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '</loc>';
+        // Use only our route fields and active language catalog, never any credentialed URL.
+        $parts = parse_url($url);
+        $params = [];
+        parse_str(is_array($parts) ? ($parts['query'] ?? '') : '', $params);
+        $page = is_string($params['page'] ?? null) ? $params['page'] : '';
+        if (isset($view['pages'][$page]) && empty($view['pages'][$page]['internal'])) {
+            $recordId = is_string($params['id'] ?? null) && in_array($page,['rooms','restaurant'],true)
+                ? $params['id'] : '';
+            $category = $page==='menu' && is_string($params['category'] ?? null) ? $params['category'] : '';
+            foreach (seo_alternate_urls($site,$view,$page,$recordId,$category) as $code=>$href) {
+                $xml .= '<xhtml:link rel="alternate" hreflang="' . htmlspecialchars($code,ENT_XML1|ENT_QUOTES,'UTF-8')
+                    . '" href="' . htmlspecialchars($href,ENT_XML1|ENT_QUOTES,'UTF-8') . '"/>';
+            }
+        }
+        $xml .= '</url>';
+    }
     return $xml . '</urlset>' . "\n";
 }

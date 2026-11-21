@@ -22,26 +22,27 @@ assert.match(capabilitySource, /\[C\.WHOLESALE\]:\s*\[C\.CUSTOMERS, C\.ORDERS\]/
 assert.match(capabilitySource, /RETAIL_OPTIONAL_CAPABILITIES[\s\S]*C\.WHOLESALE/);
 assert.match(settingsSource, /\[C\.WHOLESALE\]:\s*"Bayi \/ Toptan Satış"/);
 
-assert.match(fieldsSource, /wholesaleEnabled\s*&&[\s\S]*CustomerCommercialProfileFields/);
+assert.match(fieldsSource, /form\.commercialProfileEnabled\s*&&[\s\S]*CustomerCommercialProfileFields/);
 for (const label of [
   "Firma / unvan",
   "Yetkili kişi",
   "Vergi dairesi",
   "Vergi no",
-  "Bayi durumu",
+  "Bayi yetkisi",
   "Ödeme vadesi \\(gün\\)"
 ]) {
   assert.match(commercialFieldsSource, new RegExp(label));
 }
-assert.match(commercialFieldsSource, /aria-label="Bayi durumu"/);
+assert.match(commercialFieldsSource, /aria-label="Bayi yetkisi"/);
+assert.match(commercialFieldsSource, /wholesaleEnabled\s*&&/);
 assert.match(commercialFieldsSource, /aria-label="Ödeme vadesi \(gün\)"/);
 
 assert.match(modelSource, /commercialProfileEnabled:\s*boolean/);
 assert.match(modelSource, /customerFormToInput\(form: CustomerFormState, wholesaleEnabled = false\)/);
 assert.match(modelSource, /commercialProfile:\s*form\.commercialProfileEnabled/);
 assert.match(workspaceSource, /customerFormToInput\(form, wholesaleEnabled\)/);
-assert.match(fieldsSource, /Ticari \/ bayi müşterisi/);
-assert.match(commercialFieldsSource, /<option value="inactive">Pasif<\/option>/);
+assert.match(fieldsSource, /Ticari müşteri/);
+assert.match(commercialFieldsSource, /<option value="inactive">Bayi değil<\/option>/);
 assert.doesNotMatch(commercialFieldsSource, /value="candidate"|Ticari not/);
 assert.match(listSource, /customer\.commercialProfile\.companyName/);
 assert.match(listSource, /Aktif bayi/);
@@ -53,9 +54,16 @@ assert.match(
   frameSource,
   /wholesaleEnabled:\s*runtimeHasCapability\(businessCapabilities, BUSINESS_CAPABILITIES\.WHOLESALE\)/
 );
-assert.match(
-  customerIpcSource,
-  /input\.commercialProfile !== undefined[\s\S]*BUSINESS_CAPABILITIES\.WHOLESALE/
-);
+// Commercial identity is always editable. A disabled wholesale capability must
+// preserve existing dealer metadata, while changed dealer fields still require
+// the independent wholesale IPC authorization gate.
+const customerSaveHandler = customerIpcSource.split('ipcMain.handle("customer:save"')[1]
+  ?.split('ipcMain.handle("customer:assignRoom"')[0] ?? "";
+assert.match(customerSaveHandler, /if \(input\.commercialProfile\)/);
+assert.match(customerSaveHandler, /input\.id \? getDatabase\(\)\.getCustomer\(input\.id\)\?\.commercialProfile/);
+assert.match(customerSaveHandler, /input\.commercialProfile\.dealerStatus !== status/);
+assert.match(customerSaveHandler, /input\.commercialProfile\.priceGroup !== group/);
+assert.match(customerSaveHandler, /input\.commercialProfile\.paymentTermDays !== term/);
+assert.match(customerSaveHandler, /assertCapability\(BUSINESS_CAPABILITIES\.WHOLESALE/);
 
 console.log("commerce-wholesale-ui-contract-smoke-ok");

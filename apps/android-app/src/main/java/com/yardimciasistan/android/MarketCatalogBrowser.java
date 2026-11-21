@@ -70,9 +70,10 @@ final class MarketCatalogBrowser {
           imageParams.setMargins(0, 0, ui.dp(8), 0);
           resultRow.addView(preview, imageParams);
         } else {
-          TextView placeholder = UiKit.text(context, "Görsel\nyok", 10, UiKit.MUTED, Typeface.NORMAL);
+          TextView placeholder = UiKit.text(context, "Görsel\nyok", 10, 0xFF57534E, Typeface.NORMAL);
           placeholder.setGravity(Gravity.CENTER);
-          placeholder.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 10));
+          placeholder.setBackground(UiKit.rounded(context,
+              MarketFormUi.PRODUCT_IMAGE_BACKGROUND, MarketFormUi.PRODUCT_IMAGE_BORDER, 10));
           LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(ui.dp(58), ui.dp(58));
           imageParams.setMargins(0, 0, ui.dp(8), 0);
           resultRow.addView(placeholder, imageParams);

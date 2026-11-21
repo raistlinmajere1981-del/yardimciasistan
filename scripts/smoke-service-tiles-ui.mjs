@@ -111,7 +111,7 @@ try {
   await assertHoles(2);
   // Paint assertions use a screenshot read by the browser's own PNG decoder.
   // Normalize artwork paint to the panel color so points compare only backdrop coverage.
-  await page.addStyleTag({ content: "#desktop-sidebar { background: white !important; } .nexa-character, .nexa-habitat-speech { background: white !important; } .nexa-character > *, .nexa-habitat-speech > * { visibility: hidden; }" });
+  await page.addStyleTag({ content: "#desktop-sidebar { background: white !important; } .nexa-character { background: white !important; filter: brightness(0) invert(1) !important; } .nexa-habitat-speech { background: white !important; border-color: white !important; } .nexa-habitat-speech > * { visibility: hidden; }" });
   const screenshot = await page.screenshot();
   const brightness = await page.evaluate(async base64 => {
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
@@ -121,7 +121,7 @@ try {
     const character = rect(".nexa-character"), speech = rect(".nexa-habitat-speech"), habitat = rect(".nexa-habitat");
     const sample = (x, y) => ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data[0];
     return { artwork: sample(character.x + character.width / 2, character.y + character.height / 2),
-      bubble: sample(speech.x + 3, speech.y + speech.height / 2), margin: sample(habitat.x + 3, character.y + character.height / 2),
+      bubble: sample(speech.x + speech.width / 2, speech.y + speech.height / 2), margin: sample(habitat.x + 3, character.y + character.height / 2),
       gap: sample(character.x + character.width / 2, (character.top + speech.bottom + 8) / 2) };
   }, screenshot.toString("base64"));
   assert.ok(brightness.artwork > 245 && brightness.bubble > 245, JSON.stringify(brightness));

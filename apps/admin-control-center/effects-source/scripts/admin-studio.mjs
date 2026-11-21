@@ -1,8 +1,8 @@
-import {readFile,writeFile,rename,mkdir,stat,chmod} from "node:fs/promises";
+import {readFile,writeFile,rename,mkdir,chmod} from "node:fs/promises";
 import {existsSync,readFileSync} from "node:fs";
 import {dirname,resolve,join,sep,basename} from "node:path";
 import {fileURLToPath} from "node:url";
-import {randomUUID,createHash} from "node:crypto";
+import {randomUUID} from "node:crypto";
 import {spawn,execFileSync} from "node:child_process";
 import {importProject,exportProject,validateProject,MAX_FILE_BYTES} from "../../../../packages/effect-engine/src/model/project.mjs";
 import {compileScene} from "../../../../packages/effect-engine/src/runtime/index.mjs";
@@ -17,7 +17,6 @@ const within=(base,path)=>{const full=resolve(base,path);if(full!==base&&!full.s
 const fileFor=(project,path)=>within(within(workspace,project.directory),path);
 const idOf=(p,i)=>p.id+":"+i.id;
 const safeId=(id)=>/^[a-z0-9_-]+:[a-z0-9_-]+$/.test(id);
-const safePart=(value)=>/^[a-z0-9_-]+$/.test(value);
 
 async function projects(){
  // Test fixture/custom explicit registry remains supported. Normal Admin sessions
@@ -274,7 +273,7 @@ async function load(id) {
  scene.photo.src=preview;
  return {scene,source:existsSync(draftPath(id))?"draft":existsSync(fileFor(project,image.scene))?"installed":"new"};
 }
-async function save(id,input,sourceHash){
+async function save(id,input,_sourceHash){
  const found=await selected(id);
  const {image}=found;
  if(typeof input!=="object"||!input)throw Error("Sahne bulunamadı.");

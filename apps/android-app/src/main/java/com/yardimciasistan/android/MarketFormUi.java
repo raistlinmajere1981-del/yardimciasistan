@@ -185,13 +185,18 @@ final class MarketFormUi {
     confirmation.setOnCheckedChangeListener((button, value) -> changed.onChecked(value)); page.addView(confirmation);
   }
 
+  static final int PRODUCT_IMAGE_BACKGROUND = 0xFFF5F5F4;
+  static final int PRODUCT_IMAGE_BORDER = 0xFFE7E5E4;
+
   ImageView productImageView(Bitmap bitmap, int heightDp) {
     ImageView image = new ImageView(context);
     image.setImageBitmap(bitmap);
     image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
     image.setAdjustViewBounds(false);
     image.setPadding(dp(14), dp(12), dp(14), dp(12));
-    image.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 12));
+    // Fixed neutral surface: product photos remain readable in dark mode
+    // without altering the original bitmap or its transparent pixels.
+    image.setBackground(UiKit.rounded(context, PRODUCT_IMAGE_BACKGROUND, PRODUCT_IMAGE_BORDER, 12));
     image.setMinimumHeight(dp(heightDp));
     return image;
   }

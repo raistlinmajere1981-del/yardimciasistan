@@ -244,6 +244,7 @@ export interface PublishedQrMenu {
   /** Web QR menu publication visibility; omitted payloads remain visible for compatibility. */
   enabled?: boolean;
   table_orders_enabled?: boolean;
+  room_orders_enabled?: boolean;
   categories: PublishedMenuCategory[];
   items: PublishedMenuItem[];
   updated_at: ISODateTimeString;
@@ -418,6 +419,13 @@ export interface AndroidMarketProductDataSettings {
   include_images: boolean;
 }
 
+/** Active catalog categories usable for Android product creation. */
+export interface AndroidMarketCategory {
+  id: string;
+  name: string;
+  default_tax_rate: number;
+}
+
 export interface AndroidMarketProduct {
   id: string;
   name: string;
@@ -471,7 +479,31 @@ export interface AndroidMarketCartDraft {
   updated_at: ISODateTimeString | "";
 }
 
+/** Read-only deficit, summed across all active inventory locations. */
+export interface AndroidMarketReplenishmentRow {
+  product_id: string;
+  name: string;
+  sku: string;
+  category_id: string;
+  category_name: string;
+  unit: string;
+  quantity: number;
+  minimum_quantity: number;
+  ideal_quantity: number;
+  suggested_quantity: number;
+}
+
+export interface AndroidMarketReplenishment {
+  rows: AndroidMarketReplenishmentRow[];
+  /** True when more than the 1,200 mobile rows exist. */
+  truncated: boolean;
+}
+
 export interface AndroidMarketSnapshot {
+  /** Absent in old snapshots; never usable to mutate inventory or purchasing. */
+  replenishment?: AndroidMarketReplenishment;
+  /** Absent on older companion snapshots; never grants catalog edit authority. */
+  categories?: AndroidMarketCategory[];
   product_data: AndroidMarketProductDataSettings;
   summary: AndroidMarketSummary;
   products: AndroidMarketProduct[];
@@ -594,7 +626,29 @@ export interface AndroidDeviceSighting {
   last_seen_at: ISODateTimeString | "";
 }
 
+/** QR order detail is informational only. Approval is a separate, explicitly
+ * authorized desktop action and is never derived from this preview. */
+export interface AndroidQrOrderPreview {
+  /** Desktop-imported and versioned; web-only requests cannot be acted on. */
+  decision_ready?: boolean;
+  kind: "room" | "table";
+  source_id: string;
+  source_label: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    note: string;
+    unit_price: number;
+    currency: string;
+  }>;
+  total: number;
+  currency: string;
+  invalid_items: boolean;
+}
+
 export interface AndroidSnapshotRequest {
+  /** Optional because old snapshots and non-QR requests have no order preview. */
+  qr_order?: AndroidQrOrderPreview;
   id: string;
   customer_id: string;
   request_type: string;
@@ -615,7 +669,18 @@ export interface AndroidSnapshotRequest {
   updated_at: ISODateTimeString | "";
 }
 
+export interface AndroidSnapshotCustomerCommercialProfile {
+  company_name: string;
+  tax_office: string;
+  tax_number: string;
+  authorized_person: string;
+  dealer_status: "active" | "inactive";
+  price_group: "retail" | "dealer_a" | "dealer_b";
+  payment_term_days: number;
+}
+
 export interface AndroidSnapshotCustomer {
+  commercial_profile?: AndroidSnapshotCustomerCommercialProfile | null;
   id: string;
   full_name: string;
   phone: string;
@@ -673,6 +738,8 @@ export interface AndroidSnapshotReservation {
   end_date: string;
   time: string;
   guest_count: number;
+  /** Restaurant table reservations: explicit minutes; absent in legacy snapshots. */
+  duration_minutes?: number;
   room_ids: string[];
   table_ids: string[];
   notes: string;
@@ -791,7 +858,9 @@ export interface AndroidMarketProductCreatePayload {
   name: string;
   brand?: string;
   sku?: string;
-  category?: string;
+  category?: string; // legacy pre-selection clients
+  category_id?: string;
+  tax_rate?: number; // present only for an explicit manual override
   purchase_price?: number;
   sale_price?: number;
   currency?: string;

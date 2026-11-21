@@ -174,7 +174,10 @@ const addedProtectedChannels = [
   // Guarded additions: product save and translation queue controls.
   "commerce:product:saveDetails", "translation:pause", "translation:resume",
   // QR masadan sipariş: explicit toggle and operator-only acceptance.
-  "menu:setTableOrders", "request:acceptQrOrder"
+  "menu:setTableOrders", "request:acceptQrOrder",
+  // Room QR order intake, translation cancellation and locale-specific SEO actions.
+  "menu:setRoomOrders", "request:acceptQrRoomOrder", "translation:cancel",
+  "seo:snapshot", "seo:save", "seo:suggest"
 ];
 assert.equal(handlers.size, 296 + addedProtectedChannels.length, "all production invoke registrations must execute");
 for (const channel of addedProtectedChannels) assert.ok(handlers.has(channel), `${channel}: protected registration must execute`);

@@ -1,4 +1,5 @@
 import { applyAndroidCommerceOrderAction } from "./android-commerce-order-actions";
+import { applyAndroidQrOrderAction } from "./android-qr-order-actions.js";
 import type { DatabaseSync } from "node:sqlite";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
@@ -91,6 +92,10 @@ export function routeAndroidActionInTransaction(
     case "commerce_order_confirm":
     case "commerce_order_cancel":
       return applyAndroidCommerceOrderAction(db, action, now);
+    case "qr_table_order_accept":
+    case "qr_room_order_accept":
+    case "qr_order_reject":
+      return applyAndroidQrOrderAction(db,action,now);
     case "customer_request_mark_answered":
       return applyAndroidRequestStatus(db, action, "answered", now, enabledCapabilities);
     case "customer_request_reopen":
@@ -110,9 +115,9 @@ export function routeAndroidActionInTransaction(
         insertEvent
       );
     case "customer_create":
-      return applyAndroidCustomerSave(db, action, now, false);
+      return applyAndroidCustomerSave(db, action, now, false, enabledCapabilities);
     case "customer_update":
-      return applyAndroidCustomerSave(db, action, now, true);
+      return applyAndroidCustomerSave(db, action, now, true, enabledCapabilities);
     case "customer_delete":
       return deleteCustomerInTransaction(
         db,

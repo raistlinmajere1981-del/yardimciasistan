@@ -67,6 +67,7 @@ final class ReservationEditorDialog {
     );
     EditText endDate = null;
     EditText time = null;
+    EditText durationMinutes = null;
     if (kind == Kind.ROOM) {
       String defaultEnd = editing ? reservation.endDate : tomorrowKey();
       endDate = dateField(context, form, "Çıkış tarihi", defaultEnd);
@@ -88,11 +89,18 @@ final class ReservationEditorDialog {
       });
     } else {
       time = timeField(context, form, "Saat", editing ? reservation.time : "19:00");
+      durationMinutes = numberField(context, form, "Süre (dakika, 30–480)",
+          String.valueOf(editing ? reservation.durationMinutes : 120));
+      form.addView(UiKit.text(context,
+          "Bu süre boyunca masa başka bir rezervasyona atanamaz. Çakışmayı masaüstü kontrol eder.",
+          12, UiKit.SECONDARY, android.graphics.Typeface.NORMAL));
     }
 
     startDate.setEnabled(detailsEditable);
     if (endDate != null) endDate.setEnabled(detailsEditable);
     if (time != null) time.setEnabled(detailsEditable);
+    // Web-derived reservations may retain their original date, time and
+    // party size; the canonical desktop service remains the duration authority.
 
     EditText guestCount = numberField(
         context,
@@ -159,6 +167,7 @@ final class ReservationEditorDialog {
     Spinner finalCustomerSpinner = customerSpinner;
     EditText finalEndDate = endDate;
     EditText finalTime = time;
+    EditText finalDurationMinutes = durationMinutes;
     dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
       int customerIndex = editing ? -1 : finalCustomerSpinner.getSelectedItemPosition();
       String customerId = editing
@@ -168,10 +177,12 @@ final class ReservationEditorDialog {
       String end = finalEndDate == null ? start : finalEndDate.getText().toString().trim();
       String clock = finalTime == null ? "" : finalTime.getText().toString().trim();
       int guests = parsePositiveInt(guestCount.getText().toString());
+      int duration = finalDurationMinutes == null ? 120
+          : parsePositiveInt(finalDurationMinutes.getText().toString());
       int resourceIndex = resourceSpinner.getSelectedItemPosition();
       String resourceId = resourceIndex >= 0 && resourceIndex < resourceIds.size() ? resourceIds.get(resourceIndex) : "";
 
-      String validation = validate(kind, customerId, start, end, clock, guests);
+      String validation = validate(kind, customerId, start, end, clock, guests, duration);
       if (!validation.isEmpty()) {
         status.setTextColor(UiKit.DANGER);
         status.setText(validation);
@@ -193,6 +204,7 @@ final class ReservationEditorDialog {
         } else {
           payload.put("date", start);
           payload.put("time", clock);
+          payload.put("duration_minutes", duration);
         }
         payload.put("guest_count", guests);
         payload.put("notes", notes.getText().toString().trim());
@@ -206,7 +218,7 @@ final class ReservationEditorDialog {
     dialog.show();
   }
 
-  private static String validate(Kind kind, String customerId, String start, String end, String time, int guests) {
+  private static String validate(Kind kind, String customerId, String start, String end, String time, int guests, int duration) {
     if (customerId == null || customerId.trim().isEmpty()) {
       return "Önce müşteri seçin.";
     }
@@ -223,7 +235,14 @@ final class ReservationEditorDialog {
     if (guests < 1 || guests > 99) {
       return "Kişi sayısı 1 ile 99 arasında olmalı.";
     }
+    if (kind == Kind.TABLE && !validTableDuration(duration)) {
+      return "Masa rezervasyonu süresi 30 ile 480 dakika arasında olmalı.";
+    }
     return "";
+  }
+
+  static boolean validTableDuration(int minutes) {
+    return minutes >= 30 && minutes <= 480;
   }
 
   private static Spinner spinnerField(Context context, LinearLayout form, String label, List<String> values) {

@@ -41,7 +41,9 @@ export function registerMenuIpcHandlers(options: {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     return { enabled: getDatabase().getQrMenuWebPublicationEnabled(),
-      ordersEnabled: getDatabase().getQrTableOrderConfig().enabled, tables: getDatabase().listQrOrderTables() };
+      ordersEnabled: getDatabase().getQrTableOrderConfig().enabled,
+      roomOrdersEnabled: getDatabase().getQrRoomOrderConfig().enabled,
+      tables: getDatabase().listQrOrderTables(), rooms: getDatabase().listQrOrderRooms() };
   });
 
   ipcMain.handle("menu:setWebPublication", (_event, enabled: unknown) => {
@@ -87,6 +89,31 @@ export function registerMenuIpcHandlers(options: {
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : "Sipariş ayarı kaydedilemedi.", enabled: current,
         tables: getDatabase().listQrOrderTables() };
+    }
+  });
+
+  ipcMain.handle("menu:setRoomOrders", (_event, enabled: unknown) => {
+    options.assertUnlocked();
+    const current=getDatabase().getQrRoomOrderConfig().enabled;
+    if (typeof enabled !== "boolean")
+      return {ok:false,message:"Odaya sipariş seçimi geçersiz.",enabled:current,rooms:getDatabase().listQrOrderRooms()};
+    if (enabled) {
+      for (const capability of [
+        BUSINESS_CAPABILITIES.REQUESTS,BUSINESS_CAPABILITIES.CUSTOMERS,
+        BUSINESS_CAPABILITIES.QR_MENU,BUSINESS_CAPABILITIES.FOOD_MENU,
+        BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS,BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS,
+        BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO
+      ]) assertCapability(capability,"QR odaya sipariş için ilgili pansiyon ve menü yetenekleri etkin olmalı.");
+      if (!getDatabase().getQrMenuWebPublicationEnabled())
+        return {ok:false,message:"Önce QR Menü web yayınını açın.",enabled:current,rooms:getDatabase().listQrOrderRooms()};
+    }
+    try {
+      getDatabase().setQrRoomOrdersEnabled(enabled);
+      scheduleSync();
+      return {ok:true,message:enabled?"Odaya sipariş açık.":"Odaya sipariş kapalı.",enabled,rooms:getDatabase().listQrOrderRooms()};
+    } catch (error) {
+      return {ok:false,message:error instanceof Error?error.message:"Odaya sipariş kaydedilemedi.",
+        enabled:current,rooms:getDatabase().listQrOrderRooms()};
     }
   });
 

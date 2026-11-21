@@ -6,10 +6,13 @@ import type {
 import { listMarketCartDraftRecords } from "./market-companion-store.js";
 import { assertCustomerCreditBusinessInTransaction, listCustomerCreditAccounts, getCustomerCreditAccount } from "./customer-credit-runtime.js";
 import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
+import { listAndroidStockReplenishment } from "./stock-replenishment.js";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 
 export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnapshot {
   return {
+    categories: [],
+    replenishment: {rows:[],truncated:false},
     product_data: {
       enabled: false,
       provider: "open_food_facts",
@@ -58,6 +61,29 @@ export function createAndroidMarketSnapshotSource(
       provider: text(productDataRow?.product_data_provider) || "open_food_facts",
       auto_search_unknown_barcode: Number(productDataRow?.product_data_auto_search ?? 1) === 1,
       include_images: Number(productDataRow?.product_data_include_images ?? 1) === 1
+    };
+    const categories = (database.prepare(
+      "SELECT id,name,default_tax_rate FROM catalog_categories WHERE business_id=? AND deleted_at='' " +
+      "AND is_active=1 ORDER BY sort_order,name COLLATE NOCASE,id LIMIT 500"
+    ).all(businessId) as Array<Record<string, unknown>>).map(row => ({
+      id:text(row.id),name:text(row.name),default_tax_rate:Number(row.default_tax_rate ?? 20)
+    }));
+    const stockSuggestions = readEnabledBusinessCapabilities(database).includes(C.INVENTORY)
+      ? listAndroidStockReplenishment(databasePath)
+      : {rows:[],truncated:false};
+    const replenishment = {
+      truncated: stockSuggestions.truncated,
+      rows: stockSuggestions.rows.map(row => ({
+        product_id:row.productId,
+        name:row.name,sku:row.sku,
+        category_id:row.categoryId,
+        category_name:row.categoryName,
+        unit:row.unit,
+        quantity:row.quantity,
+        minimum_quantity:row.minimumQuantity,
+        ideal_quantity:row.idealQuantity,
+        suggested_quantity:row.suggestedQuantity
+      }))
     };
     const products = (database.prepare(`
       SELECT
@@ -214,6 +240,8 @@ export function createAndroidMarketSnapshotSource(
       ? text(salesRow?.currency) || "TRY"
       : "";
     return {
+      categories,
+      replenishment,
       product_data: productData,
       summary: {
         today_sale_count: Math.max(0, Math.trunc(number(salesRow?.sale_count))),

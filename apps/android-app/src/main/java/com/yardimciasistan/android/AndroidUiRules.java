@@ -396,6 +396,37 @@ final class AndroidUiRules {
         && data.hasPermission("reservation.create");
   }
 
+  static boolean isQrOrderRequest(OperationData.RequestRecord request) {
+    return request != null && ("room_order".equals(request.type) || "table_order".equals(request.type));
+  }
+
+  static boolean canDecideQrOrder(OperationData data, OperationData.RequestRecord request, boolean accepting) {
+    if (data == null || !isQrOrderRequest(request)
+        || !data.hasBusinessCapability(CAPABILITY_REQUESTS)
+        || !data.hasBusinessCapability(CAPABILITY_CUSTOMERS)
+        || !data.hasBusinessCapability("channel.qr_menu")
+        || !data.hasBusinessCapability(CAPABILITY_MENU)
+        || !data.hasBusinessCapability(CAPABILITY_ORDERS)
+        || !request.waitingForResponse()
+        || request.updatedAt.isEmpty()
+        || request.qrOrder == null || !request.qrOrder.decisionReady) return false;
+    boolean table = "table_order".equals(request.type);
+    if (table && !data.hasBusinessCapability(CAPABILITY_TABLES)) return false;
+    if (!table && !(data.hasBusinessCapability(CAPABILITY_ROOMS)
+        && data.hasBusinessCapability(CAPABILITY_STAYS)
+        && data.hasBusinessCapability(CAPABILITY_FOLIO))) return false;
+    if (accepting && (request.qrOrder == null || request.qrOrder.invalidItems
+        || request.qrOrder.items.isEmpty() || request.qrOrder.sourceId.isEmpty()
+        || !request.qrOrder.kind.equals(table ? "table" : "room"))) return false;
+    return (table
+        ? data.hasPermission("table_order.view") && data.hasPermission("menu.view")
+        : data.hasPermission("room_folio.view") && data.hasPermission("menu.view"))
+        && data.hasPermission(accepting
+            ? table ? "table_order.add_item" : "room_folio.add_menu_item"
+            : "customer.reject");
+  }
+
+
   static boolean canConvertRequest(OperationData data, OperationData.RequestRecord request) {
     if (data == null || request == null || !data.hasPermission("customer.convert_to_reservation")) {
       return false;

@@ -3,7 +3,8 @@ import {between} from '../random.mjs';
 // Soft radial aura with a slow seeded pulse. The gradient is cached per canvas
 // size so a steady overlay allocates no paint resources per frame.
 export function createGlow({random, params}) {
-  let enabled=params.enabled!==false, disposed=false, active=0, time=0,interactionProgress=1;
+  const enabled=params.enabled!==false;
+  let disposed=false, active=0, time=0,interactionProgress=1;
   const phase=random()*Math.PI*2;
   const drift=between(random,-1,1);
   let gradient=null, gradientKey='';

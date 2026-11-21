@@ -96,8 +96,16 @@ for (const devices of [[device], [{ ...device, isActive: false }], [{ ...device,
   [device, { ...device, deviceId: 'second-phone' }]]) {
   const html = renderToStaticMarkup(createElement(AndroidDevicesSection, { ...props, devices }));
   assert.doesNotMatch(html, /USB hata ayıklaması|Uygulamayı Kur|Kurulumu Tamamla|Yeniden eşleştirme gerekli|Yeniden Eşleştir/);
-  assert.match(html, /Bilinmeyen uygulamaları yükle/);
-  assert.match(html, /Web bağlantısı isteğe bağlıdır/);
+  if (devices.every(d => d.revokedAt)) {
+    assert.match(html, /Bilinmeyen uygulamaları yükle/);
+    assert.match(html, /https:\/\/yardimciasistan\.alwaysdata\.net\/kurulum\//);
+    assert.match(html, /android-device-setup-steps/);
+    assert.equal((html.match(/<li>/g) ?? []).length, 3, 'Exactly three brief install instructions');
+    assert.doesNotMatch(html, /HTTPS QR kodunu okutun|Telefonu bağlamak için QR gösterin/);
+  } else {
+    assert.doesNotMatch(html, /android-device-setup-steps|Bilinmeyen uygulamaları yükle/);
+    assert.doesNotMatch(html, /https:\/\/yardimciasistan\.alwaysdata\.net\/kurulum\//);
+  }
   assert.equal((html.match(/class="android-device-card/g) ?? []).length, devices.filter(d => !d.revokedAt).length,
     'Exactly one row per canonical registered device, even with identical names');
 }

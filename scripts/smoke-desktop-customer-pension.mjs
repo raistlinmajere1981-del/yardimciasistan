@@ -191,7 +191,7 @@ try {
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true
     };
-  }, { setup: { ...createSetupFixture(), setupRequired: false, syncSecret: 'stage2a-fixture-web-secret', autoSyncEnabled: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
+  }, { setup: { ...createSetupFixture(), servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }, setupRequired: false, syncSecret: 'stage2a-fixture-web-secret', autoSyncEnabled: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
   await page.goto(baseUrl);
   const customerViewButtons = () => page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button');
   await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
@@ -285,9 +285,8 @@ try {
     await expect(addressField).toHaveAttribute('rows', '1');
     expect(await noteField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
     expect(await addressField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
-    const birthdayToggle = customerWorkspace.getByRole('checkbox', { name: 'Mesaj gönder', exact: true });
-    await expect(birthdayToggle).toBeDisabled();
-    await expect(birthdayToggle).not.toBeChecked();
+    // Fixture messaging service is disabled; there is no irrelevant birthday toggle.
+    await expect(customerWorkspace.getByRole('checkbox', { name: 'Mesaj gönder', exact: true })).toHaveCount(0);
 
     await addressField.scrollIntoViewIfNeeded();
     await capture('customer-identity');

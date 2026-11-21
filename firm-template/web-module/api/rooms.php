@@ -43,6 +43,11 @@ $enabled = array_key_exists('enabled', $catalog)
     ? ($catalog['enabled'] === true)
     : $hasPublication;
 $rooms = $enabled && is_array($catalog['rooms'] ?? null) ? array_values($catalog['rooms']) : [];
+// Stay token digests are private authorization data, never public room fields.
+$rooms = array_map(static function (array $room): array {
+    unset($room['orderTokenHash']);
+    return $room;
+}, $rooms);
 usort($rooms, static function (array $left, array $right): int {
     $order = ((int) ($left['sort_order'] ?? 0)) <=> ((int) ($right['sort_order'] ?? 0));
     return $order !== 0 ? $order : strcmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));

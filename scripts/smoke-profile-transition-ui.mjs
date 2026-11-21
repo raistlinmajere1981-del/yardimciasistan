@@ -20,7 +20,7 @@ try {
       `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve(`scripts/fixtures/${fixture}.tsx`)}"></script></body></html>`) });
   });
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
-  const visit = async query => { await page.goto(`${server.resolvedUrls.local[0]}profile-transition-test${query}`); if (!query.includes("runtime")) await expandSettingsStructure(page); };
+  const visit = async query => { await page.goto(`${server.resolvedUrls.local[0]}profile-transition-test${query}`, { waitUntil: "domcontentloaded", timeout: 30000 }); if (!query.includes("runtime")) await expandSettingsStructure(page); };
   await visit("?profile=pension");
   const select = page.getByRole("combobox", { name: /Sektör tipi/ });
   const options = page.locator("#settings-options");
@@ -52,6 +52,10 @@ try {
       if (profile.choices.includes(capability)) {
         await expect(checkbox).toBeDisabled();
         expect(await checkbox.isChecked()).toBe(profile.preview.includes(capability));
+      } else if (capability === "commerce.inventory") {
+        // Optional stock tracking remains visible, disabled while dependencies
+        // own it, instead of disappearing from the capability list.
+        await expect(checkbox).toBeDisabled();
       } else await expect(checkbox).toHaveCount(0);
     }
     expect(await page.evaluate(() => window.persistedSettings())).toEqual(before);
@@ -128,8 +132,12 @@ try {
           (option === "retail.purchasing" && feature === "retail.suppliers")) {
           await expect(checkbox).toBeChecked();
           await expect(checkbox).toBeDisabled();
-        } else if (option !== feature && expected.includes(option)) await expect(checkbox).toHaveCount(0);
-        else expect(await checkbox.isChecked()).toBe(option === feature);
+        } else if (option !== feature && expected.includes(option)) {
+          if (option === "commerce.inventory") {
+            await expect(checkbox).toBeChecked();
+            await expect(checkbox).toBeDisabled();
+          } else await expect(checkbox).toHaveCount(0);
+        } else expect(await checkbox.isChecked()).toBe(option === feature);
       }
       expect(await page.evaluate(() => window.persistedSettings())).toEqual(persisted);
       expect(await page.evaluate(() => window.settingsCalls.length)).toBe(calls);

@@ -1,3 +1,4 @@
+import { queueRoomOrderPublicationIfEnabled } from "./database/qr-room-order-config.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type { CheckoutStayGuestInput, MoveStayRoomInput, StayGuestInput } from "./database-types.js";
@@ -128,6 +129,7 @@ export function moveStayRoom(db: DatabaseSync, input: MoveStayRoomInput): Result
     refreshRoomStatusFromStays(db, stay.room_id, now, true);
     refreshRoomStatusFromStays(db, input.roomId, now, false);
     record(db, stay.id, "hospitality.room_changed", now, { previous_room_id: stay.room_id, room_id: input.roomId });
+    queueRoomOrderPublicationIfEnabled(db,now);
     return { ok: true, savedId: stay.id, message: "Oda değişti; hesap, misafirler ve anlaşılmış fiyat korundu. Eski oda temizlik bekliyor." };
   });
 }

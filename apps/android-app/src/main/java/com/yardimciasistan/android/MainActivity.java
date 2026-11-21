@@ -1369,6 +1369,7 @@ public final class MainActivity extends ComponentActivity {
         this,
         existing,
         AndroidUiRules.canUseAi(data),
+        data.hasBusinessCapability("commerce.wholesale"),
         new CustomerFormDialog.Listener() {
           @Override
           public void onIdentityImageRequested() {

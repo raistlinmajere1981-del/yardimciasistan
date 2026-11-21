@@ -674,8 +674,76 @@ final class OperationData {
     return values;
   }
 
+  static final class MarketCategory {
+    String id = "";
+    String name = "";
+    double defaultTaxRate = 20;
+
+    static MarketCategory fromJson(JSONObject source) {
+      MarketCategory result = new MarketCategory();
+      result.id = value(source, "id", "");
+      result.name = value(source, "name", "");
+      result.defaultTaxRate = decimal(source, "default_tax_rate");
+      return result;
+    }
+  }
+
+  static final class StockReplenishment {
+    boolean truncated;
+    final List<StockReplenishmentRow> rows = new ArrayList<>();
+
+    static StockReplenishment fromJson(JSONObject source) {
+      StockReplenishment result = new StockReplenishment();
+      result.truncated = source.optBoolean("truncated",false);
+      JSONArray input = array(source,"rows");
+      for (int i=0; i<Math.min(input.length(),1200); i++) {
+        JSONObject row=input.optJSONObject(i);
+        if (row == null) continue;
+        StockReplenishmentRow parsed=StockReplenishmentRow.fromJson(row);
+        if (parsed != null) result.rows.add(parsed);
+      }
+      if (input.length()>1200) result.truncated=true;
+      return result;
+    }
+  }
+
+  static final class StockReplenishmentRow {
+    String productId = "";
+    String name = "";
+    String sku = "";
+    String categoryId = "";
+    String categoryName = "";
+    String unit = "piece";
+    double quantity;
+    double minimumQuantity;
+    double idealQuantity;
+    double suggestedQuantity;
+
+    static StockReplenishmentRow fromJson(JSONObject raw) {
+      StockReplenishmentRow row = new StockReplenishmentRow();
+      row.productId=value(raw,"product_id","");
+      row.name=value(raw,"name","");
+      row.sku=value(raw,"sku","");
+      row.categoryId=value(raw,"category_id","");
+      row.categoryName=value(raw,"category_name","Kategorisiz");
+      row.unit=value(raw,"unit","piece");
+      row.quantity=decimal(raw,"quantity");
+      row.minimumQuantity=decimal(raw,"minimum_quantity");
+      row.idealQuantity=decimal(raw,"ideal_quantity");
+      row.suggestedQuantity=decimal(raw,"suggested_quantity");
+      if (row.productId.isEmpty() || row.name.isEmpty()
+          || !Double.isFinite(row.quantity) || !Double.isFinite(row.idealQuantity)
+          || !Double.isFinite(row.suggestedQuantity) || row.idealQuantity<=0
+          || row.suggestedQuantity<=0 || row.suggestedQuantity>1_000_000_000
+          || Math.abs(row.idealQuantity-row.quantity-row.suggestedQuantity)>0.0002) return null;
+      return row;
+    }
+  }
+
   static final class MarketSnapshot {
+    StockReplenishment replenishment = new StockReplenishment();
     String primaryLocationId = "";
+    final List<MarketCategory> categories = new ArrayList<>();
     final List<CustomerCreditAccount> customerCreditAccounts = new ArrayList<>();
     MarketProductDataSettings productData = new MarketProductDataSettings();
     MarketSummary summary = new MarketSummary();
@@ -687,6 +755,8 @@ final class OperationData {
     static MarketSnapshot fromJson(JSONObject source) {
       MarketSnapshot market = new MarketSnapshot();
       market.primaryLocationId = value(source, "primary_location_id", "");
+      market.replenishment = StockReplenishment.fromJson(object(source,"replenishment"));
+      addRecords(array(source, "categories"), market.categories, MarketCategory::fromJson);
       market.productData = MarketProductDataSettings.fromJson(object(source, "product_data"));
       market.summary = MarketSummary.fromJson(object(source, "summary"));
       addRecords(array(source, "products"), market.products, MarketProduct::fromJson);
@@ -912,9 +982,53 @@ final class OperationData {
     }
   }
 
+  static final class QrOrderPreview {
+    String kind = "";
+    String sourceId = "";
+    String sourceLabel = "";
+    boolean invalidItems;
+    boolean decisionReady;
+    String currency = "";
+    double total;
+    final List<QrOrderItem> items = new ArrayList<>();
+
+    static QrOrderPreview fromJson(JSONObject source) {
+      QrOrderPreview result = new QrOrderPreview();
+      result.kind = value(source, "kind", "");
+      if (!"table".equals(result.kind) && !"room".equals(result.kind)) return null;
+      result.sourceId = value(source, "source_id", "");
+      result.sourceLabel = value(source, "source_label", "");
+      result.invalidItems = source.optBoolean("invalid_items", false);
+      result.decisionReady = source.optBoolean("decision_ready", false);
+      result.currency = value(source, "currency", "");
+      result.total = decimal(source, "total");
+      addRecords(array(source, "items"), result.items, QrOrderItem::fromJson);
+      return result;
+    }
+  }
+
+  static final class QrOrderItem {
+    String name = "";
+    int quantity;
+    String note = "";
+    double unitPrice;
+    String currency = "";
+
+    static QrOrderItem fromJson(JSONObject source) {
+      QrOrderItem result = new QrOrderItem();
+      result.name = value(source, "name", "Ürün");
+      result.quantity = number(source, "quantity");
+      result.note = value(source, "note", "");
+      result.unitPrice = decimal(source, "unit_price");
+      result.currency = value(source, "currency", "");
+      return result;
+    }
+  }
+
   static final class RequestRecord {
     String id = "";
     String customerId = "";
+    QrOrderPreview qrOrder;
     String type = "general_info";
     String status = "new";
     String customerName = "Misafir";
@@ -937,6 +1051,7 @@ final class OperationData {
       record.id = value(source, "id", "");
       record.customerId = value(source, "customer_id", "");
       record.type = value(source, "request_type", "general_info");
+      record.qrOrder = QrOrderPreview.fromJson(object(source, "qr_order"));
       record.status = value(source, "status", "new");
       record.customerName = value(source, "customer_name", "Misafir");
       record.customerPhone = value(source, "customer_phone", "");
@@ -964,7 +1079,35 @@ final class OperationData {
     }
   }
 
+  static final class CommercialProfile {
+    String companyName = "";
+    String taxOffice = "";
+    String taxNumber = "";
+    String authorizedPerson = "";
+    String dealerStatus = "inactive";
+    String priceGroup = "retail";
+    int paymentTermDays;
+
+    static CommercialProfile fromJson(JSONObject source) {
+      if (source == null) return null;
+      String company = value(source,"company_name","");
+      if (company.isEmpty()) return null;
+      CommercialProfile profile = new CommercialProfile();
+      profile.companyName = company;
+      profile.taxOffice = value(source,"tax_office","");
+      profile.taxNumber = value(source,"tax_number","");
+      profile.authorizedPerson = value(source,"authorized_person","");
+      String status = value(source,"dealer_status","inactive");
+      profile.dealerStatus = "active".equals(status) ? "active" : "inactive";
+      String group = value(source,"price_group","retail");
+      profile.priceGroup = "dealer_a".equals(group) || "dealer_b".equals(group) ? group : "retail";
+      profile.paymentTermDays = Math.min(3650,Math.max(0,number(source,"payment_term_days")));
+      return profile;
+    }
+  }
+
   static final class CustomerRecord {
+    CommercialProfile commercialProfile;
     String id = "";
     String fullName = "";
     String phone = "";
@@ -990,6 +1133,7 @@ final class OperationData {
     static CustomerRecord fromJson(JSONObject source) {
       CustomerRecord record = new CustomerRecord();
       record.id = value(source, "id", "");
+      record.commercialProfile = CommercialProfile.fromJson(source.optJSONObject("commercial_profile"));
       record.fullName = value(source, "full_name", "Misafir");
       record.phone = value(source, "phone", "");
       record.email = value(source, "email", "");
@@ -1075,6 +1219,7 @@ final class OperationData {
     String endDate = "";
     String time = "";
     int guestCount;
+    int durationMinutes = 120;
     List<String> roomIds = new ArrayList<>();
     List<String> tableIds = new ArrayList<>();
     String notes = "";
@@ -1095,6 +1240,8 @@ final class OperationData {
       record.endDate = value(source, "end_date", "");
       record.time = value(source, "time", "");
       record.guestCount = number(source, "guest_count");
+      int duration = number(source, "duration_minutes");
+      record.durationMinutes = duration >= 30 && duration <= 480 ? duration : 120;
       record.roomIds = strings(source, "room_ids");
       record.tableIds = strings(source, "table_ids");
       record.notes = value(source, "notes", "");

@@ -70,6 +70,36 @@ final class CustomerRequestDetailDialog {
     summary.addView(UiKit.divider(activity));
     summary.addView(detailLine(activity, "Durum", formatRequestStatus(request.status)));
 
+    boolean qrOrder = AndroidUiRules.isQrOrderRequest(request);
+    if (qrOrder) {
+      summary.addView(UiKit.divider(activity));
+      summary.addView(detailLine(activity, "Sipariş kaynağı",
+          request.qrOrder == null ? "Kaynak bilgisi bulunamadı" : request.qrOrder.sourceLabel));
+      if (request.qrOrder == null || request.qrOrder.invalidItems || request.qrOrder.items.isEmpty()) {
+        summary.addView(UiKit.text(activity,
+            "Sipariş kalemleri doğrulanamadı. Masaüstünde kontrol edin.",
+            13, UiKit.WARNING, Typeface.BOLD));
+      } else {
+        for (OperationData.QrOrderItem item : request.qrOrder.items) {
+          summary.addView(UiKit.divider(activity));
+          summary.addView(detailLine(activity, item.quantity + " × " + item.name,
+              money(item.quantity * item.unitPrice, item.currency)));
+          if (!item.note.isEmpty()) {
+            summary.addView(UiKit.text(activity, "Not: " + item.note,
+                12, UiKit.MUTED, Typeface.NORMAL));
+          }
+        }
+        summary.addView(UiKit.divider(activity));
+        summary.addView(detailLine(activity, "Talep toplamı",
+            money(request.qrOrder.total, request.qrOrder.currency)));
+      }
+      summary.addView(UiKit.text(activity,
+          request.qrOrder != null && !request.qrOrder.decisionReady
+            ? "Sipariş masaüstüne alındığında kabul ve ret işlemleri açılır."
+            : "İşlem masaüstünde güncel QR, fiyat, stok ve açık hesap doğrulamasından sonra tamamlanır.",
+          12, UiKit.MUTED, Typeface.NORMAL));
+    }
+
     if (!request.message.isEmpty()) {
       summary.addView(UiKit.divider(activity));
       summary.addView(UiKit.text(
@@ -161,10 +191,43 @@ final class CustomerRequestDetailDialog {
       page.addView(ready);
     }
 
-    boolean canConvert = AndroidUiRules.canConvertRequest(data, request);
-    boolean canRespond = data.hasPermission("customer.respond");
-    boolean canReject = data.hasPermission("customer.reject");
-    boolean canMarkAnswered = data.hasPermission("customer.mark_answered");
+    if (qrOrder && (AndroidUiRules.canDecideQrOrder(data, request, true)
+        || AndroidUiRules.canDecideQrOrder(data, request, false))) {
+      page.addView(UiKit.sectionTitle(activity,"QR sipariş kararı"));
+      LinearLayout decisions = UiKit.row(activity);
+      if (AndroidUiRules.canDecideQrOrder(data, request, true)) {
+        final String action = "table_order".equals(request.type)
+            ? "qr_table_order_accept" : "qr_room_order_accept";
+        final String destination = "table_order".equals(request.type) ? "masa adisyonuna" : "oda hesabına";
+        UiKit.addAction(decisions,UiKit.button(activity, "Siparişi kabul et",UiKit.PRIMARY,
+            view -> listener.confirm("QR siparişi kabul et",
+                request.qrOrder.sourceLabel + " için sipariş " + destination
+                    + " aktarılsın mı? Fiyat ve stok masaüstünde yeniden denetlenecek.",
+                () -> {
+                  listener.sendAction(action,
+                      payload("request_id",request.id,"expected_updated_at",request.updatedAt),
+                      "Sipariş kabulü masaüstüne iletildi; doğrulama sonucu senkronize edilecek.");
+                  dialog.dismiss();
+                })),activity);
+      }
+      if (AndroidUiRules.canDecideQrOrder(data, request, false)) {
+        UiKit.addAction(decisions,UiKit.dangerButton(activity,"Reddet",
+            view -> listener.confirm("QR siparişini reddet",
+                "Bu QR siparişi adisyona veya oda hesabına aktarılmadan reddedilsin mi?",
+                () -> {
+                  listener.sendAction("qr_order_reject",
+                      payload("request_id",request.id,"expected_updated_at",request.updatedAt),
+                      "Sipariş reddi masaüstüne iletildi; sonuç senkronize edilecek.");
+                  dialog.dismiss();
+                })),activity);
+      }
+      page.addView(decisions);
+    }
+
+    boolean canConvert = !qrOrder && AndroidUiRules.canConvertRequest(data, request);
+    boolean canRespond = !qrOrder && data.hasPermission("customer.respond");
+    boolean canReject = !qrOrder && data.hasPermission("customer.reject");
+    boolean canMarkAnswered = !qrOrder && data.hasPermission("customer.mark_answered");
 
     if (canConvert || canRespond || canReject || canMarkAnswered) {
       page.addView(UiKit.sectionTitle(activity, "Hızlı karar"));
@@ -289,7 +352,7 @@ final class CustomerRequestDetailDialog {
       page.addView(response);
     }
 
-    if (AndroidUiRules.canDelete(data, "request.delete")) {
+    if (!qrOrder && AndroidUiRules.canDelete(data, "request.delete")) {
       page.addView(UiKit.sectionTitle(activity, "Yönetici işlemi"));
       Button delete = UiKit.dangerButton(
           activity,

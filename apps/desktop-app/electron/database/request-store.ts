@@ -24,7 +24,7 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
-  const request = db.prepare("SELECT status, request_type, dealer_customer_id, accepted_order_id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string; request_type?: string; dealer_customer_id?: string; accepted_order_id?: string } | undefined;
+  const request = db.prepare("SELECT status, request_type, dealer_customer_id, accepted_order_id, accepted_folio_id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string; request_type?: string; dealer_customer_id?: string; accepted_order_id?: string; accepted_folio_id?: string } | undefined;
   if (!request) {
     return {
       ok: false,
@@ -32,6 +32,9 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
+  if (request.request_type === "room_order" && (status === "approved" || Boolean(request.accepted_folio_id))) {
+    return { ok:false, message:"Oda siparişleri yalnızca açık oda hesabına aktarılarak onaylanabilir." };
+  }
   if (request.request_type === "table_order" && (status === "approved" || Boolean(request.accepted_order_id))) {
     return { ok: false, message: "Masa siparişleri yalnızca adisyona aktarılarak onaylanabilir." };
   }
@@ -82,7 +85,7 @@ export function getRequestById(db: DatabaseSync, requestId: string): SyncedCusto
           customer_id,
           source,
           request_type,
-          table_id, order_items_json, accepted_order_id,
+          table_id, room_id, order_token_hash, order_items_json, accepted_order_id, accepted_folio_id,
           status,
           customer_name,
           customer_phone,
@@ -232,7 +235,7 @@ export function getRequests(db: DatabaseSync, customerId?: string): SyncedCustom
           customer_id,
           source,
           request_type,
-          table_id, order_items_json, accepted_order_id,
+          table_id, room_id, order_token_hash, order_items_json, accepted_order_id, accepted_folio_id,
           status,
           customer_name,
           customer_phone,
@@ -281,6 +284,9 @@ function mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
     source: row.source as SyncedCustomerRequest["source"],
     request_type: row.request_type as SyncedCustomerRequest["request_type"],
     table_id: String(row.table_id ?? ""),
+    room_id: String(row.room_id ?? ""),
+    order_token_hash: String(row.order_token_hash ?? ""),
+    accepted_folio_id: String(row.accepted_folio_id ?? ""),
     order_items: JSON.parse(String(row.order_items_json ?? "[]")) as NonNullable<SyncedCustomerRequest["order_items"]>,
     accepted_order_id: String(row.accepted_order_id ?? ""),
     status: row.status as SyncedCustomerRequest["status"],
@@ -316,10 +322,13 @@ export function deleteRequestInTransaction(
     return { ok: false, message: "Silinecek talep seçilmemiş." };
   }
   const request = db
-    .prepare("SELECT customer_name, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-    .get(requestId) as { customer_name?: string; updated_at?: string } | undefined;
+    .prepare("SELECT customer_name, updated_at, request_type FROM requests WHERE id = ? AND deleted_at = ''")
+    .get(requestId) as { customer_name?: string; updated_at?: string; request_type?:string } | undefined;
   if (!request) {
     return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+  }
+  if (androidAction && ["room_order","table_order"].includes(request.request_type ?? "")) {
+    return {ok:false,message:"QR siparişi genel talep silme işleminden kaldırılamaz."};
   }
   const versionConflict = androidAction
     ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", request.updated_at, "Talep")

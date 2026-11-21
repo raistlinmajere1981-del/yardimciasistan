@@ -15,6 +15,7 @@ export type RoomPublicMedia = PublicResourceMedia;
 
 export interface RoomPublicCatalogRoom {
   id: string;
+  orderTokenHash?: string;
   name: string;
   number: string;
   capacity: number;
@@ -33,6 +34,7 @@ export interface RoomPublicCatalog {
   localization?: import("./public-translations").PublicLocalization;
   version: typeof ROOM_PUBLIC_CATALOG_VERSION;
   enabled: boolean;
+  roomOrderEnabled?: boolean;
   updatedAt: string;
   rooms: RoomPublicCatalogRoom[];
 }

@@ -6,6 +6,7 @@ import { ModalSurface } from "../ui/ModalSurface";
 import { createQrSvg, resolveQrMenuPublicUrl } from "./qr-code";
 
 type OrderTable = { id: string; name: string; area: string; token: string };
+type OrderRoom = { id: string; name: string; number: string; token: string };
 
 export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, utilityAction }: {
   enabled: boolean;
@@ -15,6 +16,8 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
 }) {
   const [webEnabled, setWebEnabled] = useState(true);
   const [ordersEnabled, setOrdersEnabled] = useState(false);
+  const [roomOrdersEnabled, setRoomOrdersEnabled] = useState(false);
+  const [orderRooms, setOrderRooms] = useState<OrderRoom[]>([]);
   const [orderTables, setOrderTables] = useState<OrderTable[]>([]);
   const [publicationLoading, setPublicationLoading] = useState(true);
   const [publicationSaving, setPublicationSaving] = useState(false);
@@ -50,6 +53,8 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
         setWebEnabled(state.enabled !== false);
         setOrdersEnabled(state.ordersEnabled === true);
         setOrderTables(state.tables ?? []);
+        setRoomOrdersEnabled(state.roomOrdersEnabled === true);
+        setOrderRooms(state.rooms ?? []);
       })
       .catch(() => {
         if (!active) return;
@@ -112,6 +117,50 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
     } finally {
       setPublicationSaving(false);
     }
+  }
+
+  async function toggleRoomOrders(next:boolean) {
+    if (!visibleOnWeb || busy) return;
+    const bridge=window.yardimciDesktop;
+    if (!bridge?.setQrRoomOrdersEnabled) return;
+    setPublicationSaving(true);
+    try {
+      const result=await bridge.setQrRoomOrdersEnabled(next);
+      if(!result.ok) {reportAppStatus("error",result.message);return;}
+      setRoomOrdersEnabled(result.enabled);
+      setOrderRooms(result.rooms);
+      reportAppStatus("success",result.message);
+    }catch {
+      reportAppStatus("error","Odaya sipariş ayarı kaydedilemedi.");
+    }finally {setPublicationSaving(false);}
+  }
+
+  async function openQrTools() {
+    if(!visibleOnWeb || !url) return;
+    try {
+      const state=await window.yardimciDesktop?.getQrMenuWebPublication();
+      if (state) {
+        setOrderTables(state.tables ?? []);
+        setOrderRooms(state.rooms ?? []);
+        setOrdersEnabled(state.ordersEnabled);
+        setRoomOrdersEnabled(state.roomOrdersEnabled);
+      }
+    }catch {reportAppStatus("error","Güncel QR kodları okunamadı.");return;}
+    setToolsOpen(true);
+  }
+  function roomUrl(room:OrderRoom) {
+    return url + "?room=" + encodeURIComponent(room.token);
+  }
+  function downloadRoomQr(room:OrderRoom) {
+    try {
+      const code=createQrSvg(roomUrl(room));
+      const href=URL.createObjectURL(new Blob([code],{type:"image/svg+xml;charset=utf-8"}));
+      const anchor=document.createElement("a");
+      anchor.href=href;
+      anchor.download="oda-"+(room.number||room.name).replace(/[^a-zA-Z0-9_-]/g,"-")+".svg";
+      document.body.append(anchor);anchor.click();anchor.remove();
+      URL.revokeObjectURL(href);
+    }catch {reportAppStatus("error","Oda QR bağlantısı QR kodu için çok uzun.");}
   }
 
   function tableUrl(table: OrderTable) {
@@ -183,7 +232,7 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
           <ActionButton variant="secondary" size="sm" onClick={onPreview}>
             <Eye size={16} aria-hidden="true" /> Önizle
           </ActionButton>
-          <ActionButton variant="secondary" size="sm" disabled={!visibleOnWeb || !url} onClick={() => setToolsOpen(true)}>
+          <ActionButton variant="secondary" size="sm" disabled={!visibleOnWeb || !url} onClick={() => void openQrTools()}>
             <QrCode size={16} aria-hidden="true" /> QR Kod
           </ActionButton>
         </div>
@@ -202,6 +251,11 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
         <input type="checkbox" aria-label="Masadan sipariş" checked={visibleOnWeb && ordersEnabled}
           disabled={!visibleOnWeb || busy} onChange={(event) => void toggleOrders(event.target.checked)} />
         <span>Masadan sipariş {ordersEnabled && visibleOnWeb ? "açık" : "kapalı"}</span>
+      </label>
+      <label className="menu-qr-service__toggle">
+        <input type="checkbox" aria-label="Odaya sipariş" checked={visibleOnWeb && roomOrdersEnabled}
+          disabled={!visibleOnWeb || busy} onChange={event=>void toggleRoomOrders(event.target.checked)} />
+        <span>Odaya sipariş {visibleOnWeb && roomOrdersEnabled ? "açık" : "kapalı"}</span>
       </label>
     </section>
 
@@ -243,6 +297,26 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
             </div>
           </div>
         </div>
+        {roomOrdersEnabled && <section aria-label="Aktif konaklama QR kodları">
+          <strong>Odalara özel QR kodları</strong>
+          <p>QR kodu yalnız açık oda hesabı bulunan aktif konaklamada üretilir. Çıkışta iptal olur; yeni misafire yeni QR verilir.</p>
+          {orderRooms.length===0 && <p>Şu anda odaya giriş yapmış, açık hesabı bulunan misafir yok.</p>}
+          <div className="qr-menu-tools__tables">
+            {orderRooms.map(room=>{
+              let roomSvg="";
+              try {roomSvg=createQrSvg(roomUrl(room));}catch{ /* invalid or too long */ }
+              return <div key={room.id} className="qr-menu-tools__table">
+                <strong>{room.number ? "Oda "+room.number : room.name}</strong>
+                {roomSvg && <div className="qr-menu-tools__code" aria-label={room.name+" QR"}
+                  dangerouslySetInnerHTML={{__html:roomSvg}}/>}
+                <ActionButton variant="secondary" size="sm" disabled={!roomSvg}
+                  onClick={()=>downloadRoomQr(room)}>
+                  <Download size={16} aria-hidden="true"/> İndir
+                </ActionButton>
+              </div>;
+            })}
+          </div>
+        </section>}
         {ordersEnabled && orderTables.length > 0 && <section aria-label="Masalara özel QR kodları">
           <strong>Masalara özel QR kodları</strong>
           <p>Her masa kendi sipariş bağlantısına sahip. Kodları masalara yerleştirebilirsiniz.</p>

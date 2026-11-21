@@ -28,13 +28,23 @@ export function applyAndroidReservationAction({ db, action, now }: AndroidReserv
   const startDate = androidPayloadString(action.payload, room ? "start_date" : "date");
   const endDate = androidPayloadString(action.payload, "end_date");
   const time = androidPayloadString(action.payload, "time");
+  const providedDuration = action.payload.duration_minutes;
+  if (room && providedDuration !== undefined) {
+    return {ok:false,message:"Oda rezervasyonuna masa süresi eklenemez."};
+  }
+  if (!room && providedDuration !== undefined &&
+      (typeof providedDuration !== "number" || !Number.isSafeInteger(providedDuration)
+      || providedDuration < 30 || providedDuration > 480)) {
+    return {ok:false,message:"Masa rezervasyonu süresi 30–480 dakika arasında tam sayı olmalı."};
+  }
   if (!validDate(startDate) || (room && (!validDate(endDate) || endDate <= startDate)) || (!room && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) || !Number.isFinite(guestCount) || guestCount < 1 || guestCount > 99) {
     return { ok: false, message: room ? "Geçerli giriş-çıkış tarihi ve 1-99 arasında kişi sayısı gerekli." : "Geçerli tarih, saat ve 1-99 arasında kişi sayısı gerekli." };
   }
   const result = room ? saveManualReservation(db, {
     ...(editing ? { reservationId } : {}), customerId, roomId: androidPayloadString(action.payload, "room_id"), startDate, endDate, guestCount, notes
   }, context) : saveManualRestaurantReservation(db, {
-    customerId, tableId: androidPayloadString(action.payload, "table_id"), date: startDate, time, guestCount, notes
+    customerId, tableId: androidPayloadString(action.payload, "table_id"), date: startDate, time, guestCount,
+    ...(providedDuration !== undefined ? {durationMinutes:providedDuration as number} : {}), notes
   }, { ...context, ...(editing ? { reservationId } : {}) });
   return result.ok ? { ok: true, message: room ? editing ? "Pansiyon rezervasyonu telefondan güncellendi." : "Pansiyon rezervasyonu telefondan oluşturuldu."
     : editing ? "Restoran rezervasyonu telefondan güncellendi." : "Restoran rezervasyonu telefondan oluşturuldu." } : result;

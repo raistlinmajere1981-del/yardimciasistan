@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
@@ -75,6 +76,7 @@ try {
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
   });
+  enableFixtureStockTracking(database);
   assert.equal(setup.ok, true, setup.ok ? "" : setup.message);
 
   const enabled = new Set(database.getEnabledBusinessCapabilities());

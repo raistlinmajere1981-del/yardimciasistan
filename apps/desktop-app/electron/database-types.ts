@@ -88,6 +88,7 @@ export interface DesktopReservation {
   customerName: string;
   customerPhone: string;
   reservationType: string;
+  durationMinutes?: number;
   status: string;
   title: string;
   startDate: string;
@@ -1018,6 +1019,7 @@ export interface AssignReservationRoomInput {
 
 export interface SaveManualRestaurantReservationInput {
   customerId: string;
+  durationMinutes?: number;
   tableId?: string;
   date: string;
   time: string;

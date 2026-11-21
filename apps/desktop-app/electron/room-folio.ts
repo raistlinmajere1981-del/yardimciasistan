@@ -8,6 +8,7 @@ import { updateStayDatesInTransaction } from "./stay-reservation-service.js";
 import type { CommerceUnit } from "@yardimci-asistan/shared";
 import { normalizeMenuStockUnit } from "./database/stock-utils.js";
 import { queueSyncJob } from "./database/sync-runtime-store.js";
+import { queueRoomOrderPublicationIfEnabled } from "./database/qr-room-order-config.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -501,6 +502,7 @@ export class DesktopRoomFolioService {
         now
       );
 
+      if (stay.status==="checked_in") queueRoomOrderPublicationIfEnabled(db,now);
       for (const payment of reservationPayments) {
         db.prepare(`
           INSERT OR IGNORE INTO room_folio_payments (

@@ -51,6 +51,7 @@ final class MarketWorkspace {
   static final String SCREEN_HOME = "home";
   static final String SCREEN_BARCODE_RESULT = "barcode_result";
   static final String SCREEN_STOCK = "stock";
+  static final String SCREEN_REPLENISHMENT = "replenishment";
   static final String SCREEN_RECEIVING = "receiving";
   static final String SCREEN_CART = "cart";
   static final String SCREEN_SALE = "sale";
@@ -73,6 +74,7 @@ final class MarketWorkspace {
   private final MarketProductEditor productEditor;
   private final MarketCatalogBrowser catalog;
   private final MarketInventoryFlow inventory;
+  private final MarketReplenishmentFlow replenishment;
   private final MarketCheckoutFlow checkout;
   private final MarketCreditFlow credit;
 
@@ -96,6 +98,7 @@ final class MarketWorkspace {
     catalog = new MarketCatalogBrowser(context, () -> data, listener, ui, this::showBarcodeEntry, this::handleSelectedProduct);
     productEditor = new MarketProductEditor(context, listener, () -> data, ui, feedback, next -> screen = next);
     inventory = new MarketInventoryFlow(context, listener, () -> data, ui, feedback, next -> screen = next, catalog);
+    replenishment = new MarketReplenishmentFlow(context, () -> data, ui, listener::onRenderRequested);
     checkout = new MarketCheckoutFlow(context, listener, () -> data, ui, feedback, next -> screen = next, catalog, this::openScreen);
     credit = new MarketCreditFlow(context, listener, () -> data, ui, feedback);
   }
@@ -109,12 +112,15 @@ final class MarketWorkspace {
     observedSnapshotVersion = nextSnapshotVersion;
     data = nextData == null ? new OperationData() : nextData;
     checkout.reconcileCustomer();
+    replenishment.revokeWhenUnavailable();
     feedback.update(nextLocalPendingCount, nextLoading);
     enforceVisibleScreen();
 
     LinearLayout page;
     if (SCREEN_STOCK.equals(screen)) {
       page = inventory.stockScreen();
+    } else if (SCREEN_REPLENISHMENT.equals(screen)) {
+      page = replenishment.screen();
     } else if (SCREEN_RECEIVING.equals(screen)) {
       page = inventory.receivingScreen();
     } else if (SCREEN_CART.equals(screen)) {
@@ -189,6 +195,7 @@ final class MarketWorkspace {
       return;
     }
     if (SCREEN_STOCK.equals(screen) && !MarketUiRules.canStockCount(data)) screen = SCREEN_HOME;
+    if (SCREEN_REPLENISHMENT.equals(screen) && !MarketUiRules.canViewReplenishment(data)) screen = SCREEN_HOME;
     if (SCREEN_RECEIVING.equals(screen) && !MarketUiRules.canReceive(data)) screen = SCREEN_HOME;
     if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data) && !MarketUiRules.canCompleteSale(data)) screen = SCREEN_HOME;
     if (SCREEN_SALE.equals(screen) && !MarketUiRules.canCompleteSale(data)) screen = SCREEN_HOME;
@@ -227,6 +234,9 @@ final class MarketWorkspace {
     ArrayList<ActionItem> actions = new ArrayList<>();
     if (MarketUiRules.canStockCount(data)) {
       actions.add(new ActionItem("Stok Say", () -> openScreen(SCREEN_STOCK)));
+    }
+    if (MarketUiRules.canViewReplenishment(data)) {
+      actions.add(new ActionItem("İdeal Stok Eksikleri", () -> openScreen(SCREEN_REPLENISHMENT)));
     }
     if (MarketUiRules.canReceive(data)) {
       actions.add(new ActionItem("Mal Kabul", () -> openScreen(SCREEN_RECEIVING)));

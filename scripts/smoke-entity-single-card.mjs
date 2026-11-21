@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -22,6 +23,7 @@ try {
   database.initialize();
   const setup = database.saveInitialSetup(createSmokeSetupInput({ businessName: "Single card fixture", profileId: "market", profileOptions: ["commerce.wholesale", "channel.online_sales"], phone: "", whatsapp: "", syncSecret: "fixture-only", servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: [] }));
   assert.equal(setup.ok, true, setup.message);
+  enableFixtureStockTracking(database);
   const category = saveCatalogCategory(database.databasePath, { name: "Pasif gerçek kategori", isActive: false });
   const product = runtime.saveRuntimeCatalogProduct(database.databasePath, { name: "Stoklu ürün", categoryId: category.id, salePrice: 20, trackInventory: true, minimumQuantity: 2 });
   runtime.setRuntimeInventoryCount(database.databasePath, { productId: product.id, countedQuantity: 10 });
@@ -142,14 +144,14 @@ try {
   await page.getByRole("button", { name: "Mevcut bayi", exact: true }).click();
   await expect(dialog.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Kayıtlı firma");
   await expect(dialog.getByLabel("Adres", { exact: true })).toHaveValue("Kayıtlı adres");
-  await expect(dialog.getByLabel("Fiyat grubu", { exact: true })).toHaveValue("retail");
+  await expect(dialog.getByLabel("Bayi yetkisi", { exact: true })).toHaveValue("inactive");
+  await expect(dialog.getByLabel("Bayi fiyat grubu", { exact: true })).toHaveCount(0);
   await button("Müşteri Kartını Kaydet").click();
   await expect(dialog).toHaveCount(0);
   assert.equal(database.getCustomer(existing.savedId).commercialProfile.priceGroup, "retail");
   await page.getByRole("button", { name: "Mevcut bayi", exact: true }).click();
   await dialog.locator("summary").click();
-  await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).not.toBeChecked();
-  await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).toBeEnabled();
+  await expect(dialog.getByLabel("Mesaj gönder", { exact: true })).toHaveCount(0);
   await expect(dialog.getByLabel("Kimlik / pasaport no", { exact: true })).toHaveValue("OLD123");
   await close();
   await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
@@ -158,14 +160,12 @@ try {
   await expect(quick.getByRole("checkbox", { name: "Ön/arka", exact: true })).toHaveCount(1);
   await expect(quick.getByRole("button", { name: "Kimliği kameradan tara", exact: true })).toBeDisabled();
   await expect(quick.getByRole("button", { name: "Dosyadan AI ile Doldur", exact: true })).toBeDisabled();
-  await expect(quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true })).toHaveCount(1);
-  const birthday = quick.getByRole("checkbox", { name: "Mesaj gönder", exact: true });
-  await expect(birthday).toBeVisible();
-  await expect(birthday).toBeDisabled();
+  await expect(quick.getByRole("checkbox", { name: "Ticari müşteri", exact: true })).toHaveCount(1);
+  await expect(quick.getByRole("checkbox", { name: "Mesaj gönder", exact: true })).toHaveCount(0);
   await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(0);
-  await quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true }).check();
+  await quick.getByRole("checkbox", { name: "Ticari müşteri", exact: true }).check();
   await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toBeVisible();
-  await quick.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true }).uncheck();
+  await quick.getByRole("checkbox", { name: "Ticari müşteri", exact: true }).uncheck();
   await expect(dialog.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(0);
   const quickOrder = await quick.evaluate(el => {
     const rail = el.closest(".detail-workspace-layout__rail");

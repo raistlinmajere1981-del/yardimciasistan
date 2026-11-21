@@ -308,7 +308,8 @@ button.market-list-row {
   padding: 5px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-field);
+  background: var(--color-product-image-mat);
+  border-color: var(--color-product-image-edge);
 }
 
 .market-list-row small,
@@ -341,6 +342,22 @@ button.market-list-row {
   align-items: center;
 }
 
+/* Keep the product description with the barcode rather than a separate panel. */
+.market-product-barcode-description {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.market-product-barcode-description > .form-field {
+  min-width: 0;
+}
+.market-product-barcode-description textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
 .market-product-image-card {
   min-height: 180px;
   display: grid;
@@ -362,7 +379,8 @@ button.market-list-row {
   box-sizing: border-box;
   padding: var(--space-4);
   border-style: solid;
-  background: var(--color-bg-field);
+  background: var(--color-product-image-mat);
+  border-color: var(--color-product-image-edge);
 }
 
 .market-product-image-card img {
@@ -448,6 +466,13 @@ button.market-list-row {
   gap: var(--space-2);
   justify-content: flex-end;
 }
+
+/* Ideal-stock planning is a full-width read-only report, not an inline-styled exception. */
+.market-stock-replenishment { grid-column: 1 / -1; }
+.market-stock-replenishment__filters { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.market-stock-replenishment__scroll { max-height: 350px; overflow: auto; }
+.market-stock-replenishment-table { width: 100%; text-align: left; border-collapse: collapse; }
+.market-stock-replenishment__sku { display: block; }
 
 .market-stock-card {
   display: grid;
@@ -932,7 +957,8 @@ button.market-list-row {
   padding: 9px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-field);
+  background: var(--color-product-image-mat);
+  border-color: var(--color-product-image-edge);
 }
 
 .market-sale-product span {
@@ -1635,6 +1661,9 @@ button.market-list-row {
 
 @container (max-width: 56rem) {
   .market-product-prices .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 43rem) {
+  .market-product-barcode-description { grid-template-columns: minmax(0, 1fr); }
 }
 @container (max-width: 36rem) {
   .market-product-prices .form-grid { grid-template-columns: minmax(0, 1fr); }

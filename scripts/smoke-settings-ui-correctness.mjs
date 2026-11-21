@@ -16,7 +16,7 @@ try {
   await page.route("**/settings-correctness-test*", async route => route.fulfill({ contentType: "text/html", body: await server.transformIndexHtml("/settings-correctness-test",
     `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve("scripts/fixtures/settings-platform.tsx")}"></script></body></html>`) }));
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
-  const visit = query => page.goto(`${server.resolvedUrls.local[0]}settings-correctness-test${query}`);
+  const visit = query => page.goto(`${server.resolvedUrls.local[0]}settings-correctness-test${query}`, { waitUntil: "domcontentloaded", timeout: 30000 });
   // Issue #87: importing a folder is local maintenance, not dependent on
   // first-run business setup or Web connection. A folder extracted while the
   // panel is open must appear on an explicit refresh.
@@ -78,7 +78,11 @@ try {
         structureToggleAbsent: panels[1].querySelector('.settings-panel-header [aria-expanded]') === null
       };
     });
-    expect(panelLayout.heights.every(height => Math.abs(height - panelLayout.heights[0]) < 2), JSON.stringify(panelLayout.heights)).toBe(true);
+    // The Web heading intentionally includes a 44px SEO action and grows
+    // vertically; the two text-only headings retain their compact height.
+    expect(panelLayout.heights.every(height => height >= 42), JSON.stringify(panelLayout.heights)).toBe(true);
+    expect(panelLayout.heights[0] >= panelLayout.heights[1]-2).toBe(true);
+    await expect(webPanel.getByRole("button",{name:"SEO Yönetimi",exact:true})).toBeVisible();
     expect(panelLayout.sameScrollableParent).toBe(true);
     expect(panelLayout.structureToggleAbsent).toBe(true);
     const labels = profile === "restaurant" ? ["Talepler", "QR Menü", "Online Satış"] : ["Talepler", "Online Satış"];

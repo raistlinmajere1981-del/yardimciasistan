@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import assert from "node:assert/strict";
 import { load } from "./test-helpers/market-sale-benefits-fixture.mjs";
 import { capabilities } from "./test-helpers/commerce-benefits-fixture.mjs";
@@ -90,6 +91,7 @@ try {
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
   });
+  enableFixtureStockTracking(database);
   assert.equal(setup.ok, true, setup.ok ? "" : setup.message);
 
   const customer = database.saveCustomer(baseCustomer({

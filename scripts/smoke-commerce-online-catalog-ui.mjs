@@ -1,3 +1,4 @@
+import { enableFixtureStockTracking } from "./test-helpers/stock-capability.mjs";
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -195,6 +196,7 @@ try {
   // Exercise the real detail editor against the same temporary database. Counting
   // inventory and product edits commit together through the footer Save.
   selectOnlineSales(true);
+  enableFixtureStockTracking(database);
   const stockProduct = saveRuntimeCatalogProduct(database.databasePath, {
     name: "Hybrid stock product", salePrice: 25, purchasePrice: 10, trackInventory: true,
     minimumQuantity: 2, imageAssetPath: "test-preview.png"
@@ -239,7 +241,7 @@ try {
   await expect(detail.locator('.product-workspace-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeVisible();
   const fields = detail.getByRole("region", { name: "Ürün detayları", exact: true });
   const rail = detail.getByRole("complementary", { name: "Ürün işlemleri", exact: true });
-  for (const title of ["Ürün bilgileri", "Fiyatlandırma", "Açıklama"]) {
+  for (const title of ["Ürün bilgileri", "Fiyatlandırma"]) {
     await expect(fields.getByRole("heading", { name: title, exact: true })).toHaveCount(1);
   }
   await expect(fields.getByLabel("Ürün adı", { exact: true })).toHaveValue(stockProduct.name);

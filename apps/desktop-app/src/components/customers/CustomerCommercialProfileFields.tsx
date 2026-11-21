@@ -20,7 +20,11 @@ export function CustomerCommercialProfileFields({
   wholesaleEnabled = false,
   onChange
 }: CustomerCommercialProfileFieldsProps) {
-  const priceGroup = priceGroupForDealerStatus(wholesaleEnabled ? form.commercialDealerStatus : "inactive", form.commercialPriceGroup);
+  // A disabled wholesale feature hides dealer controls without modifying the
+  // stored dealer price group during an unrelated company/tax edit.
+  const priceGroup = wholesaleEnabled
+    ? priceGroupForDealerStatus(form.commercialDealerStatus, form.commercialPriceGroup)
+    : form.commercialPriceGroup;
 
   useEffect(() => {
     if (form.commercialPriceGroup !== priceGroup) {

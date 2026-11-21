@@ -7,6 +7,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -28,6 +29,7 @@ final class CustomerFormDialog {
   private final ComponentActivity activity;
   private final OperationData.CustomerRecord existing;
   private final boolean aiEnabled;
+  private final boolean wholesaleEnabled;
   private final Listener listener;
   private final Dialog dialog;
 
@@ -47,6 +49,14 @@ final class CustomerFormDialog {
   private EditText fatherName;
   private EditText issuingAuthority;
   private EditText address;
+  private CheckBox commercialEnabled;
+  private EditText commercialCompanyName;
+  private EditText commercialTaxOffice;
+  private EditText commercialTaxNumber;
+  private EditText commercialAuthorizedPerson;
+  private Spinner commercialDealerStatus;
+  private Spinner commercialPriceGroup;
+  private EditText commercialPaymentTermDays;
   private TextView status;
   private Button imageButton;
   private Button saveButton;
@@ -55,11 +65,13 @@ final class CustomerFormDialog {
       ComponentActivity activity,
       OperationData.CustomerRecord existing,
       boolean aiEnabled,
+      boolean wholesaleEnabled,
       Listener listener
   ) {
     this.activity = activity;
     this.existing = existing;
     this.aiEnabled = aiEnabled;
+    this.wholesaleEnabled = wholesaleEnabled;
     this.listener = listener;
     this.dialog = new Dialog(activity);
     build();
@@ -147,6 +159,43 @@ final class CustomerFormDialog {
     email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
     notes = addInput(form, "Müşteri notları", "Tercihler ve işletme notları", value("notes"), true);
 
+    form.addView(sectionLabel("Ticari müşteri"));
+    commercialEnabled = new CheckBox(activity);
+    commercialEnabled.setText("Firma / ticari müşteri kaydı");
+    commercialEnabled.setTextColor(UiKit.TEXT);
+    commercialEnabled.setChecked(existing != null && existing.commercialProfile != null);
+    form.addView(commercialEnabled);
+    LinearLayout commercialPanel = UiKit.column(activity);
+    OperationData.CommercialProfile profile = existing == null ? null : existing.commercialProfile;
+    commercialCompanyName = addInput(commercialPanel,"Firma / ticari unvan *",
+        "Örn. Örnek Gıda Ltd. Şti.",profile == null ? "" : profile.companyName,false);
+    commercialTaxOffice = addInput(commercialPanel,"Vergi dairesi","Vergi dairesi adı",
+        profile == null ? "" : profile.taxOffice,false);
+    commercialTaxNumber = addInput(commercialPanel,"Vergi numarası","Vergi numarası",
+        profile == null ? "" : profile.taxNumber,false);
+    commercialTaxNumber.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+    commercialAuthorizedPerson = addInput(commercialPanel,"Yetkili kişi","İlgili kişi",
+        profile == null ? "" : profile.authorizedPerson,false);
+    if (wholesaleEnabled) {
+      commercialPanel.addView(sectionLabel("Toptancı / bayi seçenekleri"));
+      commercialDealerStatus = addChoiceSpinner(commercialPanel,"Bayi durumu",new ChoiceItem[]{
+          new ChoiceItem("inactive","Bayi değil"),
+          new ChoiceItem("active","Aktif bayi")
+      },profile == null ? "inactive" : profile.dealerStatus);
+      commercialPriceGroup = addChoiceSpinner(commercialPanel,"Fiyat grubu",new ChoiceItem[]{
+          new ChoiceItem("retail","Perakende"),
+          new ChoiceItem("dealer_a","Bayi A"),
+          new ChoiceItem("dealer_b","Bayi B")
+      },profile == null ? "retail" : profile.priceGroup);
+      commercialPaymentTermDays = addInput(commercialPanel,"Ödeme vadesi (gün)",
+          "0–3650",profile == null ? "0" : String.valueOf(profile.paymentTermDays),false);
+      commercialPaymentTermDays.setInputType(InputType.TYPE_CLASS_NUMBER);
+    }
+    commercialPanel.setVisibility(commercialEnabled.isChecked() ? View.VISIBLE : View.GONE);
+    commercialEnabled.setOnCheckedChangeListener((button,checked) ->
+        commercialPanel.setVisibility(checked ? View.VISIBLE : View.GONE));
+    form.addView(commercialPanel);
+
     form.addView(sectionLabel("Kimlik kartı / pasaport"));
     identityType = addChoiceSpinner(
         form,
@@ -223,8 +272,47 @@ final class CustomerFormDialog {
       return;
     }
 
+    if (commercialEnabled.isChecked()) {
+      if (textValue(commercialCompanyName).isEmpty()) {
+        setStatus("Ticari müşteri için firma / unvan gerekli.", UiKit.DANGER);
+        commercialCompanyName.requestFocus();
+        return;
+      }
+      if (textValue(commercialCompanyName).length() > 180
+          || textValue(commercialTaxOffice).length() > 120
+          || textValue(commercialTaxNumber).length() > 32
+          || textValue(commercialAuthorizedPerson).length() > 160) {
+        setStatus("Ticari müşteri alanlarından biri çok uzun.",UiKit.DANGER);
+        return;
+      }
+      if (wholesaleEnabled) {
+        try {
+          int days = Integer.parseInt(textValue(commercialPaymentTermDays));
+          if (days < 0 || days > 3650) throw new NumberFormatException();
+        } catch (NumberFormatException error) {
+          setStatus("Ödeme vadesi 0–3650 gün arasında olmalı.",UiKit.DANGER);
+          return;
+        }
+      }
+    }
+
     JSONObject payload = new JSONObject();
     try {
+      if (commercialEnabled.isChecked()) {
+        JSONObject commercial = new JSONObject()
+            .put("company_name",textValue(commercialCompanyName))
+            .put("tax_office",textValue(commercialTaxOffice))
+            .put("tax_number",textValue(commercialTaxNumber))
+            .put("authorized_person",textValue(commercialAuthorizedPerson));
+        if (wholesaleEnabled) {
+          commercial.put("dealer_status",selectedChoiceValue(commercialDealerStatus));
+          commercial.put("price_group",selectedChoiceValue(commercialPriceGroup));
+          commercial.put("payment_term_days",Integer.parseInt(textValue(commercialPaymentTermDays)));
+        }
+        payload.put("commercial_profile",commercial);
+      } else if (existing != null && existing.commercialProfile != null) {
+        payload.put("commercial_profile",JSONObject.NULL);
+      }
       payload.put("full_name", normalizedName);
       payload.put("phone", textValue(phone));
       payload.put("email", textValue(email));

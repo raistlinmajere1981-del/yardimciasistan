@@ -12,6 +12,9 @@ const rules = read("apps/android-app/src/main/java/com/yardimciasistan/android/M
 const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/android/BarcodeCameraScanner.java");
 const syncController = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidOperationsSyncController.java");
 const productLookup = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
+const photoUI = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketFormUi.java");
+const catalogUI = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketCatalogBrowser.java");
+const editorUI = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketProductEditor.java");
 const gradle = read("apps/android-app/build.gradle");
 const manifest = read("apps/android-app/AndroidManifest.xml");
 
@@ -44,6 +47,15 @@ assert.match(cameraScanner, /CameraSelector\.DEFAULT_BACK_CAMERA/);
 assert.match(cameraScanner, /BarcodeScanning\.getClient/);
 assert.match(manifest, /android\.permission\.CAMERA/);
 assert.match(productLookup, /world\.openfoodfacts\.org\/api\/v2\/product/);
+
+// The same fixed neutral surface is used by picker thumbnails, product details
+// and new-product previews. No Bitmap/pixel rewriting or theme-derived fill.
+assert.match(photoUI, /PRODUCT_IMAGE_BACKGROUND\s*=\s*0xFFF5F5F4/);
+assert.match(photoUI, /PRODUCT_IMAGE_BORDER\s*=\s*0xFFE7E5E4/);
+assert.match(photoUI, /image\.setBackground\(UiKit\.rounded\(context, PRODUCT_IMAGE_BACKGROUND, PRODUCT_IMAGE_BORDER/);
+assert.match(catalogUI, /ui\.productImageView\(cached, 58\)/);
+assert.match(catalogUI, /MarketFormUi\.PRODUCT_IMAGE_BACKGROUND/);
+assert.match(editorUI, /ui\.productImageView\(productCreateImagePreview, 180\)/);
 
 assert.match(gradle, /androidx\.camera:camera-view:/);
 assert.match(gradle, /com\.google\.mlkit:barcode-scanning:/);

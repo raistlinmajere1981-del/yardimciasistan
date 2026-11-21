@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
+import { queueRoomOrderPublicationIfEnabled } from "./database/qr-room-order-config.js";
 import { refreshRoomStatusFromStays, enforceActiveStayRoomStatus } from "./room-state-service.js";
 import { createId } from "@yardimci-asistan/shared";
 import type {
@@ -194,6 +195,7 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
       },
       now
     });
+    if (status==="checked_in") queueRoomOrderPublicationIfEnabled(db,now);
     db.exec("RELEASE customer_stay");
   } catch {
     db.exec("ROLLBACK TO customer_stay; RELEASE customer_stay");
@@ -343,6 +345,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
       },
       now
     });
+    if (status==="checked_in") queueRoomOrderPublicationIfEnabled(db,now);
     db.exec("RELEASE stay_status");
   } catch {
     db.exec("ROLLBACK TO stay_status; RELEASE stay_status");

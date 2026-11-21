@@ -98,6 +98,8 @@ CREATE TABLE business (
   publish_qr_menu_web INTEGER NOT NULL DEFAULT 1 CHECK (publish_qr_menu_web IN (0, 1)),
   qr_table_orders_enabled INTEGER NOT NULL DEFAULT 0 CHECK (qr_table_orders_enabled IN (0, 1)),
   qr_table_order_secret TEXT NOT NULL DEFAULT '',
+  qr_room_orders_enabled INTEGER NOT NULL DEFAULT 0 CHECK (qr_room_orders_enabled IN (0, 1)),
+  qr_room_order_secret TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT NOT NULL DEFAULT '',
@@ -528,6 +530,7 @@ CREATE TABLE customer_credit_entries (
   CHECK (entry_type NOT IN ('adjustment_debit', 'adjustment_credit') OR length(trim(note)) > 0)
 );
 
+
 CREATE TABLE customer_room_stays (
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
@@ -801,6 +804,9 @@ CREATE TABLE requests (
   source TEXT NOT NULL DEFAULT 'manual',
   request_type TEXT NOT NULL,
   table_id TEXT NOT NULL DEFAULT '',
+  room_id TEXT NOT NULL DEFAULT '',
+  order_token_hash TEXT NOT NULL DEFAULT '',
+  accepted_folio_id TEXT NOT NULL DEFAULT '',
   order_items_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(order_items_json)),
   accepted_order_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'new',
@@ -836,6 +842,7 @@ CREATE TABLE reservations (
   end_date TEXT NOT NULL DEFAULT '',
   time TEXT NOT NULL DEFAULT '',
   guest_count INTEGER NOT NULL DEFAULT 1,
+  duration_minutes INTEGER NOT NULL DEFAULT 120 CHECK (duration_minutes BETWEEN 30 AND 480),
   adult_count INTEGER NOT NULL DEFAULT 0,
   child_count INTEGER NOT NULL DEFAULT 0,
   room_ids_json TEXT NOT NULL DEFAULT '[]',
@@ -849,6 +856,45 @@ CREATE TABLE reservations (
   sync_status TEXT NOT NULL DEFAULT 'local_only'
 , agreed_total_minor INTEGER NOT NULL DEFAULT 0
   CHECK (agreed_total_minor >= 0), currency TEXT NOT NULL DEFAULT 'TRY');
+-- Final write-time protection: two independent Desktop/Android connections
+-- cannot allocate overlapping time windows on the same table even if both
+-- preflight readers saw it as available. Half-open intervals permit back-to-back bookings.
+CREATE TRIGGER trg_table_reservation_overlap_insert
+BEFORE INSERT ON reservations
+WHEN NEW.deleted_at='' AND NEW.status IN ('pending','approved')
+  AND NEW.reservation_type IN ('table','breakfast')
+  AND json_valid(NEW.table_ids_json) AND json_array_length(NEW.table_ids_json)>0
+  AND EXISTS (
+    SELECT 1 FROM reservations old
+    JOIN json_each(NEW.table_ids_json) incoming
+    JOIN json_each(old.table_ids_json) occupied ON occupied.value=incoming.value
+    WHERE old.deleted_at='' AND old.status IN ('pending','approved')
+      AND old.reservation_type IN ('table','breakfast') AND old.id<>NEW.id
+      AND datetime(NEW.start_date||' '||NEW.time)<datetime(old.start_date||' '||old.time,'+'||old.duration_minutes||' minutes')
+      AND datetime(old.start_date||' '||old.time)<datetime(NEW.start_date||' '||NEW.time,'+'||NEW.duration_minutes||' minutes')
+  )
+BEGIN
+  SELECT RAISE(ABORT,'Masa rezervasyonu zaman aralığı çakışıyor.');
+END;
+CREATE TRIGGER trg_table_reservation_overlap_update
+BEFORE UPDATE OF start_date,time,duration_minutes,table_ids_json,status,deleted_at,reservation_type ON reservations
+WHEN NEW.deleted_at='' AND NEW.status IN ('pending','approved')
+  AND NEW.reservation_type IN ('table','breakfast')
+  AND json_valid(NEW.table_ids_json) AND json_array_length(NEW.table_ids_json)>0
+  AND EXISTS (
+    SELECT 1 FROM reservations old
+    JOIN json_each(NEW.table_ids_json) incoming
+    JOIN json_each(old.table_ids_json) occupied ON occupied.value=incoming.value
+    WHERE old.deleted_at='' AND old.status IN ('pending','approved')
+      AND old.reservation_type IN ('table','breakfast') AND old.id<>NEW.id
+      AND datetime(NEW.start_date||' '||NEW.time)<datetime(old.start_date||' '||old.time,'+'||old.duration_minutes||' minutes')
+      AND datetime(old.start_date||' '||old.time)<datetime(NEW.start_date||' '||NEW.time,'+'||NEW.duration_minutes||' minutes')
+  )
+BEGIN
+  SELECT RAISE(ABORT,'Masa rezervasyonu zaman aralığı çakışıyor.');
+END;
+
+
 
 CREATE TABLE room_folio_items (
   id TEXT PRIMARY KEY,
@@ -3255,6 +3301,18 @@ CREATE TRIGGER trg_kbs_requests_android_snapshot_delete AFTER DELETE ON kbs_deli
     attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
 END;
 
+-- Source-language SEO copy is owned by Desktop; other languages reuse public_translations.
+CREATE TABLE seo_page_sources (
+  business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+  page_key TEXT NOT NULL CHECK (page_key IN
+    ('home','about','rooms','restaurant','menu','catalog','gallery','announcements','reviews','contact')),
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  og_title TEXT NOT NULL DEFAULT '',
+  og_description TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (business_id,page_key)
+);
 -- Public translation service: current schema only, independent of spoken languages.
 CREATE TABLE public_translation_settings (
   business_id TEXT PRIMARY KEY REFERENCES business(id) ON DELETE CASCADE,
@@ -3277,7 +3335,7 @@ CREATE TABLE public_translation_runtime (
 );
 CREATE TABLE public_translations (
   business_id TEXT NOT NULL REFERENCES business(id) ON DELETE CASCADE,
-  record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing','site_text')),
+  record_type TEXT NOT NULL CHECK(record_type IN ('business','room','table','menu_category','menu_product','catalog_category','catalog_product','gallery','marketing','site_text','seo')),
   record_id TEXT NOT NULL, field TEXT NOT NULL, target_language TEXT NOT NULL,
   source_text TEXT NOT NULL, source_hash TEXT NOT NULL,
   translated_text TEXT NOT NULL DEFAULT '',
@@ -3305,7 +3363,11 @@ SELECT b.id AS business_id, 'catalog_product' AS record_type, p.id AS record_id,
 UNION ALL
 SELECT b.id AS business_id, 'catalog_category' AS record_type, r.id AS record_id, r.name AS label, json_object('name', r.name) AS fields_json FROM business b JOIN catalog_categories r ON r.business_id=b.id WHERE b.deleted_at='' AND r.deleted_at='' AND r.is_active=1 AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='channel.online_sales' AND c.is_enabled=1) AND EXISTS(SELECT 1 FROM catalog_products p JOIN commerce_product_publications x ON x.product_id=p.id AND x.business_id=b.id WHERE p.category_id=r.id AND p.deleted_at='' AND p.is_active=1 AND x.is_published=1 AND x.channel='online_sales')
 UNION ALL
-SELECT b.id AS business_id, 'marketing' AS record_type, r.id AS record_id, r.title AS label, json_object('title', r.title, 'text', r.text) AS fields_json FROM business b JOIN marketing_publications r ON r.business_id=b.id WHERE b.deleted_at='' AND r.channel='website' AND r.desired_published=1 AND r.status!='draft' AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='marketing.studio' AND c.is_enabled=1);
+SELECT b.id AS business_id, 'marketing' AS record_type, r.id AS record_id, r.title AS label, json_object('title', r.title, 'text', r.text) AS fields_json FROM business b JOIN marketing_publications r ON r.business_id=b.id WHERE b.deleted_at='' AND r.channel='website' AND r.desired_published=1 AND r.status!='draft' AND EXISTS(SELECT 1 FROM business_capabilities c WHERE c.business_id=b.id AND c.capability_id='marketing.studio' AND c.is_enabled=1)
+UNION ALL
+SELECT s.business_id, 'seo' AS record_type, s.page_key AS record_id, s.page_key AS label,
+  json_object('title',s.title,'description',s.description,'og_title',s.og_title,'og_description',s.og_description)
+  AS fields_json FROM seo_page_sources s JOIN business b ON b.id=s.business_id WHERE b.deleted_at='';
 
 -- Dealer read projections share the existing private durable publication.
 CREATE TRIGGER trg_dealer_history_commerce_orders_insert AFTER INSERT ON commerce_orders

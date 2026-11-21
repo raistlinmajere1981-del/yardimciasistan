@@ -7,6 +7,7 @@ export interface BusinessWebContext extends BusinessAiContext {
   dealerApplicationEnabled?: boolean;
   trafficEnabled?: boolean;
   localization?: import("./public-translations").PublicLocalization;
+  seo?: import("./seo").SeoPublication;
   mapDisplayMode: BusinessMapDisplayMode;
   googleMapsEmbedUrl: string;
   gallery: PublicResourceMedia[];

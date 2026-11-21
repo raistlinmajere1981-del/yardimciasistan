@@ -30,6 +30,7 @@ const supersededAnalysis = () => ({
 interface CustomerFormFieldsProps {
   form: CustomerFormState;
   aiEnabled: boolean;
+  birthdayMessagingEnabled?: boolean;
   wholesaleEnabled?: boolean;
   identityExpanded?: boolean;
   identityActionsTarget: HTMLDivElement | null;
@@ -43,6 +44,7 @@ interface CustomerFormFieldsProps {
 export function CustomerFormFields({
   form,
   aiEnabled,
+  birthdayMessagingEnabled = false,
   wholesaleEnabled = false,
   identityExpanded = true,
   identityActionsTarget,
@@ -217,7 +219,7 @@ export function CustomerFormFields({
               />
               <strong>Ticari müşteri</strong>
             </label>}
-            <label className="form-check customer-birthday-toggle">
+            {birthdayMessagingEnabled && <label className="form-check customer-birthday-toggle">
               <input
                 type="checkbox"
                 checked={Boolean(form.birthDate) && form.birthdayMessageEnabled}
@@ -225,7 +227,7 @@ export function CustomerFormFields({
                 onChange={event => update("birthdayMessageEnabled", event.target.checked)}
               />
               <strong>Mesaj gönder</strong>
-            </label>
+            </label>}
           </div>
           {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
         </div>,

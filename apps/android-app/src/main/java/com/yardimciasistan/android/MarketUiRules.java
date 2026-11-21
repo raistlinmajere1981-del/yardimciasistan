@@ -90,6 +90,69 @@ final class MarketUiRules {
     return canViewProducts(data) && data.hasBusinessCapability(CAPABILITY_BARCODE);
   }
 
+  static boolean canViewReplenishment(OperationData data) {
+    return canViewProducts(data)
+        && data.hasBusinessCapability(CAPABILITY_CATALOG)
+        && data.hasBusinessCapability(CAPABILITY_INVENTORY);
+  }
+
+  /** Presentation-only selection; never mutates inventory or purchase orders. */
+  static List<OperationData.StockReplenishmentRow> filteredReplenishment(
+      OperationData data, String categoryId, String query) {
+    List<OperationData.StockReplenishmentRow> result = new ArrayList<>();
+    if (!canViewReplenishment(data)) return result;
+    String search=text(query).toLowerCase(new Locale("tr","TR"));
+    for (OperationData.StockReplenishmentRow row : data.market.replenishment.rows) {
+      if (categoryId != null && !categoryId.isEmpty() && !categoryId.equals(row.categoryId)) continue;
+      if (!search.isEmpty() && !(row.name+" "+row.sku).toLowerCase(new Locale("tr","TR")).contains(search)) continue;
+      result.add(row);
+    }
+    return result;
+  }
+
+  private static String safeCsvCell(String text) {
+    String raw=text==null?"":text;
+    String first=raw.stripLeading();
+    if ((!first.isEmpty() && "=+-@".indexOf(first.charAt(0))>=0)
+        || (!raw.isEmpty() && "\t\r\n".indexOf(raw.charAt(0))>=0)) raw="'"+raw;
+    return "\""+raw.replace("\"","\"\"")+"\"";
+  }
+
+  static String replenishmentCsv(List<OperationData.StockReplenishmentRow> rows) {
+    StringBuilder csv=new StringBuilder("\uFEFF");
+    csv.append("Kategori;Ürün;SKU;Birim;Mevcut;Minimum;İdeal;Sipariş\r\n");
+    for (OperationData.StockReplenishmentRow row : rows) {
+      String[] cells={row.categoryName,row.name,row.sku,row.unit,
+          String.valueOf(row.quantity),String.valueOf(row.minimumQuantity),
+          String.valueOf(row.idealQuantity),String.valueOf(row.suggestedQuantity)};
+      for (int i=0;i<cells.length;i++) {
+        if (i>0) csv.append(';');
+        csv.append(safeCsvCell(cells[i]));
+      }
+      csv.append("\r\n");
+    }
+    return csv.toString();
+  }
+
+  static String replenishmentText(List<OperationData.StockReplenishmentRow> rows) {
+    StringBuilder message=new StringBuilder("İdeal Stok — Sipariş Önerisi\n");
+    message.append(rows.size()).append(" eksik ürün · Yalnız öneridir; sipariş oluşturulmadı.\n\n");
+    String previous="";
+    for (OperationData.StockReplenishmentRow row : rows) {
+      if (!row.categoryName.equals(previous)) {
+        previous=row.categoryName;
+        message.append("[").append(previous).append("]\n");
+      }
+      message.append("• ").append(row.name).append(row.sku.isEmpty()?"":" ("+row.sku+")")
+          .append(": ").append(java.math.BigDecimal.valueOf(row.suggestedQuantity)
+              .stripTrailingZeros().toPlainString())
+          .append(" ").append(row.unit.equals("piece")?"adet":
+              row.unit.equals("pack")?"paket":row.unit.equals("box")?"kutu":row.unit)
+          .append("\n");
+    }
+    return message.toString();
+  }
+
   static boolean canStockCount(OperationData data) {
     return canViewProducts(data) && data.hasPermission(PERMISSION_STOCK_COUNT);
   }
@@ -359,6 +422,23 @@ final class MarketUiRules {
       throw error;
     } catch (Exception error) {
       throw new ValidationException("Ürün kaydı hazırlanamadı.");
+    }
+  }
+
+  /** Only an explicit override travels over the wire; category defaults stay desktop-owned. */
+  static double taxRateOverride(String raw) throws ValidationException {
+    String value = text(raw).replace(',', '.');
+    if (value.isEmpty()) throw new ValidationException("Manuel KDV oranı gerekli.");
+    try {
+      java.math.BigDecimal rate = new java.math.BigDecimal(value);
+      if (rate.compareTo(java.math.BigDecimal.ZERO) < 0
+          || rate.compareTo(java.math.BigDecimal.valueOf(100)) > 0
+          || rate.stripTrailingZeros().scale() > 2) {
+        throw new ValidationException("KDV oranı 0 ile 100 arasında, en fazla iki ondalıklı olmalı.");
+      }
+      return rate.doubleValue();
+    } catch (NumberFormatException error) {
+      throw new ValidationException("Geçerli bir KDV oranı girin.");
     }
   }
 

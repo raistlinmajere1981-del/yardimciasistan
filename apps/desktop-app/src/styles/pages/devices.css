@@ -41,6 +41,25 @@
   justify-content: flex-end;
 }
 
+/* First-run guidance; hidden once the first active or inactive device is registered. */
+.android-device-setup-steps {
+  margin: 0;
+  padding-left: 1.4rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.android-device-setup-steps li + li {
+  margin-top: var(--space-2);
+}
+
+.android-device-setup-steps a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .android-devices-empty {
   display: flex;
   align-items: center;

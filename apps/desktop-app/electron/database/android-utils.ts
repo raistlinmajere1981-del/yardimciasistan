@@ -207,6 +207,9 @@ export function androidActionTargetPage(
   actionType: string,
   payload: Record<string, unknown> = {}
 ): DesktopAndroidActionFailure["targetPage"] {
+  if (actionType === "qr_room_order_accept") return "pension";
+  if (actionType === "qr_table_order_accept") return "restaurant";
+  if (actionType === "qr_order_reject") return "customerWork";
   if (actionType.startsWith("customer_") || actionType === "message_delete") {
     return "customerWork";
   }

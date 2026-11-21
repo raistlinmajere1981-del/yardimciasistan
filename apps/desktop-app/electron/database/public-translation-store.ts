@@ -200,7 +200,7 @@ export class PublicTranslationStore {
   private publicationJobs(kind?: TranslationIdentity["kind"]) {
     const jobs = kind === "room" ? ["room_catalog_publish"] : kind === "table" ? ["table_catalog_publish"]
       : kind?.startsWith("menu_") ? ["menu_publish"] : kind?.startsWith("catalog_") ? ["online_catalog_publish"]
-      : kind === "marketing" ? ["marketing_website_publish"] : kind ? ["business_context_publish"]
+      : kind === "marketing" ? ["marketing_website_publish"] : kind === "seo" ? ["business_context_publish"] : kind ? ["business_context_publish"]
       : ["room_catalog_publish", "table_catalog_publish", "menu_publish", "online_catalog_publish", "business_context_publish", "marketing_website_publish"];
     return jobs as Array<Parameters<typeof queueSyncJob>[1]>;
   }

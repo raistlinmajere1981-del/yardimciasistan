@@ -30,6 +30,7 @@ export interface CustomerWorkspaceProps {
   data: DesktopDashboardData;
   aiEnabled: boolean;
   whatsappEnabled: boolean;
+  birthdayMessagingEnabled?: boolean;
   reservationsEnabled: boolean;
   requestsEnabled?: boolean;
   staysEnabled: boolean;
@@ -51,6 +52,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     data,
     aiEnabled,
     whatsappEnabled,
+    birthdayMessagingEnabled = false,
     reservationsEnabled,
     requestsEnabled = false,
     staysEnabled,
@@ -346,6 +348,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           key={formRevision}
           form={form}
           aiEnabled={aiEnabled}
+          birthdayMessagingEnabled={birthdayMessagingEnabled}
           wholesaleEnabled={wholesaleEnabled}
           identityExpanded={staysEnabled}
           identityActionsTarget={identityActionsTarget}

@@ -91,7 +91,10 @@ final class CustomerWorkspace {
         page.addView(item);
         if (search != null) search.add(item,
             customer.fullName + " " + customer.phone + " " + customer.email + " "
-                + customer.notes);
+                + customer.notes + " "
+                + (customer.commercialProfile == null ? "" :
+                    customer.commercialProfile.companyName + " " + customer.commercialProfile.taxNumber
+                    + " " + customer.commercialProfile.taxOffice));
       }
     } else {
       boolean waitingOnly = AndroidUiRules.CUSTOMER_WAITING.equals(visibleFilter);
@@ -143,6 +146,16 @@ final class CustomerWorkspace {
         UiKit.MUTED,
         Typeface.NORMAL
     ));
+
+    if (customer.commercialProfile != null) {
+      card.addView(UiKit.text(activity,
+          "Ticari müşteri · " + customer.commercialProfile.companyName,
+          12, UiKit.SECONDARY, Typeface.BOLD));
+      if (data.hasBusinessCapability("commerce.wholesale")
+          && "active".equals(customer.commercialProfile.dealerStatus)) {
+        card.addView(UiKit.text(activity,"Aktif bayi",12,UiKit.INFO,Typeface.BOLD));
+      }
+    }
 
     String identitySummary = customerIdentitySummary(customer);
     if (!identitySummary.isEmpty()) {

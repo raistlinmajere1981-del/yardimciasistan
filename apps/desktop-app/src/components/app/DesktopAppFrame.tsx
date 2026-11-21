@@ -322,6 +322,8 @@ function DesktopAppFrameContent({
             data: surfaceData,
             aiEnabled,
             whatsappEnabled,
+            birthdayMessagingEnabled: whatsappEnabled && setupData.servicePreferences.whatsapp
+              && setupData.birthdaySettings.enabled,
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS) || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS),
             requestsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.REQUESTS) && runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),

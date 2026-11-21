@@ -104,6 +104,12 @@ final class ReservationDetailDialog {
       ));
     }
 
+    if (AndroidUiRules.isRestaurantOnlyReservation(reservation)) {
+      summary.addView(UiKit.divider(activity));
+      summary.addView(detailLine(activity, "Rezervasyon süresi",
+          reservation.durationMinutes + " dakika"));
+    }
+
     if (!reservation.roomIds.isEmpty()) {
       summary.addView(UiKit.divider(activity));
       summary.addView(detailLine(

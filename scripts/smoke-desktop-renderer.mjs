@@ -520,7 +520,7 @@ try {
   await expect(androidDeviceSection.getByRole("button", { name: "Yenile", exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-device-card")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Telefon eşleştir · QR göster", exact: true })).toBeVisible();
-  await expect(androidDeviceSection).toContainText("Web bağlantısı isteğe bağlıdır");
+  await expect(androidDeviceSection).toContainText("Telefonlar");
   await expect(androidDeviceSection.getByText("USB hata ayıklaması", { exact: false })).toHaveCount(0);
   await expect(androidDeviceSection.getByRole("button", { name: "Uygulamayı Kur", exact: true })).toHaveCount(0);
   await expect(androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true })).toHaveCount(0);

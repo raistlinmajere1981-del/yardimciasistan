@@ -64,6 +64,47 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
+  public void idealStockPlanningIsReadOnlyPermissionGatedAndCsvEscaped() throws Exception {
+    OperationData data=marketData();
+    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_VIEW);
+    assertTrue(MarketUiRules.canViewReplenishment(data));
+    JSONObject snapshot=new JSONObject()
+        .put("rows",new JSONArray()
+            .put(new JSONObject().put("product_id","p1").put("name","Kahve")
+                .put("sku","SKU1").put("category_id","drinks")
+                .put("category_name","İçecek").put("unit","piece")
+                .put("quantity",15).put("minimum_quantity",10)
+                .put("ideal_quantity",25).put("suggested_quantity",10))
+            .put(new JSONObject().put("product_id","p2").put("name","=BAD, Gıda")
+                .put("sku","@SKU").put("category_id","food")
+                .put("category_name","+Gıda").put("unit","pack")
+                .put("quantity",3).put("minimum_quantity",5)
+                .put("ideal_quantity",11).put("suggested_quantity",8)))
+        .put("truncated",false);
+    data.market.replenishment=OperationData.StockReplenishment.fromJson(snapshot);
+    assertEquals(2,data.market.replenishment.rows.size());
+    assertEquals(1,MarketUiRules.filteredReplenishment(data,"drinks","KAHVE").size());
+    assertEquals(1,MarketUiRules.filteredReplenishment(data,"food","BAD").size());
+    assertEquals(0,MarketUiRules.filteredReplenishment(data,"drinks","BAD").size());
+    String csv=MarketUiRules.replenishmentCsv(data.market.replenishment.rows);
+    assertTrue(csv.startsWith("\uFEFF"));
+    assertTrue(csv.contains("\r\n"));
+    assertTrue(csv.contains("'=BAD, Gıda"));
+    assertTrue(csv.contains("'+Gıda"));
+    assertTrue(csv.contains("'@SKU"));
+    String message=MarketUiRules.replenishmentText(data.market.replenishment.rows);
+    assertTrue(message.contains("10 adet"));
+    assertTrue(message.contains("8 paket"));
+    assertFalse(message.contains("Stok hareketi oluşturuldu"));
+    data.permissions.remove(MarketUiRules.PERMISSION_PRODUCT_VIEW);
+    assertFalse(MarketUiRules.canViewReplenishment(data));
+    assertEquals(0,MarketUiRules.filteredReplenishment(data,"","").size());
+    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_VIEW);
+    data.businessCapabilities.remove(MarketUiRules.CAPABILITY_INVENTORY);
+    assertFalse(MarketUiRules.canViewReplenishment(data));
+  }
+
+  @Test
   public void productDataLookupRequiresServiceAndProductCreatePermission() {
     OperationData data = marketData();
     data.market.productData.enabled = true;
@@ -234,6 +275,21 @@ public final class AndroidMarketUiTest {
     assertFalse(payload.has("proposed_name"));
     assertFalse(payload.has("photo"));
     assertFalse(payload.has("image"));
+  }
+
+  @Test
+  public void manualTaxOverridesAreValidatedWithoutAssumingAllGoodsUseTwentyPercent() throws Exception {
+    assertEquals(7.5, MarketUiRules.taxRateOverride("7,5"), 0);
+    assertEquals(0, MarketUiRules.taxRateOverride("0"), 0);
+    assertEquals(100, MarketUiRules.taxRateOverride("100"), 0);
+    for (String invalid : new String[] { "", "-1", "101", "not a number", "7.555" }) {
+      try {
+        MarketUiRules.taxRateOverride(invalid);
+        fail("Invalid tax rate accepted: " + invalid);
+      } catch (MarketUiRules.ValidationException expected) {
+        assertNotNull(expected.getMessage());
+      }
+    }
   }
 
   @Test

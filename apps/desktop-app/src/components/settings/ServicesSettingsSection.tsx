@@ -15,6 +15,10 @@ export interface ServicesSettingsProps {
   dashboardData?: DesktopDashboardData;
   androidDeviceState?: SyncState;
   onFormChange: (form: SetupFormState) => void;
+  onAndroidPreferenceChange?: (key: "androidEnabled" | "localNetworkEnabled", enabled: boolean) => void;
+  savedAndroidEnabled?: boolean;
+  savedLocalNetworkEnabled?: boolean;
+  androidPreferenceError?: string;
   onRefreshAndroidDevices?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   androidPermissionGroups?: Record<string, AndroidPermissionGroups>;
@@ -32,6 +36,10 @@ export function ServicesSettingsSection({
   dashboardData,
   androidDeviceState = "idle",
   onFormChange,
+  onAndroidPreferenceChange,
+  savedAndroidEnabled,
+  savedLocalNetworkEnabled,
+  androidPreferenceError,
   onRefreshAndroidDevices,
   onSetAndroidDeviceRole,
   androidPermissionGroups,
@@ -51,7 +59,8 @@ export function ServicesSettingsSection({
     update("birthdaySettings", { ...form.birthdaySettings, [key]: value });
   };
 
-  const androidReady = !setupData.setupRequired && setupData.servicePreferences.android
+  const androidReady = !setupData.setupRequired
+    && (savedAndroidEnabled ?? setupData.servicePreferences.android)
     && enabledCapabilities.includes("service.android");
 
   return (
@@ -90,23 +99,27 @@ export function ServicesSettingsSection({
           {isBusinessServiceAvailable("android", enabledCapabilities) && (
           <ServiceSettingsCard disabled={disabled} readiness="Test kullanılamıyor" id="settings-android" title="Android" enabled={form.androidEnabled}
             status={`${(dashboardData?.androidDevices ?? []).filter(device => device.isActive && !device.revokedAt).length} etkin cihaz`}
-            onEnabledChange={enabled => update("androidEnabled", enabled)}>
+            onEnabledChange={enabled => onAndroidPreferenceChange
+              ? onAndroidPreferenceChange("androidEnabled", enabled) : update("androidEnabled", enabled)}>
               <div className="form-stack">
                 <div className="form-stack">
                   <label className="form-check setup-checkline">
                     <input
                       checked={form.localNetworkEnabled}
-                      onChange={(event) => update("localNetworkEnabled", event.target.checked)}
+                      onChange={(event) => onAndroidPreferenceChange
+                        ? onAndroidPreferenceChange("localNetworkEnabled", event.target.checked)
+                        : update("localNetworkEnabled", event.target.checked)}
                       type="checkbox"
                     />
                     Yerel ağ bağlantısı
                   </label>
                 </div>
+                {androidPreferenceError && <p className="settings-service-empty" role="alert">{androidPreferenceError}</p>}
                 {form.androidEnabled && <>
                   {!androidReady && <p className="settings-service-empty" role="status">
-                    Cihaz işlemleri için Android servisini Kaydet ile etkinleştirin.
+                    Android servisi kaydediliyor. Ardından eşleştirme düğmesi burada açılacak.
                   </p>}
-                  {androidReady && setupData.localNetworkEnabled !== false && form.localNetworkEnabled
+                  {androidReady && (savedLocalNetworkEnabled ?? setupData.localNetworkEnabled) !== false && form.localNetworkEnabled
                     && <LocalCompanionPairingPanel disabled={disabled} />}
                   <AndroidDevicesSection
                     operationsEnabled={androidReady && !disabled}

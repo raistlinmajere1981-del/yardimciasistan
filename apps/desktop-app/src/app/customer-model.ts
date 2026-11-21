@@ -98,8 +98,11 @@ export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = 
         taxOffice: form.commercialTaxOffice,
         taxNumber: form.commercialTaxNumber,
         authorizedPerson: form.commercialAuthorizedPerson,
-        dealerStatus: wholesaleEnabled ? form.commercialDealerStatus : "inactive",
-        priceGroup: wholesaleEnabled && form.commercialDealerStatus === "active" ? form.commercialPriceGroup : "retail",
+        // Hidden dealer fields retain their previously saved values on an ordinary
+        // commercial edit. Server IPC rejects privilege changes without wholesale.
+        dealerStatus: form.commercialDealerStatus,
+        priceGroup: wholesaleEnabled && form.commercialDealerStatus === "inactive"
+          ? "retail" : form.commercialPriceGroup,
         paymentTermDays: Number(form.commercialPaymentTermDays)
       } : null
   };

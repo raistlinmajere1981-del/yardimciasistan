@@ -5,7 +5,8 @@ const OUTER='#e8681d', MIDDLE='#ffb43c', CORE='#fff2b0';
 // A layered, coherent flame: seeded phases give a stable character, while all
 // motion is a smooth function of shared ticker time. No per-frame allocation.
 export function createFlame({random, params}) {
-  let enabled=params.enabled!==false, disposed=false, active=0, time=0;
+  const enabled=params.enabled!==false;
+  let disposed=false, active=0, time=0;
   const phases=[random()*Math.PI*2,random()*Math.PI*2,random()*Math.PI*2];
   const lean=between(random,-1,1);
   function shape(ctx,width,height,layer){

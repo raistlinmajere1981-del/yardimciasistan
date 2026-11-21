@@ -3,12 +3,13 @@
   'use strict';
   const root = document.querySelector('[data-table-order]');
   if (!root) return;
-  const token = root.dataset.tableToken || '';
+  const roomOrder = Boolean(root.dataset.roomToken);
+  const token = roomOrder ? root.dataset.roomToken : root.dataset.tableToken || '';
   // Presentation-only demonstration. This branch never issues guest HTTP
   // requests and cannot authorize an order or enter the desktop adisyon.
   const simulated = root.dataset.demoSimulation === 'true';
   const apiBase = JSON.parse(document.getElementById('site-context').textContent).apiBasePath;
-  const endpoint = apiBase + '/api/table-order.php';
+  const endpoint = apiBase + (roomOrder ? '/api/room-order.php' : '/api/table-order.php');
   const ui = window.DemoLanguage.ui;
   const locale = window.DemoLanguage.locale;
   const status = root.querySelector('[data-table-order-status]');
@@ -17,7 +18,7 @@
   const send = root.querySelector('[data-table-order-submit]');
   const orderNote = root.querySelector('[data-table-order-note]');
   if (simulated) send.textContent = ui('Simülasyonu tamamla');
-  const storageKey = 'ya-qr-order:' + token;
+  const storageKey = 'ya-qr-order:' + (roomOrder ? 'room:' : 'table:') + token;
   const cart = new Map();
   let enabled = false;
   let busy = false;
@@ -100,16 +101,16 @@
   async function resolveTable() {
     status.textContent = simulated ? ui('Demo Masa B3 · Sipariş simülasyonu') : ui('Masa doğrulanıyor…');
     try {
-      let tableName = 'Demo Masa B3';
+      let resourceName = 'Demo Masa B3';
       if (!simulated) {
-        const response = await fetch(endpoint + '?table=' + encodeURIComponent(token), {cache:'no-store'});
+        const response = await fetch(endpoint + '?' + (roomOrder ? 'room=' : 'table=') + encodeURIComponent(token), {cache:'no-store'});
         const result = await response.json();
         if (!response.ok || !result.ok) throw Error(result.message || '');
-        tableName = result.table.name;
+        resourceName = roomOrder ? result.room.name : result.table.name;
       }
       enabled = true;
       status.textContent = simulated ? ui('Demo Masa B3 · Sipariş simülasyonu')
-        : ui('{name} için sipariş hazırlanıyor.', {name:tableName});
+        : ui('{name} için sipariş hazırlanıyor.', {name:resourceName});
       for (const row of document.querySelectorAll('[data-menu-entry-id]')) {
         if (!row.dataset.menuPrice) continue;
         const price = Number(row.dataset.menuPrice);
@@ -133,7 +134,8 @@
       render();
     } catch {
       enabled = false;
-      status.textContent = ui('Masa QR kodu geçersiz veya sipariş kapalı.');
+      status.textContent = roomOrder ? ui('Oda QR kodu geçersiz veya sipariş kapalı.')
+        : ui('Masa QR kodu geçersiz veya sipariş kapalı.');
       send.disabled = true;
     }
   }
@@ -152,7 +154,7 @@
       const response = await fetch(endpoint, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          table_token:token, idempotency_key:operationKey, note:orderNote.value,
+          [roomOrder ? 'room_token' : 'table_token']:token, idempotency_key:operationKey, note:orderNote.value,
           items:[...cart.values()].map(item => ({id:item.id,quantity:item.quantity,note:item.note}))
         })
       });

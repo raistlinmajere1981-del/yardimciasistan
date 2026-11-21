@@ -1,3 +1,4 @@
+import { getQrRoomOrderConfig, qrRoomOrderTokenHash } from "./database/qr-room-order-config";
 import { PublicTranslationStore } from "./database/public-translation-store";
 import { DatabaseSync } from "node:sqlite";
 import { getRoomPublishedMedia } from "./room-media-service";
@@ -25,6 +26,13 @@ export function createPublicRoomCatalog(
       "SELECT publish_rooms_web FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1"
     ).get() as { publish_rooms_web?: unknown } | undefined;
     const publicationEnabled = Number(publication?.publish_rooms_web ?? 1) === 1;
+    const roomOrders=getQrRoomOrderConfig(db);
+    const roomOrderEnabled=roomOrders.enabled && roomOrders.secret !== ""
+      && hasBusinessCapability(enabled,BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS)
+      && hasBusinessCapability(enabled,BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)
+      && hasBusinessCapability(enabled,BUSINESS_CAPABILITIES.FOOD_MENU)
+      && hasBusinessCapability(enabled,BUSINESS_CAPABILITIES.QR_MENU)
+      && hasBusinessCapability(enabled,BUSINESS_CAPABILITIES.REQUESTS);
     if (!publicationEnabled) {
       return { version: 1, enabled: false, updatedAt: "", rooms: [] };
     }
@@ -37,8 +45,16 @@ export function createPublicRoomCatalog(
       ORDER BY sort_order ASC, number ASC, name ASC
     `).all() as Array<Record<string, unknown>>;
 
+    const activeStays=new Map((roomOrderEnabled ? db.prepare(
+      "SELECT s.room_id,s.id AS stay_id FROM customer_room_stays s " +
+      "JOIN room_folios f ON f.stay_id=s.id AND f.room_id=s.room_id AND f.status='open' AND f.deleted_at='' " +
+      "WHERE s.status='checked_in' AND s.deleted_at=''"
+    ).all() : []) .map(row=>[String(row.room_id),String(row.stay_id)]));
     const rooms = rows.map((row) => ({
       id: text(row.id),
+      ...(roomOrderEnabled && activeStays.has(text(row.id)) ? {
+        orderTokenHash:qrRoomOrderTokenHash(roomOrders.secret,text(row.id),activeStays.get(text(row.id))!)
+      } : {}),
       name: text(row.name),
       number: text(row.number),
       capacity: Math.max(1, Math.trunc(Number(row.capacity ?? 1) || 1)),
@@ -62,6 +78,7 @@ export function createPublicRoomCatalog(
     return {
       version: 1,
       enabled: true,
+      roomOrderEnabled,
       localization: new PublicTranslationStore(db).localization(rows.map(r => ({kind: "room", id: String(r.id), fields: {name: String(r.name), bed_info: String(r.bed_info), description: String(r.description), price_note: String(r.price_note)}}))),
       updatedAt,
       rooms: rooms.map(({ updatedAt: _updatedAt, ...room }) => room)
