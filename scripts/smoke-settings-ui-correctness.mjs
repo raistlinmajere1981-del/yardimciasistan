@@ -36,6 +36,14 @@ try {
     }] });
   });
   await backupPanel.getByRole("button", { name: "Yedekleri Yenile" }).click();
+  const refreshBounds = await backupPanel.getByRole("button", { name: "Yedekleri Yenile" }).evaluate(button => {
+    const b=button.getBoundingClientRect(), header=button.closest('.backup-manager-title').getBoundingClientRect();
+    const parent=button.closest('.settings-action-popover').getBoundingClientRect();
+    return { buttonLeft:b.left, buttonRight:b.right, headerLeft:header.left,headerRight:header.right, parentRight:parent.right };
+  });
+  expect(refreshBounds.buttonLeft >= refreshBounds.headerLeft + 2).toBe(true);
+  expect(refreshBounds.buttonRight <= refreshBounds.headerRight - 2, JSON.stringify(refreshBounds)).toBe(true);
+  expect(refreshBounds.buttonRight <= refreshBounds.parentRight - 4).toBe(true);
   await expect(backupPanel.locator(".backup-row")).toHaveCount(1);
   await expect(backupPanel.getByRole("button", { name: "Geri Yükle" })).toBeEnabled();
   await page.evaluate(() => window.refreshSettings({ webModuleUrl: "https://fixture.test", syncSecret: "fixture-secret-123" }));
@@ -78,11 +86,11 @@ try {
         structureToggleAbsent: panels[1].querySelector('.settings-panel-header [aria-expanded]') === null
       };
     });
-    // The Web heading intentionally includes a 44px SEO action and grows
-    // vertically; the two text-only headings retain their compact height.
+    // SEO moved into the persistent top-right settings utility bar.
     expect(panelLayout.heights.every(height => height >= 42), JSON.stringify(panelLayout.heights)).toBe(true);
     expect(panelLayout.heights[0] >= panelLayout.heights[1]-2).toBe(true);
-    await expect(webPanel.getByRole("button",{name:"SEO Yönetimi",exact:true})).toBeVisible();
+    await expect(page.locator(".settings-utility-actions").getByRole("button",{name:"SEO Yönetimi",exact:true})).toBeVisible();
+    await expect(webPanel.getByRole("button",{name:"SEO Yönetimi",exact:true})).toHaveCount(0);
     expect(panelLayout.sameScrollableParent).toBe(true);
     expect(panelLayout.structureToggleAbsent).toBe(true);
     const labels = profile === "restaurant" ? ["Talepler", "QR Menü", "Online Satış"] : ["Talepler", "Online Satış"];

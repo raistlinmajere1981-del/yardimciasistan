@@ -161,9 +161,6 @@ export function ServicesSettingsSection({
                 />
                 Görselleri ekle
               </label>
-              <small>
-                Otomatik arama kapalıysa ürün kartındaki “Ürün Bilgilerini Ara” düğmesiyle manuel sorgu yapılabilir.
-              </small>
           </ServiceSettingsCard>
           )}
 

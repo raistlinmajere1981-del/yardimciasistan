@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FileText, MessageCircle, Printer } from "lucide-react";
+import { FileText, MessageCircle, Printer, QrCode } from "lucide-react";
 import { BUSINESS_CAPABILITIES as C, documentKindEnabled, documentTriggerCompatible, type DocumentKind, type DocumentTrigger, type DocumentOutputMode } from "@yardimci-asistan/shared";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { isSettingsSectionVisible, printSettingsDefinition } from "../../app/settings-registry";
@@ -19,10 +19,14 @@ const documents: ReadonlyArray<{ kind: DocumentKind; title: string; size: string
   { kind: "credit_statement", title: "Borç dökümü", size: "A4 · 210 × 297 mm" },
   { kind: "shipping_label", title: "Kargo etiketi", size: "100 × 150 mm" },
   { kind: "kitchen_ticket", title: "Mutfak siparişi", size: "80 × 160 mm" },
-  { kind: "product_label", title: "Ürün etiketi", size: "60 × 40 mm" }
+  { kind: "product_label", title: "Ürün etiketi", size: "60 × 40 mm" },
+  { kind: "stock_replenishment", title: "Stok ihtiyaç listesi", size: "A4 yatay · 297 × 210 mm" },
+  { kind: "qr_menu", title: "QR Menü kodu", size: "Etiket · 100 × 150 mm" },
+  { kind: "qr_table", title: "Masa QR kodları", size: "Etiket · 100 × 150 mm" },
+  { kind: "qr_room", title: "Oda QR kodları", size: "Etiket · 100 × 150 mm" }
 ];
 
-const triggers: Array<[DocumentTrigger, string]> = [["manual", "Elle"], ["sale_completed", "Satış tamamlandığında"], ["table_closed", "Masa kapandığında"], ["stay_checked_out", "Konaklama çıkışında"], ["customer_statement_requested", "Müşteri dökümü istendiğinde"], ["order_dispatched", "Sipariş sevk edildiğinde"], ["shipment_created", "Gönderi oluşturulduğunda"], ["order_created", "Sipariş oluşturulduğunda"]];
+const triggers: Array<[DocumentTrigger, string]> = [["manual", "Elle"], ["sale_completed", "Satış tamamlandığında"], ["table_closed", "Masa kapandığında"], ["stay_checked_out", "Konaklama çıkışında"], ["customer_statement_requested", "Müşteri dökümü istendiğinde"], ["order_dispatched", "Sipariş sevk edildiğinde"], ["shipment_created", "Gönderi oluşturulduğunda"], ["order_created", "Sipariş oluşturulduğunda"], ["stay_checked_in", "Misafir giriş yaptığında"]];
 
 /** Configuration only; the canvas remains representative sample data. */
 export function PrintManagementWorkspace({ initialized, whatsappEnabled, onClose }: {
@@ -106,6 +110,7 @@ export function PrintManagementWorkspace({ initialized, whatsappEnabled, onClose
     templates.discard(); rules.discard(); printers.discard(); setSaveNotice("");
   };
   const selectedLayout = selected ? templates.layout(selected.kind) : null;
+  const isQr = selected ? ["qr_menu", "qr_table", "qr_room"].includes(selected.kind) : false;
   const trigger = selected && documentTriggerCompatible(selected.kind, selectedTrigger) ? selectedTrigger : "manual";
   const channelControl = (channel: "print" | "whatsapp") => selected && <label>
     {channel === "print" ? "Yazdırma politikası" : "WhatsApp politikası"}
@@ -113,7 +118,7 @@ export function PrintManagementWorkspace({ initialized, whatsappEnabled, onClose
       value={rules.mode(selected.kind, trigger, channel)}
       onChange={event => { setSaveNotice(""); rules.change(selected.kind, trigger, channel, event.target.value as DocumentOutputMode); }}>
       <option value="OFF">Kapalı</option><option value="ASK_CONFIRMATION">{channel === "print" ? "Yazdırma onayı" : "Kullanıcı onayı"}</option>
-      {channel === "print" && <option value="AUTOMATIC">Otomatik</option>}
+      {channel === "print" && selected.kind !== "stock_replenishment" && (!isQr || (selected.kind === "qr_room" && trigger === "stay_checked_in")) && <option value="AUTOMATIC">Otomatik</option>}
     </select>
   </label>;
   return <WorkspaceFrame title="Baskı Yönetimi"
@@ -135,17 +140,26 @@ export function PrintManagementWorkspace({ initialized, whatsappEnabled, onClose
             <h3>Belgeler</h3>
             {available.map(document => <ActionButton key={document.kind} variant="ghost" disabled={busy}
               aria-pressed={selected.kind === document.kind} aria-controls="print-document-preview"
-              onClick={() => { setPrintNotice(""); setSelectedKind(document.kind); }}>
+              onClick={() => { setPrintNotice(""); if (["qr_menu", "qr_table", "qr_room", "stock_replenishment"].includes(document.kind)) setEditing(false); setSelectedKind(document.kind); }}>
               <FileText size={16} aria-hidden="true" /><span>{document.title}<small>{document.size}</small></span>
             </ActionButton>)}
           </nav>
           <section className="print-management__preview" aria-label="Belge önizlemesi">
             <div className="print-management__preview-heading"><h3>{selected.title}</h3><StatusBadge tone="warning">Örnek belge</StatusBadge></div>
             <div className="print-management__mode">
-              <small>{selectedLayout ? `${selectedLayout.pageWidth / 10} × ${selectedLayout.pageHeight / 10} mm` : selected.size} · Mali belge değildir</small>
-              <ActionButton variant={editing ? "secondary" : "primary"} disabled={!templates.ready || busy} onClick={() => setEditing(value => !value)}>{editing ? "Önizlemeye dön" : "Düzenle"}</ActionButton>
+              <small>{selectedLayout ? `${selectedLayout.pageWidth / 10} × ${selectedLayout.pageHeight / 10} mm` : selected.size}</small>
+              {selected.kind !== "stock_replenishment" && !isQr && <ActionButton variant={editing ? "secondary" : "primary"} disabled={!templates.ready || busy} onClick={() => setEditing(value => !value)}>{editing ? "Önizlemeye dön" : "Düzenle"}</ActionButton>}
             </div>
-            <DocumentTemplateCanvas key={`${selected.kind}:${authority}`} onApplyImage={produce => { setSaveNotice(""); return templates.saveProcessedImage(selected.kind, selectedLayout ?? defaultDocumentLayout(selected.kind), produce); }} documentKind={selected.kind} imageAuthority={authority} onPickImage={() => { setSaveNotice(""); void templates.pickFormImage(selected.kind, selectedLayout ?? defaultDocumentLayout(selected.kind)); }} layout={selectedLayout ?? defaultDocumentLayout(selected.kind)} editing={editing} enabled={templates.ready && !busy} onChange={layout => { setSaveNotice(""); templates.stage(selected.kind, layout); }} onPreset={() => { setSaveNotice(""); templates.stage(selected.kind, defaultDocumentLayout(selected.kind, selectedLayout)); }} />
+            {isQr ? <div className="print-management__qr-preview" id="print-document-preview" aria-label="QR baskı örneği">
+              <article className="print-management__qr-paper"><h3>{selected.title}</h3><div className="print-management__qr-symbol"><QrCode size={140} strokeWidth={1.6} aria-hidden="true" /></div><p>QR menüyü açmak için kodu okutun.</p><small>Örnek bağlantı</small></article>
+            </div> : selected.kind === "stock_replenishment" ? <div className="print-management__stock-preview" id="print-document-preview" aria-label="Stok ihtiyaç listesi örnek baskı">
+              <article className="print-management__stock-paper"><h3>İdeal Stok İhtiyaç Listesi</h3><p>Örnek İşletme · Çok sayfalı A4 yatay</p>
+                <table><thead><tr><th>Kategori</th><th>Ürün</th><th>SKU</th><th>Mevcut</th><th>İdeal</th><th>İhtiyaç</th></tr></thead>
+                  <tbody><tr><td>Örnek kategori</td><td>Örnek ürün</td><td>ÖR-01</td><td>4</td><td>12</td><td>8</td></tr>
+                    <tr><td>Örnek kategori</td><td>Başka ürün</td><td>ÖR-02</td><td>3</td><td>10</td><td>7</td></tr></tbody></table>
+                <p>Yalnız stok önerisidir; satın alma siparişi oluşturulmaz.</p>
+              </article>
+            </div> : <DocumentTemplateCanvas key={`${selected.kind}:${authority}`} onApplyImage={produce => { setSaveNotice(""); return templates.saveProcessedImage(selected.kind, selectedLayout ?? defaultDocumentLayout(selected.kind), produce); }} documentKind={selected.kind} imageAuthority={authority} onPickImage={() => { setSaveNotice(""); void templates.pickFormImage(selected.kind, selectedLayout ?? defaultDocumentLayout(selected.kind)); }} layout={selectedLayout ?? defaultDocumentLayout(selected.kind)} editing={editing} enabled={templates.ready && !busy} onChange={layout => { setSaveNotice(""); templates.stage(selected.kind, layout); }} onPreset={() => { setSaveNotice(""); templates.stage(selected.kind, defaultDocumentLayout(selected.kind, selectedLayout)); }} />}
           </section>
           <aside className="print-management__configuration" aria-label={`${selected.title} yapılandırması`}>
             <h3>Belge ayarları</h3>
@@ -171,7 +185,7 @@ export function PrintManagementWorkspace({ initialized, whatsappEnabled, onClose
               </select>
             </label>
             <div className="print-management__channel"><Printer size={18} aria-hidden="true" /><div><strong>Yazdırma</strong>{channelControl("print")}</div></div>
-            {whatsappEnabled && capabilities.includes(C.WHATSAPP) && rules.whatsappAvailable && <div className="print-management__channel"><MessageCircle size={18} aria-hidden="true" /><div><strong>WhatsApp</strong>{channelControl("whatsapp")}<small>Gönderim kullanıcı onayı gerektirir; henüz bağlı değil.</small></div></div>}
+            {selected.kind !== "stock_replenishment" && !isQr && whatsappEnabled && capabilities.includes(C.WHATSAPP) && rules.whatsappAvailable && <div className="print-management__channel"><MessageCircle size={18} aria-hidden="true" /><div><strong>WhatsApp</strong>{channelControl("whatsapp")}<small>Gönderim kullanıcı onayı gerektirir; henüz bağlı değil.</small></div></div>}
           </aside>
         </div>}
   </WorkspaceFrame>;

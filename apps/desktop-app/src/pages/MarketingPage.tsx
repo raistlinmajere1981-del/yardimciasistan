@@ -26,6 +26,7 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: Mark
   const [snapshot, setSnapshot] = useState<MarketingStudioSnapshot | null>(null), [plans, setPlans] = useState<MarketingScheduleSnapshot | null>(null);
   const [view, setView] = usePageViewState<"workspace" | "analytics">("marketing.view", "workspace");
   const [analyticsRange, setAnalyticsRange] = usePageViewState<MarketingAnalyticsRangeInput>("marketing.analytics.range", {preset: "30d"});
+  const [analyticsCheckedAt, setAnalyticsCheckedAt] = useState<string | null>(null);
   const [surface, setSurface] = useState<Surface | null>(null), [loading, setLoading] = useState(false), [message, setMessage] = useState("");
   const workspaceLauncher = useRef<HTMLElement | null>(null);
   function captureLauncher() {
@@ -71,13 +72,15 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: Mark
   const recentRow = (row: typeof recent[number]) => <button type="button" className="marketing-record" key={row.id} onClick={() => openRecent(row)}><MarketingThumbnail snapshot={snapshot!} ids={row.images}/><span><strong title={row.title}>{marketingDisplayTitle(row.title, row.publication?.text ?? "", row.images.length)}</strong><small>{channelNames[row.channel]} · {new Date(row.date).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone={row.label === "Yayında" || row.label === "Tamamlandı" ? "success" : row.label === "Planlandı" ? "info" : "neutral"}>{row.label}</StatusBadge></button>;
   return <FeatureWorkspacePage label="Pazarlama" bodyLabel="Pazarlama çalışma alanı" layout="fill" toolbar={<>
     <FeatureViewSelector label="Pazarlama görünümü" value={view} items={[{id: "workspace", label: "Çalışma Alanı"}, {id: "analytics", label: "Analitik"}]} onChange={setView}/>
-    <div className="page-toolbar__actions"><ActionButton variant="quiet" disabled={loading} onClick={() => {setMessage(""); setLoading(true); void reload().catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Pazarlama verileri alınamadı.")).finally(() => setLoading(false));}}><RefreshCw size={16}/>Durumu yenile</ActionButton></div>
+    <div className="page-toolbar__actions">
+      {view === "analytics" && analyticsCheckedAt && <small className="marketing-analytics-last-check" role="status">Son kontrol: {new Date(analyticsCheckedAt).toLocaleString("tr-TR")}</small>}
+      <ActionButton variant="quiet" disabled={loading} onClick={() => {setMessage(""); setLoading(true); void reload().catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Pazarlama verileri alınamadı.")).finally(() => setLoading(false));}}><RefreshCw size={16}/>Durumu yenile</ActionButton></div>
   </>}>
     <div className="marketing-page" aria-busy={loading}>
       {message && <p role="alert">{message}</p>}
-      {view === "analytics" ? <div className="marketing-body"><MarketingAnalytics range={analyticsRange} onRange={setAnalyticsRange} onCampaign={id => openSurface({kind: "delivery", id})} onPublication={id => {const p = snapshot?.publications.find(p => p.id === id); if(p) void openContent(p.contentId, p);}}/></div> : <>
+      {view === "analytics" ? <div className="marketing-body"><MarketingAnalytics range={analyticsRange} onRange={setAnalyticsRange} onMeasuredAt={setAnalyticsCheckedAt} onCampaign={id => openSurface({kind: "delivery", id})} onPublication={id => {const p = snapshot?.publications.find(p => p.id === id); if(p) void openContent(p.contentId, p);}}/></div> : <>
         <Panel as="section" surfaceRole="communication" className="marketing-welcome"><div><h2>Merhaba!</h2><p>Markanızı daha görünür hale getirin. İçeriğinizi oluşturun,<br className="marketing-welcome-break"/> kanallarınızı seçin ve paylaşın.</p></div><Send className="marketing-welcome-icon" size={66} strokeWidth={1} aria-hidden="true"/><ActionButton disabled={loading || !snapshot} onClick={() => openSurface({kind: "share"})}><Plus size={18}/>Yeni paylaşım</ActionButton></Panel>
-        <div className="marketing-dashboard">
+        <div className={"marketing-dashboard" + (webAvailable ? " marketing-dashboard--with-web" : "")}>
           <Panel as="section" className="marketing-summary-card" aria-label="Taslaklar"><header><div><h3><FileText size={17}/>Taslaklar</h3><p>Tamamlanmayı bekleyen içerikleriniz.</p></div><ActionButton variant="quiet" size="sm" disabled={!snapshot} onClick={() => openSurface({kind: "drafts"})}>Tümünü gör</ActionButton></header><div className="marketing-card-list">
             {drafts.slice(0,5).map(c => <button className="marketing-record" type="button" key={c.content.id} disabled={loading} onClick={() => void openContent(c.content.id)}><MarketingThumbnail snapshot={snapshot!} ids={c.media.map(m => m.mediaAssetId)}/><span><strong title={c.content.title}>{marketingDisplayTitle(c.content.title, c.content.masterText, c.media.length)}</strong><small>Son düzenleme: {new Date(c.content.updatedAt).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone="warning">Taslak</StatusBadge></button>)}
             {!drafts.length && <div className="marketing-card-empty"><FileText size={30}/><strong>Yeni fikirler için yer var.</strong><p>Yeni paylaşım oluşturup taslak olarak kaydedin.</p></div>}

@@ -1,95 +1,171 @@
 import { useEffect, useMemo, useState } from "react";
+import { ClipboardList, Download, Printer, RefreshCw } from "lucide-react";
+import type { PrintStockReplenishmentInput } from "@yardimci-asistan/shared";
 import type { StockReplenishmentRow } from "../../../electron/stock-replenishment";
 import { ActionButton } from "../ui/ActionButton";
+import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 
-/** A read-only purchase suggestion. No purchase is created until the operator
- * uses the existing purchasing workflow; inventory counts stay unchanged. */
+const collator = new Intl.Collator("tr-TR", { numeric: true, sensitivity: "base" });
+type Sort = "deficit" | "name" | "category";
+
+/** Read-only purchasing projection. Never creates an order or inventory movement. */
 export function StockReplenishmentPanel({ refreshRevision = 0 }: { refreshRevision?: number }) {
-  const [rows,setRows] = useState<StockReplenishmentRow[]>([]);
-  const [categoryId,setCategoryId] = useState("");
-  const [search,setSearch] = useState("");
-  const [loading,setLoading] = useState(true);
-  const [error,setError] = useState("");
-  const [reload,setReload] = useState(0);
-  useEffect(()=>{
-    let active=true;
-    setLoading(true);setError("");
-    const read = window.yardimciDesktop?.commerce?.listStockReplenishment;
-    if (!read) { setError("Stok servisi bağlantısı bulunamadı.");setLoading(false);return; }
-    void read().then(value=>{
-      if(active)setRows(value);
-    }).catch(e=>{
-      if(active)setError(e instanceof Error ? e.message : "Sipariş önerileri okunamadı.");
-    }).finally(()=>{if(active)setLoading(false);});
-    return ()=>{active=false;};
-  },[refreshRevision,reload]);
-  const categories = useMemo(()=>Array.from(new Map(rows.map(row=>[row.categoryId,{id:row.categoryId,name:row.categoryName}])).values()),[rows]);
-  const filtered = useMemo(()=>rows.filter(row=>(!categoryId||row.categoryId===categoryId)
-    && (!search.trim() || (row.name+" "+row.sku).toLocaleLowerCase("tr-TR").includes(search.trim().toLocaleLowerCase("tr-TR")))),[rows,categoryId,search]);
-  function downloadCsv(selected:StockReplenishmentRow[]){
-    const value = (v:string|number) => {
-      const text=String(v);
-      const safe = typeof v==="string" && /^[=+@\t\r-]/.test(text) ? "'"+text : text;
-      return '"'+safe.replaceAll('"','""')+'"';
-    };
-    const fields=[["Kategori","Ürün","SKU","Birim","Mevcut","Minimum","İdeal","Sipariş"],
-      ...selected.map(r=>[r.categoryName,r.name,r.sku,r.unit,r.quantity,r.minimumQuantity,r.idealQuantity,r.suggestedQuantity])];
-    const blob=new Blob(["\uFEFF"+fields.map(row=>row.map(value).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const link=document.createElement("a");link.href=url;link.download="ideal-stok-siparis-listesi.csv";
-    document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }
-  function printList(selected:StockReplenishmentRow[]){
-    const esc=(value:string|number)=>String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
-    const body=selected.map(r=>"<tr>"+[r.categoryName,r.name,r.sku,r.unit,r.quantity,r.minimumQuantity,r.idealQuantity,r.suggestedQuantity]
-      .map(v=>"<td>"+esc(v)+"</td>").join("")+"</tr>").join("");
-    const html='<!doctype html><html lang="tr"><meta charset="utf-8"><title>İdeal Stok Sipariş Listesi</title>'
-      +'<style>body{font:12px sans-serif;color:#111;padding:20px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #888;padding:6px;text-align:left}thead{display:table-header-group}tr{break-inside:avoid}@page{size:A4 landscape;margin:12mm}</style>'
-      +'<h1>İdeal Stok – Sipariş Listesi</h1><p>'+new Date().toLocaleDateString("tr-TR")+' · '+selected.length+' ürün · Yalnız öneridir; sipariş oluşturulmadı.</p>'
-      +'<table><thead><tr>'+["Kategori","Ürün","SKU","Birim","Mevcut","Minimum","İdeal","Sipariş"].map(t=>"<th>"+t+"</th>").join("")+'</tr></thead><tbody>'+body+'</tbody></table></html>';
-    const frame=document.createElement("iframe");
-    frame.setAttribute("title","Sipariş listesi yazdırma");
-    frame.style.cssText="position:fixed;left:-9999px;top:0;width:900px;height:800px;border:0;";
-    document.body.append(frame);
-    frame.onload=()=>{
-      const view=frame.contentWindow;
-      if(view) { view.onafterprint=()=>frame.remove();view.focus();view.print(); }
-      else frame.remove();
-    };
-    frame.srcdoc=html;
-  }
-  return <section className="market-panel market-stock-replenishment" aria-label="İdeal stok sipariş listesi">
-    <header className="market-panel-heading"><span>Satın Alma Planlama</span><h2>İdeal Stok Eksikleri</h2>
-      <p>Her ürün için önerilen miktar = İdeal stok − Mevcut stok. Minimum stok yalnız uyarı eşiğidir.</p></header>
-    <div className="market-form-actions market-stock-replenishment__filters">
-      <label className="form-field">Kategori
-        <select value={categoryId} onChange={e=>setCategoryId(e.target.value)}>
-          <option value="">Tüm kategoriler</option>
-          {categories.map(category=><option value={category.id} key={category.id}>{category.name}</option>)}
-        </select>
-      </label>
-      <label className="form-field">Ara <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ürün adı / SKU"/></label>
-      <ActionButton variant="secondary" onClick={()=>setReload(n=>n+1)} disabled={loading}>Yenile</ActionButton>
-      <ActionButton variant="secondary" disabled={loading || !filtered.length} onClick={()=>downloadCsv(filtered)}>Seçilenleri CSV</ActionButton>
-      <ActionButton variant="secondary" disabled={loading || !rows.length} onClick={()=>downloadCsv(rows)}>Tüm eksikleri CSV</ActionButton>
-      <ActionButton variant="secondary" disabled={loading || !filtered.length} onClick={()=>printList(filtered)}>Seçilenleri Yazdır</ActionButton>
-      <ActionButton variant="secondary" disabled={loading || !rows.length} onClick={()=>printList(rows)}>Tümünü Yazdır</ActionButton>
-    </div>
-    {error && <p role="alert">{error}</p>}
-    <p role="status" className="market-muted">{loading?"Stok önerileri hesaplanıyor…":filtered.length+" ürün için sipariş önerisi · Toplam "+rows.length+" eksik ürün"}</p>
-    <div className="market-stock-replenishment__scroll">
-      <table className="market-stock-replenishment-table">
-        <thead><tr><th>Kategori</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>İdeal</th><th>Sipariş</th></tr></thead>
-        <tbody>
-          {filtered.slice(0,250).map(row=><tr key={row.productId}>
-            <td>{row.categoryName}</td><td>{row.name}<small className="market-stock-replenishment__sku">{row.sku}</small></td>
-            <td>{row.quantity} {row.unit}</td><td>{row.minimumQuantity}</td>
-            <td>{row.idealQuantity}</td><td><strong>{row.suggestedQuantity} {row.unit}</strong></td>
-          </tr>)}
-        </tbody>
-      </table>
-    </div>
-    {filtered.length>250 && <p className="market-muted">İlk 250 ürün gösteriliyor. CSV ve yazdırma tüm filtre sonuçlarını içerir.</p>}
-    {!loading && !error && rows.length===0 && <p className="market-muted">İdeal stok altında ürün yok. Ürün kartlarında ideal stok miktarı belirleyebilirsiniz.</p>}
+  const [open, setOpen] = useState(false);
+  return <section className="market-panel market-stock-replenishment-launcher" aria-label="İdeal stok planlama">
+    <div><header className="market-panel-heading"><span>Satın Alma Planlama</span><h2>İdeal Stok Eksikleri</h2></header>
+      <p className="market-muted">İdeal stok ihtiyaçlarını inceleyin, seçin, CSV olarak alın veya Baskı Yönetimi üzerinden yazdırın.</p></div>
+    <ActionButton onClick={() => setOpen(true)}><ClipboardList size={17} aria-hidden="true"/> İhtiyaç listesini aç</ActionButton>
+    {open && <StockReplenishmentWorkspace refreshRevision={refreshRevision} onClose={() => setOpen(false)} />}
   </section>;
+}
+
+export function stockReplenishmentCsv(rows: StockReplenishmentRow[]): string {
+  const csv = (value: string | number) => {
+    const text = String(value);
+    const safe = typeof value === "string" && /^[=+@\t\r-]/.test(text) ? "'" + text : text;
+    return '"' + safe.replaceAll('"', '""') + '"';
+  };
+  const data: Array<Array<string | number>> = [["Kategori", "Ürün", "SKU", "Birim", "Mevcut", "Minimum", "İdeal", "Sipariş"],
+    ...rows.map(row => [row.categoryName, row.name, row.sku, row.unit, row.quantity, row.minimumQuantity, row.idealQuantity, row.suggestedQuantity])];
+  return "\uFEFF" + data.map(row => row.map(csv).join(";")).join("\r\n");
+}
+function downloadCsv(rows: StockReplenishmentRow[], filename: string) {
+  const url = URL.createObjectURL(new Blob([stockReplenishmentCsv(rows)], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function StockReplenishmentWorkspace({ refreshRevision, onClose }: { refreshRevision: number; onClose(): void }) {
+  const [rows, setRows] = useState<StockReplenishmentRow[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<Sort>("deficit");
+  const [pageSize, setPageSize] = useState<25 | 50 | 100>(50);
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [loading, setLoading] = useState(true);
+  const [printing, setPrinting] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError(""); setMessage("");
+    const read = window.yardimciDesktop?.commerce?.listStockReplenishment;
+    if (!read) { setLoading(false); setError("Stok bağlantısı kullanılamıyor."); return; }
+    void read().then(value => { if (active) { setRows(value); setSelectedIds(new Set()); } })
+      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Stok ihtiyaç listesi okunamadı."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [refreshRevision, reload]);
+  const categories = useMemo(() => Array.from(new Map(rows.map(row => [row.categoryId, { id: row.categoryId, name: row.categoryName }])).values())
+    .sort((a, b) => collator.compare(a.name, b.name)), [rows]);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase("tr-TR");
+    return rows.filter(row => (!categoryId || row.categoryId === categoryId)
+      && (!term || (row.name + " " + row.sku + " " + row.categoryName).toLocaleLowerCase("tr-TR").includes(term)))
+      .sort((a, b) => sort === "deficit" ? b.suggestedQuantity - a.suggestedQuantity || collator.compare(a.name, b.name)
+        : sort === "name" ? collator.compare(a.name, b.name)
+          : collator.compare(a.categoryName, b.categoryName) || collator.compare(a.name, b.name));
+  }, [rows, categoryId, search, sort]);
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pages);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const selected = useMemo(() => rows.filter(row => selectedIds.has(row.productId)), [rows, selectedIds]);
+  const allOnPage = pageRows.length > 0 && pageRows.every(row => selectedIds.has(row.productId));
+  const allFiltered = filtered.length > 0 && filtered.every(row => selectedIds.has(row.productId));
+  const select = (ids: string[], checked: boolean) => setSelectedIds(previous => {
+    const next = new Set(previous);
+    for (const id of ids) if (checked) next.add(id); else next.delete(id);
+    return next;
+  });
+  const filter = (apply: () => void) => { apply(); setPage(1); setMessage(""); };
+  const print = async (input: PrintStockReplenishmentInput) => {
+    if (printing || loading) return;
+    const bridge = window.yardimciDesktop?.printStockReplenishment;
+    if (!bridge) { setMessage("Baskı Yönetimi bağlantısı bulunamadı."); return; }
+    setPrinting(true); setMessage("");
+    try {
+      const result = await bridge(input);
+      setMessage(!result.ok ? result.message
+        : result.value === "accepted" ? "Belge yazıcı kuyruğuna gönderildi."
+          : result.value === "failed" ? "Yazdırma başarısız. Yeniden göndermeden önce yazıcıyı kontrol edin."
+            : result.value === "unknown" ? "Yazdırma sonucu belirsiz. Yeniden göndermeden önce yazıcı kuyruğunu kontrol edin."
+              : "Yazdırma iptal edildi.");
+    } catch { setMessage("Yazdırma başlatılamadı. Baskı Yönetimi ayarlarını kontrol edin."); }
+    finally { setPrinting(false); }
+  };
+  const saveCsv = (list: StockReplenishmentRow[], name: string) => {
+    if (!list.length) return;
+    downloadCsv(list, name); setMessage(String(list.length) + " satırlık CSV hazırlandı.");
+  };
+  return <WorkspaceFrame presentation="centered" className="stock-replenishment-workspace" bodyScroll="panes"
+    title="İdeal Stok İhtiyaç Listesi" onClose={onClose} closeBlocked={printing}
+    headerSummary={String(rows.length) + " eksik ürün"}
+    footer={<>
+      <span className="market-muted" role="status">{loading ? "İhtiyaç listesi hesaplanıyor…" : String(filtered.length) + " filtre sonucu · " + String(selectedIds.size) + " seçili · " + String(rows.length) + " toplam eksik"}</span>
+      <div className="stock-replenishment__footer-actions">
+        <ActionButton variant="secondary" onClick={() => saveCsv(selected, "secilen-stok-ihtiyaclari.csv")} disabled={!selected.length || loading || printing}><Download size={16}/> Seçilenleri CSV</ActionButton>
+        <ActionButton variant="secondary" onClick={() => saveCsv(filtered, "filtreli-stok-ihtiyaclari.csv")} disabled={!filtered.length || loading || printing}>Filtreyi CSV</ActionButton>
+        <ActionButton variant="secondary" onClick={() => saveCsv(rows, "tum-stok-ihtiyaclari.csv")} disabled={!rows.length || loading || printing}>Tümünü CSV</ActionButton>
+        <ActionButton variant="secondary" busy={printing} onClick={() => void print({ scope: "selected", productIds: selected.map(row => row.productId) })} disabled={!selected.length || loading}><Printer size={16}/> Seçilenleri Yazdır</ActionButton>
+        <ActionButton onClick={() => void print({ scope: "all" })} disabled={!rows.length || loading || printing}>Tümünü Yazdır</ActionButton>
+      </div>
+    </>}>
+    <div className="stock-replenishment__content">
+      <div className="stock-replenishment__intro">
+        <p>Önerilen miktar = ideal stok − mevcut stok. Minimum stok yalnız uyarı eşiğidir; bu liste sipariş veya stok hareketi oluşturmaz.</p>
+        <ActionButton variant="secondary" disabled={loading || printing} onClick={() => setReload(n => n + 1)}><RefreshCw size={16}/> Yenile</ActionButton>
+      </div>
+      <div className="stock-replenishment__toolbar">
+        <label>Kategori<select aria-label="İhtiyaç kategorisi" value={categoryId} onChange={e => filter(() => setCategoryId(e.target.value))}>
+          <option value="">Tüm kategoriler</option>{categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select></label>
+        <label className="stock-replenishment__search">Ara<input aria-label="İhtiyaçlarda ara" value={search} onChange={e => filter(() => setSearch(e.target.value))} placeholder="Ürün, SKU veya kategori" /></label>
+        <label>Sıralama<select aria-label="İhtiyaç sıralaması" value={sort} onChange={e => filter(() => setSort(e.target.value as Sort))}>
+          <option value="deficit">En çok ihtiyaç</option><option value="name">Ürün adı</option><option value="category">Kategori</option>
+        </select></label>
+        <label>Sayfa boyutu<select aria-label="Sayfadaki ürün" value={pageSize} onChange={e => filter(() => setPageSize(Number(e.target.value) as 25 | 50 | 100))}>
+          {[25, 50, 100].map(value => <option value={value} key={value}>{value} ürün</option>)}
+        </select></label>
+      </div>
+      <div className="stock-replenishment__selection">
+        <ActionButton size="sm" variant="secondary" disabled={!pageRows.length || printing} onClick={() => select(pageRows.map(row => row.productId), !allOnPage)}>
+          {allOnPage ? "Bu sayfanın seçimini kaldır" : "Bu sayfayı seç"}
+        </ActionButton>
+        <ActionButton size="sm" variant="secondary" disabled={!filtered.length || printing} onClick={() => select(filtered.map(row => row.productId), !allFiltered)}>
+          {allFiltered ? "Filtre seçimini kaldır" : "Filtre sonucunu seç (" + String(filtered.length) + ")"}
+        </ActionButton>
+        <ActionButton size="sm" variant="ghost" disabled={!selectedIds.size || printing} onClick={() => setSelectedIds(new Set())}>Seçimi temizle</ActionButton>
+        <span className="market-muted">{selectedIds.size} ürün seçili</span>
+      </div>
+      {error && <p role="alert" className="stock-replenishment__notice">{error}</p>}
+      {message && <p role="status" className="stock-replenishment__notice">{message}</p>}
+      <div className="stock-replenishment__table-scroll">
+        <table className="stock-replenishment__table">
+          <thead><tr><th scope="col">Seç</th><th scope="col">Kategori</th><th scope="col">Ürün / SKU</th><th scope="col">Mevcut</th><th scope="col">Minimum</th><th scope="col">İdeal</th><th scope="col">İhtiyaç</th></tr></thead>
+          <tbody>{pageRows.map(row => <tr key={row.productId} data-selected={selectedIds.has(row.productId)}>
+            <td><input type="checkbox" aria-label={row.name + " seç"} checked={selectedIds.has(row.productId)} disabled={printing} onChange={event => select([row.productId], event.target.checked)}/></td>
+            <td>{row.categoryName}</td><td><strong>{row.name}</strong><small>{row.sku || "SKU yok"}</small></td>
+            <td>{row.quantity} <small>{row.unit}</small></td><td>{row.minimumQuantity}</td><td>{row.idealQuantity}</td>
+            <td className="stock-replenishment__need"><strong>{row.suggestedQuantity}</strong> <small>{row.unit}</small></td>
+          </tr>)}</tbody>
+        </table>
+        {loading && <p role="status" className="stock-replenishment__empty">Stok önerileri hesaplanıyor…</p>}
+        {!loading && !error && !filtered.length && <p className="stock-replenishment__empty">{rows.length ? "Arama ve kategoriye uygun ürün yok." : "İdeal stok altında ürün bulunmuyor. Ürün kartında ideal stok miktarı belirleyebilirsiniz."}</p>}
+      </div>
+      <div className="stock-replenishment__pagination">
+        <span className="market-muted">{filtered.length ? String((currentPage - 1) * pageSize + 1) + "–" + String(Math.min(currentPage * pageSize, filtered.length)) + " / " + String(filtered.length) + " ürün" : "0 ürün"}</span>
+        <div className="stock-replenishment__pages">
+          <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(1)}>İlk</ActionButton>
+          <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(n => Math.max(1, n - 1))}>Önceki</ActionButton>
+          <span aria-label="Sayfa numarası">{currentPage} / {pages}</span>
+          <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(n => Math.min(pages, n + 1))}>Sonraki</ActionButton>
+          <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(pages)}>Son</ActionButton>
+        </div>
+      </div>
+      <p className="market-muted stock-replenishment__print-note">Yazıcı ve yazdırma onayı: Ayarlar → Baskı Yönetimi → Stok ihtiyaç listesi. Yazdırılan belge, baskı anındaki güncel stoktan hazırlanır.</p>
+    </div>
+  </WorkspaceFrame>;
 }

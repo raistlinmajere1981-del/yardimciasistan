@@ -66,8 +66,8 @@ try {
   assert.equal(setupResult.ok,true,setupResult.message);
   raw=new DatabaseSync(desktop.databasePath);
   const b=raw.prepare("SELECT id FROM business").get().id;
-  saveCheckoutSettings(desktop.databasePath,{version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:1499,
-    bank:{name:'DEMO Translation Bank',accountHolder:'DEMO Translation Store',iban:'DEMO — INVALID — DO NOT PAY'},
+  saveCheckoutSettings(desktop.databasePath,{version:2,enabled:true,currency:'TRY',shippingFeeMinor:1499,
+    bank:{name:'DEMO Translation Bank',accountHolder:'DEMO Translation Store',iban:'GB82 WEST 1234 5698 7654 32'},
     legal:{version:'translation-fixture-v2',preliminary:'DEMO preliminary information.',agreement:'DEMO sale agreement.'}});
   raw.exec(`UPDATE business SET publish_tables_web=1;
     UPDATE settings SET online_sales_delivery_enabled=1,online_sales_pickup_enabled=1;
@@ -245,7 +245,8 @@ try {
   await expect(checkoutBody.locator('h2')).toHaveText(order.order_number);
   await expect(checkoutBody).toContainText(ui('Ödeme bekleniyor. Sipariş oluşturulması ödeme onayı değildir.'));
   await expect(checkoutBody).toContainText(englishPrice);
-  await expect(checkoutBody).toContainText(ui('DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.'));
+  await expect(checkoutBody).toContainText('GB82 WEST 1234 5698 7654 32');
+  await expect(checkoutBody).not.toContainText('DEMO — Banka bilgileri geçersizdir');
   await expect(checkoutBody.getByRole('link',{name:ui('Alışverişe devam et'),exact:true})).toBeVisible();
   await expect(page.locator('#mini-cart [data-cart-lines]')).toHaveText(ui('Sepetiniz henüz boş.'));
   assert.equal(new URL(page.url()).origin,base);

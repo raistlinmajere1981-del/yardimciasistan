@@ -101,7 +101,6 @@ export function ProductPhotoGallery({ productId, collection, photos, disabled, o
     </ol>
     <input ref={input} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" aria-label="Ürün fotoğraflarını seç" disabled={blocked || photos.length === MAX_PRODUCT_PHOTOS} onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void add(files); }} />
     <ActionButton variant="secondary" disabled={blocked || photos.length === MAX_PRODUCT_PHOTOS} onClick={() => input.current?.click()}><Upload size={16} aria-hidden="true" />Fotoğraf ekle</ActionButton>
-    <small>JPEG, PNG, WEBP · 5 MB/fotoğraf. Fotoğraf değişiklikleri Ürünü Kaydet ile uygulanır; Değişiklikleri Geri Al ile iptal edilir.</small>
     {message && <p role="status">{message}</p>}
     {error && <p role="alert">{error}</p>}
   </section>;

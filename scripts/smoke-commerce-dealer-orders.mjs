@@ -41,7 +41,7 @@ try {
   const beforeLink=database.createDealerAccessProjection();
   assert.ok(beforeLink.dealers.some(dealer=>dealer.enabled && dealer.account_id===''));
   assert.equal(beforeLink.catalogs.length,2,'never build private catalogs for unverified, unlinked web accounts');
-  saveCheckoutSettings(database.databasePath,{version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:1500,bank:{name:'DEMO',accountHolder:'DEMO',iban:'DEMO — GEÇERSİZ'},legal:{version:'demo-v2',preliminary:'DEMO',agreement:'DEMO'}});
+  saveCheckoutSettings(database.databasePath,{version:2,enabled:true,currency:'TRY',shippingFeeMinor:1500,bank:{name:'DEMO',accountHolder:'DEMO',iban:'GB82 WEST 1234 5698 7654 32'},legal:{version:'demo-v2',preliminary:'DEMO',agreement:'DEMO'}});
   const initialCatalog=database.createCommerceOnlineCatalog();
   assert.equal((await publishDesktopProjection(database,{baseUrl:f.baseUrl,syncSecret:f.secret},'online_catalog_publish',initialCatalog,(identity,value)=>transport.publishOnlineCatalog({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}))).ok,true);
   await f.publish();

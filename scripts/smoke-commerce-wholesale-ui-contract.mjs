@@ -63,7 +63,7 @@ assert.match(customerSaveHandler, /if \(input\.commercialProfile\)/);
 assert.match(customerSaveHandler, /input\.id \? getDatabase\(\)\.getCustomer\(input\.id\)\?\.commercialProfile/);
 assert.match(customerSaveHandler, /input\.commercialProfile\.dealerStatus !== status/);
 assert.match(customerSaveHandler, /input\.commercialProfile\.priceGroup !== group/);
-assert.match(customerSaveHandler, /input\.commercialProfile\.paymentTermDays !== term/);
+assert.doesNotMatch(customerSaveHandler, /input\.commercialProfile\.paymentTermDays !== term/, "commercial payment terms are independent from dealer authorization");
 assert.match(customerSaveHandler, /assertCapability\(BUSINESS_CAPABILITIES\.WHOLESALE/);
 
 console.log("commerce-wholesale-ui-contract-smoke-ok");

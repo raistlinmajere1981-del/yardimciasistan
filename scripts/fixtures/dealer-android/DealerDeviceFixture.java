@@ -235,13 +235,13 @@ public final class DealerDeviceFixture extends Instrumentation {
       JSONObject draft=frozen.draftOrder();
       JSONObject line=new JSONObject().put("product_id","p").put("name","Fixture Parça")
           .put("quantity",4).put("unit_price_minor",2500).put("line_total_minor",10000);
-      JSONObject offlineQuote=new JSONObject().put("version",2).put("minor_unit",2)
+      JSONObject offlineQuote=new JSONObject().put("version",3).put("minor_unit",2)
           .put("items",new JSONArray().put(line)).put("currency","TRY")
           .put("delivery_method","pickup").put("payment_method","bank_transfer")
           .put("subtotal_minor",10000).put("delivery_fee_minor",0).put("total_minor",10000)
-          .put("quote_id",repeat(64)).put("demo",true)
+          .put("quote_id",repeat(64))
           .put("bank",new JSONObject().put("name","DEMO Test").put("accountHolder","DEMO")
-              .put("iban","DEMO-GECERSIZ-HESAP"))
+              .put("iban","GB82 WEST 1234 5698 7654 32"))
           .put("legal",new JSONObject().put("version","test").put("preliminary","DEMO ön bilgilendirme")
               .put("agreement","DEMO satış sözleşmesi"));
       frozen.prepareOrder(offlineQuote,true,true,false);

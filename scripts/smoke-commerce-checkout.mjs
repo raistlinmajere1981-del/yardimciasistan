@@ -38,13 +38,15 @@ try {
   const product=saveRuntimeCatalogProduct(f.database.databasePath,{name:'TEST Checkout Pompası',sku:'TEST-CHECKOUT',unit:'piece',salePrice:123.45,currency:'TRY',taxRate:20,isActive:true,trackInventory:true});
   setRuntimeInventoryCount(f.database.databasePath,{productId:product.id,countedQuantity:10,unitCost:50});
   f.database.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,titleOverride:'',descriptionOverride:'',sortOrder:0,isFeatured:true,featuredOrder:0});
-  const settings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:shipping ? 1499 : null,
-    bank:{name:'DEMO Banka',accountHolder:'DEMO Teknikel',iban:'DEMO — GEÇERSİZ — ÖDEME YAPMAYIN'},legal:{version:'demo-v2',preliminary:'DEMO ön bilgilendirme. Ticari kullanıma hazır değildir.',agreement:'DEMO satış sözleşmesi. Ticari kullanıma hazır değildir.'}};
+  const settings={version:2,enabled:true,currency:'TRY',shippingFeeMinor:shipping ? 1499 : null,
+    bank:{name:'DEMO Banka',accountHolder:'DEMO Teknikel',iban:'GB82 WEST 1234 5698 7654 32'},legal:{version:'demo-v2',preliminary:'DEMO ön bilgilendirme. Ticari kullanıma hazır değildir.',agreement:'DEMO satış sözleşmesi. Ticari kullanıma hazır değildir.'}};
   const setupInput={...f.database.getSetupData(),aiApiKey:'',clearAiApiKey:false,initialCounts:{rooms:0,tables:0},tableCategories:[],onlineSalesDelivery:{pickupEnabled:true,shippingEnabled:shipping},commerceCheckout:settings};
   if(shipping)setupInput.arasShipping={enabled:true,environment:'test',customerCode:'fixture',username:'fixture',password:''};
   const saved=f.database.saveInitialSetup(setupInput,undefined,undefined,shipping ? {mode:'replace',encryptedValue:'safe-storage:v1:fixture-ciphertext'} : undefined);assert.equal(saved.ok,true,saved.message);
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'checkout settings join the canonical settings transaction');
-  assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,demo:false}}).ok,false,'invalid real bank data cannot be enabled');
+  assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,bank:{...settings.bank,iban:"GB83 WEST 1234 5698 7654 32"}}}).ok,false,'invalid bank checksum cannot be enabled');
+  assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,demo:true}}).ok,false,'legacy demo flag cannot activate checkout');
+  assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,version:1}}).ok,false,'legacy checkout settings cannot activate checkout');
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'rejected settings leave the saved owner intact');
   const value=f.database.createCommerceOnlineCatalog();
   const published=await publishDesktopProjection(f.database,{baseUrl:f.baseUrl,syncSecret:f.secret},'online_catalog_publish',value,identity=>f.transport.publishOnlineCatalog({sourceRevision:identity.sourceRevision,idempotencyKey:identity.idempotencyKey,value}));
@@ -104,7 +106,7 @@ try {
     await page.getByLabel('Satış sözleşmesini kabul ediyorum.',{exact:true}).check();
     await page.getByRole('button',{name:'Siparişi onayla',exact:true}).click();
     await expect(page).toHaveURL(/page=checkout-result/);
-    await expect(page.locator('#checkout-body')).toContainText('DEMO — GEÇERSİZ');
+    await expect(page.locator('#checkout-body')).toContainText('GB82 WEST 1234 5698 7654 32');
     await expect(page.locator('#checkout-body h2')).toHaveText(/^YA-\d{8}-[A-F0-9]{10}$/);
     await expect(page.locator('#checkout-body')).toContainText(expectedText);
     await page.getByRole('button',{name:'Havale yaptım',exact:true}).click();

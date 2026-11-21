@@ -97,7 +97,6 @@
         if(order.checkout) {
           const quote=order.checkout;
           detail.append(element('p',paymentLabel(order.payment_status)),element('p',deliveryLabel(order.delivery_status)));
-          if(quote.demo)detail.append(element('p',ui('DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.')));
           const instructions=element('dl','');
           const money = minor => new Intl.NumberFormat(locale,{style:'currency',currency:quote.currency}).format(minor/100);
           detail.append(element('p',ui('Ürünler toplamı: {0}',{0:money(quote.subtotal_minor)})),element('p',ui('Teslimat: {0}',{0:money(quote.delivery_fee_minor)})));

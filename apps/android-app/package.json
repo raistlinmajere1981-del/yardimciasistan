@@ -1,6 +1,6 @@
 {
   "name": "@yardimci-asistan/android-app",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "scripts": {
     "build": "npm run debug",

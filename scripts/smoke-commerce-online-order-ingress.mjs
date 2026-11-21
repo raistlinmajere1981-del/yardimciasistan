@@ -252,9 +252,8 @@ try {
   const resetDb = new DatabaseSync(database.databasePath);
   try { assert.deepEqual(resetDb.prepare("SELECT source_reference FROM commerce_orders").all().map((row) => row.source_reference), ["web-after-reset"]); }
   finally { resetDb.close(); }
-  const frozen = { version: 2, currency: "TRY", minor_unit: 2, subtotal_minor: 5000, delivery_fee_minor: 1500, total_minor: 6500,
-    delivery_method: "shipping", payment_method: "bank_transfer", demo: true,
-    bank: {name: "DEMO", accountHolder: "DEMO", iban: "DEMO — GEÇERSİZ"},
+  const frozen = { version: 3, currency: "TRY", minor_unit: 2, subtotal_minor: 5000, delivery_fee_minor: 1500, total_minor: 6500,
+    delivery_method: "shipping", payment_method: "bank_transfer", bank: {name: "DEMO", accountHolder: "DEMO", iban: "GB82 WEST 1234 5698 7654 32"},
     legal: {version: "demo-v2", preliminary: "DEMO", agreement: "DEMO"}, quote_id: "a".repeat(64),
     order_number: "YA-20261107-A123456789", accepted_at: "2026-11-07T10:00:00Z", consent: {preliminary: true, agreement: true, marketing: false},
     items: [{product_id: currentProduct.id, name: "Accepted product name", sku: "ACCEPTED", unit: "piece", quantity: 2, unit_price_minor: 2500, line_total_minor: 5000, tax_rate: 20}] };
@@ -275,7 +274,11 @@ try {
     assert.equal(detail.items[0].unitPrice, 25);
     new OnlineOrderIngressService(database).importOrder(acceptedTransport);
     assert.equal(check.prepare("SELECT count(*) AS n FROM commerce_orders WHERE source_reference = 'web_order_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'").get().n, 1);
-    assert.throws(() => new OnlineOrderIngressService(database).importOrder({...acceptedTransport, id: "bad-checkout", checkout: {...frozen, total_minor: 1}}), /snapshot/);
+    const ingress = new OnlineOrderIngressService(database);
+    assert.throws(() => ingress.importOrder({...acceptedTransport, id: "bad-checkout", checkout: {...frozen, total_minor: 1}}), /snapshot/);
+    assert.throws(() => ingress.importOrder({...acceptedTransport, id: "legacy-checkout", checkout: {...frozen, version: 2}}), /snapshot/);
+    assert.throws(() => ingress.importOrder({...acceptedTransport, id: "demo-checkout", checkout: {...frozen, demo: true}}), /snapshot/);
+    assert.throws(() => ingress.importOrder({...acceptedTransport, id: "bad-iban", checkout: {...frozen, bank: {...frozen.bank, iban: "GB83 WEST 1234 5698 7654 32"}}}), /snapshot/);
     assert.equal(check.prepare("SELECT count(*) AS n FROM finance_entries").get().n, 0, "acceptance is never a paid sale");
   } finally {check.close();}
   console.log("commerce-online-order-ingress-smoke-ok");

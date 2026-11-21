@@ -19,6 +19,7 @@ import { getRoomWorkspaceModel } from "./room-workspace-model";
 import { useRoomStayOperations } from "./use-room-stay-operations";
 import { RoomStayPanel } from "./RoomStayPanel";
 import { RoomCheckoutAction, RoomDailyOperations } from "./RoomDailyOperations";
+import { RoomQrPrintAction } from "./RoomQrPrintAction";
 import { RoomStayDates } from "./RoomStayDates";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ChoiceChips } from "../ui/ChoiceChips";
@@ -117,6 +118,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       status={null}
     />}
     actions={<>
+      {!history && <RoomQrPrintAction roomId={room.id} stayId={currentStayId} enabled={menuEnabled && folioEnabled}
+        disabled={busy || dirty} />}
       {!history && model.currentStay && <RoomCheckoutAction
         model={model}
         data={data}

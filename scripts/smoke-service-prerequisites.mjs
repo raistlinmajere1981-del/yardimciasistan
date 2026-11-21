@@ -82,7 +82,9 @@ assert.match(markup({ enabled: true }, { ...owner, dirty: true }), /Kapalı · B
 assert.match(markup({ blockedReason: 'AI Yardımcı kapalı' }), /disabled=""/);
 assert.match(markup({ blockedReason: 'AI Yardımcı kapalı' }), /data-state="blocked"/);
 assert.equal((markup({}).match(/<button/g) ?? []).length, 1, 'one native button, no nested controls');
-assert.ok(!markup({}).includes('settings-service-prerequisite'), 'notes appear only when blocked');
+assert.match(markup({}), /Servis ayarları/, 'available service shows a short description');
+assert.doesNotMatch(markup({}), /id="fixture-service-prerequisite"/, 'unblocked description is not announced as a prerequisite');
+assert.match(markup({ blockedReason: 'AI Yardımcı kapalı' }), /id="fixture-service-prerequisite"/, 'blocked reason is labelled for assistive technology');
 const handlers = load(file, { ...dependencies,
   'react': { ...React, useContext: () => host, useRef: value => ({ current: value }),
     useState: value => [value, () => {}], useEffect() {} },

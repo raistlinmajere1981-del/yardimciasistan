@@ -1,8 +1,7 @@
 /** Public business configuration, carried by the existing online_catalog publication. */
 export interface CommerceCheckoutSettings {
-  version: 1;
+  version: 2;
   enabled: boolean;
-  demo: boolean;
   currency: "TRY" | "EUR" | "USD" | "GBP";
   shippingFeeMinor: number | null;
   bank: { name: string; accountHolder: string; iban: string } | null;
@@ -10,7 +9,7 @@ export interface CommerceCheckoutSettings {
 }
 
 export interface CommerceCheckoutSnapshot {
-  version: 2;
+  version: 3;
   currency: string;
   minor_unit: 2;
   items: Array<{ product_id: string; name: string; unit: string; quantity: number;
@@ -21,7 +20,6 @@ export interface CommerceCheckoutSnapshot {
   delivery_method: "pickup" | "shipping";
   payment_method: "bank_transfer";
   bank: NonNullable<CommerceCheckoutSettings["bank"]>;
-  demo: boolean;
   legal: NonNullable<CommerceCheckoutSettings["legal"]>;
   quote_id: string;
   order_number: string;
@@ -47,4 +45,4 @@ export interface CommerceWebOrderStatus {
   events: Array<{ id: string; type: string; created_at: string }>;
 }
 
-export const DEFAULT_COMMERCE_CHECKOUT: CommerceCheckoutSettings = { version:1,enabled:false,demo:true,currency:"TRY",shippingFeeMinor:null,bank:null,legal:null };
+export const DEFAULT_COMMERCE_CHECKOUT: CommerceCheckoutSettings = { version:2,enabled:false,currency:"TRY",shippingFeeMinor:null,bank:null,legal:null };

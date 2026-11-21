@@ -312,6 +312,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           />
         </div>
         <div className="settings-utility-actions">
+          {initialized && webAvailable && <ActionButton id="settings-seo-button" variant="secondary" onClick={() => setSeoOpen(true)}>SEO Yönetimi</ActionButton>}
           {printingEnabled && <ActionButton id="settings-print-button" variant="secondary" onClick={() => setPrintOpen(true)}>Baskı Yönetimi</ActionButton>}
           {initialized && translations.saved.enabled && <ActionButton id="settings-language-button" variant="secondary" onClick={() => setLanguageOpen(true)}>Dil Yönetimi</ActionButton>}
           <SettingsActionPopover id="settings-security-button" label="Güvenlik" open={utility === "security"} onOpenChange={open => setUtility(open ? "security" : null)}>
@@ -361,8 +362,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
             resetVersion={drafts.webResetVersion}
             onVerified={drafts.markWebVerified} onBusyChange={setWebConnecting}
             disabled={drafts.busy || guardBusy} initialized={initialized}
-            onChange={web => drafts.setDraft(form => ({ ...form, ...web }))}
-            onOpenSeo={initialized && webAvailable ? () => setSeoOpen(true) : undefined} />
+            onChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
           <section className="settings-panel settings-structure">
             <div className="settings-panel-header"><h2>İşletme Yapısı ve Özellikler</h2></div>
             <div id="settings-structure-content">

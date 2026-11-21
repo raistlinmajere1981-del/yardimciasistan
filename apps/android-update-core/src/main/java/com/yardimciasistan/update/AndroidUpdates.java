@@ -2,6 +2,12 @@ package com.yardimciasistan.update;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.view.Gravity;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -29,6 +35,60 @@ public final class AndroidUpdates {
   private static final String APK_TYPE="application/vnd.android.package-archive";
   private AndroidUpdates(){}
 
+  /** Host-owned semantic theme colors. The update mechanism remains shared. */
+  public static final class Palette {
+    public final int surface, border, text, secondary, accent, onAccent, soft, success, warning, danger;
+    public Palette(int surface, int border, int text, int secondary, int accent, int onAccent,
+                   int soft, int success, int warning, int danger) {
+      this.surface=surface;this.border=border;this.text=text;this.secondary=secondary;
+      this.accent=accent;this.onAccent=onAccent;this.soft=soft;
+      this.success=success;this.warning=warning;this.danger=danger;
+    }
+  }
+  private static int dp(Activity activity,int size) {
+    return Math.round(size*activity.getResources().getDisplayMetrics().density);
+  }
+  private static GradientDrawable shape(Activity activity,int fill,int outline,int radius) {
+    GradientDrawable background=new GradientDrawable();
+    background.setColor(fill); background.setCornerRadius(dp(activity,radius));
+    background.setStroke(dp(activity,1),outline);
+    return background;
+  }
+  private static TextView label(Activity activity,String value,int size,int color,boolean bold) {
+    TextView text=new TextView(activity);
+    text.setText(value);text.setTextSize(size);text.setTextColor(color);
+    text.setTypeface(Typeface.create("sans",bold?Typeface.BOLD:Typeface.NORMAL));
+    text.setLineSpacing(0,1.08f);
+    return text;
+  }
+  private static Button action(Activity activity,String title,Palette colors,boolean primary) {
+    Button button=new Button(activity);
+    button.setText(title);button.setAllCaps(false);button.setTextSize(14);
+    button.setTypeface(Typeface.create("sans",Typeface.BOLD));
+    int normalText=primary?colors.onAccent:colors.accent;
+    button.setTextColor(new ColorStateList(
+        new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},
+        new int[]{colors.secondary,normalText}));
+    StateListDrawable background=new StateListDrawable();
+    background.addState(new int[]{-android.R.attr.state_enabled},
+        shape(activity,colors.soft,colors.border,12));
+    background.addState(new int[]{},new RippleDrawable(
+        ColorStateList.valueOf((colors.accent&0x00ffffff)|0x28000000),
+        shape(activity,primary?colors.accent:colors.soft,
+            primary?colors.accent:colors.border,12),null));
+    button.setBackground(background);
+    button.setMinHeight(dp(activity,48));button.setMinimumHeight(dp(activity,48));
+    button.setPadding(dp(activity,12),dp(activity,9),dp(activity,12),dp(activity,9));
+    return button;
+  }
+  private static void showStatus(Activity activity,TextView status,String message,int tone,Palette colors) {
+    status.setVisibility(View.VISIBLE);
+    status.setText(message);
+    status.setTextColor(tone==0?colors.secondary:tone==1?colors.success:
+        tone==2?colors.warning:colors.danger);
+    status.setBackground(shape(activity,colors.soft,colors.border,12));
+  }
+
   /** Only a subsequently launched APK with the expected version can confirm installation. */
   public static void confirmInstalledOnLaunch(Activity activity){
     SharedPreferences state=activity.getSharedPreferences("android_updates_v1",Activity.MODE_PRIVATE);
@@ -37,40 +97,61 @@ public final class AndroidUpdates {
       state.edit().remove("pending_version").putInt("installed_success_version",pending).apply();
   }
 
-  public static View settingsView(Activity activity,String channel,String fileProviderSuffix) {
+  public static View settingsView(Activity activity,String channel,String fileProviderSuffix,Palette colors) {
     String packageId=activity.getPackageName();
     String feed=BASE+"/updates/stable/"+channel+"/release.json";
     LinearLayout panel=new LinearLayout(activity);
     panel.setOrientation(LinearLayout.VERTICAL);
-    int pad=(int)(12*activity.getResources().getDisplayMetrics().density);
-    panel.setPadding(pad,pad,pad,pad);
-    TextView title=new TextView(activity);
-    title.setText("Güncellemeler");
-    title.setTextSize(18);
-    panel.addView(title);
+    panel.setPadding(dp(activity,16),dp(activity,15),dp(activity,16),dp(activity,16));
+    panel.setBackground(shape(activity,colors.surface,colors.border,16));
+    LinearLayout.LayoutParams panelParams=new LinearLayout.LayoutParams(-1,-2);
+    panelParams.setMargins(0,dp(activity,10),0,dp(activity,12));
+    panel.setLayoutParams(panelParams);
+    LinearLayout header=new LinearLayout(activity);
+    header.setOrientation(LinearLayout.HORIZONTAL);
+    header.setGravity(Gravity.CENTER_VERTICAL);
+    TextView icon=label(activity,"↻",24,colors.accent,true);
+    icon.setGravity(Gravity.CENTER);
+    icon.setBackground(shape(activity,colors.soft,colors.border,12));
+    header.addView(icon,new LinearLayout.LayoutParams(dp(activity,42),dp(activity,42)));
+    LinearLayout identity=new LinearLayout(activity);
+    identity.setOrientation(LinearLayout.VERTICAL);
+    identity.setPadding(dp(activity,12),0,0,0);
+    identity.addView(label(activity,"Güncellemeler",17,colors.text,true));
     long installed=installedVersion(activity);
-    TextView status=new TextView(activity);
-    status.setText("Kurulu sürüm: "+installedName(activity)+" ("+installed+")");
+    TextView version=label(activity,"Kurulu sürüm: "+installedName(activity)+" ("+installed+")",12,colors.secondary,false);
+    identity.addView(version);
+    header.addView(identity,new LinearLayout.LayoutParams(0,-2,1f));
+    panel.addView(header);
+    TextView status=label(activity,"",13,colors.secondary,false);
+    status.setPadding(dp(activity,12),dp(activity,10),dp(activity,12),dp(activity,10));
+    LinearLayout.LayoutParams statusParams=new LinearLayout.LayoutParams(-1,-2);
+    statusParams.setMargins(0,dp(activity,12),0,0);
+    status.setLayoutParams(statusParams);
+    status.setVisibility(View.GONE);
+    status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
     panel.addView(status);
     SharedPreferences progress=activity.getSharedPreferences("android_updates_v1",Activity.MODE_PRIVATE);
     int confirmed=progress.getInt("installed_success_version",0);
     if(confirmed>0 && installed>=confirmed){
-      status.setText("Yeni sürüm kuruldu: "+installedName(activity)+" ("+installed+")");
+      showStatus(activity,status,"Yeni sürüm kuruldu: "+installedName(activity)+" ("+installed+")",1,colors);
       progress.edit().remove("installed_success_version").apply();
     }
     AtomicReference<UpdateManifest> offered=new AtomicReference<>();
-    Button check=new Button(activity);
-    check.setText("Güncellemeyi denetle");
-    panel.addView(check);
-    Button install=new Button(activity);
-    install.setText("İndir ve yükle");
+    Button check=action(activity,"Güncellemeyi denetle",colors,false);
+    LinearLayout.LayoutParams checkParams=new LinearLayout.LayoutParams(-1,-2);
+    checkParams.setMargins(0,dp(activity,12),0,0);
+    panel.addView(check,checkParams);
+    Button install=action(activity,"İndir ve yükle",colors,true);
+    LinearLayout.LayoutParams installParams=new LinearLayout.LayoutParams(-1,-2);
+    installParams.setMargins(0,dp(activity,8),0,0);
     install.setVisibility(View.GONE);
-    panel.addView(install);
+    panel.addView(install,installParams);
     check.setOnClickListener(v->{
       check.setEnabled(false);
       install.setVisibility(View.GONE);
       offered.set(null);
-      status.setText("Sürüm denetleniyor…");
+      showStatus(activity,status,"Sürüm denetleniyor…",0,colors);
       new Thread(()->{
         try {
           byte[] body=readHttps(feed,16384);
@@ -80,16 +161,16 @@ public final class AndroidUpdates {
             check.setEnabled(true);
             if(latest.newerThan(installedVersion(activity))){
               offered.set(latest);
-              status.setText("Yeni sürüm: "+latest.versionName+" ("+latest.versionCode+")"
-                  +(latest.notes.isEmpty()?"":"\n"+latest.notes));
+              showStatus(activity,status,"Yeni sürüm: "+latest.versionName+" ("+latest.versionCode+")"
+                  +(latest.notes.isEmpty()?"":"\n"+latest.notes),1,colors);
               install.setVisibility(View.VISIBLE);
-            }else status.setText("Güncel sürüm: "+installedName(activity));
+            }else showStatus(activity,status,"Kurulu sürüm güncel.",1,colors);
           });
         } catch(Exception error){
           activity.runOnUiThread(()->{
             if(activity.isFinishing()||activity.isDestroyed())return;
             check.setEnabled(true);
-            status.setText("Güncelleme kontrolü başarısız. İnternet veya yayın daha sonra yeniden denenebilir.");
+            showStatus(activity,status,"Güncelleme kontrolü başarısız. İnternet veya yayın daha sonra yeniden denenebilir.",3,colors);
           });
         }
       },"ya-update-check").start();
@@ -99,7 +180,7 @@ public final class AndroidUpdates {
       if(update==null||!update.newerThan(installedVersion(activity)))return;
       install.setEnabled(false);
       check.setEnabled(false);
-      status.setText("İmzalı APK indiriliyor ve doğrulanıyor…");
+      showStatus(activity,status,"İmzalı APK indiriliyor ve doğrulanıyor…",0,colors);
       new Thread(()->{
         try{
           File apk=downloadAndVerify(activity,update);
@@ -107,10 +188,10 @@ public final class AndroidUpdates {
             if(activity.isFinishing()||activity.isDestroyed())return;
             check.setEnabled(true);install.setEnabled(true);
             if(!update.newerThan(installedVersion(activity))){
-              status.setText("Kurulu sürüm güncel.");return;
+              showStatus(activity,status,"Kurulu sürüm güncel.",1,colors);return;
             }
             if(!activity.getPackageManager().canRequestPackageInstalls()){
-              status.setText("Android kurulum izni gerekiyor. İzin verip İndir ve yükle seçeneğini yeniden açın.");
+              showStatus(activity,status,"Android kurulum izni gerekiyor. İzin verip İndir ve yükle seçeneğini yeniden açın.",2,colors);
               Intent permission=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                   Uri.parse("package:"+packageId));
               activity.startActivity(permission);
@@ -120,16 +201,16 @@ public final class AndroidUpdates {
               Uri uri=FileProvider.getUriForFile(activity,packageId+fileProviderSuffix,apk);
               activity.startActivity(ApkInstallIntent.forVerifiedApk(activity.getPackageManager(),uri));
               progress.edit().putInt("pending_version",(int)update.versionCode).apply();
-              status.setText("Android kurulum onayı bekleniyor; yükleme ancak yeni sürüm açılınca doğrulanacak.");
+              showStatus(activity,status,"Android kurulum onayı bekleniyor; yükleme ancak yeni sürüm açılınca doğrulanacak.",2,colors);
             }catch(ApkInstallIntent.SystemInstallerUnavailableException error){
-              status.setText("Sistem paket yükleyicisi bulunamadı. Kurulum başlatılmadı.");
-            }catch(Exception error){status.setText("Android kurulum ekranı açılamadı. Kurulum başlatılmadı.");}
+              showStatus(activity,status,"Sistem paket yükleyicisi bulunamadı. Kurulum başlatılmadı.",3,colors);
+            }catch(Exception error){showStatus(activity,status,"Android kurulum ekranı açılamadı. Kurulum başlatılmadı.",3,colors);}
           });
         }catch(Exception error){
           activity.runOnUiThread(()->{
             if(activity.isFinishing()||activity.isDestroyed())return;
             install.setEnabled(true);check.setEnabled(true);
-            status.setText("İndirme veya APK doğrulaması başarısız. Kurulum başlatılmadı.");
+            showStatus(activity,status,"İndirme veya APK doğrulaması başarısız. Kurulum başlatılmadı.",3,colors);
           });
         }
       },"ya-update-download").start();

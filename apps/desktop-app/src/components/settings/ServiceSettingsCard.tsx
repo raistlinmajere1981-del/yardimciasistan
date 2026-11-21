@@ -5,6 +5,11 @@ import { reportAppStatus, type AppStatusState } from '../../app/runtime-state';
 import { ActionButton } from '../ui/ActionButton';
 import { FormDialog } from '../ui/FormDialog';
 import { StatusBadge } from '../ui/StatusBadge';
+import {
+  Bot, Camera, Languages, MessageCircle, MessagesSquare, Mic,
+  ScanBarcode, Send, Settings2, ShieldCheck, Smartphone, Star, Store,
+  Truck, Volume2, type LucideIcon
+} from 'lucide-react';
 
 import { SettingsUnsavedChangesDialog } from './SettingsUnsavedChangesDialog';
 
@@ -21,6 +26,24 @@ export const ServiceSettingsContext = createContext<{
   owner: (id: string) => ServiceSettingsOwner;
 } | null>(null);
 type ServiceReadiness = 'Test edilmedi' | 'Test kullanılamıyor' | 'Kontrol ediliyor…' | 'Kullanılamıyor' | 'Hata' | 'Hazır';
+
+/** Compact launcher identities; these describe a service, never its verified connection state. */
+const serviceIdentity: Record<string, { icon: LucideIcon; summary: string }> = {
+  'settings-google-reviews': { icon: Star, summary: 'İşletme yorumları' },
+  'settings-ai': { icon: Bot, summary: 'Model ve bağlantı' },
+  'settings-translation': { icon: Languages, summary: 'Yayın ve çeviriler' },
+  'settings-speech': { icon: Volume2, summary: 'Metinleri seslendir' },
+  'settings-dictation': { icon: Mic, summary: 'Konuşmayı metne çevir' },
+  'settings-whatsapp': { icon: MessageCircle, summary: 'Müşteri mesajları' },
+  'settings-android': { icon: Smartphone, summary: 'Telefon eşleştirme' },
+  'settings-kbs': { icon: ShieldCheck, summary: 'Konaklama bildirimi' },
+  'settings-marketing-instagram': { icon: Camera, summary: 'Sosyal medya hesabı' },
+  'settings-marketing-sms': { icon: Send, summary: 'Kampanya mesajları' },
+  'settings-whatsapp-business': { icon: MessagesSquare, summary: 'İşletme mesajlaşması' },
+  'settings-dealer-portal': { icon: Store, summary: 'Bayi sipariş portalı' },
+  'settings-online-delivery': { icon: Truck, summary: 'Sipariş ve sevkiyat' },
+  'settings-product-data': { icon: ScanBarcode, summary: 'Barkod ürün bilgisi' }
+};
 interface ServiceSettingsCardProps {
   id: string;
   className?: string;
@@ -99,15 +122,30 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
     ? `${enabled ? 'Etkinleştirilecek' : 'Kapatılacak'} · Bekliyor` : `${enabled ? 'Etkin' : 'Kapalı'}${owner?.dirty ? ' · Bekliyor' : ''}`;
   const savedEnabled = owner?.savedEnabled ?? enabled;
   const indicatorLabel = `${title}: ${savedEnabled ? 'Etkin' : 'Kapalı'}${owner?.dirty ? ' · Bekliyor' : ''}${blockedReason ? ` · Kullanılamıyor: ${blockedReason}` : ''}`;
+  const state = blockedReason ? 'blocked' : savedEnabled ? 'active' : 'inactive';
+  const identity = serviceIdentity[id] ?? { icon: Settings2, summary: 'Servis ayarları' };
+  const ServiceIcon = identity.icon;
   return <>
-    <ActionButton ref={node => { triggerRef.current = node; }} id={id} variant="secondary" className="settings-service-row"
+    <ActionButton ref={node => { triggerRef.current = node; }} id={id} variant="service" className="settings-service-row"
+      data-state={state}
       aria-label={`${title} ayarları`} aria-describedby={`${id}-state${blockedReason ? ` ${id}-prerequisite` : ''}`}
       aria-haspopup="dialog" aria-expanded={open} disabled={Boolean((busy || blockedReason) && !open)}
       onClick={() => { if (!busy && !blockedReason) { if (host) host.open(id); else setLocalOpen(true); } }}>
-      <span id={`${id}-state`} className="settings-service-indicator" role="img" aria-label={indicatorLabel} title={indicatorLabel}
-        data-state={blockedReason ? 'blocked' : savedEnabled ? 'active' : 'inactive'} />
-      <span className="settings-service-copy"><strong className="settings-service-name">{title}</strong>
-        {blockedReason && <small id={`${id}-prerequisite`} className="settings-service-prerequisite">{blockedReason}</small>}
+      <span className="settings-service-top">
+        <span className="settings-service-icon"><ServiceIcon size={19} strokeWidth={1.8} aria-hidden="true" /></span>
+        <span className="settings-service-state">
+          <span id={`${id}-state`} className="settings-service-indicator" role="img"
+            aria-label={indicatorLabel} data-state={state} />
+          <StatusBadge tone={state === 'blocked' ? 'muted' : state === 'active' ? 'success' : 'danger'}>
+            {state === 'blocked' ? 'Kullanılamaz' : state === 'active' ? 'Etkin' : 'Kapalı'}
+          </StatusBadge>
+        </span>
+      </span>
+      <span className="settings-service-copy">
+        <strong className="settings-service-name">{title}</strong>
+        <small id={blockedReason ? `${id}-prerequisite` : undefined} className="settings-service-prerequisite">
+          {blockedReason || (owner?.dirty ? 'Değişiklik bekliyor' : identity.summary)}
+        </small>
       </span>
     </ActionButton>
     {open && createPortal(<FormDialog title={title} dialogClassName={`settings-service-overlay settings-service-overlay--${id.replace(/^settings-/, "")}`} returnFocusRef={triggerRef} closeBlocked={Boolean(busy || confirmClose)} dismissOnBackdrop

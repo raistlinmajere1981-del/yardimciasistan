@@ -159,7 +159,6 @@ export function BenefitsPointsEditor({ active, secure, pointsEnabled, onSaved, r
       <form className="benefits-points-operations form-stack" onSubmit={event => { event.preventDefault(); if (!busy && secure && pointsEnabled && accountReady && amount && note.trim().length >= 3) setOperationPending("adjust"); }}>
         {error && <div className="action-row"><p role="alert">{error}</p><ActionButton variant="quiet" disabled={busy} onClick={() => setAccountRevision(value => value + 1)}>Yeniden dene</ActionButton></div>}
         {!secure && <p role="status">Güvenli anahtar saklama kullanılamıyor. Puan hareketleri kapalı.</p>}
-        {!pointsEnabled && <p role="status">Puan kullanımı kapalı. Bakiye ve geçmiş görüntülenebilir.</p>}
         <Panel as="section" className="form-stack" aria-label="Puan düzeltmesi"><h3>Puan düzeltme</h3>
           <fieldset disabled={busy || !secure || !pointsEnabled || !accountReady} className="form-stack benefits-fields">
             <div className="form-grid form-grid--compact">

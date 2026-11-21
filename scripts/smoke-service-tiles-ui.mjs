@@ -22,11 +22,18 @@ try {
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
   await page.goto(`${server.resolvedUrls.local[0]}service-tiles-test?profile=market&webVisibility=on`);
   await expandSettingsStructure(page);
+  if (process.argv.includes("--screenshot")) {
+    await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; document.documentElement.dataset.accent = "coral"; });
+    await page.setViewportSize({ width: 1649, height: 1000 });
+    await page.locator(".settings-services-panel").screenshot({ path: "/tmp/yardimci-services-dark.png" });
+  }
   const tile = id => page.locator(`#settings-${id}`);
   const dialog = page.locator(".settings-service-overlay");
   for (const id of ["translation", "dictation", "whatsapp"]) {
     await expect(tile(id)).toBeDisabled();
+    await expect(tile(id).locator(".settings-service-icon svg")).toHaveCount(1);
     await expect(tile(id).locator(".settings-service-indicator")).toHaveAttribute("data-state", "blocked");
+    await expect(tile(id).locator(".settings-service-state .status-badge")).toHaveText("Kullanılamaz");
     await tile(id).evaluate(node => node.click());
     await tile(id).evaluate(node => node.focus());
     await expect(tile(id)).not.toBeFocused();
@@ -35,6 +42,8 @@ try {
   }
   await expect(tile("translation")).toContainText("AI Yardımcı kapalı");
   await expect(tile("whatsapp")).toContainText("WhatsApp numarası eksik");
+  await expect(tile("ai").locator(".settings-service-state .status-badge")).toHaveText("Kapalı");
+  await expect(tile("speech").locator(".settings-service-state .status-badge")).toHaveText("Etkin");
   // Search cannot bypass the shared launcher's external prerequisite gate.
   const search = page.getByRole("searchbox", { name: "Ayarlarda ara" });
   await search.fill("Çoklu Dil");
@@ -80,7 +89,7 @@ try {
     await page.setViewportSize({ width, height });
     const layoutFailures = await page.locator(".settings-services-grid").evaluate(grid => [...grid.querySelectorAll(".settings-service-row")].filter(node => {
       const rect = node.getBoundingClientRect();
-      return !(rect.width > 0 && rect.height <= 64 && node.tagName === "BUTTON" && !node.querySelector("button,input")
+      return !(rect.width > 0 && rect.height >= 124 && rect.height <= 180 && node.tagName === "BUTTON" && !node.querySelector("button,input")
         && node.scrollWidth <= node.clientWidth + 1);
     }).map(node => ({id:node.id, tag:node.tagName, height:node.getBoundingClientRect().height, scroll:node.scrollWidth, client:node.clientWidth})));
     assert.deepEqual(layoutFailures, [], `${width}px compact accessible tiles`);

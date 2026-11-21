@@ -9,8 +9,27 @@ let browser;
 try {
   const ui = await openMarketingWorkspaceBrowser(f); browser = {close: ui.close};
   const {page, errors, responses} = ui;
+  const cardLayout = async () => page.locator('.marketing-summary-card').evaluateAll(cards => cards.map(card => {
+    const b=card.getBoundingClientRect(); return {left:b.left,right:b.right,top:b.top,bottom:b.bottom};
+  }));
+  await expect(page.locator('.marketing-summary-card')).toHaveCount(3);
+  let rectangles=await cardLayout();
+  assert(rectangles.every(card=>Math.abs(card.top-rectangles[0].top)<2), 'Three marketing panels share one row');
+  assert(rectangles.every(card=>Math.abs(card.bottom-rectangles[0].bottom)<2), 'Three marketing panels fill the same height');
+  assert(rectangles[2].right>page.viewportSize().width*.85, 'Three panels use the full available width');
+  await page.evaluate(()=>window.__setMarketingWebAvailable(false));
+  await expect(page.locator('.marketing-summary-card')).toHaveCount(2);
+  rectangles=await cardLayout();
+  assert(Math.abs(rectangles[0].top-rectangles[1].top)<2, 'Two marketing panels share one row');
+  assert(rectangles[1].right>page.viewportSize().width*.85, 'Two panels fill the available width');
+  await page.evaluate(()=>window.__setMarketingWebAvailable(true));
+  await expect(page.locator('.marketing-summary-card')).toHaveCount(3);
   await page.getByRole('button', { name: 'Analitik', exact: true }).click();
   await expect(page.getByLabel('Analitik genel özet')).toContainText('Gönderilen mesaj6');
+  await expect(page.locator('.page-toolbar__actions .marketing-analytics-last-check')).toContainText('Son kontrol:');
+  await expect(page.getByLabel('Pazarlama analitiği')).not.toContainText('Etkin kanallarınızın yayın ve gönderim sonuçlarını izleyin.');
+  await expect(page.getByLabel('Kanal sonuçları')).not.toContainText('Her kanal kendi ölçümleriyle gösterilir.');
+  await expect(page.getByLabel('Pazarlama analitiği').locator('> .marketing-analytics-last-check')).toHaveCount(0);
   for (const channel of ['Web sitesi','WhatsApp Business','SMS','Instagram']) await expect(page.getByLabel(`${channel} analitiği`, { exact: true })).toBeVisible();
   await expect(page.getByLabel('Web sitesi analitiği')).toContainText('Dashboard’daki Site trafiği kartında ölçülür.');
   await expect(page.getByLabel('Web sitesi metrikleri')).toContainText('Başarısız0');

@@ -52,10 +52,6 @@ export function CustomerMessagesWorkspace({
                 { id: "web", label: "WhatsApp", icon: <MessageCircle size={16} aria-hidden="true" /> }
               ]}
             />
-            <p className="message-mode-intro">
-              <strong>{mode === "safe" ? "Hazırlanmış mesajları kontrol edin." : "WhatsApp burada açılır."}</strong>
-              <span>{mode === "safe" ? "Göndermeden önce son kontrol sizde kalır." : "Gönderme işlemini yine siz tamamlarsınız."}</span>
-            </p>
           </div>
         </div>
       )}

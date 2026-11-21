@@ -12,7 +12,7 @@ const template=join(main,'web-site-template');
 const json=p=>JSON.parse(readFileSync(p,'utf8'));
 const hash=p=>createHash('sha256').update(readFileSync(p)).digest('hex');
 const manifest=json(join(template,'template-manifest.json'));
-const widgetSha='7984a72b2c7c5caee57dcb5856c0f634679cdcbc7fff62ac7eb2cb3d2947d5e6';
+const widgetSha=manifest.common['public/assets/core/widget.js'];
 const sites=[
  {name:'BlackSea',root:join(workspace,'blacksea_web'),entry:join(workspace,'blacksea_web/index.php'),id:'blacksea-pansiyon',base:''},
  {name:'Teknikel',root:join(workspace,'teknikel_web/canonical'),entry:join(workspace,'teknikel_web/index.php'),id:'teknikel-site',base:''},
@@ -26,7 +26,7 @@ function php(args) {
  assert.equal(result.stderr,'','Unexpected PHP diagnostics'); return result.stdout;
 }
 test('local canonical engine and independent site themes', async()=>{
- assert.equal(manifest.template_version,'0.8.0'); assert.equal(Object.keys(manifest.common).length,95);
+ assert.equal(manifest.template_version,'0.9.0'); assert.equal(Object.keys(manifest.common).length,96);
  assert.equal(hash(join(template,'public/assets/core/widget.js')),widgetSha);
  const provenance=await canonicalProvenance(canonicalEngineRoot);
  assert.equal(Object.keys(provenance.files).length,24);

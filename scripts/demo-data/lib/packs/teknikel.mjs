@@ -114,7 +114,7 @@ export function createTeknikelPack(options) {
     settings: { dealerApplicationEnabled: false, dealerPortalEnabled: false, onlineSalesDelivery: true, onlineSalesPickup: true, onlineSalesShipping: false },
     seed(ctx) {
       const categories = new Map(source.catalog.categories.map((category, index) => [category.source_category_id,
-        ctx.addCategory({ id: `cat_tk_${category.source_category_id === "__OTHER__" ? "other" : category.source_category_id}`, name: category.name, code: category.source_category_id, sortOrder: (index + 1) * 10 })]));
+        ctx.addCategory({ id: `cat_tk_${category.source_category_id === "__OTHER__" ? "other" : category.source_category_id}`, name: category.name, code: category.source_category_id, defaultTaxRate: 20, sortOrder: (index + 1) * 10 })]));
       const originals = [];
       let featuredCount = 0;
       const products = source.catalog.products.map((input, index) => {
@@ -126,7 +126,7 @@ export function createTeknikelPack(options) {
         const product = ctx.addProduct({
           key: input.sku, sku: input.sku, name: input.name, brand: input.brand ?? "", categoryId: categories.get(input.source_category_id),
           salePrice, purchasePrice, dealerPriceA, dealerPriceB, taxRate: 20, unit: "piece", sortOrder: (index + 1) * 10,
-          minimumQuantity: 3, quickAccess: curated, quickAccessOrder: index + 1, originalAssets,
+          minimumQuantity: 3, idealQuantity: index % 12 === 0 ? stock + 10 : Math.max(3, stock - 5), quickAccess: curated, quickAccessOrder: index + 1, originalAssets,
           description: `${input.description ?? input.name} — DEMO: stok, alış maliyeti, bayi A/B fiyatları ve %20 vergi sentetik yer tutucudur. Kaynak brüt TRY fiyatı gerçek teklif değildir.${curated ? "" : " Diğer: kategori incelemesi bekler; web yayını kapalıdır."}`,
           dataSource: "teknikel-public-catalog/demo-data-generator", dataLicense: TEKNIKEL_DATA_PROVENANCE,
           sourceProductUrl: input.source_url ?? "", imageSourceUrl: originalAssets[0]?.sourceUrl ?? "",

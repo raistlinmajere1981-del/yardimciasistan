@@ -163,10 +163,10 @@ export const marketDealerPack = {
   seed(ctx) {
     const { db } = ctx;
     const categories = {
-      staple: ctx.addCategory({ id: "cat_md_staple", name: "Temel Gıda", code: "TEM", sortOrder: 10 }),
-      beverage: ctx.addCategory({ id: "cat_md_beverage", name: "İçecek", code: "ICE", sortOrder: 20 }),
-      cleaning: ctx.addCategory({ id: "cat_md_cleaning", name: "Temizlik", code: "TEMZ", sortOrder: 30 }),
-      packaging: ctx.addCategory({ id: "cat_md_packaging", name: "Ambalaj", code: "AMB", sortOrder: 40 })
+      staple: ctx.addCategory({ id: "cat_md_staple", name: "Temel Gıda", code: "TEM", defaultTaxRate: 10, sortOrder: 10 }),
+      beverage: ctx.addCategory({ id: "cat_md_beverage", name: "İçecek", code: "ICE", defaultTaxRate: 10, sortOrder: 20 }),
+      cleaning: ctx.addCategory({ id: "cat_md_cleaning", name: "Temizlik", code: "TEMZ", defaultTaxRate: 20, sortOrder: 30 }),
+      packaging: ctx.addCategory({ id: "cat_md_packaging", name: "Ambalaj", code: "AMB", defaultTaxRate: 20, sortOrder: 40 })
     };
 
     const productInputs = [
@@ -193,7 +193,7 @@ export const marketDealerPack = {
         purchasePrice,
         dealerPriceA,
         dealerPriceB,
-        taxRate: 10,
+        taxRate: [categories.cleaning, categories.packaging].includes(categoryId) ? 20 : 10,
         sortOrder: (index + 1) * 10,
         palette: DEMO_PALETTES.market,
         paletteVariant: index + 2,
@@ -204,6 +204,7 @@ export const marketDealerPack = {
         unit: key.includes("kg") ? "kg" : key.includes("l") ? "l" : "piece",
         trackInventory: true,
         minimumQuantity: 4,
+        idealQuantity: [0, 2, 5, 9].includes(index) ? stock + 15 : Math.max(8, stock - 6),
         quickAccess: index < 5,
         quickAccessOrder: index + 1
       });

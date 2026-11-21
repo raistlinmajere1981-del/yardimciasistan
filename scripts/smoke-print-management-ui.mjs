@@ -32,6 +32,17 @@ try {
     const pension = render([C.PRINTING, C.ACCOMMODATION_STAYS]);
     assert.match(pension, /Konaklama dökümü/);
     assert.doesNotMatch(pension, /Ürün etiketi|Adisyon/);
+    const stock = render([C.PRINTING, C.INVENTORY]);
+    assert.match(stock, /Stok ihtiyaç listesi/);
+    assert.match(stock, /Çok sayfalı A4 yatay/);
+    assert.doesNotMatch(stock, />Düzenle<|value="AUTOMATIC"/);
+    assert.doesNotMatch(render([C.INVENTORY]), /Stok ihtiyaç listesi/);
+    const qr = render([C.PRINTING, C.QR_MENU, C.FOOD_MENU, C.REQUESTS, C.CUSTOMERS,
+      C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.ACCOMMODATION_FOLIO, C.FOOD_TABLES, C.FOOD_ORDERS]);
+    assert.match(qr, /QR Menü kodu/); assert.match(qr, /Masa QR kodları/); assert.match(qr, /Oda QR kodları/);
+    const onlyMenuQr = render([C.PRINTING, C.QR_MENU, C.FOOD_MENU]);
+    assert.match(onlyMenuQr, /QR Menü kodu/);
+    assert.doesNotMatch(onlyMenuQr, /Oda QR kodları|Masa QR kodları/);
     const market = render([C.PRINTING, C.SALES, C.RETAIL_LABELS]);
     assert.match(market, /Ürün etiketi/);
     assert.doesNotMatch(market, /Adisyon|Kargo etiketi/);

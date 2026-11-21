@@ -111,11 +111,11 @@ export const pensionRestaurantPack = {
     const { db } = ctx;
 
     const categoryIds = {
-      breakfast: ctx.addCategory({ id: "cat_pr_breakfast", name: "Kahvaltı", code: "KAH", sortOrder: 10 }),
-      starter: ctx.addCategory({ id: "cat_pr_starter", name: "Başlangıçlar", code: "BAS", sortOrder: 20 }),
-      main: ctx.addCategory({ id: "cat_pr_main", name: "Ana Yemekler", code: "ANA", sortOrder: 30 }),
-      dessert: ctx.addCategory({ id: "cat_pr_dessert", name: "Tatlılar", code: "TAT", sortOrder: 40 }),
-      drink: ctx.addCategory({ id: "cat_pr_drink", name: "İçecekler", code: "ICE", sortOrder: 50 })
+      breakfast: ctx.addCategory({ id: "cat_pr_breakfast", name: "Kahvaltı", code: "KAH", defaultTaxRate: 10, sortOrder: 10 }),
+      starter: ctx.addCategory({ id: "cat_pr_starter", name: "Başlangıçlar", code: "BAS", defaultTaxRate: 10, sortOrder: 20 }),
+      main: ctx.addCategory({ id: "cat_pr_main", name: "Ana Yemekler", code: "ANA", defaultTaxRate: 10, sortOrder: 30 }),
+      dessert: ctx.addCategory({ id: "cat_pr_dessert", name: "Tatlılar", code: "TAT", defaultTaxRate: 10, sortOrder: 40 }),
+      drink: ctx.addCategory({ id: "cat_pr_drink", name: "İçecekler", code: "ICE", defaultTaxRate: 10, sortOrder: 50 })
     };
 
     const products = [
@@ -157,6 +157,7 @@ export const pensionRestaurantPack = {
         description: `${name} — sentetik demo menü ürünü.`,
         trackInventory: true,
         minimumQuantity: 4,
+        idealQuantity: [1, 5, 9].includes(sortOrder) ? stock + 10 : Math.max(6, stock - 5),
         quickAccess: sortOrder <= 3,
         quickAccessOrder: sortOrder
       });

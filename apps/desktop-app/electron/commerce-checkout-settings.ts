@@ -3,16 +3,25 @@ import { BUSINESS_CAPABILITIES, hasBusinessCapability, type CommerceCheckoutSett
 import { readEnabledBusinessCapabilities } from "./business-capability-store";
 
 export const CLOSED_CHECKOUT: CommerceCheckoutSettings = {
-  version: 1, enabled: false, demo: true, currency: "TRY", shippingFeeMinor: null, bank: null, legal: null
+  version: 2, enabled: false, currency: "TRY", shippingFeeMinor: null, bank: null, legal: null
 };
+
+/** Real bank transfer only. Sample/demo bank strings never bypass checksum validation. */
+export function isValidCommerceIban(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const iban = value.replace(/ /g, "").toUpperCase();
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
+  const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, char => String(char.charCodeAt(0) - 55));
+  return BigInt(digits) % 97n === 1n;
+}
 
 export function normalizeCheckoutSettings(input: unknown): CommerceCheckoutSettings {
   const value=input as CommerceCheckoutSettings;
   const invalid = (): never => { throw new Error("Sipariş ödeme ayarları geçersiz."); };
-  if (!value || value.version !== 1 || typeof value.enabled !== "boolean" || typeof value.demo !== "boolean"
+  if (!value || value.version !== 2 || typeof value.enabled !== "boolean" || "demo" in value
     || !["TRY", "EUR", "USD", "GBP"].includes(value.currency)
     || (value.shippingFeeMinor !== null && (!Number.isSafeInteger(value.shippingFeeMinor) || value.shippingFeeMinor < 0 || value.shippingFeeMinor > 90000000000))) return invalid();
-  const result: CommerceCheckoutSettings = { version: 1, enabled: value.enabled, demo: value.demo, currency: value.currency,
+  const result: CommerceCheckoutSettings = { version: 2, enabled: value.enabled, currency: value.currency,
     shippingFeeMinor: value.shippingFeeMinor, bank: null, legal: null };
   for (const group of ["bank", "legal"] as const) {
     const fields = group === "bank" ? { name: 160, accountHolder: 160, iban: 80 } : { version: 80, preliminary: 20000, agreement: 20000 };
@@ -30,13 +39,7 @@ export function normalizeCheckoutSettings(input: unknown): CommerceCheckoutSetti
   }
   if (value.enabled) {
     const iban = result.bank!.iban.replace(/ /g, "").toUpperCase();
-    if (value.demo) {
-      if (!result.bank!.iban.includes("DEMO") || /^[A-Z]{2}\d{2}[A-Z0-9 ]+$/.test(result.bank!.iban)) return invalid();
-    } else {
-      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return invalid();
-      const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, char => String(char.charCodeAt(0) - 55));
-      if (BigInt(digits) % 97n !== 1n) return invalid();
-    }
+    if (!isValidCommerceIban(iban)) return invalid();
   }
   return result;
 }

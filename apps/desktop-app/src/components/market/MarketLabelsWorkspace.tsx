@@ -135,7 +135,6 @@ export function MarketLabelsWorkspace({
         <header className="market-panel-heading">
           <span>Etiket</span>
           <h2>Etiket Hazırla</h2>
-          <p>Donanım gerekmeden önizleyin; PNG veya etiket ölçüsünde PDF üretin.</p>
         </header>
 
         <div className="form-grid form-grid--compact">
@@ -224,7 +223,6 @@ export function MarketLabelsWorkspace({
               </StatusBadge>
             ))}
           </div>
-          <small>ZPL, TSPL ve sistem yazıcısı seçenekleri saha donanımı belli olduğunda etkinleştirilecek.</small>
         </section>
       </section>
 
@@ -244,7 +242,7 @@ export function MarketLabelsWorkspace({
             <div className="market-label-preview-empty"><Tags size={28} aria-hidden="true" /><span>{previewMessage}</span></div>
           )}
         </div>
-        <small className="market-label-preview-message" role="status" aria-live="polite">{previewMessage}</small>
+        {previewMessage !== "Etiket önizlemesi hazır." && <small className="market-label-preview-message" role="status" aria-live="polite">{previewMessage}</small>}
       </section>
     </div>
   );

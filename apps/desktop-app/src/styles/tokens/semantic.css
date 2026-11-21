@@ -18,6 +18,16 @@
   /* Stable studio/product photography mat, independent of dark or light theme. */
   --color-product-image-mat: #f7f7f5;
   --color-product-image-edge: #d6dade;
+  /* Printed reports and QR labels use stable paper colors in every UI theme. */
+  --print-paper: #fff;
+  --print-report-ink: #1b2a3d;
+  --print-report-muted: #647588;
+  --print-report-rule: #b4c2ce;
+  --print-report-header: #eaf0f4;
+  --print-qr-ink: #182b3e;
+  --print-qr-copy: #263c50;
+  --print-qr-muted: #506477;
+  --print-qr-symbol: #142335;
   --color-focus: var(--coral-600);
   --color-accent: var(--coral-600);
   --color-accent-hover: var(--coral-700);
@@ -44,6 +54,9 @@
   --color-selected-border: var(--color-accent-border);
   --shadow-selected-ring: 0 0 0 1px var(--color-selected);
   --shadow-status-ring: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+  --shadow-service-danger-indicator: 0 0 0 1px var(--color-danger-border);
+  --shadow-service-success-indicator: 0 0 0 1px var(--color-success-border);
+  --shadow-service-muted-indicator: 0 0 0 1px var(--color-border-strong);
 
   /* Surface role is classification, not status. Tints stay deliberately quiet. */
   --color-role-neutral-bg: var(--color-bg-panel);

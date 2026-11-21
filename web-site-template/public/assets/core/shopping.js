@@ -92,7 +92,6 @@
   function bankInstructions(body,receipt) {
     const quote=receipt.checkout;
     if(!quote){body.append(el('p',ui('Sipariş talebiniz alındı. Ödeme koşulları için işletmeyle iletişime geçin.')));return;}
-    if(quote.demo)body.append(el('p',ui('DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.'),'shopping-demo'));
     body.append(el('h2',receipt.order_number),el('p',ui(({unpaid:'Ödeme bekleniyor. Sipariş oluşturulması ödeme onayı değildir.',verification_pending:'Havale bildiriminiz alındı. İşletme doğrulaması bekleniyor.',paid:'Ödemeniz işletme tarafından doğrulandı.',rejected:'Ödeme bildirimi doğrulanamadı. İşletmeyle iletişime geçin.',refunded:'İşletme havale iadesini kaydetti.'})[receipt.payment_status] || 'Ödeme bekleniyor.')));
     body.append(el('p',ui(({awaiting_desktop:'Siparişiniz alındı; işletmeye iletiliyor.',placed:'Sipariş alındı',confirmed:'Sipariş onaylandı',fulfilled:'Sipariş tamamlandı',cancelled:'Sipariş iptal edildi',rejected:'Sipariş işlenemedi'})[receipt.status] || 'Sipariş alındı')));
     body.append(el('p',ui(({unfulfilled:'Teslimat: Hazırlanmadı',preparing:'Teslimat: Hazırlanıyor',delivered:'Teslimat: Teslim edildi',cancelled:'Teslimat: İptal edildi',returned:'Teslimat: İade alındı'})[receipt.delivery_status] || 'Teslimat: Hazırlanmadı')));
@@ -173,7 +172,6 @@
         details.append(el('h2',draft.name),el('p',draft.phone),el('p',draft.email||''),el('p',state.deliveryLabels[state.deliveryMethod]));
         if(state.deliveryMethod==='shipping')details.append(el('p',[draft.address.addressLine1,draft.address.district,draft.address.city,draft.address.countryCode].join(', ')));
         details.append(el('p',ui('Ödeme: Havale / EFT')));
-        if(quote.demo)details.append(el('p',ui('DEMO satış akışı. Hukuki metinler ticari kullanıma hazır değildir.'),'shopping-demo'));
         for(const [title,text] of [['Ön bilgilendirme',quote.legal.preliminary],['Satış sözleşmesi',quote.legal.agreement]]){const disclosure=el('details'), summary=el('summary',ui(title));disclosure.append(summary,el('p',text));details.append(disclosure);}
         const {form,footer,submit}=formShell(details,'checkout-payment','Siparişi onayla');
         for(const [name,label,required] of [['preliminary','Ön bilgilendirmeyi okudum ve kabul ediyorum.',true],['agreement','Satış sözleşmesini kabul ediyorum.',true],['marketing','Kampanya e-postaları almak istiyorum (isteğe bağlı).',false]]){const labelNode=el('label',ui(label)), input=el('input');input.type='checkbox';input.name=name;input.required=required;input.checked=draft.consent?.[name]===true;input.disabled=Boolean(state.pending);labelNode.prepend(input);form.append(labelNode);}

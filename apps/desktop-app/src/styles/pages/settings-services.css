@@ -224,31 +224,86 @@
   gap: var(--space-2);
   min-width: 0;
 }
-.action-button.settings-service-row {
-  display: grid;
-  grid-template-columns: var(--space-6) minmax(0, 1fr);
-  align-items: center;
+/* One action per service. Icons identify the feature; the saved preference
+   gets a separate text badge, and missing prerequisites never open an editor. */
+.settings-service-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
   width: 100%;
   min-width: 0;
-  height: 60px;
+  min-height: 124px;
   box-sizing: border-box;
+  padding: var(--space-3);
   text-align: start;
   white-space: normal;
 }
-.settings-service-copy { display: grid; gap: var(--space-1); min-width: 0; }
-.settings-service-name { min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
-.settings-service-prerequisite { color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-normal); line-height: var(--leading-tight); }
+.settings-service-top, .settings-service-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.settings-service-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+}
+.settings-service-row[data-state="active"] .settings-service-icon {
+  color: var(--color-success);
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+}
+.settings-service-state { justify-content: flex-end; gap: var(--space-2); }
+.settings-service-state .status-badge { flex: 0 0 auto; }
 .settings-service-indicator {
-  width: var(--space-6);
-  height: var(--space-6);
+  flex: 0 0 auto;
+  width: var(--space-4);
+  height: var(--space-4);
+  border: 2px solid var(--color-bg-panel);
   border-radius: var(--radius-pill);
   background: var(--color-danger);
+  box-shadow: var(--shadow-service-danger-indicator);
 }
-.settings-service-indicator[data-state="active"] { background: var(--color-success); }
-.settings-service-indicator[data-state="blocked"] { background: var(--color-text-muted); }
-.settings-service-row:disabled { opacity: 1; color: var(--color-text-muted); }
+.settings-service-indicator[data-state="active"] {
+  background: var(--color-success);
+  box-shadow: var(--shadow-service-success-indicator);
+}
+.settings-service-indicator[data-state="blocked"] {
+  background: var(--color-text-muted);
+  box-shadow: var(--shadow-service-muted-indicator);
+}
+.settings-service-copy { display: grid; gap: var(--space-1); min-width: 0; }
+.settings-service-name {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.settings-service-prerequisite {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+.settings-service-row[data-state="blocked"] .settings-service-icon { color: var(--color-text-muted); }
 .settings-service-detail-status { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .form-dialog.settings-service-overlay {
   inset: var(--form-canvas-top, var(--header-height)) 0 0;

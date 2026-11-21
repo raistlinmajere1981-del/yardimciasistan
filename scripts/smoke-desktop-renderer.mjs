@@ -895,9 +895,9 @@ try {
   await expect(qrMenuPanel.getByRole("button", { name: "Önizle", exact: true })).toBeFocused();
   await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(0);
   await qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true }).click();
-  const qrTools = page.getByRole("dialog", { name: "QR Menü", exact: true });
+  const qrTools = page.getByRole("dialog", { name: "QR Menü Kodları", exact: true });
   await expect(qrTools).toBeVisible();
-  await expect(qrTools.locator(".qr-menu-tools__code svg")).toBeVisible();
+  await expect(qrTools.locator(".qr-menu-workspace__code svg")).toBeVisible();
   await expect(qrTools.getByRole("button", { name: "Sayfayı Aç", exact: true })).toBeVisible();
   await expect(qrTools.getByRole("button", { name: "Bağlantıyı Kopyala", exact: true })).toBeVisible();
   await expect(qrTools.getByRole("button", { name: "QR Kodu İndir", exact: true })).toBeVisible();

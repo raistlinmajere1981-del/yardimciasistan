@@ -74,7 +74,7 @@ const real = new Set([
   "finance-ipc", "room-folio-ipc", "business-capability-ipc", "business-layout-ipc",
   "business-public-profile-ipc", "business-location-geocode-ipc", "google-reviews-settings-ipc",
   "kbs-settings-ipc", "kbs-webview-ipc", "room-media-ipc", "table-media-ipc",
-  "commerce-ipc", "web-connection-ipc", "data-maintenance", "desktop-update-service"
+  "commerce-ipc", "web-connection-ipc", "data-maintenance", "desktop-update-service", "document-output-stock-print", "document-output-qr-print"
 ]);
 function stub(name) {
   return new Proxy({ __esModule: true }, { get: (target, key) => {
@@ -161,7 +161,7 @@ load(resolve(root, "main-entry"));
 await new Promise(setImmediate);
 for (const action of immediate) action();
 const addedProtectedChannels = [
-  ...["prepareSaleReceipt", "listReady", "printReady", "previewReady", "pickFormImage", "readFormImage", "saveProcessedFormImage", "getPrinters", "readPrinterBinding", "savePrinterBinding", "read", "saveRule", "readTemplate", "saveTemplate"].map(name => `documentOutput:${name}`),
+  ...["prepareSaleReceipt", "listReady", "printReady", "previewReady", "printStockReplenishment", "printQrCodes", "pickFormImage", "readFormImage", "saveProcessedFormImage", "getPrinters", "readPrinterBinding", "savePrinterBinding", "read", "saveRule", "readTemplate", "saveTemplate"].map(name => `documentOutput:${name}`),
   ...["get", "configure", "saveRule", "issueCoupon", "pointAccount", "adjustPoints", "expirePoints",
     "companionGrantStatus", "companionSpendStatus", "companionSpendGrant", "companionSpendRevoke",
     "companionDevices", "companionGrant", "companionRevoke"].map(name => `benefits:${name}`),

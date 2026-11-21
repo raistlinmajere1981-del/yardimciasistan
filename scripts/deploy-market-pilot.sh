@@ -8,18 +8,22 @@ Market Pilot Alwaysdata sitesi ve Yardımcı Asistan web modülü.
 Kullanım:
   npm run deploy:market-pilot -- --dry-run
   npm run deploy:market-pilot -- --yes
+  npm run deploy:market-pilot -- --site-only
 
 --dry-run : erişimi, yolları ve kaynakları kontrol eder; sunucuya yazmaz.
 --yes     : yeni hesapta bir defalık temiz modül kurar; sonraki yayınlarda veriyi korur.
+--site-only: zaten aynı sürümdeki web modülüne dokunmadan yalnız siteyi yayımlar.
 Web güvenlik anahtarı admin konsoluna yazılmaz. İlk kurulumun bilgileri
 artifacts/market-pilot/install-info.txt dosyasında (yerel, Git dışı) saklanır.
 EOF
 }
 if [[ "$#" -ne 1 ]]; then usage >&2; exit 2; fi
+site_only=false
 case "$1" in
   --help|-h) usage; exit 0 ;;
   --dry-run) dry_run=true ;;
   --yes) dry_run=false ;;
+  --site-only) dry_run=false; site_only=true ;;
   *) usage >&2; exit 2 ;;
 esac
 
@@ -120,6 +124,10 @@ if [[ "$dry_run" == true ]]; then
 fi
 
 cd "$repo_root"
+if [[ "$site_only" == true ]]; then
+  # The clean 2.5 tenant has already been installed and independently verified.
+  curl --proto "=https" -fsS --max-time 20 "$web_url/api/version.php" | node "$repo_root/scripts/site-release-target.mjs" --verify-backend
+else
 if [[ "$module_state" == first ]]; then
   echo 'İlk web modülü paketi ve bağımsız secret hazırlanıyor...'
   npm run prepare:web-install -- --url "$web_url" --name 'Market Pilot' --no-print-secret
@@ -150,6 +158,7 @@ if [[ "$module_state" == first ]]; then
   npm run deploy:web -- --yes --skip-pack --fresh
 else
   npm run deploy:web -- --yes --skip-pack
+fi
 fi
 
 echo 'Market ana sayfası hazırlanıyor...'

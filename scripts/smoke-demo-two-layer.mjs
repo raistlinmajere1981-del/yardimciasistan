@@ -62,8 +62,8 @@ try {
       webModuleUrl: config.baseUrl,
       servicePreferences: { whatsapp: true, android: false },
       commerceCheckout: {
-        version: 1, enabled: true, demo: true, currency: 'TRY', shippingFeeMinor: null,
-        bank: { name: 'DEMO Banka', accountHolder: 'DEMO İki Katman', iban: 'DEMO — GEÇERSİZ — ÖDEME YAPMAYIN' },
+        version:2, enabled: true, currency: 'TRY', shippingFeeMinor: null,
+        bank: { name: 'DEMO Banka', accountHolder: 'DEMO İki Katman', iban: 'GB82 WEST 1234 5698 7654 32' },
         legal: { version: 'demo-v2', preliminary: 'DEMO ön bilgilendirme.', agreement: 'DEMO satış sözleşmesi.' }
       },
       initialCounts: { rooms: 0, tables: 0 },
@@ -278,7 +278,7 @@ try {
   assert.match(order.order_number,/^YA-\d{8}-[A-F0-9]{10}$/);
   await expect(page).toHaveURL(/page=checkout-result/);
   await expect(page.locator('#checkout-body h2')).toHaveText(order.order_number);
-  await expect(page.locator('#checkout-body')).toContainText('DEMO — GEÇERSİZ');
+  await expect(page.locator('#checkout-body')).toContainText('GB82 WEST 1234 5698 7654 32');
   console.log('PASS shared Commerce V2 guest checkout: server quote, consent, uncertain 503, exact retry and accepted reference');
 
   console.log('7. Verifying Account Portal and Redirects...');

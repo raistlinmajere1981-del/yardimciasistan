@@ -9,7 +9,7 @@ Durum: **yerel geliştirme ve otomatik hedefli doğrulama**. Canlı deploy, APK/
 - Bireysel/ticari müşteri kaydı core.customers altında her sektörde kullanılabilir.
 - Firma adı, vergi dairesi, vergi no, yetkili kişi ve ödeme vadesi customer_commercial_profiles tablosunda tutulur.
 - Ticari profil oluşturmak için commerce.wholesale aranmaz.
-- Bayi durumunu active yapmak ve dealer_a/dealer_b fiyat grubunu kaydetmek için WHOLESALE yetkisi IPC sınırında zorunludur. Perakende modunda model inactive/retail gönderir.
+- Bayi durumunu active yapmak veya dealer_a/dealer_b fiyat grubunu değiştirmek için WHOLESALE yetkisi IPC sınırında zorunludur. Toptan satış kapatıldığında önceden kaydedilmiş bayi durumu/fiyat grubu normal ticari düzenlemede sessizce silinmez; IPC değişiklikleri reddeder. Ticari müşteri ödeme vadesi bayi ayrıcalığı sayılmaz.
 - Arama ve CSV/XLSX aktarımında firma/vergi alanları toptan satış kapalıyken de bulunur. “Ticari” filtresi bütün ticari kayıtları, “Bayiler” yalnız aktif bayi kayıtlarını kapsar.
 - Bayi web erişimi ve özel fiyat çözümlemesi mevcut toptancı yeteneği/portal güvenlik kontrollerine bağlı kalır.
 

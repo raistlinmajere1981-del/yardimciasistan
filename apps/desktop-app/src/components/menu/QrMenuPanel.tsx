@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Copy, Download, ExternalLink, Eye, QrCode, X } from "lucide-react";
+import { Eye, QrCode } from "lucide-react";
 import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
-import { ModalSurface } from "../ui/ModalSurface";
-import { createQrSvg, resolveQrMenuPublicUrl } from "./qr-code";
+import { QrMenuWorkspace, type OrderRoom, type OrderTable } from "./QrMenuWorkspace";
+import { resolveQrMenuPublicUrl } from "./qr-code";
 
-type OrderTable = { id: string; name: string; area: string; token: string };
-type OrderRoom = { id: string; name: string; number: string; token: string };
 
 export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, utilityAction }: {
   enabled: boolean;
@@ -25,14 +23,6 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
   const [toolsOpen, setToolsOpen] = useState(false);
   const url = useMemo(() => resolveQrMenuPublicUrl(webModuleUrl), [webModuleUrl]);
   const visibleOnWeb = moduleEnabled && webEnabled;
-  const svg = useMemo(() => {
-    if (!visibleOnWeb || !url) return "";
-    try {
-      return createQrSvg(url);
-    } catch {
-      return "";
-    }
-  }, [visibleOnWeb, url]);
   const busy = publicationLoading || publicationSaving;
 
   useEffect(() => {
@@ -148,61 +138,6 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
     }catch {reportAppStatus("error","Güncel QR kodları okunamadı.");return;}
     setToolsOpen(true);
   }
-  function roomUrl(room:OrderRoom) {
-    return url + "?room=" + encodeURIComponent(room.token);
-  }
-  function downloadRoomQr(room:OrderRoom) {
-    try {
-      const code=createQrSvg(roomUrl(room));
-      const href=URL.createObjectURL(new Blob([code],{type:"image/svg+xml;charset=utf-8"}));
-      const anchor=document.createElement("a");
-      anchor.href=href;
-      anchor.download="oda-"+(room.number||room.name).replace(/[^a-zA-Z0-9_-]/g,"-")+".svg";
-      document.body.append(anchor);anchor.click();anchor.remove();
-      URL.revokeObjectURL(href);
-    }catch {reportAppStatus("error","Oda QR bağlantısı QR kodu için çok uzun.");}
-  }
-
-  function tableUrl(table: OrderTable) {
-    return `${url}?table=${encodeURIComponent(table.token)}`;
-  }
-
-  function downloadTableQr(table: OrderTable) {
-    try {
-      const code = createQrSvg(tableUrl(table));
-      const href = URL.createObjectURL(new Blob([code], { type: "image/svg+xml;charset=utf-8" }));
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.download = `masa-${table.name.replace(/[^a-zA-Z0-9_-]/g, "-")}.svg`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(href);
-    } catch { reportAppStatus("error", "Bu masanın QR bağlantısı çok uzun."); }
-  }
-
-  async function copyUrl() {
-    if (!url) return;
-    try {
-      await navigator.clipboard.writeText(url);
-      reportAppStatus("success", "QR Menü bağlantısı panoya kopyalandı.");
-    } catch {
-      reportAppStatus("error", "QR Menü bağlantısı panoya kopyalanamadı.");
-    }
-  }
-
-  function downloadQr() {
-    if (!svg) return;
-    const href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = "qr-menu.svg";
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(href);
-  }
-
   const statusText = publicationLoading
     ? "Web durumu okunuyor…"
     : publicationSaving
@@ -227,6 +162,18 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
           <strong>QR Menü</strong>
           <span role={publicationError ? "alert" : "status"}>{statusText}</span>
         </div>
+        <div className="menu-qr-service__order-toggles">
+          <label className="menu-qr-service__toggle">
+            <input type="checkbox" aria-label="Masadan sipariş" checked={visibleOnWeb && ordersEnabled}
+              disabled={!visibleOnWeb || busy} onChange={(event) => void toggleOrders(event.target.checked)} />
+            <span>Masadan sipariş {ordersEnabled && visibleOnWeb ? "açık" : "kapalı"}</span>
+          </label>
+          <label className="menu-qr-service__toggle">
+            <input type="checkbox" aria-label="Odaya sipariş" checked={visibleOnWeb && roomOrdersEnabled}
+              disabled={!visibleOnWeb || busy} onChange={event=>void toggleRoomOrders(event.target.checked)} />
+            <span>Odaya sipariş {visibleOnWeb && roomOrdersEnabled ? "açık" : "kapalı"}</span>
+          </label>
+        </div>
         <div className="menu-qr-service__actions">
           {utilityAction}
           <ActionButton variant="secondary" size="sm" onClick={onPreview}>
@@ -247,94 +194,14 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
           <span>{publicationSaving ? "Güncelleniyor…" : visibleOnWeb ? "Webde aktif" : "Webde pasif"}</span>
         </label>
       </div>
-      <label className="menu-qr-service__toggle">
-        <input type="checkbox" aria-label="Masadan sipariş" checked={visibleOnWeb && ordersEnabled}
-          disabled={!visibleOnWeb || busy} onChange={(event) => void toggleOrders(event.target.checked)} />
-        <span>Masadan sipariş {ordersEnabled && visibleOnWeb ? "açık" : "kapalı"}</span>
-      </label>
-      <label className="menu-qr-service__toggle">
-        <input type="checkbox" aria-label="Odaya sipariş" checked={visibleOnWeb && roomOrdersEnabled}
-          disabled={!visibleOnWeb || busy} onChange={event=>void toggleRoomOrders(event.target.checked)} />
-        <span>Odaya sipariş {visibleOnWeb && roomOrdersEnabled ? "açık" : "kapalı"}</span>
-      </label>
     </section>
 
-    {toolsOpen && visibleOnWeb && <ModalSurface
-      labelledBy="qr-menu-tools-title"
-      className="qr-menu-tools-modal"
-      dismissOnBackdrop
-      onClose={() => setToolsOpen(false)}
-    >
-      <div className="qr-menu-tools">
-        <header className="workspace-frame__header">
-          <div>
-            <strong id="qr-menu-tools-title">QR Menü</strong>
-            <span>Bu kod webdeki güncel QR Menü sayfasını açar.</span>
-          </div>
-          <ActionButton variant="ghost" type="button" data-modal-initial-focus onClick={() => setToolsOpen(false)} aria-label="QR Menü araçlarını kapat">
-            <X size={18} aria-hidden="true" />
-          </ActionButton>
-        </header>
-        <div className="qr-menu-tools__body">
-          {svg
-            ? <div className="qr-menu-tools__code" aria-label="QR Menü kodu" dangerouslySetInnerHTML={{ __html: svg }} />
-            : <p className="empty-state">QR kodu oluşturmak için geçerli bir web bağlantısı gerekli.</p>}
-          <div className="qr-menu-tools__details">
-            <label className="form-field form-field--fluid">
-              QR Menü bağlantısı
-              <input value={url} readOnly />
-            </label>
-            <div className="action-row">
-              <ActionButton variant="secondary" size="sm" disabled={!url} onClick={() => void window.yardimciDesktop?.openExternal(url)}>
-                <ExternalLink size={16} aria-hidden="true" /> Sayfayı Aç
-              </ActionButton>
-              <ActionButton variant="secondary" size="sm" disabled={!url} onClick={() => void copyUrl()}>
-                <Copy size={16} aria-hidden="true" /> Bağlantıyı Kopyala
-              </ActionButton>
-              <ActionButton variant="secondary" size="sm" disabled={!svg} onClick={downloadQr}>
-                <Download size={16} aria-hidden="true" /> QR Kodu İndir
-              </ActionButton>
-            </div>
-          </div>
-        </div>
-        {roomOrdersEnabled && <section aria-label="Aktif konaklama QR kodları">
-          <strong>Odalara özel QR kodları</strong>
-          <p>QR kodu yalnız açık oda hesabı bulunan aktif konaklamada üretilir. Çıkışta iptal olur; yeni misafire yeni QR verilir.</p>
-          {orderRooms.length===0 && <p>Şu anda odaya giriş yapmış, açık hesabı bulunan misafir yok.</p>}
-          <div className="qr-menu-tools__tables">
-            {orderRooms.map(room=>{
-              let roomSvg="";
-              try {roomSvg=createQrSvg(roomUrl(room));}catch{ /* invalid or too long */ }
-              return <div key={room.id} className="qr-menu-tools__table">
-                <strong>{room.number ? "Oda "+room.number : room.name}</strong>
-                {roomSvg && <div className="qr-menu-tools__code" aria-label={room.name+" QR"}
-                  dangerouslySetInnerHTML={{__html:roomSvg}}/>}
-                <ActionButton variant="secondary" size="sm" disabled={!roomSvg}
-                  onClick={()=>downloadRoomQr(room)}>
-                  <Download size={16} aria-hidden="true"/> İndir
-                </ActionButton>
-              </div>;
-            })}
-          </div>
-        </section>}
-        {ordersEnabled && orderTables.length > 0 && <section aria-label="Masalara özel QR kodları">
-          <strong>Masalara özel QR kodları</strong>
-          <p>Her masa kendi sipariş bağlantısına sahip. Kodları masalara yerleştirebilirsiniz.</p>
-          <div className="qr-menu-tools__tables">
-            {orderTables.map(table => {
-              let tableSvg = "";
-              try { tableSvg = createQrSvg(tableUrl(table)); } catch { /* invalid or too long */ }
-              return <div key={table.id} className="qr-menu-tools__table">
-                <strong>{table.area ? `${table.area} · ` : ""}{table.name}</strong>
-                {tableSvg && <div className="qr-menu-tools__code" aria-label={`${table.name} QR`} dangerouslySetInnerHTML={{ __html: tableSvg }} />}
-                <ActionButton variant="secondary" size="sm" disabled={!tableSvg} onClick={() => downloadTableQr(table)}>
-                  <Download size={16} aria-hidden="true" /> İndir
-                </ActionButton>
-              </div>;
-            })}
-          </div>
-        </section>}
-      </div>
-    </ModalSurface>}
+    {toolsOpen && visibleOnWeb && <QrMenuWorkspace url={url} roomOrdersEnabled={roomOrdersEnabled}
+      ordersEnabled={ordersEnabled} rooms={orderRooms} tables={orderTables} onClose={() => setToolsOpen(false)}
+      onRefresh={async () => {
+        const fresh = await window.yardimciDesktop?.getQrMenuWebPublication();
+        if (!fresh) throw new Error("QR kodları okunamadı.");
+        return { rooms: fresh.rooms, tables: fresh.tables };
+      }} />}
   </>;
 }

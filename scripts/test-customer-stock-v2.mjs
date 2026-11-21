@@ -54,15 +54,15 @@ function fixture(){
   db.prepare("INSERT INTO business(id,name,display_name,profile_id,created_at,updated_at) VALUES ('biz','Market','Market','market','t','t')").run();
   return {db,path,close(){db.close();rmSync(dir,{recursive:true,force:true});}};
 }
-test("commercial identity stays editable without wholesale; dealer privilege never leaks into retail",()=>{
+test("commercial identity edits preserve hidden dealer metadata; IPC guards privilege",()=>{
   const base={...customerModel.toCustomerForm(null),fullName:"Market 24",commercialProfileEnabled:true,
     commercialCompanyName:"Market 24 LTD",commercialTaxNumber:"1234567890",
     commercialDealerStatus:"active",commercialPriceGroup:"dealer_b",commercialPaymentTermDays:"30"};
   const retail=customerModel.customerFormToInput(base,false);
   assert.equal(retail.commercialProfile.companyName,"Market 24 LTD");
   assert.equal(retail.commercialProfile.taxNumber,"1234567890");
-  assert.equal(retail.commercialProfile.dealerStatus,"inactive");
-  assert.equal(retail.commercialProfile.priceGroup,"retail");
+  assert.equal(retail.commercialProfile.dealerStatus,"active","existing hidden status is preserved for the IPC owner");
+  assert.equal(retail.commercialProfile.priceGroup,"dealer_b","existing hidden pricing is preserved rather than silently demoted");
   assert.equal(retail.commercialProfile.paymentTermDays,30);
   const wholesale=customerModel.customerFormToInput(base,true);
   assert.equal(wholesale.commercialProfile.dealerStatus,"active");
@@ -94,7 +94,10 @@ test("IPC permits retail company identity but rejects forged dealer privilege wh
   });
   let captured=null;
   handlers.registerCustomerIpcHandlers({
-    getDatabase:()=>({saveCustomer:input=>{captured=input;return {ok:true,message:"saved",savedId:"c1"};}}),
+    getDatabase:()=>({
+      getCustomer:id=>id==="stored" ? {commercialProfile:{dealerStatus:"active",priceGroup:"dealer_a",paymentTermDays:45}} : null,
+      saveCustomer:input=>{captured=input;return {ok:true,message:"saved",savedId:"c1"};}
+    }),
     assertUnlocked:()=>{},
     assertCapability:cap=>{if(cap===shared.BUSINESS_CAPABILITIES.WHOLESALE)throw Error("Wholesale disabled");},
     finalizeRecordDeletion:v=>v,finalizeCustomerMutation:v=>v,
@@ -106,6 +109,16 @@ test("IPC permits retail company identity but rejects forged dealer privilege wh
   const safe=customerModel.customerFormToInput(base,false);
   assert.equal(handler(null,safe).ok,true);
   assert.equal(captured.commercialProfile.dealerStatus,"inactive");
+  const ordinaryWithTerms=customerModel.customerFormToInput({...base,commercialPaymentTermDays:"30"},false);
+  assert.equal(handler(null,ordinaryWithTerms).ok,true,"ordinary commercial payment terms do not grant dealer access");
+  assert.equal(captured.commercialProfile.paymentTermDays,30);
+  const existing=customerModel.customerFormToInput({...base,id:"stored",commercialDealerStatus:"active",
+    commercialPriceGroup:"dealer_a",commercialPaymentTermDays:"60"},false);
+  assert.equal(handler(null,existing).ok,true,"existing dealer metadata may be preserved without wholesale");
+  assert.equal(captured.commercialProfile.paymentTermDays,60);
+  const changedGroup=customerModel.customerFormToInput({...base,id:"stored",commercialDealerStatus:"active",
+    commercialPriceGroup:"dealer_b",commercialPaymentTermDays:"60"},false);
+  assert.throws(()=>handler(null,changedGroup),/Wholesale disabled/);
   const forged=customerModel.customerFormToInput({...base,commercialDealerStatus:"active",commercialPriceGroup:"dealer_a"},true);
   assert.throws(()=>handler(null,forged),/Wholesale disabled/);
 });

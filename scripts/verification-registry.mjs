@@ -9,6 +9,12 @@ const SMOKE_FILES = [
   "scripts/smoke-document-output-sale-job.mjs",
   "scripts/smoke-document-output-pdf.mjs",
   "scripts/smoke-print-management-ui.mjs",
+  "scripts/smoke-qr-menu-workspace-ui.mjs",
+  "scripts/smoke-qr-print-settings-ui.mjs",
+  "scripts/smoke-qr-print-integration.mjs",
+  "scripts/smoke-stock-replenishment-ui.mjs",
+  "scripts/smoke-stock-replenishment-print.mjs",
+  "scripts/smoke-seo-management-ui.mjs",
   "scripts/smoke-table-order-benefits-ui.mjs",
   "scripts/smoke-table-order-benefits.mjs",
   "scripts/smoke-commerce-benefits-management.mjs",
@@ -336,6 +342,22 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  // Milestone 2026-11-20: real SQLite / publishing behavior contracts.
+  check("customer-stock-v2", "Ticari müşteri, ideal stok, KDV ve stok yetkileri", "node", ["--test", "scripts/test-customer-stock-v2.mjs"], {
+    phase: 5, presets: ["full"], domains: ["desktop", "commerce", "customers"]
+  }),
+  check("table-reservation-slots", "Gerçek masa rezervasyonu uygunluk ve çakışma sözleşmesi", "node", ["--test", "scripts/test-table-reservation-slots.mjs"], {
+    phase: 5, presets: ["full"], domains: ["hospitality", "web"]
+  }),
+  check("qr-room-order-v2", "Oda QR siparişi onayı ve folio/idempotency", "node", ["--test", "scripts/test-qr-room-order-v2.mjs"], {
+    phase: 5, presets: ["full"], domains: ["hospitality", "web", "commerce"]
+  }),
+  check("seo-publication", "Çok dilli SEO kaynak, çeviri ve yayın sözleşmesi", "node", ["--test", "scripts/test-seo-publication.mjs"], {
+    phase: 5, presets: ["full"], domains: ["web", "translations", "settings"]
+  }),
+  check("seo-head-php", "SEO head, canonical, hreflang, sitemap ve QR noindex", "php", ["scripts/test-seo-head.php"], {
+    phase: 5, presets: ["full"], domains: ["web", "translations", "settings"]
+  }),
   check("demo-data-tests", "Varsayılan A/B/C backup-v2 demo paketleri", "node", ["--test", "scripts/demo-data/demo-data.test.mjs"], {
     phase: 50, presets: ["full"], domains: ["desktop", "commerce"], requires: ["build-desktop"]
   }),
@@ -734,6 +756,11 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-c19-android-fixture.mjs") return [];
   if (file === "scripts/smoke-form-image-perspective.mjs" || file === "scripts/smoke-document-output-render-snapshot.mjs") return [];
   if (file === "scripts/smoke-document-output-management.mjs" || file === "scripts/smoke-document-output.mjs" || file === "scripts/smoke-print-management-ui.mjs") return [];
+  // These UI checks use Vite fixtures, not prebuilt Electron or site packages.
+  if (["scripts/smoke-qr-menu-workspace-ui.mjs", "scripts/smoke-qr-print-settings-ui.mjs",
+    "scripts/smoke-stock-replenishment-ui.mjs", "scripts/smoke-seo-management-ui.mjs"].includes(file)) return [];
+  // Native print contracts read the compiled Electron services.
+  if (["scripts/smoke-qr-print-integration.mjs", "scripts/smoke-stock-replenishment-print.mjs"].includes(file)) return ["build-desktop"];
   if (["scripts/smoke-market-sale-full-refund.mjs", "scripts/smoke-market-sale-full-refund-preview.mjs", "scripts/smoke-market-sale-full-refund-ui.mjs"].includes(file)) return [];
   if (file === "scripts/smoke-commerce-ipc-contract.mjs") return [];
   if (file === "scripts/smoke-commerce-order-fulfillment.mjs") return [];
@@ -798,6 +825,12 @@ function smokeDomains(file) {
   if (/^scripts\/smoke-(ai-connection-cancel|backup-zip-import|teknikel-shipping-repair)(-ui)?\.mjs$/.test(file)) return ["desktop", "settings"];
   if (file === "scripts/smoke-service-prerequisites.mjs" || file === "scripts/smoke-service-tiles-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-print-management-ui.mjs") return ["desktop", "settings"];
+  if (file === "scripts/smoke-seo-management-ui.mjs") return ["desktop", "settings", "web", "translations"];
+  if (file === "scripts/smoke-stock-replenishment-ui.mjs" || file === "scripts/smoke-stock-replenishment-print.mjs") {
+    return ["desktop", "commerce", "settings"];
+  }
+  if (file === "scripts/smoke-qr-menu-workspace-ui.mjs" || file === "scripts/smoke-qr-print-settings-ui.mjs" ||
+      file === "scripts/smoke-qr-print-integration.mjs") return ["desktop", "hospitality", "commerce"];
   if (file === "scripts/smoke-table-order-benefits.mjs" || file === "scripts/smoke-table-order-benefits-ui.mjs") return ["desktop", "hospitality", "commerce", "finance", "customers"];
   if (file === "scripts/smoke-qr-table-order-web.mjs" || file === "scripts/smoke-qr-table-order-acceptance.mjs") return ["web", "hospitality", "commerce", "product-identity"];
   if (file === "scripts/smoke-demo-two-layer.mjs") return ["web", "translations", "commerce"];

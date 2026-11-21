@@ -94,7 +94,7 @@ try {
   });
   expect(groupStyles.services).toEqual(groupStyles.feature);
   const action = page.locator('#settings-android');
-  await expect(action).toHaveText('Android');
+  await expect(action.locator('.settings-service-name')).toHaveText('Android');
   await expect(action).toHaveAttribute('aria-label', 'Android ayarları');
   await expect(action).toBeEnabled();
   await page.mouse.move(0, 0);
@@ -119,10 +119,13 @@ try {
     const layout = await grid.evaluate(node => {
       const rows = [...node.querySelectorAll('.settings-service-row')].map(row => row.getBoundingClientRect());
       const box = node.getBoundingClientRect();
+      const groups = new Map();
+      rows.forEach(row => { const key = Math.round(row.top); groups.set(key, [...(groups.get(key) ?? []), row.height]); });
       return { contained: rows.every(row => row.left >= box.left && row.right <= box.right + 1),
-        compact: rows.every(row => row.height <= 64), aligned: Math.max(...rows.map(row => row.height)) - Math.min(...rows.map(row => row.height)) <= 1 };
+        sized: rows.every(row => row.height >= 124 && row.height <= 180),
+        aligned: [...groups.values()].every(heights => Math.max(...heights) - Math.min(...heights) <= 1) };
     });
-    expect(layout, `${width}px service grid`).toEqual({ contained: true, compact: true, aligned: true });
+    expect(layout, `${width}px service grid`).toEqual({ contained: true, sized: true, aligned: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   // Saved web settings get one bounded probe; opening services never runs their provider tests.
@@ -415,6 +418,11 @@ try {
     overlay = await manage(id);
     await expect(overlay).toBeVisible();
     expect(await overlay.locator('.workspace-frame__body').evaluate(node => node.scrollWidth <= node.clientWidth + 1), `${id} content fits`).toBe(true);
+    if (id === 'settings-online-delivery') {
+      await expect(overlay.getByLabel('Havale / EFT ile ödeme', { exact: true })).toBeVisible();
+      await expect(overlay.getByLabel('DEMO ortamı')).toHaveCount(0);
+      await expect(overlay.getByRole('button', { name: 'DEMO alanlarını doldur' })).toHaveCount(0);
+    }
     if (id === 'settings-dealer-portal') {
       await expect(overlay.getByLabel('Online Bayi Başvurusu')).toHaveCount(1);
       await expect(overlay.getByRole('button', {name:'Başvuru bağlantısını kopyala'})).toHaveCount(0);

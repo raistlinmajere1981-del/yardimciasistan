@@ -103,9 +103,22 @@ try {
   const trafficButton = page.getByRole("button", { name: /Site trafiği/ });
   await expect(trafficButton).toBeVisible();
   await expect(trafficButton).toContainText("22 bugün");
-  await trafficButton.hover();
   const trafficDialog = page.getByRole("dialog", { name: "Site trafiği ayrıntıları" });
+  await trafficButton.hover();
+  await expect(trafficDialog).toHaveCount(0);
+  await trafficButton.focus();
+  await expect(trafficDialog).toHaveCount(0);
+  await trafficButton.click();
   await expect(trafficDialog).toBeVisible();
+  await expect(trafficButton).toHaveAttribute("aria-expanded", "true");
+  const trafficGeometry = await trafficDialog.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+  });
+  expect(trafficGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(trafficGeometry.top).toBeGreaterThanOrEqual(0);
+  expect(trafficGeometry.right).toBeLessThanOrEqual(1280);
+  expect(trafficGeometry.bottom).toBeLessThanOrEqual(900);
   await expect(trafficDialog).toContainText("Onaylı web siparişi");
   await expect(trafficDialog).toContainText("Katalog · part-1");
   await trafficDialog.getByRole("button", { name: "30 gün" }).click();
@@ -114,7 +127,31 @@ try {
   await expect.poll(() => page.evaluate(() => window.__m8fTrafficCalls.some(call => call.days === 30 && call.fresh))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(trafficDialog).toHaveCount(0);
+  await expect(trafficButton).toHaveAttribute("aria-expanded", "false");
+  await trafficButton.click();
+  await expect(trafficDialog).toBeVisible();
+  await trafficButton.click();
+  await expect(trafficDialog).toHaveCount(0);
+  await trafficButton.click();
+  await expect(trafficDialog).toBeVisible();
+  await trafficDialog.getByRole("button", { name: "Raporu kapat" }).click();
+  await expect(trafficDialog).toHaveCount(0);
+  await expect(trafficButton).toBeFocused();
+  await trafficButton.click();
+  await expect(trafficDialog).toBeVisible();
+  await page.locator(".dashboard-priority-panel").click({ position: { x: 20, y: 20 } });
+  await expect(trafficDialog).toHaveCount(0);
   await expect(page.locator(".system-health-item")).toHaveCount(6);
+  await expect(page.getByRole("heading", { name: "Sistem sağlığı", exact: true })).toBeVisible();
+  await expect(page.getByText("Bağlantılar ve koruma")).toHaveCount(0);
+  const systemHealthGeometry = await page.locator(".system-health-grid").evaluate(grid => {
+    const container = grid.getBoundingClientRect();
+    const cards = [...grid.querySelectorAll(".system-health-item")].map(card => card.getBoundingClientRect());
+    return { containerWidth: container.width, coverage: cards.at(-1).right - cards[0].left, top: cards[0].top, sameRow: cards.every(card => Math.abs(card.top - cards[0].top) <= 2), gridColumns: getComputedStyle(grid).gridTemplateColumns.split(" ").length };
+  });
+  expect(systemHealthGeometry.gridColumns).toBe(6);
+  expect(systemHealthGeometry.sameRow).toBe(true);
+  expect(systemHealthGeometry.coverage).toBeGreaterThan(systemHealthGeometry.containerWidth * 0.98);
   await expect(page.locator(".system-health-item").filter({ hasText: "Web bağlantısı" })).toContainText("Web eşitlemeye hazır");
   await expect(page.locator(".system-health-item").filter({ hasText: "Ağ sinyali" })).toContainText("İnternet ve servis erişimi doğrulanmadı");
   await expect(page.locator(".system-health-item").filter({ hasText: "AI" })).toContainText("Yapılandırıldı");
@@ -160,6 +197,16 @@ try {
   await page.goto(`${baseUrl}dashboard-workspace-test?noSide`);
   await expect(page.getByRole("complementary", { name: "Takvim ve işletme durumu" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Şimdi yapılacaklar" })).toBeVisible();
+  await expect(page.locator(".system-health-item")).toHaveCount(4);
+  const fourCardLayout = await page.locator(".system-health-grid").evaluate(grid => {
+    const cards = [...grid.querySelectorAll(".system-health-item")].map(item => item.getBoundingClientRect());
+    return { columns: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
+      coverage: cards.at(-1).right - cards[0].left, available: grid.getBoundingClientRect().width,
+      sameRow: cards.every(card => Math.abs(card.top - cards[0].top) <= 2) };
+  });
+  expect(fourCardLayout.columns).toBe(4);
+  expect(fourCardLayout.sameRow).toBe(true);
+  expect(fourCardLayout.coverage).toBeGreaterThan(fourCardLayout.available * 0.98);
 
   expect(pageErrors).toEqual([]);
   console.log("dashboard-workspace-smoke-ok");

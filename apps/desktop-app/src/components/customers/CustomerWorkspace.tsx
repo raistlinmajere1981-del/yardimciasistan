@@ -229,6 +229,17 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     returnFocusRef={navigation.returnFocusRef}
     dismissOnBackdrop
     footer={!history ? <div className="customer-workspace-footer">
+      {customer && onDelete && <ActionButton className="customer-workspace-delete" variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
+        try {
+          const result = await onDelete(customer);
+          if (result?.ok) navigation.closeWorkspace();
+          else if (result && !result.ok) reportAppStatus("error", result.message);
+        } catch (error) {
+          reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
+        }
+      })()}>
+        <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
+      </ActionButton>}
       <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || fieldsBusy || messagingBusy || customerLoading || !dirty} onClick={() => {
         setFormRevision(++formGeneration.current); setForm(baseline); setSaveState("idle");
       }}>Değişiklikleri Geri Al</ActionButton>
@@ -252,17 +263,6 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               disabled={!customer.phone}
             >
               <MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz
-            </ActionButton>}
-            {onDelete && <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
-              try {
-                const result = await onDelete(customer);
-                if (result?.ok) navigation.closeWorkspace();
-                else if (result && !result.ok) reportAppStatus("error", result.message);
-              } catch (error) {
-                reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
-              }
-            })()}>
-              <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
             </ActionButton>}
           </div>}
         </DetailSectionCard>

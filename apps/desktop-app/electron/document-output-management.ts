@@ -139,9 +139,11 @@ export class DocumentOutputManagement {
       const context = this.context(value.documentKind);
       const rule = value as unknown as DocumentOutputRuleInput;
       requireValue(["print", "whatsapp"].includes(rule.channel) && ["native_print", "whatsapp_webview"].includes(rule.adapter)
-        && ["OFF", "ASK_CONFIRMATION", "AUTOMATIC"].includes(rule.mode) && ["manual", "sale_completed", "table_closed", "stay_checked_out", "order_dispatched", "shipment_created", "customer_statement_requested", "order_created"].includes(rule.trigger)
+        && ["OFF", "ASK_CONFIRMATION", "AUTOMATIC"].includes(rule.mode) && ["manual", "sale_completed", "table_closed", "stay_checked_out", "order_dispatched", "shipment_created", "customer_statement_requested", "order_created", "stay_checked_in"].includes(rule.trigger)
         && documentTriggerCompatible(rule.documentKind, rule.trigger)
         && documentChannelCompatible(rule.channel, rule.adapter, rule.mode)
+        && (rule.documentKind !== "stock_replenishment" || (rule.trigger === "manual" && rule.channel === "print" && rule.mode !== "AUTOMATIC"))
+        && (!(["qr_menu", "qr_table", "qr_room"] as string[]).includes(rule.documentKind) || (rule.channel === "print" && (rule.trigger === "stay_checked_in" || rule.mode !== "AUTOMATIC")))
         && ((rule.channel === "print" && rule.adapter === "native_print")
           || (context.whatsappEnabled && rule.channel === "whatsapp" && rule.adapter === "whatsapp_webview")), "DOCUMENT_RULE_INVALID");
       saveDocumentOutputRule(this.database, { ...rule, businessId: context.businessId });

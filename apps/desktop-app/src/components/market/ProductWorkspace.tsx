@@ -420,7 +420,6 @@ export function ProductWorkspace({
     <strong>Mevcut stok: {balance?.quantity ?? (creating || !product?.trackInventory ? 0 : "—")} {form.unit}</strong>
     <label className="form-field form-field--fluid form-field--span">Minimum stok<input type="number" min="0" step="0.0001" value={form.minimumQuantity} disabled={mutationBusy} onChange={event => setForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
     <label className="form-field form-field--fluid form-field--span">İdeal stok<input type="number" min="0" step="0.0001" value={form.idealQuantity} disabled={mutationBusy} onChange={event => setForm(current => ({ ...current, idealQuantity: event.target.value }))} /></label>
-    <small>Sipariş önerisi ideal stoktan mevcut stok düşülerek hesaplanır; minimum stok yalnız kritik seviye uyarısıdır.</small>
     <label className="form-field form-field--fluid form-field--span">İşlem<select aria-label="Stok işlemi" value={stockOperation} disabled={stockDisabled} onChange={event => { setStockOperation(event.target.value as typeof stockOperation); stockOperationId.current = crypto.randomUUID(); }}>
       <option value="add">Ekle</option><option value="remove">Çıkar</option><option value="count">Fiziksel Sayım</option>
     </select></label>
@@ -428,7 +427,6 @@ export function ProductWorkspace({
     <label className="form-field form-field--fluid">Kısa not<input maxLength={240} value={countNote} onChange={event => { setCountNote(event.target.value); stockOperationId.current = crypto.randomUUID(); }} disabled={stockDisabled} /></label>
     {stockPreview !== null && <p role="status">Kaydet sonrası stok: {stockPreview} {form.unit}</p>}
     {stockDraftDirty && stockValidation && <p role="alert">{stockValidation}</p>}
-    <small>Stok işlemi Ürünü Kaydet ile bir kez geçmişe işlenir. Geri Al yalnız bekleyen işlemi iptal eder; kayıtlı hareketler değişmez.</small>
     <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={clearStockDraft}>Stok taslağını temizle</ActionButton>
     {product?.trackInventory && <ActionButton variant="secondary" disabled={mutationBusy || resourceState !== "success"} onClick={() => {
       navigation.updateWorkspaceMode({ entityType: "product", mode: "history" }); void refreshStockHistory();
@@ -513,7 +511,6 @@ export function ProductWorkspace({
                 <input type="number" min={0} max={1000000} step={1} value={featuredOrder} disabled={mutationBusy || !publicationLoaded || !isPublished || !isFeatured}
                   onChange={event => setFeaturedOrder(Number(event.target.value))} />
               </label>
-              <small>Vitrin işareti Hızlı Erişim'den bağımsızdır. Değişiklikler Ürünü Kaydet ile yayın ayarına yazılır.</small>
               {(isPublished !== publicationBaseline || isFeatured !== featuredBaseline || featuredOrder !== featuredOrderBaseline)
                 && <small>Web yayın ve vitrin tercihleri Ürünü Kaydet ile uygulanacak.</small>}
               {publicationMessage && <p role="status">{publicationMessage}</p>}

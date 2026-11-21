@@ -214,7 +214,7 @@ public class DealerSessionTest {
       if(url.getPath().endsWith("/dealer/checkout-quote.php")){
         quotes[0]++;
         if(quotes[0]==1){connection.status=401;connection.response="{\"ok\":false,\"code\":\"login_required\"}";}
-        else connection.response="{\"ok\":true,\"quote\":{\"version\":2}}";
+        else connection.response="{\"ok\":true,\"quote\":{\"version\":3}}";
       } else if(url.getPath().endsWith("/account/refresh.php")){
         refreshes[0]++;rotate(connection,NEW_SESSION,NEW_REFRESH);
       } else throw new AssertionError("Unexpected endpoint "+url);
@@ -222,7 +222,7 @@ public class DealerSessionTest {
     });
     JSONObject draft=new JSONObject().put("items",new org.json.JSONArray().put(new JSONObject().put("productId","p").put("quantity",1)));
     String original=draft.toString();
-    assertEquals(2,session.call("checkout-quote",draft).body.getJSONObject("quote").getInt("version"));
+    assertEquals(3,session.call("checkout-quote",draft).body.getJSONObject("quote").getInt("version"));
     assertEquals(2,quotes[0]);assertEquals(1,refreshes[0]);
     assertEquals(original,draft.toString());
     assertEquals(NEW,session.cookie());assertEquals(Collections.singletonList(NEW),rotated);

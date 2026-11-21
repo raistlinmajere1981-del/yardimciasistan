@@ -54,7 +54,11 @@ final class AndroidSettingsWorkspace {
 
     page.addView(UiKit.title(activity, "Ayarlar"));
     page.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
-        activity, "android-companion", ".fileprovider"));
+        activity, "android-companion", ".fileprovider",
+        new com.yardimciasistan.update.AndroidUpdates.Palette(
+            UiKit.CARD, UiKit.BORDER, UiKit.TEXT, UiKit.SECONDARY,
+            UiKit.PRIMARY, UiKit.ACCENT_TEXT, UiKit.SURFACE_ALT,
+            UiKit.SUCCESS, UiKit.WARNING, UiKit.DANGER)));
     page.addView(sectionLabel("Görünüm"));
     LinearLayout appearance = UiKit.card(activity);
     appearance.addView(settingLine("Tema", themeLabel, UiKit.PRIMARY));

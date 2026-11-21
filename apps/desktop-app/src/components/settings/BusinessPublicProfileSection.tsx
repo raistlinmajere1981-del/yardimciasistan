@@ -600,7 +600,6 @@ export function BusinessSocialLinksSection({
       <div className="setup-section-title setup-section-title--subsection">
         <div>
           <h3>Sosyal Medya</h3>
-          <p>Web sitesinin üst ve alt alanında gösterilecek profil bağlantıları.</p>
         </div>
         <ActionButton
           variant="secondary"

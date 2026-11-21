@@ -16,8 +16,6 @@ export function SiteTrafficCard() {
   const [position, setPosition] = useState<CSSProperties>({ visibility: "hidden" });
   const anchor = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const restoringFocus = useRef(false);
   const seq = useRef(0);
   const read = useCallback(async (days: 7 | 30, fresh = false) => {
     const current = ++seq.current;
@@ -34,9 +32,6 @@ export function SiteTrafficCard() {
     const requestSequence = seq;
     return () => { ++requestSequence.current; window.clearInterval(handle); };
   }, [period, read]);
-  const clearClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
-  const scheduleClose = () => { clearClose(); closeTimer.current = setTimeout(() => setOpen(false), 220); };
-  useEffect(() => () => clearClose(), []);
   useLayoutEffect(() => {
     if (!open) return;
     const element = popup.current;
@@ -46,8 +41,16 @@ export function SiteTrafficCard() {
       const a = anchor.current?.getBoundingClientRect();
       const p = popup.current?.getBoundingClientRect();
       if (!a || !p) return;
-      const left = Math.max(8, Math.min(a.right - p.width, window.innerWidth - p.width - 8));
-      const top = a.bottom + p.height + 8 > window.innerHeight ? Math.max(8, a.top - p.height - 8) : a.bottom + 8;
+      // Prefer the available space beside the card so the trigger stays clickable.
+      const roomOnLeft = a.left >= p.width + 20;
+      const left = roomOnLeft
+        ? a.left - p.width - 12
+        : Math.max(8, Math.min(a.right - p.width, window.innerWidth - p.width - 8));
+      const top = roomOnLeft
+        ? Math.max(8, Math.min(a.top, window.innerHeight - p.height - 8))
+        : a.bottom + p.height + 8 > window.innerHeight
+          ? Math.max(8, a.top - p.height - 8)
+          : a.bottom + 8;
       setPosition({ position: "fixed", left, top, visibility: "visible" });
     };
     const frame = requestAnimationFrame(place);
@@ -60,9 +63,7 @@ export function SiteTrafficCard() {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault(); setOpen(false);
-      restoringFocus.current = true;
-      try { anchor.current?.focus({ preventScroll: true }); }
-      finally { restoringFocus.current = false; }
+      anchor.current?.focus({ preventScroll: true });
     };
     document.addEventListener("pointerdown", dismiss, true);
     document.addEventListener("keydown", escape, true);
@@ -82,17 +83,20 @@ export function SiteTrafficCard() {
   const last = value?.last_collected_at ? new Date(value.last_collected_at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "";
   return <section className="dashboard-site-traffic" aria-label="Site trafiği">
     <button ref={anchor} type="button" className="dashboard-site-traffic-trigger interactive-surface" aria-haspopup="dialog" aria-expanded={open}
-      onMouseEnter={() => { clearClose(); setOpen(true); }} onMouseLeave={scheduleClose}
-      onFocus={() => { if (restoringFocus.current) return; clearClose(); setOpen(true); }} onClick={() => { clearClose(); setOpen(v => !v); }}>
+      onClick={() => setOpen(value => !value)}>
       <span className="dashboard-site-traffic-symbol"><BarChart3 size={19} aria-hidden="true" /></span>
       <span className="dashboard-site-traffic-copy"><small>Site trafiği</small><strong>{busy && !value ? "Yükleniyor…" : value && !value.enabled ? "Site trafiği kapalı" : noData ? "Henüz ölçüm yok" : `${count(today?.sessions)} bugün`}</strong>
         <small>{value && !value.enabled ? "Ayarlar > Web bağlantısı" : noData ? "Ziyaretler ölçülmeye başlayınca görünür" : `${count(value.totals.sessions)} oturum · ${period} gün${result?.ok && result.stale ? " · güncel değil" : ""}`}</small></span>
-      <Activity size={17} aria-hidden="true" />
+      <span className="dashboard-site-traffic-open-icon" aria-hidden="true"><MousePointerClick size={17} /></span>
     </button>
     {open && <div ref={popup} popover="manual" role="dialog" aria-label="Site trafiği ayrıntıları" className="dashboard-site-traffic-popup"
-      style={position} onMouseEnter={clearClose} onMouseLeave={scheduleClose}>
-      <header className="dashboard-site-traffic-header"><div><strong>Site trafiği</strong><small>{last ? `Son kayıt: ${last}` : "Henüz ziyaret kaydı yok"}{result?.ok && result.stale ? " · Güncel değil" : ""}</small></div>
-        <button type="button" className="dashboard-site-traffic-icon-button" aria-label="Raporu kapat" onClick={() => setOpen(false)}><X size={17} /></button></header>
+      style={position}>
+      <header className="dashboard-site-traffic-header">
+        <span className="dashboard-site-traffic-header-symbol"><BarChart3 size={22} aria-hidden="true" /></span>
+        <div className="dashboard-site-traffic-header-text"><span className="dashboard-site-traffic-eyebrow">Ziyaret analitiği</span><strong>Site trafiği</strong><small>{last ? `Son kayıt: ${last}` : "Henüz ziyaret kaydı yok"}{result?.ok && result.stale ? " · Güncel değil" : ""}</small></div>
+        <button type="button" className="dashboard-site-traffic-icon-button" aria-label="Raporu kapat" onClick={() => { setOpen(false); anchor.current?.focus({ preventScroll: true }); }}><X size={17} /></button>
+      </header>
+      <div className="dashboard-site-traffic-body">
       <div className="dashboard-site-traffic-toolbar"><div role="group" aria-label="Rapor dönemi">
         {([7, 30] as const).map(days => <button key={days} type="button" aria-pressed={days === period} onClick={() => setPeriod(days)}>{days} gün</button>)}
         </div><button className="dashboard-site-traffic-icon-button" type="button" aria-label="Raporu yenile" disabled={busy} onClick={() => void read(period, true)}><RefreshCw size={16} /></button></div>
@@ -109,6 +113,7 @@ export function SiteTrafficCard() {
       </> : <p className="dashboard-site-traffic-empty">{result && !result.ok ? result.message : "Yeni ölçüm başlatıldı; henüz güvenilir bir ziyaret kaydı yok."}</p>}
       {todayObserved && <span className="sr-only">Bugün sayfa görüntülemesi: {count(today?.views)}</span>}
       <small className="dashboard-site-traffic-footnote">Oturumlar yaklaşık ölçülür; tekil kişi sayısı değildir.</small>
+      </div>
     </div>}
   </section>;
 }

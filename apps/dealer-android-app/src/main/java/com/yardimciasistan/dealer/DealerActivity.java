@@ -620,7 +620,7 @@ public final class DealerActivity extends ComponentActivity {
     ui.button(form, "Yerel oturumu temizle", () -> safely(() -> { state.invalidateSession(); accessVerified = false; message = "Yerel oturum kapatıldı."; render(); }), false);
     // Public release feed remains accessible without an active dealer account.
     form.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
-        this, "android-dealer", ".files"));
+        this, "android-dealer", ".files", updatePalette()));
     loading(busy);
   }
   private void authenticate(String base, String endpoint, JSONObject credentials) {
@@ -1143,9 +1143,6 @@ public final class DealerActivity extends ComponentActivity {
     ui.label(details, "Sunucunun doğruladığı kesin sipariş tutarı:", 15, ui.muted);
     ui.label(details, money(quote.getLong("total_minor") / 100d, currency), 25, ui.accent)
         .setTypeface(null, Typeface.BOLD);
-    if (quote.optBoolean("demo")) {
-      ui.label(details, "DEMO — Banka bilgileri geçersizdir; gerçek para göndermeyin.", 14, ui.danger);
-    }
     JSONArray lines = quote.getJSONArray("items");
     for (int i = 0; i < lines.length(); i++) {
       JSONObject line = lines.getJSONObject(i);
@@ -1243,7 +1240,6 @@ public final class DealerActivity extends ComponentActivity {
         ui.label(info, "Ödeme: " + ("paid".equals(receipt.optString("payment_status"))
             ? "Doğrulandı" : "Havale bekleniyor / işletme doğrulayacak"), 14, ui.ink);
         ui.label(info, "Tutar: " + money(receipt.optLong("total_minor") / 100d, receipt.optString("currency")), 17, ui.ink);
-        if (checkout.optBoolean("demo")) ui.label(info, "DEMO — Gerçek ödeme yapmayın.", 14, ui.danger);
         ui.label(info, bank.optString("name") + " · " + bank.optString("accountHolder")
             + "\nIBAN: " + bank.optString("iban")
             + "\nHavale açıklaması: " + receipt.optString("order_number"), 14, ui.ink);
@@ -1303,9 +1299,17 @@ public final class DealerActivity extends ComponentActivity {
       }
     }
   }
+  /** Pass the active Dealer appearance; neither update surface owns a hard-coded theme. */
+  private com.yardimciasistan.update.AndroidUpdates.Palette updatePalette() {
+    return new com.yardimciasistan.update.AndroidUpdates.Palette(
+        ui.surface, ui.border, ui.ink, ui.muted, ui.accent, ui.onAccent, ui.soft,
+        ui.dark ? 0xff75dbb4 : 0xff166750,
+        ui.dark ? 0xffffc47f : 0xff8a5500, ui.danger);
+  }
+
   private void account() {
     body.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
-        this, "android-dealer", ".files"));
+        this, "android-dealer", ".files", updatePalette()));
     DealerAppearance selected = ui.appearance;
     choices(body, "Tema", new String[] {"Sistem", "Açık", "Koyu"},
         new String[] {"system", "light", "dark"}, selected.theme,

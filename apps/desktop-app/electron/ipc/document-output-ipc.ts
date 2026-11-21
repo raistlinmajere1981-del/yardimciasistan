@@ -5,6 +5,8 @@ import type { DocumentKind, DocumentOutputManagementResult } from "@yardimci-asi
 import { DocumentOutputManagement, DocumentOutputManagementError, sanitizeDocumentPrinters } from "../document-output-management";
 import { listReadyDocuments } from "../document-output-ready";
 import { prepareSaleDocumentJob } from "../document-output-sale-job";
+import { registerStockReplenishmentPrintIpc } from "../document-output-stock-print";
+import { registerQrPrintIpc } from "../document-output-qr-print";
 
 interface Options {
   printDocument?: typeof import("../document-output-native-print").printConfirmedDocument;
@@ -12,6 +14,7 @@ interface Options {
   formImages?: { userData(): string; choose(): Promise<string | null>; decode: FormImageDecoder };
   databasePath(): string;
   installationId(): string;
+  webModuleUrl(): string;
   assertUnlocked(): void;
   isTrustedRendererUrl(url: string): boolean;
 }
@@ -22,6 +25,11 @@ export function assertDocumentOutputSender(event: Electron.IpcMainInvokeEvent, o
   try { options.assertUnlocked(); } catch { throw new DocumentOutputManagementError("DOCUMENT_SESSION_LOCKED"); }
 }
 export function registerDocumentOutputIpcHandlers(options: Options): void {
+  registerQrPrintIpc({ databasePath: options.databasePath, installationId: options.installationId,
+    webModuleUrl: options.webModuleUrl, assertAuthorized: options.assertUnlocked,
+    assertSender: event => assertDocumentOutputSender(event, options) });
+  registerStockReplenishmentPrintIpc({ databasePath: options.databasePath, installationId: options.installationId,
+    assertAuthorized: event => assertDocumentOutputSender(event, options) });
   ipcMain.handle("documentOutput:prepareSaleReceipt", (event, ...args: unknown[]): DocumentOutputManagementResult<{ jobId: string }> => {
     let database: DatabaseSync | undefined;
     try {

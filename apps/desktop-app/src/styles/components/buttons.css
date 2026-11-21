@@ -97,6 +97,38 @@
   color: var(--color-text-muted);
 }
 
+/* A service settings launcher is a first-class action variant, not a page override. */
+.action-button-service {
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  box-shadow: var(--shadow-panel);
+}
+.action-button-service[data-state="active"] {
+  border-color: var(--color-success-border);
+  background: var(--color-role-configuration-bg);
+}
+.action-button-service:hover:not(:disabled) {
+  border-color: var(--color-accent-border);
+  background: var(--color-interactive-hover);
+  box-shadow: var(--shadow-panel), var(--shadow-selected-ring);
+}
+.action-button-service[aria-expanded="true"] {
+  border-color: var(--color-accent-border);
+}
+.action-button-service:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+  border-color: var(--color-border);
+  background: var(--color-bg-surface);
+}
+.action-button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--color-selected-soft);
+  color: var(--color-selected);
+}
+
 .action-button-quiet {
   background: transparent;
   color: var(--color-text);

@@ -27,6 +27,28 @@ site publications. To replace previously published placeholder menu images,
 reimport the sample into a disposable desktop test profile and republish its
 QR menu (or update each product photo through the desktop UI).
 
+## 2.5.0 — ideal stok ve kategori KDV test kapsamı
+
+Bütün paketler `catalog_categories.default_tax_rate` ve `catalog_products.ideal_quantity`
+alanlarını gerçek SQLite şemasından doldurur. İdeal stok, satın alma hareketi
+oluşturmaz: yalnız mevcut stoğun hedefin altında olduğu ürünler için öneri verir.
+`lib/verify.mjs` bu ayrımı **gerçek masaüstü stok ihtiyaç okuma servisi**
+üzerinden, kategori KDV değerlerini ise SQLite üzerinden doğrular.
+
+| Paket | Stok açığı olan / yeterli stoklu ürün | Kategori KDV testi |
+| --- | --- | --- |
+| A Pansiyon + Restoran | 3 / 11 | 5 kategori %10, Türk Kahvesi ürününde ayrı %20 |
+| B Market | 4 / 6 (+ 2 stoksuz ürün) | 3 kategori %10, 2 kategori %20 |
+| C Market + Bayi | 4 / 8 | 2 kategori %10, 2 kategori %20 |
+| D Teknikel | 15 / 164 | 25 kategori %20 — stok ve vergi değerleri sentetik |
+
+B paketinde stok ihtiyacında 66 birim, C'de 60 birim, D'de 150 birim,
+A'da 30 birim sentetik açık vardır. Böylece stok ihtiyaç listesi,
+seçili ürün baskısı, kategori KDV varsayılanı, bayi fiyatlandırması,
+stok uyarısı ve QR menü işletme akışları aynı örneklerden denenebilir.
+QR oda/masa erişim sırları ve banka/SMTP bilgileri bilinçli olarak
+üretilmez; kurulumda ayrı oluşturulması gerekir.
+
 ## Output
 
 Running the generator writes only under `artifacts/demo-data/`:

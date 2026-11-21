@@ -18,7 +18,7 @@ final class DealerCheckout {
   static JSONObject verifiedQuote(JSONObject response, JSONObject draft) throws Exception {
     if (!response.optBoolean("ok")) throw new IllegalArgumentException("Sunucu sipariş özeti doğrulanamadı.");
     JSONObject quote = response.optJSONObject("quote");
-    if (quote == null || quote.optInt("version", -1) != 2
+    if (quote == null || quote.optInt("version", -1) != 3
         || quote.optInt("minor_unit", -1) != 2
         || !"bank_transfer".equals(quote.optString("payment_method"))
         || !quote.optString("quote_id").matches("[a-f0-9]{64}")
@@ -35,8 +35,8 @@ final class DealerCheckout {
     if (bank == null || legal == null) throw new IllegalArgumentException("Banka veya sözleşme bilgisi bulunamadı.");
     for (String key : new String[]{"name","accountHolder","iban"}) required(bank,key);
     for (String key : new String[]{"version","preliminary","agreement"}) required(legal,key);
-    if (quote.optBoolean("demo") && !bank.getString("iban").contains("DEMO")) {
-      throw new IllegalArgumentException("DEMO banka bilgisi geçersiz.");
+    if (quote.has("demo") || !validIban(bank.getString("iban"))) {
+      throw new IllegalArgumentException("Banka hesap bilgisi geçersiz.");
     }
     JSONArray lines = quote.optJSONArray("items"), requested = draft.getJSONArray("items");
     if (lines == null || lines.length() != requested.length() || lines.length() == 0) {
@@ -53,6 +53,19 @@ final class DealerCheckout {
       }
     }
     return new JSONObject(quote.toString());
+  }
+
+  private static boolean validIban(String value) {
+    String iban = value.replace(" ", "").toUpperCase(java.util.Locale.ROOT);
+    if (!iban.matches("[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}")) return false;
+    String rearranged = iban.substring(4) + iban.substring(0, 4);
+    int remainder = 0;
+    for (int i = 0; i < rearranged.length(); i++) {
+      char c = rearranged.charAt(i);
+      String digits = c >= 'A' && c <= 'Z' ? Integer.toString(c - 'A' + 10) : Character.toString(c);
+      for (int j = 0; j < digits.length(); j++) remainder = (remainder * 10 + digits.charAt(j) - '0') % 97;
+    }
+    return remainder == 1;
   }
 
   private static String required(JSONObject object, String key) throws Exception {

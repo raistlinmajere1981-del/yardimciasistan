@@ -60,7 +60,9 @@ assert.match(product,/market-product-barcode-description/);
 const barcodeSection=product.match(/<div class="market-product-barcode-description[^"]*">([\s\S]*?)<\/div>/)?.[1]??"";
 assert.match(barcodeSection,/Barkod/);
 assert.match(barcodeSection,/Açıklama/);
-assert.equal((product.match(/<textarea/g)??[]).length,1,"Description is a single controlled field");
+assert.equal((barcodeSection.match(/<textarea/g)??[]).length,0,"Description is a one-line input");
+assert.match(barcodeSection,/Açıklama<input[^>]*value="Test açıklaması"/);
+assert.ok(barcodeSection.indexOf("Açıklama") < barcodeSection.indexOf("Barkod"),"Description is under Brand, barcode under SKU");
 assert.doesNotMatch(product,/detail-section-card__heading[^>]*><h3>Açıklama/,"No redundant description panel");
 assert.ok(product.indexOf("Alış fiyatı")<product.indexOf("Perakende fiyat"),"Purchase price leads pricing row");
 const noRetail=renderToStaticMarkup(createElement(ProductFormFields,{

@@ -3816,7 +3816,7 @@ CREATE TABLE document_print_templates (
   business_id TEXT NOT NULL REFERENCES business(id),
   id TEXT NOT NULL CHECK (length(id) BETWEEN 1 AND 128),
   revision INTEGER NOT NULL CHECK (typeof(revision) = 'integer' AND revision > 0),
-  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket','stock_replenishment','qr_menu','qr_table','qr_room')),
   layout_json TEXT NOT NULL CHECK (length(CAST(layout_json AS BLOB)) <= 32768 AND json_valid(layout_json)),
   created_at TEXT NOT NULL,
   PRIMARY KEY (business_id, id, revision),
@@ -3884,15 +3884,24 @@ END;
 
 CREATE TABLE document_output_rules (
   business_id TEXT NOT NULL REFERENCES business(id),
-  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
-  trigger_kind TEXT NOT NULL CHECK (trigger_kind IN ('sale_completed','table_closed','stay_checked_out','order_dispatched','shipment_created','customer_statement_requested','order_created','manual')),
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket','stock_replenishment','qr_menu','qr_table','qr_room')),
+  trigger_kind TEXT NOT NULL CHECK (trigger_kind IN ('sale_completed','table_closed','stay_checked_out','order_dispatched','shipment_created','customer_statement_requested','order_created','stay_checked_in','manual')),
   channel TEXT NOT NULL CHECK (channel IN ('print','email','whatsapp')),
   mode TEXT NOT NULL CHECK (mode IN ('OFF','ASK_CONFIRMATION','AUTOMATIC')),
   adapter TEXT NOT NULL CHECK (adapter IN ('native_print','smtp','whatsapp_webview','whatsapp_business_api')),
   PRIMARY KEY (business_id, document_kind, trigger_kind, channel),
   CHECK ((channel = 'print' AND adapter = 'native_print') OR (channel = 'email' AND adapter = 'smtp') OR (channel = 'whatsapp' AND adapter IN ('whatsapp_webview','whatsapp_business_api'))),
   CHECK (mode <> 'AUTOMATIC' OR adapter <> 'whatsapp_webview'),
-  CHECK (trigger_kind = 'manual' OR (document_kind = 'sale_receipt' AND trigger_kind = 'sale_completed') OR (document_kind = 'table_bill' AND trigger_kind = 'table_closed') OR (document_kind = 'stay_statement' AND trigger_kind = 'stay_checked_out') OR (document_kind = 'credit_statement' AND trigger_kind = 'customer_statement_requested') OR (document_kind = 'shipping_label' AND trigger_kind IN ('order_dispatched','shipment_created')) OR (document_kind = 'kitchen_ticket' AND trigger_kind = 'order_created'))
+  CHECK (trigger_kind = 'manual' OR (document_kind = 'sale_receipt' AND trigger_kind = 'sale_completed') OR (document_kind = 'table_bill' AND trigger_kind = 'table_closed') OR (document_kind = 'stay_statement' AND trigger_kind = 'stay_checked_out') OR (document_kind = 'credit_statement' AND trigger_kind = 'customer_statement_requested') OR (document_kind = 'shipping_label' AND trigger_kind IN ('order_dispatched','shipment_created')) OR (document_kind = 'kitchen_ticket' AND trigger_kind = 'order_created') OR (document_kind = 'qr_room' AND trigger_kind = 'stay_checked_in'))
+);
+-- One arrival QR print attempt per checked-in stay; no automatic replay after uncertain output.
+CREATE TABLE qr_room_print_arrival_receipts (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  stay_id TEXT NOT NULL,
+  room_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('ASK_CONFIRMATION','AUTOMATIC')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (business_id, stay_id)
 );
 CREATE TABLE document_printer_bindings (
   business_id TEXT NOT NULL REFERENCES business(id),
@@ -3909,7 +3918,7 @@ CREATE TABLE document_output_jobs (
   operation_id TEXT NOT NULL CHECK (length(operation_id) BETWEEN 1 AND 128),
   command_kind TEXT NOT NULL CHECK (command_kind IN ('event','manual')),
   reprint_of TEXT,
-  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket')),
+  document_kind TEXT NOT NULL CHECK (document_kind IN ('sale_receipt','table_bill','stay_statement','product_label','invoice_copy','credit_statement','shipping_label','kitchen_ticket','stock_replenishment','qr_menu','qr_table','qr_room')),
   trigger_kind TEXT NOT NULL,
   channel TEXT NOT NULL,
   mode TEXT NOT NULL CHECK (mode IN ('ASK_CONFIRMATION','AUTOMATIC')),

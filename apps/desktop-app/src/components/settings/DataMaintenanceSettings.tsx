@@ -206,7 +206,13 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
           <h3>Veri ve Yedekleme</h3>
           <p>Yerel verileri yedekleyin, geri yükleyin veya temiz başlangıç için tamamen sıfırlayın.</p>
         </div>
-        {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
+        <div className="backup-manager-header-actions">
+          {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
+          <ActionButton variant="secondary" size="sm" type="button" aria-label="Yedekleri Yenile"
+            onClick={() => void loadBackups()} disabled={busy}>
+            <RefreshCw size={16} aria-hidden="true" />
+          </ActionButton>
+        </div>
       </div>
       <div className="settings-panel-body">
       <div className="form-actions backup-manager-toolbar">
@@ -229,13 +235,8 @@ export function DataMaintenanceSettings({ initialized = true }: { initialized?: 
       </div>
 
 
-      <p className="backup-import-help">Demo sitesinden indirilen örnek içerik ZIP'lerini doğrudan içe aktarabilirsiniz. Mevcut veriler değişmez; içe alınan paketi aşağıdan Geri Yükle ile kullanabilirsiniz.</p>
       <div className="backup-list-heading">
         <strong>Mevcut Yedekler</strong>
-        <ActionButton variant="secondary" size="sm" type="button" onClick={() => void loadBackups()} disabled={busy}>
-          <RefreshCw size={15} aria-hidden="true" />
-          Yedekleri Yenile
-        </ActionButton>
       </div>
 
       <div className="backup-list" aria-busy={action === "load"}>

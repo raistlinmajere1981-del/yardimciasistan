@@ -86,3 +86,22 @@
 .print-management__quad polygon { fill: none; stroke: var(--color-accent); stroke-width: .5; }
 .print-management__corner.action-button { position: absolute; transform: translate(-50%, -50%); touch-action: none; padding: 0; min-width: var(--interaction-target-min); }
 .print-management__prepared-preview { width: min(100%, 32rem); height: auto; margin-top: var(--space-4); }
+
+/* Long inventory reports are automatically paginated, not a fixed single-page form. */
+.print-management__stock-preview { min-height: 0; flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-bg-app); }
+.print-management__stock-paper { width: min(100%, 40rem); aspect-ratio: 297/210; flex: none; background: var(--print-paper); color: var(--print-report-ink); padding: 1.3rem; box-sizing: border-box; box-shadow: var(--shadow-panel); }
+.print-management__stock-paper h3 { color: var(--print-report-ink); font-size: var(--print-report-heading-size); }
+.print-management__stock-paper > p { font-size: var(--print-report-meta-size); color: var(--print-report-muted); }
+.print-management__stock-paper table { width: 100%; border-collapse: collapse; font-size: var(--print-report-table-size); text-align: left; }
+.print-management__stock-paper th, .print-management__stock-paper td { padding: .45rem .2rem; border-bottom: 1px solid var(--print-report-rule); }
+.print-management__stock-paper th { background: var(--print-report-header); }
+.print-management__stock-preview > .print-management__hint { max-width: 40rem; }
+
+/* QR label preview is a representative size/geometry, never a live bearer token. */
+.print-management__qr-preview { display: flex; flex: 1; min-height: 0; overflow: auto; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-3); background: var(--color-bg-app); border: 1px solid var(--color-border); border-radius: var(--radius-panel); }
+.print-management__qr-paper { background: var(--print-paper); color: var(--print-qr-ink); flex: 0 0 auto; width: min(100%, 13rem); aspect-ratio: 100/150; padding: 1rem; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center; box-shadow: var(--shadow-panel); }
+.print-management__qr-paper h3 { margin: 0; color: var(--print-qr-ink); font-size: var(--print-qr-heading-size); }
+.print-management__qr-paper p { color: var(--print-qr-copy); margin: 0; font-size: var(--print-qr-body-size); }
+.print-management__qr-paper small { font-size: var(--print-qr-caption-size); color: var(--print-qr-muted); }
+.print-management__qr-symbol { display: flex; align-items: center; justify-content: center; color: var(--print-qr-symbol); width: 100%; }
+.print-management__qr-preview .print-management__hint { max-width: 33rem; margin: 0; font-size: var(--text-xs); }

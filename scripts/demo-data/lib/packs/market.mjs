@@ -142,11 +142,11 @@ export const marketPack = {
   seed(ctx) {
     const { db } = ctx;
     const categories = {
-      breakfast: ctx.addCategory({ id: "cat_mk_breakfast", name: "Kahvaltılık", code: "KAH", sortOrder: 10 }),
-      drink: ctx.addCategory({ id: "cat_mk_drink", name: "İçecek", code: "ICE", sortOrder: 20 }),
-      staple: ctx.addCategory({ id: "cat_mk_staple", name: "Temel Gıda", code: "TEM", sortOrder: 30 }),
-      home: ctx.addCategory({ id: "cat_mk_home", name: "Ev ve Temizlik", code: "EVC", sortOrder: 40 }),
-      gift: ctx.addCategory({ id: "cat_mk_gift", name: "Hediye ve Ambalaj", code: "HED", sortOrder: 50 })
+      breakfast: ctx.addCategory({ id: "cat_mk_breakfast", name: "Kahvaltılık", code: "KAH", defaultTaxRate: 10, sortOrder: 10 }),
+      drink: ctx.addCategory({ id: "cat_mk_drink", name: "İçecek", code: "ICE", defaultTaxRate: 10, sortOrder: 20 }),
+      staple: ctx.addCategory({ id: "cat_mk_staple", name: "Temel Gıda", code: "TEM", defaultTaxRate: 10, sortOrder: 30 }),
+      home: ctx.addCategory({ id: "cat_mk_home", name: "Ev ve Temizlik", code: "EVC", defaultTaxRate: 20, sortOrder: 40 }),
+      gift: ctx.addCategory({ id: "cat_mk_gift", name: "Hediye ve Ambalaj", code: "HED", defaultTaxRate: 20, sortOrder: 50 })
     };
 
     const productInputs = [
@@ -170,7 +170,7 @@ export const marketPack = {
         categoryId,
         salePrice,
         purchasePrice,
-        taxRate: 10,
+        taxRate: [categories.home, categories.gift].includes(categoryId) ? 20 : 10,
         sortOrder: (index + 1) * 10,
         palette: DEMO_PALETTES.market,
         paletteVariant: index,
@@ -180,6 +180,8 @@ export const marketPack = {
         description: `${name} — sentetik demo market ürünü.`,
         trackInventory: trackInventory === 1,
         minimumQuantity: trackInventory ? 5 : 0,
+        // Both replenishment-needed and healthy-stock rows for report testing.
+        idealQuantity: trackInventory ? ([0, 3, 6, 8].includes(index) ? stock + 15 : Math.max(8, stock - 5)) : 0,
         quickAccess: index < 4,
         quickAccessOrder: index + 1
       });

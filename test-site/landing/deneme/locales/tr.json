@@ -1086,8 +1086,6 @@
   "checkout.shipping_next": "Teslimat bedeli bir sonraki adımda belirlenir.",
   "checkout.banka": "Banka",
   "checkout.bu_oturumda_siparis_sonucu_bulunamadi_hesabinizdan_siparislerinizi_kontrol_edebilirsiniz": "Bu oturumda sipariş sonucu bulunamadı. Hesabınızdan siparişlerinizi kontrol edebilirsiniz.",
-  "checkout.demo_satis_akisi_hukuki_metinler_ticari_kullanima_hazir_degildir": "DEMO satış akışı. Hukuki metinler ticari kullanıma hazır değildir.",
-  "checkout.demo_banka_bilgileri_gecersizdir_gercek_odeme_yapmayin": "DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.",
   "checkout.devam_et": "Devam et",
   "checkout.guncel_toplam_dogrulaniyor": "Güncel toplam doğrulanıyor…",
   "checkout.havale_eft": "Havale / EFT",

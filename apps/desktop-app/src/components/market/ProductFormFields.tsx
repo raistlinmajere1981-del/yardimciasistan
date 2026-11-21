@@ -214,6 +214,9 @@ export function ProductFormFields({
       <label className="form-field form-field--fluid">Marka<input disabled={disabled} value={form.brand} onChange={(event) => onChange({ ...form, brand: event.target.value })} /></label>
       {retailFieldsEnabled && <label className="form-field form-field--fluid">SKU<input disabled={disabled} value={form.sku} onChange={(event) => onChange({ ...form, sku: event.target.value })} /></label>}
       <div className="market-product-barcode-description form-field--span">
+      <label className="form-field form-field--fluid">Açıklama<input
+        disabled={disabled} value={form.description}
+        onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
       {retailFieldsEnabled && <label className="form-field form-field--fluid">
         Barkod
         <span className="market-inline-field">
@@ -230,9 +233,6 @@ export function ProductFormFields({
           </ActionButton>}
         </span>
       </label>}
-      <label className="form-field form-field--fluid">Açıklama<textarea
-        disabled={disabled} rows={2} value={form.description}
-        onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
       </div>
 
       {retailFieldsEnabled && <label className="form-field form-field--fluid">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => {

@@ -342,10 +342,10 @@ button.market-list-row {
   align-items: center;
 }
 
-/* Keep the product description with the barcode rather than a separate panel. */
+/* The description sits below Brand; the barcode and lookup sit below SKU. */
 .market-product-barcode-description {
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: var(--space-3);
   min-width: 0;
@@ -353,9 +353,12 @@ button.market-list-row {
 .market-product-barcode-description > .form-field {
   min-width: 0;
 }
-.market-product-barcode-description textarea {
-  min-height: 4.5rem;
-  resize: vertical;
+.market-product-barcode-description > .form-field:only-child {
+  grid-column: 1 / -1;
+}
+.market-product-barcode-description .market-inline-field input {
+  min-width: 0;
+  width: 100%;
 }
 
 .market-product-image-card {
@@ -467,12 +470,66 @@ button.market-list-row {
   justify-content: flex-end;
 }
 
-/* Ideal-stock planning is a full-width read-only report, not an inline-styled exception. */
-.market-stock-replenishment { grid-column: 1 / -1; }
-.market-stock-replenishment__filters { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
-.market-stock-replenishment__scroll { max-height: 350px; overflow: auto; }
-.market-stock-replenishment-table { width: 100%; text-align: left; border-collapse: collapse; }
-.market-stock-replenishment__sku { display: block; }
+/* Stock replenishment is a projection launcher, not an embedded 250-row report. */
+.market-stock-replenishment-launcher {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); min-height: 7rem;
+}
+.market-stock-replenishment-launcher > div { min-width: 0; }
+.market-stock-replenishment-launcher > .action-button { flex: none; }
+.stock-replenishment-workspace.workspace-frame--centered {
+  width: min(1280px, calc(100vw / var(--ui-scale) - var(--space-4)));
+  height: min(860px, calc(100dvh / var(--ui-scale) - var(--space-10)), max(0px, calc(var(--workspace-canvas-height, calc(100dvh / var(--ui-scale) - var(--workspace-canvas-top, var(--header-height)))) - var(--space-4))));
+}
+.stock-replenishment-workspace .workspace-frame__body--panes { padding: 0; }
+.stock-replenishment__content { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.stock-replenishment__intro, .stock-replenishment__pagination {
+  display: flex; gap: var(--space-2); justify-content: space-between; align-items: center; flex-wrap: wrap;
+}
+.stock-replenishment__intro p { margin: 0; max-width: 65rem; color: var(--color-text-muted); font-size: var(--text-sm); }
+.stock-replenishment__intro .action-button { flex: none; }
+.stock-replenishment__toolbar { display: grid; grid-template-columns: minmax(9rem, 1.1fr) minmax(12rem, 2fr) minmax(9rem, 1fr) minmax(7rem, .75fr); gap: var(--space-2); }
+.stock-replenishment__toolbar label { display: grid; min-width: 0; gap: var(--space-1); color: var(--color-text-muted); font-size: var(--text-xs); }
+.stock-replenishment__toolbar input, .stock-replenishment__toolbar select { width: 100%; min-width: 0; }
+.stock-replenishment__selection {
+  display: flex; gap: var(--space-2); justify-content: flex-start; align-items: center; flex-wrap: wrap;
+}
+.stock-replenishment__selection > span { margin-left: auto; }
+.stock-replenishment__table-scroll { flex: 1 1 auto; min-height: 9rem; min-width: 0; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-panel); scrollbar-gutter: stable; }
+.stock-replenishment__table { width: 100%; min-width: 43rem; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); }
+.stock-replenishment__table th {
+  position: sticky; top: 0; z-index: 1; background: var(--color-bg-panel);
+  color: var(--color-text-muted); text-align: left; white-space: nowrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border);
+}
+.stock-replenishment__table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.stock-replenishment__table tr[data-selected=true] { background: var(--color-accent-soft); }
+.stock-replenishment__table td:first-child, .stock-replenishment__table th:first-child { width: 3.2rem; text-align: center; }
+.stock-replenishment__table td strong { font-weight: 650; }
+.stock-replenishment__table td small { display: block; font-size: var(--text-xs); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.stock-replenishment__table td:nth-child(n+4) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stock-replenishment__table .stock-replenishment__need strong { color: var(--color-accent); }
+.stock-replenishment__empty { margin: 0; padding: var(--space-3); }
+.stock-replenishment__notice {
+  margin: 0; padding: var(--space-3); background: var(--color-bg-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius-control);
+}
+.stock-replenishment__pages, .stock-replenishment__footer-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-1); }
+.stock-replenishment__pages > span { min-width: 4rem; text-align: center; font-variant-numeric: tabular-nums; }
+.stock-replenishment__print-note { margin: 0; font-size: var(--text-xs); }
+.stock-replenishment-workspace .workspace-frame__footer { gap: var(--space-2); }
+.stock-replenishment-workspace .workspace-frame__footer > .market-muted { margin-right: auto; font-size: var(--text-xs); }
+@media (max-width: 900px) {
+  .stock-replenishment__toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-replenishment__footer-actions { justify-content: flex-start; }
+}
+@media (max-width: 600px) {
+  .market-stock-replenishment-launcher { align-items: start; flex-direction: column; }
+  .stock-replenishment__content { padding: var(--space-2); }
+  .stock-replenishment__toolbar { grid-template-columns: 1fr; }
+  .stock-replenishment__selection > span { margin-left: 0; }
+  .stock-replenishment-workspace .workspace-frame__footer { align-items: flex-start; }
+}
 
 .market-stock-card {
   display: grid;

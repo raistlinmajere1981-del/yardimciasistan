@@ -27,8 +27,8 @@ export async function createDealerAccountDeviceFixture(serial) {
     assert.equal((await ingress.pullCustomerAccountPages(f.transport)).error,'');
     const customer=f.database.listCustomers({}).items.find(row=>row.email==='physical@example.test');assert.ok(customer);
     const product=saveRuntimeCatalogProduct(f.database.databasePath,{name:'Physical API fixture product',sku:'PHYSICAL-ACCOUNT',brand:'',categoryId:'',salePrice:100,dealerPriceA:80,dealerPriceB:60,purchasePrice:20,currency:'TRY',unit:'piece',taxRate:20,trackInventory:false,isActive:true});
-    const settings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:null,
-      bank:{name:'DEMO Banka',accountHolder:'DEMO Bayi',iban:'DEMO-GECERSIZ-HESAP'},
+    const settings={version:2,enabled:true,currency:'TRY',shippingFeeMinor:null,
+      bank:{name:'DEMO Banka',accountHolder:'DEMO Bayi',iban:'GB82 WEST 1234 5698 7654 32'},
       legal:{version:'dealer-device-v2',preliminary:'DEMO test ön bilgilendirme metni.',agreement:'DEMO test satış sözleşmesi.'}};
     saveCheckoutSettings(f.database.databasePath,settings);
     f.database.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,sortOrder:0});

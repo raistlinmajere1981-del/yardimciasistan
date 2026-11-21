@@ -7,6 +7,13 @@
   --text-lg: 1.125rem;
   --text-xl: 1.375rem;
   --text-2xl: 1.75rem;
+  /* Fixed-size previews mirror stock report and QR label print typography. */
+  --print-report-heading-size: 1.1rem;
+  --print-report-meta-size: .7rem;
+  --print-report-table-size: .65rem;
+  --print-qr-heading-size: 1rem;
+  --print-qr-body-size: .68rem;
+  --print-qr-caption-size: .56rem;
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;

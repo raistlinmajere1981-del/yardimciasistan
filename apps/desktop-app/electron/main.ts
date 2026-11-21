@@ -1,5 +1,7 @@
 import { getDocumentPrinterInstallationId } from "./document-printer-installation";
 import { registerDocumentOutputIpcHandlers } from "./ipc/document-output-ipc";
+import { printQrAfterCheckIn } from "./document-output-qr-print";
+import { createAndroidEntityId } from "./database/android-utils";
 import { registerDataTransferIpc } from "./ipc/data-transfer-ipc";
 import { PublicTranslationService } from "./public-translation-service";
 import { registerPublicTranslationIpc } from "./ipc/public-translation-ipc";
@@ -457,6 +459,16 @@ if (!hasSingleInstanceLock) {
         const result = getDatabase().applyAndroidAction(action, localContext,
           new CommerceBenefitsKey(app.getPath("userData"), safeStorage));
         if (result.ok) kbsDeliveryRequestProcessor.wake();
+        // Companion check-ins pass the same committed-stay QR print gate as Desktop.
+        // Replayed actions never spool again, even if the previous result is uncertain.
+        if (result.ok && !result.alreadyApplied) {
+          const status = action.payload.status;
+          const stayId = action.action_type === "customer_room_assign" && status === "checked_in"
+            ? createAndroidEntityId("stay_", action.id)
+            : action.action_type === "customer_room_stay_status" && status === "checked_in"
+              && typeof action.payload.stay_id === "string" ? action.payload.stay_id : "";
+          if (stayId) scheduleRoomQrArrivalPrint(stayId);
+        }
         getDatabase().recordAndroidActionResult(action, result);
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
         getDatabase().queueSyncJob("android_snapshot");
@@ -613,7 +625,9 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
-  registerDocumentOutputIpcHandlers({ installationId: () => getDocumentPrinterInstallationId(app.getPath("userData")), databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, isTrustedRendererUrl: isTrustedDesktopRendererUrl });
+  registerDocumentOutputIpcHandlers({ installationId: () => getDocumentPrinterInstallationId(app.getPath("userData")), databasePath: () => getDatabase().databasePath,
+    webModuleUrl: () => getDatabase().getSetupData().webModuleUrl,
+    assertUnlocked: assertAppSessionUnlocked, isTrustedRendererUrl: isTrustedDesktopRendererUrl });
   registerDataTransferIpc({ databasePath: () => getDatabase().databasePath, assertUnlocked: assertAppSessionUnlocked, onMutation: () => { syncCoordinator?.scheduleSoon(); } });
   registerPublicTranslationIpc({database:getDatabase, service:publicTranslationService, assertUnlocked:assertAppSessionUnlocked, onChanged:() => getSyncCoordinator().scheduleSoon(0, true)});
   registerSeoIpc({database:getDatabase, assertUnlocked:assertAppSessionUnlocked,
@@ -877,8 +891,21 @@ function finalizeDesktopHospitalityMutation(
   return finalizeDesktopCustomerMutation(result);
 }
 
+function scheduleRoomQrArrivalPrint(stayId: string) {
+  // Output follows a successful commit, never modifies the stay/KBS receipt.
+  void printQrAfterCheckIn({
+    databasePath: () => getDatabase().databasePath,
+    installationId: () => getDocumentPrinterInstallationId(app.getPath("userData")),
+    webModuleUrl: () => getDatabase().getSetupData().webModuleUrl,
+    assertAuthorized: assertAppSessionUnlocked
+  }, stayId).catch(error => desktopLog.error({
+    scope: "qr-print", event: "arrival.failed", message: "QR giriş baskısı işlenemedi.", error
+  }));
+}
 async function finalizeDesktopCheckInMutation(result: DesktopCustomerMutationResult) {
-  return finalizeDesktopHospitalityMutation(result, ["arrival"]);
+  const finalized = finalizeDesktopHospitalityMutation(result, ["arrival"]);
+  if (finalized.ok && finalized.savedId) scheduleRoomQrArrivalPrint(finalized.savedId);
+  return finalized;
 }
 
 async function finalizeDesktopCheckoutMutation(result: DesktopCustomerMutationResult) {

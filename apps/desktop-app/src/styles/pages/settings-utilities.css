@@ -45,6 +45,28 @@
   font-size: var(--text-xs);
 }
 
+.settings-action-popover .backup-manager-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: start;
+}
+.settings-action-popover .backup-manager-title > div:first-child {
+  min-width: 0;
+}
+.settings-action-popover .backup-manager-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+}
+.backup-manager-header-actions > .action-button {
+  flex: 0 0 auto;
+}
+
 .backup-list-heading {
   display: flex;
   flex-wrap: wrap;

@@ -21,21 +21,17 @@ function ya_commerce_mail_enqueue(PDO $db, string $eventId, string $recipient, s
 /** Stable template for accepted intake; does not claim payment or final fulfillment. */
 function ya_commerce_mail_order(PDO $db, string $id, array $request, array $quote): void
 {
-    $body = "Sipariş talebiniz alındı.\nSipariş referansı: " . $id . "\n\n";
+    $body = "Sipariş talebiniz alındı.\nSipariş referansı: " . $quote['order_number'] . "\n\n";
     foreach ($quote['items'] as $line) {
         $body .= $line['name'] . ' × ' . $line['quantity'] . ': ' . number_format($line['line_total_minor'] / 100, 2, '.', '') . ' ' . $quote['currency'] . "\n";
     }
     $body .= "\nÜrünler toplamı: " . number_format($quote['subtotal_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
-        . "\nTeslimat ve ödeme talimatları henüz kesinleşmedi. Bu mesaj ödeme onayı değildir.\n";
-    if (($quote['version'] ?? 1) === 2) {
-        $body = str_replace($id, $quote['order_number'], $body);
-        $body = str_replace("Teslimat ve ödeme talimatları henüz kesinleşmedi.",
-            "Teslimat: " . number_format($quote['delivery_fee_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
-            . "\nÖdenecek toplam: " . number_format($quote['total_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
-            . "\n" . ($quote['demo'] ? 'DEMO — gerçek ödeme yapmayın. ' : '')
-            . $quote['bank']['name'] . "\n" . $quote['bank']['accountHolder'] . "\nIBAN: " . $quote['bank']['iban']
-            . "\nHavale açıklaması: " . $quote['order_number'], $body);
-    }
+        . "\nTeslimat: " . number_format($quote['delivery_fee_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
+        . "\nÖdenecek toplam: " . number_format($quote['total_minor'] / 100, 2, '.', '') . ' ' . $quote['currency']
+        . "\nBanka: " . $quote['bank']['name'] . "\nHesap sahibi: " . $quote['bank']['accountHolder']
+        . "\nIBAN: " . $quote['bank']['iban']
+        . "\nHavale açıklaması: " . $quote['order_number']
+        . "\nÖdeme, işletme tarafından doğrulanana kadar beklemede kalır.\n";
     $email = $request['buyer']['email'] ?? '';
     if ($email !== '') ya_commerce_mail_enqueue($db, $id . ':received', $email, 'Sipariş talebiniz alındı', $body);
     $business = getenv('YA_COMMERCE_NOTIFICATION_EMAIL') ?: '';

@@ -94,12 +94,9 @@ export function SystemHealthPanel({
   return (
     <Panel className="system-health-panel" padding="compact" aria-labelledby="system-health-title">
       <div className="system-health-heading">
-        <div>
-          <p>Sistem sağlığı</p>
-          <h2 id="system-health-title">Bağlantılar ve koruma</h2>
-        </div>
+        <h2 id="system-health-title">Sistem sağlığı</h2>
       </div>
-      <div className="system-health-grid">
+      <div className="system-health-grid" data-count={items.length}>
         {items.map((item) => {
           const Icon = item.icon;
           return (

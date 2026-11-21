@@ -54,10 +54,11 @@ ikincil, non-canonical bir yüzey gerekirse düşünülebilir.
 Ayarlar tek sayfadır; kategori sekmeleri yoktur. İşletme Yapısı ve Özellikler,
 sektör/yetenekler ve genişliğe göre 3–4 kolonlu kompakt servis grid’ini içerir.
 Dar ekranlarda kolon sayısı azalır. Servisler, Ek özellikler ile aynı çerçeve ve
-iç yüzeyi paylaşır. Her hücre tek erişilebilir Ayarlar düğmesidir; ad ve büyük dairesel etkinlik
-göstergesi taşır (etkin yeşil, kapalı kırmızı, dış ön koşulu eksik gri). Durum
-erişilebilir metinle de bildirilir. Dış ön koşulu eksik hücre kısa neden gösterir
-ve tıklama/klavye/arama yoluyla açılamaz; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
+iç yüzeyi paylaşır. Her hücre tek erişilebilir Ayarlar düğmesidir; servis simgesi,
+adı, kısa açıklaması, dairesel durum işareti ve metin rozeti taşır (etkin yeşil,
+kapalı kırmızı, dış ön koşulu eksik gri). Gösterilen etkinlik kayıtlı tercihtir;
+canlı bağlantı/test doğrulaması yalnız detayda ayrı görünür. Dış ön koşulu eksik hücre kısa neden gösterir
+ve tıklama/klavye/arama yoluyla açılamaz. Kurulum gerekliyken
 açıktır; normal her ziyarette kapalı başlar. Kurulum tamamlanınca taslaklar temiz
 olduğunda kapanır. Her servis ortak, klavye erişimli detay penceresinde kendi
 Kaydet/İptal işlemlerini kullanır. Etkinleştirme tercihi ile gerçek test sonucu ayrı
@@ -180,6 +181,38 @@ renderer sekmesinden bağımsız Electron otomasyon lifecycle'ına aittir.
 
 AI sonucu kullanıcı tarafından gözden geçirilebilir ve düzenlenebilir olmalıdır. AI kesin
 rezervasyon/müsaitlik/fiyat yetkilisi gibi davranmaz.
+
+## QR Menü kodları ve oda giriş baskısı
+
+QR menünün genel, oda ve masa kodları tek uzun QR ızgarası yerine tek WorkspaceFrame
+içinde ayrı sekmelerde yönetilir. Oda/masa listeleri arama, 25 satırlık sayfalama,
+sayfa boyunca kalıcı seçim ve en çok 100 kodluk toplu baskı sunar; yalnız seçilen
+kodun QR görseli çizilir. Kod indirme ve bağlantı kopyalama korunur. Birimlerin
+aktif/siparişe açık olup olmadığı otoriter menü ve konaklama durumundan okunur.
+
+Baskı Yönetimi qr_menu, qr_table ve qr_room için ayrı cihaz yazıcısı ve manuel
+onay politikası tutar. Oda QR kodları için ayrıca stay_checked_in olayında
+OFF / ASK_CONFIRMATION / AUTOMATIC ayarı vardır. Çıktı 100 × 150 mm etiket,
+güncel sunucu tarafı QR token'ından oluşturulur. Oda barkodu sadece açık foliosu
+olan girişli konaklama süresince geçerlidir. Manuel oda baskı düğmesi tek işlem
+olarak Room Workspace topbar'ında bulunur; ikinci overlay açmaz. Giriş baskısı,
+gerçek konaklama commit'i sonrasında bir kez claim edilir; tekrar gönderilmiş
+Android işlemleri, iptal, başarısızlık ve bilinmeyen spool sonucu otomatik yeniden
+basılmaz. QR baskı hatası konaklama veya KBS sonucunu geri almaz.
+
+## Stok ihtiyaç listesi ve baskı
+
+Stok ekranında İdeal Stok Eksikleri yalnızca geniş çalışma alanını açan bir launcher'dır;
+10.000 ürünlük liste sayfa açılışında yüklenmez. Çalışma alanı kategori/isim/SKU
+araması, sıralama, 25/50/100 satırlık sayfalama, sayfalar arası kalıcı seçim ve
+seçili/filtreli/tüm CSV kapsamlarını birbirinden ayırır. Stok ve satın alma kayıtları
+bu rapordan değiştirilmez. Veri sınırı aşıldığında sessizce kırpılmış sonuç gösterilmez.
+
+Yazdırma Baskı Yönetimi'nin kayıtlı stok/print yetkilerini, cihaz yazıcı bağlamasını
+ve manuel onay politikasını kullanır. Stok ihtiyaç listesi değişken uzunlukta A4 yatay,
+çok sayfalı ve salt okunur belgedir; fiş şablonu veya renderer iframe'i değildir.
+Ürün kimliği sunucuda yeniden çözülür ve son stok verisi esas alınır; baskı iptal,
+başarısız ve belirsiz sonuçları ayrı bildirilir. Otomatik gönderim yoktur.
 
 ## Android Companion
 

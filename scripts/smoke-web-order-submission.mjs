@@ -36,8 +36,8 @@ async function sync(payload) {
   return response.json();
 }
 let revision = 0;
-const checkout = { version: 1, enabled: true, demo: true, currency: "TRY", shippingFeeMinor: 1500,
-  bank: { name: "DEMO Banka", accountHolder: "DEMO İşletme", iban: "DEMO — GEÇERSİZ — ÖDEME YAPMAYIN" },
+const checkout = { version:2, enabled: true, currency: "TRY", shippingFeeMinor: 1500,
+  bank: { name: "DEMO Banka", accountHolder: "DEMO İşletme", iban: "GB82 WEST 1234 5698 7654 32" },
   legal: { version: "demo-v2", preliminary: "DEMO ön bilgilendirme. Ticari kullanıma hazır değildir.", agreement: "DEMO satış sözleşmesi. Ticari kullanıma hazır değildir." } };
 const publishedProduct = { product_id: "published-product", name: "Published product", description: "", sku: "", unit: "piece", price: 25,
   currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0 };

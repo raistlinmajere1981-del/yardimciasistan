@@ -26,13 +26,13 @@ public class DealerStateTest {
           .put("name", product.optString("name", "Ürün"))
           .put("unit_price_minor", unit).put("line_total_minor", amount));
     }
-    return new JSONObject().put("version", 2).put("minor_unit", 2).put("items", lines)
+    return new JSONObject().put("version", 3).put("minor_unit", 2).put("items", lines)
         .put("currency", state.product(items.getJSONObject(0).getString("productId")).getString("currency"))
         .put("delivery_method", draft.getJSONObject("delivery").getString("method"))
         .put("subtotal_minor", sum).put("delivery_fee_minor", 0).put("total_minor", sum)
         .put("payment_method", "bank_transfer").put("quote_id", "a".repeat(64))
-        .put("demo", true).put("bank", new JSONObject().put("name", "TEST BANKA")
-            .put("accountHolder", "DEMO").put("iban", "DEMO-GECERSIZ-HESAP"))
+        .put("bank", new JSONObject().put("name", "TEST BANKA")
+            .put("accountHolder", "DEMO").put("iban", "GB82 WEST 1234 5698 7654 32"))
         .put("legal", new JSONObject().put("version", "test-v1")
             .put("preliminary", "Ön bilgilendirme test metni")
             .put("agreement", "Satış sözleşmesi test metni"));
@@ -138,6 +138,16 @@ public class DealerStateTest {
   @Test public void invalidOrTamperedServerQuotesFailBeforeDurableOrder() throws Exception {
     DealerState state=signedIn();state.quantity("p",2);JSONObject draft=state.draftOrder();
     JSONObject q=quoted(state);
+    for (JSONObject invalid : new JSONObject[]{
+        new JSONObject(q.toString()).put("version", 2),
+        new JSONObject(q.toString()).put("demo", true),
+        new JSONObject(q.toString()).put("bank",
+            new JSONObject(q.getJSONObject("bank").toString()).put("iban", "GB83 WEST 1234 5698 7654 32"))
+    }) {
+      assertThrows(IllegalArgumentException.class, () -> DealerCheckout.verifiedQuote(
+          new JSONObject().put("ok", true).put("quote", invalid), draft));
+      assertFalse(state.data.has("pending"));
+    }
     for (String key : new String[]{"quote_id","currency","payment_method","total_minor","items","bank","legal"}) {
       JSONObject broken=new JSONObject(q.toString());
       switch(key){

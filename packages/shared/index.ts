@@ -70,3 +70,5 @@ export * from "./types/document-output";
 export * from "./types/document-output-management";
 
 export * from "./types/commerce-checkout";
+
+export * from "./utils/qr-code";

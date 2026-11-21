@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 
-type ActionButtonVariant = "primary" | "secondary" | "accent" | "ghost" | "danger" | "quiet" | "link";
+type ActionButtonVariant = "primary" | "secondary" | "accent" | "ghost" | "danger" | "quiet" | "link" | "service";
 type ActionButtonSize = "sm" | "md" | "lg";
 type ActionButtonResult = "success" | "error";
 

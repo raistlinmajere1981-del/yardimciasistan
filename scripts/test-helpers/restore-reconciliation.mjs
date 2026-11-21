@@ -131,7 +131,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
       purchasePrice: 50, currency: 'TRY', unit: 'piece', taxRate: 20, trackInventory: false, isActive: true };
     const product = saveRuntimeCatalogProduct(f.db.databasePath, productInput);
     f.db.saveCommerceProductPublication({productId:product.id,channel:'online_sales',isPublished:true,titleOverride:'',descriptionOverride:'',sortOrder:0});
-    const checkoutSettings={version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:1700,bank:{name:'DEMO Restore A',accountHolder:'DEMO',iban:'DEMO — GEÇERSİZ'},legal:{version:'restore-terms',preliminary:'DEMO',agreement:'DEMO'}};
+    const checkoutSettings={version:2,enabled:true,currency:'TRY',shippingFeeMinor:1700,bank:{name:'DEMO Restore A',accountHolder:'DEMO',iban:'GB82 WEST 1234 5698 7654 32'},legal:{version:'restore-terms',preliminary:'DEMO',agreement:'DEMO'}};
     saveCheckoutSettings(f.db.databasePath,checkoutSettings);
     const customer = f.db.saveCustomer({ fullName: 'Restore dealer', phone: '05550001199', email: '', notes: '', tags: [],
       commercialProfile: { companyName: 'Restore dealer', dealerStatus: 'active', priceGroup: 'dealer_a' } });

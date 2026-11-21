@@ -1,8 +1,8 @@
 import { BUSINESS_CAPABILITIES as C, type BusinessCapability } from "./business-capabilities";
 
-export const DOCUMENT_KINDS = ["sale_receipt", "table_bill", "stay_statement", "product_label", "invoice_copy", "credit_statement", "shipping_label", "kitchen_ticket"] as const;
+export const DOCUMENT_KINDS = ["sale_receipt", "table_bill", "stay_statement", "product_label", "invoice_copy", "credit_statement", "shipping_label", "kitchen_ticket", "stock_replenishment", "qr_menu", "qr_table", "qr_room"] as const;
 export type DocumentKind = typeof DOCUMENT_KINDS[number];
-export type DocumentTrigger = "sale_completed" | "table_closed" | "stay_checked_out" | "order_dispatched" | "shipment_created" | "customer_statement_requested" | "order_created" | "manual";
+export type DocumentTrigger = "sale_completed" | "table_closed" | "stay_checked_out" | "order_dispatched" | "shipment_created" | "customer_statement_requested" | "order_created" | "stay_checked_in" | "manual";
 export type DocumentOutputChannel = "print" | "email" | "whatsapp";
 export type DocumentOutputMode = "OFF" | "ASK_CONFIRMATION" | "AUTOMATIC";
 export type DocumentDeliveryState = "queued" | "awaiting-confirmation" | "sending" | "accepted" | "failed" | "unknown";
@@ -53,7 +53,11 @@ export interface DocumentOutputJob {
 export const DOCUMENT_REQUIRED_CAPABILITIES: Record<DocumentKind, readonly BusinessCapability[]> = {
   sale_receipt: [C.SALES], table_bill: [C.FOOD_ORDERS], stay_statement: [C.ACCOMMODATION_STAYS],
   product_label: [C.RETAIL_LABELS], invoice_copy: [],
-  credit_statement: [C.CUSTOMER_CREDIT], shipping_label: [C.ORDERS], kitchen_ticket: [C.FOOD_ORDERS]
+  credit_statement: [C.CUSTOMER_CREDIT], shipping_label: [C.ORDERS], kitchen_ticket: [C.FOOD_ORDERS], stock_replenishment: [C.INVENTORY],
+  qr_menu: [C.QR_MENU, C.FOOD_MENU],
+  qr_table: [C.QR_MENU, C.FOOD_MENU, C.FOOD_TABLES, C.FOOD_ORDERS, C.REQUESTS],
+  qr_room: [C.QR_MENU, C.FOOD_MENU, C.REQUESTS, C.CUSTOMERS,
+    C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.ACCOMMODATION_FOLIO]
 };
 export function documentKindEnabled(kind: DocumentKind, capabilities: Iterable<BusinessCapability>): boolean {
   const enabled = new Set(capabilities);
@@ -63,7 +67,7 @@ export function documentTriggerCompatible(kind: DocumentKind, trigger: DocumentT
   const triggers: Partial<Record<DocumentKind, readonly DocumentTrigger[]>> = {
     sale_receipt: ["sale_completed"], table_bill: ["table_closed"], stay_statement: ["stay_checked_out"],
     credit_statement: ["customer_statement_requested"], shipping_label: ["order_dispatched", "shipment_created"],
-    kitchen_ticket: ["order_created"]
+    kitchen_ticket: ["order_created"], qr_room: ["stay_checked_in"]
   };
   return trigger === "manual" || triggers[kind]?.includes(trigger) === true;
 }

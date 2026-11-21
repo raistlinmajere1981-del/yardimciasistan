@@ -20,7 +20,13 @@ export interface SaveDocumentPrinterBindingInput extends DocumentOutputReadInput
 export interface DocumentFormImage { imageRef: string; dataUrl: string }
 export interface ReadDocumentFormImageInput extends DocumentOutputReadInput { imageRef: string }
 export interface SaveProcessedFormImageInput extends DocumentOutputReadInput { originalImageRef: string; pngBase64: string }
+/** Bounded selection is revalidated against fresh inventory inside trusted Desktop main. */
+export type PrintStockReplenishmentInput = { scope: "all" } | { scope: "selected"; productIds: string[] };
+/** Only a kind and bounded IDs cross the renderer boundary; never bearer tokens or URLs. */
+export type PrintQrCodesInput = { kind: "qr_menu"; ids?: never } | { kind: "qr_room" | "qr_table"; ids: string[] };
 export interface DocumentOutputManagementBridge {
+  printQrCodes(input: PrintQrCodesInput): Promise<DocumentOutputManagementResult<"accepted" | "failed" | "unknown" | null>>;
+  printStockReplenishment(input: PrintStockReplenishmentInput): Promise<DocumentOutputManagementResult<"accepted" | "failed" | "unknown" | null>>;
   prepareSaleReceipt?(input: { saleId: string }): Promise<DocumentOutputManagementResult<{ jobId: string }>>;
   listReadyDocuments(input: DocumentOutputReadInput): Promise<DocumentOutputManagementResult<Array<{ jobId: string; createdAt: string }>>>;
   previewReadyDocument(input: DocumentOutputReadInput & { jobId: string }): Promise<DocumentOutputManagementResult<null>>;

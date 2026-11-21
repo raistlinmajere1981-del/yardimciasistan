@@ -3,9 +3,12 @@
 Sürüm otoritesi `product-version.json`; Desktop/Companion package metadata'sı,
 lock kayıtları, Bayi Gradle sürümü, web modülü ve demo `release.json` bu kaynağa
 bağlıdır. Mevcut `version:set`, `version:bump`, `version:web:set` ve Admin Control
-Center işlemleri korunur. Web modülü sürümü bağımsız ilerleyebilir; bu temiz
-kurulumda ürün ve web modülü 2.0.11, Android versionCode 15'tir. Yeni wire protocol,
-migration, backfill veya eski APK imzasına uyumluluk katmanı eklenmez.
+Center işlemleri korunur. Web modülü sürümü bağımsız ilerleyebilir.
+**Bu belge sürümden bağımsız iş akışını anlatır; 2.0.11/Android 15 tarihsel
+örnekleri geçerli sürüm olarak kullanmayın.** Güncel sürümü her zaman
+`npm run version:show` / `product-version.json` üzerinden alın.
+Yeni wire protocol, migration, backfill veya eski APK imzasına uyumluluk
+katmanı yalnız ayrı açık kararla eklenir.
 
 `pack:release`, Windows x64/x86 ve Companion release hattını, Bayi release APK'sını,
 mevcut `prepare:web-install --installation ya --no-print-secret` paketini, demo
@@ -51,7 +54,8 @@ cd /home/raistlin/YardimciWorkspace/YardimciAsistan
 
    Başarı: iki Windows installer, iki kalıcı imzalı APK, temiz web modülü paketi ve
    iki katmanlı demo build'i oluşur; son `release:check` geçer. Bayi dosyasının
-   yayın adı `YardimciAsistan-Bayi-Android-2.0.11.apk` olur.
+   yayın adı `YardimciAsistan-Bayi-Android-<ürün-sürümü>.apk` olur
+   (`product-version.json` esas alınır).
 
 4. Paket doğrulamasını bağımsız tekrarlayın:
 

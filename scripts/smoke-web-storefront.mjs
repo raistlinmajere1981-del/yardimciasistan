@@ -54,8 +54,8 @@ const cartKey = 'ya:storefront:/yardimci-asistan/:guest:cart:v2';
 const attemptKey = 'ya:storefront:/yardimci-asistan/:guest:attempt:v2';
 const checkoutKey = 'ya:checkout:/yardimci-asistan/:guest:v2';
 const checkout = {
-  version: 1, enabled: true, demo: true, currency: 'TRY', shippingFeeMinor: 1499,
-  bank: { name: 'DEMO Bank <img onerror=window.injected=true>', accountHolder: 'DEMO Store', iban: 'DEMO — INVALID — DO NOT PAY' },
+  version:2, enabled: true, currency: 'TRY', shippingFeeMinor: 1499,
+  bank: { name: 'DEMO Bank <img onerror=window.injected=true>', accountHolder: 'DEMO Store', iban: 'GB82 WEST 1234 5698 7654 32' },
   legal: { version: 'fixture-v2', preliminary: 'DEMO <script>window.injected=true</script>', agreement: 'DEMO agreement — not for commerce.' }
 };
 const csp = "script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
@@ -239,12 +239,13 @@ async function accepted(page, count, receipt, owner = 'guest') {
   await atStep(page, 'result');
   await expect(body(page).locator('h2')).toHaveText(receipt.order_number);
   await expect(body(page)).toContainText('Ödeme bekleniyor. Sipariş oluşturulması ödeme onayı değildir.');
-  await expect(body(page)).toContainText('DEMO — Banka bilgileri geçersizdir. Gerçek ödeme yapmayın.');
+  await expect(body(page)).toContainText('GB82 WEST 1234 5698 7654 32');
+  await expect(body(page)).not.toContainText('DEMO — Banka bilgileri geçersizdir');
   await expect(body(page)).toContainText(checkout.bank.iban);
   await expect(body(page).locator('script,img,iframe,form')).toHaveCount(0);
   assert.match(receipt.order_id, /^web_(?:dealer_)?order_[a-f0-9]{32}$/);
   assert.match(receipt.order_number, /^YA-\d{8}-[A-F0-9]{10}$/);
-  assert.equal(receipt.payment_status, 'unpaid'); assert.equal(receipt.checkout.version, 2);
+  assert.equal(receipt.payment_status, 'unpaid'); assert.equal(receipt.checkout.version, 3);
   assert.equal(orderCount(), count);
   const saved = await privateStorage(page);
   const storageOwner = owner === 'guest' ? owner : `account:${owner}`;

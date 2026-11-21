@@ -52,6 +52,8 @@ let delayProcessed = false;
 const processedCalls: Array<{ originalImageRef: string; imageRef: string; dataUrl: string }> = [];
 const images = new Map<string, string>();
 const mock: DocumentOutputManagementBridge = {
+  printStockReplenishment: async () => ({ok:false,code:"TEST",message:"Baskı ayarı yok."}),
+  printQrCodes: async () => ({ok:false,code:"TEST",message:"Baskı ayarı yok."}),
   listReadyDocuments: async ({documentKind}) => ({ok:true,value:readyJob && documentKind === "sale_receipt" ? [{jobId:"a".repeat(64),createdAt:"2026-11-06"}] : []}),
   previewReadyDocument: async () => { previewCalls++; return {ok:true,value:null}; },
   printReadyDocument: async () => { printCalls++; readyJob = false; return {ok:true,value:"accepted"}; },

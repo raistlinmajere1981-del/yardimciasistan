@@ -29,6 +29,7 @@ const { readProductImageAsset, readProductOriginalAssets } = electron("product-i
 const { createCommerceOnlineCatalog } = electron("commerce-online-catalog-publication");
 const { listRoomMedia, listPendingRoomMedia } = electron("room-media-service");
 const { listTableMedia, listPendingTableMedia } = electron("table-media-service");
+const { listStockReplenishment } = electron("stock-replenishment");
 
 const REFUND_AUTHORITY = {
   actor: { id: "demo-data-verifier", role: "desktop_owner", assertAuthorized() {} }
@@ -418,6 +419,43 @@ const PACK_CHECKS = {
   "d-teknikel": checkTeknikel
 };
 
+/**
+ * Verify both stock planning scenarios through the real read service, and
+ * check category defaults independently of the input arrays in the generator.
+ */
+function stockAndVatChecks(db, dbPath, packId) {
+  const { checks, check } = publishCheckList();
+  const rows = db.prepare(`SELECT p.id, p.name, p.track_inventory, p.minimum_quantity,
+    p.ideal_quantity, p.tax_rate, c.default_tax_rate AS category_tax,
+    COALESCE((SELECT SUM(b.quantity) FROM inventory_balances b
+      WHERE b.product_id = p.id), 0) AS available
+    FROM catalog_products p LEFT JOIN catalog_categories c ON c.id = p.category_id
+    WHERE p.deleted_at = '' ORDER BY p.id`).all();
+  const categories = db.prepare("SELECT default_tax_rate FROM catalog_categories WHERE deleted_at = ''").all();
+  const tracked = rows.filter(row => row.track_inventory === 1);
+  const needs = tracked.filter(row => row.available < row.ideal_quantity);
+  const expectedDeficit = new Map(needs.map(row => [row.id, Number((row.ideal_quantity - row.available).toFixed(4))]));
+  const suggested = listStockReplenishment(dbPath);
+  check("idealStock.trackable", () => tracked.length > 0, true);
+  check("idealStock.configured", () => tracked.every(row =>
+    row.ideal_quantity > 0 && row.minimum_quantity <= row.ideal_quantity), true);
+  check("idealStock.suppressedWhenTrackingOff", () => rows.every(row =>
+    row.track_inventory !== 0 || row.ideal_quantity === 0), true);
+  check("idealStock.deficitAndHealthy", () => needs.length > 0 && needs.length < tracked.length, true);
+  check("idealStock.readService", () => suggested.length === expectedDeficit.size
+    && suggested.every(row => expectedDeficit.get(row.productId) === row.suggestedQuantity
+      && row.suggestedQuantity > 0 && row.idealQuantity > row.quantity), true);
+  check("vat.categoryDefaultRange", () => categories.length > 0
+    && categories.every(row => row.default_tax_rate === 10 || row.default_tax_rate === 20), true);
+  check("vat.productOverride", () => rows.filter(row => row.category_tax !== row.tax_rate)
+    .map(row => row.name), packId === "a-pension-restaurant" ? ["Türk Kahvesi"] : []);
+  check("vat.variedCategoryDefaults", () =>
+    packId === "b-market" || packId === "c-market-dealer"
+      ? new Set(categories.map(row => row.default_tax_rate)).size === 2
+      : true, true);
+  return checks;
+}
+
 function capabilityChecks(db) {
   const { checks, check } = publishCheckList();
   const profileRow = db.prepare("SELECT profile_id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get();
@@ -444,6 +482,7 @@ export function verifyPackage({ folderPath, dbPath, pack }) {
     const integrity = inspectDatabase(db);
     const checks = integrity.ok ? (PACK_CHECKS[pack.id]?.({ db, dbPath, folderPath, pack }) ?? []) : [];
     const capabilities = integrity.ok ? capabilityChecks(db) : [];
+    const stockVat = integrity.ok ? stockAndVatChecks(db, dbPath, pack.id) : [];
     const assetFiles = fs.existsSync(`${folderPath}/assets`) ? countFiles(`${folderPath}/assets`) : 0;
     let imageError = "";
     const imageRows = db.prepare("SELECT id, image_asset_path FROM catalog_products WHERE deleted_at = '' AND image_asset_path <> ''").all();
@@ -467,6 +506,7 @@ export function verifyPackage({ folderPath, dbPath, pack }) {
       { name: "manifest.assets", pass: manifest.assets?.fileCount === assetFiles, expected: assetFiles, actual: manifest.assets?.fileCount },
       { name: "productImages.readable", pass: imageRows.length > 0 && !imageError, actual: imageError || imageRows.length },
       ...capabilities,
+      ...stockVat,
       ...checks
     ];
     return {

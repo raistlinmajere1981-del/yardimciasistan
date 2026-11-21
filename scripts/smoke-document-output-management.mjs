@@ -9,12 +9,13 @@ import ts from "typescript";
 
 const root = mkdtempSync(join(tmpdir(), "document-output-management-"));
 const require = createRequire(import.meta.url);
-for (const file of ["packages/shared/types/business-capabilities.ts", "packages/shared/types/document-output.ts", "apps/desktop-app/electron/document-printer-installation.ts", "apps/desktop-app/electron/document-form-images.ts", "apps/desktop-app/electron/document-output-store.ts", "apps/desktop-app/electron/document-output-sale-job.ts", "apps/desktop-app/electron/document-output-sale-source.ts", "apps/desktop-app/electron/document-output-render-snapshot.ts", "apps/desktop-app/electron/document-output-snapshot-store.ts", "apps/desktop-app/electron/document-output-ready.ts", "apps/desktop-app/electron/document-output-html.ts", "apps/desktop-app/electron/document-output-pdf.ts", "apps/desktop-app/electron/document-output-print-claim.ts", "apps/desktop-app/electron/document-output-native-print.ts", "apps/desktop-app/electron/document-output-management.ts", "apps/desktop-app/electron/ipc/document-output-ipc.ts", "apps/desktop-app/electron/preload.ts"]) {
+for (const file of ["packages/shared/types/business-capabilities.ts", "packages/shared/types/document-output.ts", "apps/desktop-app/electron/document-printer-installation.ts", "apps/desktop-app/electron/document-form-images.ts", "apps/desktop-app/electron/document-output-store.ts", "apps/desktop-app/electron/document-output-sale-job.ts", "apps/desktop-app/electron/document-output-sale-source.ts", "apps/desktop-app/electron/document-output-render-snapshot.ts", "apps/desktop-app/electron/document-output-snapshot-store.ts", "apps/desktop-app/electron/document-output-ready.ts", "apps/desktop-app/electron/document-output-html.ts", "apps/desktop-app/electron/document-output-pdf.ts", "apps/desktop-app/electron/document-output-print-claim.ts", "apps/desktop-app/electron/document-output-native-print.ts", "apps/desktop-app/electron/document-output-management.ts", "apps/desktop-app/electron/document-output-stock-report.ts", "apps/desktop-app/electron/document-output-stock-print.ts", "apps/desktop-app/electron/ipc/document-output-ipc.ts", "apps/desktop-app/electron/preload.ts"]) {
   const target = join(root, file.replace(/\.ts$/, ".js"));
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
 }
 for (const name of ["electron", "@yardimci-asistan/shared"]) mkdirSync(join(root, "node_modules", name), { recursive: true });
+writeFileSync(join(root, "apps/desktop-app/electron/document-output-qr-print.js"), "exports.registerQrPrintIpc=()=>{};");
 writeFileSync(join(root, "node_modules/@yardimci-asistan/shared/index.js"), 'module.exports = {...require("../../../packages/shared/types/document-output.js"), ...require("../../../packages/shared/types/business-capabilities.js")};');
 writeFileSync(join(root, "node_modules/electron/index.js"), `const state = { handlers: new Map(), calls: [], locked: false };
 module.exports = { state,
@@ -688,4 +689,25 @@ test("processed original ownership, kind, sender, lock and persisted capabilitie
   assert.equal((await f.invoke("saveProcessedFormImage",input)).ok,false);assert.equal(decoded,0);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM document_output_jobs").get().n,0);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM document_print_templates").get().n,0);
+});
+
+test("stock report printing requires unlocked trusted owner, enabled inventory and configured manual print", async t => {
+  const f = fixture(t);
+  const input = {scope:"all"};
+  assert.equal((await f.invoke("printStockReplenishment", input)).code, "DOCUMENT_CAPABILITY_DISABLED");
+  enable(f.db,"b1",C.INVENTORY,true);
+  assert.equal((await f.invoke("printStockReplenishment", input)).code, "DOCUMENT_STOCK_CONFIGURATION_MISSING");
+  const rule = {documentKind:"stock_replenishment",trigger:"manual",channel:"print",mode:"ASK_CONFIRMATION",adapter:"native_print"};
+  assert.equal(f.invoke("saveRule",rule).ok,true);
+  assert.equal((await f.invoke("printStockReplenishment", input)).code, "DOCUMENT_STOCK_PRINTER_MISSING");
+  state.locked = true;
+  assert.equal((await f.invoke("printStockReplenishment", input)).code,"DOCUMENT_SESSION_LOCKED");
+  state.locked = false;
+  const frame = state.event.senderFrame;
+  state.event.senderFrame = {url:frame.url};
+  assert.equal((await f.invoke("printStockReplenishment", input)).code,"DOCUMENT_OWNER_REQUIRED");
+  state.event.senderFrame=frame;
+  enable(f.db,"b1",C.INVENTORY,false);
+  assert.equal((await f.invoke("printStockReplenishment", input)).code,"DOCUMENT_CAPABILITY_DISABLED");
+  assert.equal(f.db.prepare("SELECT count(*) AS n FROM document_output_jobs").get().n,0);
 });

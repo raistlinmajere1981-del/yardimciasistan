@@ -20,8 +20,8 @@ try {
   writeFileSync(fixtureSiteConfig,readFileSync(fixtureSiteConfig,'utf8').replace("'local_api_root' => dirname(__DIR__, 2) . '/yardimci-asistan',","'local_api_root' => null,"));
   const setup=f.database.saveInitialSetup({...f.database.getSetupData(),aiApiKey:'',clearAiApiKey:false,
     initialCounts:{rooms:0,tables:0},tableCategories:[],onlineSalesDelivery:{pickupEnabled:true,shippingEnabled:false},
-    commerceCheckout:{version:1,enabled:true,demo:true,currency:'TRY',shippingFeeMinor:null,
-      bank:{name:'DEMO Banka',accountHolder:'DEMO Bayi',iban:'DEMO — GEÇERSİZ — ÖDEME YAPMAYIN'},
+    commerceCheckout:{version:2,enabled:true,currency:'TRY',shippingFeeMinor:null,
+      bank:{name:'DEMO Banka',accountHolder:'DEMO Bayi',iban:'GB82 WEST 1234 5698 7654 32'},
       legal:{version:'demo-v2',preliminary:'DEMO ön bilgilendirme.',agreement:'DEMO satış sözleşmesi.'}}});
   assert.equal(setup.ok,true,setup.message);
   const publishPublicSurfaces=async()=>{
@@ -130,7 +130,7 @@ try {
   await expect(page).toHaveURL(/page=checkout-result/);
   await expect(page.locator('#checkout-body h2')).toHaveText(order.order_number);
   await expect(page.locator('#checkout-body')).toContainText('80,00');
-  await expect(page.locator('#checkout-body')).toContainText('DEMO — GEÇERSİZ');
+  await expect(page.locator('#checkout-body')).toContainText('GB82 WEST 1234 5698 7654 32');
   assert.equal(f.storage("echo $db->query('SELECT count(*) FROM web_orders')->fetchColumn();"),1);
   await page.goto(f.siteUrl+'/deneme/?page=account');await expect(page.locator('#account-order-list')).toContainText(order.order_number);
   await page.locator('#account-profile [name=fullName]').fill('Updated Browser Customer');

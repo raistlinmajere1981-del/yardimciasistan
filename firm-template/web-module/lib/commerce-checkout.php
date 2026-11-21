@@ -5,13 +5,13 @@ require_once __DIR__ . '/commerce-payment-provider.php';
 /** Public configuration allowlist. Missing configuration closes checkout, never guesses a fee. */
 function ya_commerce_checkout_settings(mixed $raw): array
 {
-    $closed = ['version' => 1, 'enabled' => false, 'demo' => true, 'currency' => 'TRY', 'shippingFeeMinor' => null, 'bank' => null, 'legal' => null];
+    $closed = ['version' => 2, 'enabled' => false, 'currency' => 'TRY', 'shippingFeeMinor' => null, 'bank' => null, 'legal' => null];
     if ($raw === null) return $closed;
-    if (!is_array($raw) || ($raw['version'] ?? null) !== 1 || !is_bool($raw['enabled'] ?? null)
-        || !is_bool($raw['demo'] ?? null) || !in_array($raw['currency'] ?? '', ['TRY','EUR','USD','GBP'], true)) throw new InvalidArgumentException('invalid_checkout_settings');
+    if (!is_array($raw) || ($raw['version'] ?? null) !== 2 || !is_bool($raw['enabled'] ?? null)
+        || array_key_exists('demo', $raw) || !in_array($raw['currency'] ?? '', ['TRY','EUR','USD','GBP'], true)) throw new InvalidArgumentException('invalid_checkout_settings');
     $fee = $raw['shippingFeeMinor'] ?? null;
     if ($fee !== null && (!is_int($fee) || $fee < 0 || $fee > 90000000000)) throw new InvalidArgumentException('invalid_shipping_fee');
-    $result = [...$closed, 'enabled' => $raw['enabled'], 'demo' => $raw['demo'], 'currency' => $raw['currency'], 'shippingFeeMinor' => $fee];
+    $result = [...$closed, 'enabled' => $raw['enabled'], 'currency' => $raw['currency'], 'shippingFeeMinor' => $fee];
     foreach (['bank' => ['name' => 160, 'accountHolder' => 160, 'iban' => 80], 'legal' => ['version' => 80, 'preliminary' => 20000, 'agreement' => 20000]] as $group => $fields) {
         if (($raw[$group] ?? null) === null && !$raw['enabled']) continue;
         if (!is_array($raw[$group] ?? null)) throw new InvalidArgumentException('invalid_checkout_' . $group);
@@ -22,8 +22,7 @@ function ya_commerce_checkout_settings(mixed $raw): array
             $result[$group][$key] = trim($value);
         }
     }
-    if ($raw['enabled'] && $raw['demo'] && (!str_contains($result['bank']['iban'], 'DEMO') || preg_match('/^[A-Z]{2}\d{2}[A-Z0-9 ]+$/D', $result['bank']['iban']))) throw new InvalidArgumentException('demo_bank_must_be_invalid');
-    if ($raw['enabled'] && !$raw['demo']) {
+    if ($raw['enabled']) {
         $iban = str_replace(' ', '', strtoupper($result['bank']['iban']));
         if (!preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/D', $iban)) throw new InvalidArgumentException('invalid_bank_iban');
         $digits = '';
@@ -49,8 +48,8 @@ function ya_commerce_checkout_quote(array $items, array $delivery, array $catalo
     if ($fee === null) throw new YaOnlineOrderRejection(409, 'shipping_fee_unconfigured', 'Kargo bedeli henüz tanımlanmadı. Mağazadan teslim seçebilirsiniz.');
     if ($quote['subtotal_minor'] + $fee === 0) throw new YaOnlineOrderRejection(422, 'positive_checkout_total_required', 'Sıfır tutarlı siparişlerde havale checkout henüz desteklenmiyor.');
     if ($quote['subtotal_minor'] > 900000000000 - $fee) throw new YaOnlineOrderRejection(422, 'amount_out_of_range', 'Sipariş tutarı sınırı aşıldı.');
-    $quote = [...$quote, 'version' => 2, 'delivery_fee_minor' => $fee, 'total_minor' => $quote['subtotal_minor'] + $fee,
-        'delivery_method' => $delivery['method'], 'payment_method' => 'bank_transfer', 'bank' => $settings['bank'], 'demo' => $settings['demo'], 'legal' => $settings['legal']];
+    $quote = [...$quote, 'version' => 3, 'delivery_fee_minor' => $fee, 'total_minor' => $quote['subtotal_minor'] + $fee,
+        'delivery_method' => $delivery['method'], 'payment_method' => 'bank_transfer', 'bank' => $settings['bank'], 'legal' => $settings['legal']];
     // Terms, destination and quantities participate; a changed quote needs a new review.
     $quote['quote_id'] = hash('sha256', json_encode([$quote, $delivery], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     return $quote;

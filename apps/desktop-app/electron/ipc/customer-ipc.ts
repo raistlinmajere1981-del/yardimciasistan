@@ -81,17 +81,15 @@ export function registerCustomerIpcHandlers(options: {
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    // Commercial tax identity is independent of wholesale. When wholesale is
-    // withdrawn, existing dealer metadata may be preserved verbatim, but no
-    // mobile/renderer IPC can elevate, revoke or edit it.
+    // Commercial identity and payment terms do not require wholesale. Existing
+    // dealer privilege metadata can be preserved, but status/price-group changes
+    // must always pass the wholesale capability gate.
     if (input.commercialProfile) {
       const previous = input.id ? getDatabase().getCustomer(input.id)?.commercialProfile : null;
       const status = previous?.dealerStatus ?? "inactive";
       const group = previous?.priceGroup ?? "retail";
-      const term = previous?.paymentTermDays ?? 0;
       if (input.commercialProfile.dealerStatus !== status
-        || input.commercialProfile.priceGroup !== group
-        || input.commercialProfile.paymentTermDays !== term) {
+        || input.commercialProfile.priceGroup !== group) {
         assertCapability(BUSINESS_CAPABILITIES.WHOLESALE, "Bayi yetkilendirmesi için Toptan Satış etkin olmalı.");
       }
     }
