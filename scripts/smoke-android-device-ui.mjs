@@ -2209,7 +2209,10 @@ async function exerciseStockCameraOnly(stockXml) {
   console.log("stock-camera-preview-verified");
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await waitForUiCondition(
-    xml => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Galeriden seç"),
+    // The stock action buttons can be below the fold after returning from
+    // the camera. Accessibility dumps only expose the visible portion.
+    xml => xml.includes("AI DESTEKLİ STOK GİRİŞİ")
+      && xml.includes('text="Stok"') && !xml.includes("Görseli kontrol et"),
     10000, "Kamera önizlemesinden stok ekranına dönülemedi."
   );
   const remaining = adb(["shell", "run-as", packageName, "find", "cache/stock-images", "-type", "f"],
@@ -2484,7 +2487,8 @@ async function exerciseStockImageSources(stockXml) {
   assertContains(cameraPreviewXml, ["Yeniden çek", "Başka görsel seç", "90° döndür", "kalıcı saklanmaz"]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await waitForUiCondition(
-    (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Galeriden seç"),
+    (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ")
+      && xml.includes('text="Stok"') && !xml.includes("Görseli kontrol et"),
     10000,
     "Sistem kamerasından stok ekranına dönülemedi."
   );

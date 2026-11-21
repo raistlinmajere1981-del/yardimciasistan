@@ -29,6 +29,8 @@
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
+        <!-- Optional camera fallback for ROMs without an implicit capture handler. -->
+        <package android:name="net.sourceforge.opencamera" />
         <intent>
             <action android:name="android.intent.action.OPEN_DOCUMENT" />
             <data android:mimeType="image/*" />

@@ -76,6 +76,12 @@ final class LintBehaviorFixture {
       require(MediaStore.ACTION_IMAGE_CAPTURE.equals(capture.getAction()), "external camera action preserved");
       require(output.equals(capture.getParcelableExtra(MediaStore.EXTRA_OUTPUT)), "FileProvider output URI preserved");
       require("content".equals(output.getScheme()), "camera never receives a file URI");
+      // Package-scoped fallback must keep the FileProvider URI and IMAGE_CAPTURE.
+      // It is only selected when the OS cannot resolve a general camera handler.
+      Intent scoped = new Intent(capture);
+      scoped.setPackage("net.sourceforge.opencamera");
+      require(output.equals(scoped.getParcelableExtra(MediaStore.EXTRA_OUTPUT)),
+          "package scoping cannot drop the secure camera output URI");
 
       String target = "companion:https://fixture.invalid";
       ConnectionSettings.markHostingActionBarrier(preferences, target);

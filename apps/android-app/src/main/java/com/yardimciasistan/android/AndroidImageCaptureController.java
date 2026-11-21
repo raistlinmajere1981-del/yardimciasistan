@@ -66,7 +66,7 @@ final class AndroidImageCaptureController {
       listener.onStockImageSelected(uri);
     });
 
-    identityCameraLauncher = activity.registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+    identityCameraLauncher = activity.registerForActivityResult(new VisibleCameraTakePicture(), success -> {
       Uri resultUri = pendingIdentityCameraUri;
       pendingIdentityCameraUri = null;
       if (Boolean.TRUE.equals(success) && resultUri != null) {
@@ -217,14 +217,33 @@ final class AndroidImageCaptureController {
       // Keep the explicit-handler fallback, scoped to compatible camera apps.
       List<ResolveInfo> handlers = packageManager.queryIntentActivities(
           intent, PackageManager.MATCH_DEFAULT_ONLY);
+      Intent resolved = firstExportedHandler(intent, handlers);
+      if (resolved != null) return resolved;
+
+      // Some Android forks register third-party camera activities, but do not
+      // offer an implicit IMAGE_CAPTURE default. On such systems the unscoped
+      // query is empty even when a concrete, exported handler exists.
+      // Restrict the fallback to a camera app that we can actually verify;
+      // never launch a generic app activity or grant the image URI blindly.
+      Intent openCamera = new Intent(intent);
+      openCamera.setPackage("net.sourceforge.opencamera");
+      resolved = firstExportedHandler(openCamera, packageManager.queryIntentActivities(
+          openCamera, PackageManager.MATCH_DEFAULT_ONLY));
+      if (resolved != null) return resolved;
+
+      return intent;
+    }
+
+    private static Intent firstExportedHandler(Intent source, List<ResolveInfo> handlers) {
       for (ResolveInfo handler : handlers) {
         if (handler.activityInfo == null || !handler.activityInfo.enabled || !handler.activityInfo.exported) {
           continue;
         }
-        intent.setComponent(new ComponentName(handler.activityInfo.packageName, handler.activityInfo.name));
-        return intent;
+        Intent explicit = new Intent(source);
+        explicit.setComponent(new ComponentName(handler.activityInfo.packageName, handler.activityInfo.name));
+        return explicit;
       }
-      return intent;
+      return null;
     }
   }
 }
