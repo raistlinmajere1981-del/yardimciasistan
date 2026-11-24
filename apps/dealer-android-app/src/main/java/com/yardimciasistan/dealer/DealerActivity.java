@@ -549,7 +549,9 @@ public final class DealerActivity extends ComponentActivity {
     shell.addView(container, new LinearLayout.LayoutParams(-1, -1));
     LinearLayout form = ui.column(); form.setPadding(dp(16), dp(36), dp(16), dp(24)); container.addView(form);
     form.addView(businessLogo(72)); ui.label(form, DealerBranding.displayName(businessBrand()), 14, ui.muted);
-    ui.label(form, "Müşteri hesabınıza giriş", 26, ui.ink).setTypeface(null, Typeface.BOLD);
+    ui.label(form, state.text("connection_base").isEmpty() || accountConfig == null
+        ? "Bayi bağlantısı" : "Müşteri hesabınıza giriş", 26, ui.ink)
+        .setTypeface(null, Typeface.BOLD);
     notice = ui.label(form, message, 14, ui.danger); notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
     if (!state.text("cookie").isEmpty() && state.object("cart").length() > 0) {
       ui.label(form, "Çevrimdışı sepet (salt okunur)", 18, ui.ink);
@@ -564,14 +566,23 @@ public final class DealerActivity extends ComponentActivity {
     }
     String base = state.text("connection_base");
     if (base.isEmpty() || accountConfig == null) {
-      EditText connection = field(form, "İşletme bağlantısı", connectionInput.isEmpty() ? base : connectionInput,
+      EditText connection = field(form, "İşletmenin web adresi", connectionInput.isEmpty() ? base : connectionInput,
           InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, value -> connectionInput = value, 2048);
-      connection.setHint("İşletmenin paylaştığı HTTPS bağlantısı");
+      connection.setHint("https://ornek-isletme.com");
       loginButton = ui.button(form, "İşletmeye bağlan", () -> safely(() -> {
-        String target = DealerApi.normalizeBase(connection.getText().toString());
+        String target = DealerApi.moduleBaseFromWebsite(connection.getText().toString());
         task(() -> {
           DealerApi api = new DealerApi(target);
-          JSONObject config = api.call("account/config", null, "").body;
+          JSONObject config;
+          try { config = api.call("account/config", null, "").body; }
+          catch (DealerApi.Failure error) {
+            if (error.status == 404 || error.status == 410
+                || error.getMessage().startsWith("Sunucu yanıtı okunamadı")) {
+              throw new IllegalArgumentException(
+                  "Bu web sitesinde bayi bağlantısı bulunamadı. İşletmenin web adresini kontrol edin.");
+            }
+            throw error;
+          }
           JSONObject response = new JSONObject().put("account", config);
           JSONObject branding = loadBusinessBrand(api, target);
           if (branding != null) response.put("branding", branding);
@@ -617,7 +628,12 @@ public final class DealerActivity extends ComponentActivity {
       ui.button(form, "Bayi başvurusu", () -> application.open(base), false);
       ui.button(form, "İşletmeyi değiştir", () -> safely(() -> { state.put("connection_base", ""); accountConfig = null; render(); }), false);
     }
-    ui.button(form, "Yerel oturumu temizle", () -> safely(() -> { state.invalidateSession(); accessVerified = false; message = "Yerel oturum kapatıldı."; render(); }), false);
+    if (!state.text("cookie").isEmpty() || !state.text("connection_base").isEmpty()) {
+      ui.button(form, "Yerel oturumu temizle", () -> safely(() -> {
+        state.invalidateSession(); accessVerified = false;
+        message = "Yerel oturum kapatıldı."; render();
+      }), false);
+    }
     // Public release feed remains accessible without an active dealer account.
     form.addView(com.yardimciasistan.update.AndroidUpdates.settingsView(
         this, "android-dealer", ".files", updatePalette()));
@@ -896,7 +912,6 @@ public final class DealerActivity extends ComponentActivity {
     }
     cartTotal = ui.label(body, "", 23, ui.accent);
     updateCartTotal();
-    ui.label(body, "Fiyatlar işletme onayında güncellenebilir.", 12, ui.muted);
     JSONArray methods = state.object("catalog").optJSONArray("delivery_methods");
     List<String> options = new ArrayList<>();
     if (methods != null)
@@ -1103,7 +1118,7 @@ public final class DealerActivity extends ComponentActivity {
           currency = p.optString("currency");
       }
       cartTotal.setText(
-          getString(R.string.estimated_total, money(state.total().doubleValue(), currency)));
+          getString(R.string.cart_product_total, money(state.total().doubleValue(), currency)));
     } catch (Exception error) {
       cartTotal.setText(error.getMessage());
     }
@@ -1140,7 +1155,10 @@ public final class DealerActivity extends ComponentActivity {
     LinearLayout details = ui.column();
     details.setPadding(ui.dp(18), ui.dp(8), ui.dp(18), ui.dp(14));
     scrollView.addView(details);
-    ui.label(details, "Sunucunun doğruladığı kesin sipariş tutarı:", 15, ui.muted);
+    if (DealerCheckout.displayedPricesDiffer(quote, state)) {
+      ui.label(details, "Sepette gördüğünüz ürün fiyatı değişti. Siparişi onaylamadan önce yeni tutarları kontrol edin.", 15, ui.accent);
+    }
+    ui.label(details, "Sipariş toplamı", 15, ui.muted);
     ui.label(details, money(quote.getLong("total_minor") / 100d, currency), 25, ui.accent)
         .setTypeface(null, Typeface.BOLD);
     JSONArray lines = quote.getJSONArray("items");
@@ -1435,7 +1453,7 @@ public final class DealerActivity extends ComponentActivity {
     return ui.dp(value);
   }
   private String price(JSONObject product) {
-    return "Kayıtlı fiyat (değişebilir): " + money(product.optDouble("price"), product.optString("currency"));
+    return money(product.optDouble("price"), product.optString("currency"));
   }
   private String money(double amount, String currency) {
     NumberFormat format = NumberFormat.getNumberInstance(locale);

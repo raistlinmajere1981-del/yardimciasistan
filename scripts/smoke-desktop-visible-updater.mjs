@@ -10,6 +10,7 @@ import { runInNewContext } from "node:vm";
 const require = createRequire(import.meta.url);
 const { compareVersions } = require("@yardimci-asistan/shared");
 const compiled = fs.readFileSync("apps/desktop-app/dist-electron/desktop-update-service.js", "utf8");
+const compiledIpc = fs.readFileSync("apps/desktop-app/dist-electron/ipc/desktop-update-ipc.js", "utf8");
 const helper = fs.readFileSync("apps/desktop-app/resources/updater/windows-install.ps1", "utf8");
 const fixtures = [];
 const read = file => JSON.parse(fs.readFileSync(file, "utf8"));
@@ -50,7 +51,6 @@ function fixture({ platform = "win32", packaged = true, launch = "ready", curren
     setTimeout: (action, delay) => delay === 250 ? (quits.push(action), { unref() {} }) : setTimeout(action, 0), clearTimeout,
     require: name => {
       if (name === "electron") return { app, BrowserWindow: { getAllWindows: () => [] },
-        ipcMain: { removeHandler() {}, handle: (name, action) => handlers.set(name, action) },
         dialog: { showMessageBox: async options => { calls.push(["notification", options]); } } };
       if (name === "node:child_process") return { spawn: (exe, args, options) => {
         // This is the only launcher implementation used in the smoke. No real
@@ -78,11 +78,26 @@ function fixture({ platform = "win32", packaged = true, launch = "ready", curren
     }
   }, { filename: "desktop-update-service.js" });
   const service = module.exports;
-  service.registerDesktopUpdateIpcHandlers(() => userData, () => {});
+  const ipc = {};
+  runInNewContext(compiledIpc, {
+    exports: ipc,
+    require(name) {
+      if (name === "../desktop-update-service") return service;
+      assert.equal(name, "electron");
+      return { ipcMain: {
+        removeHandler: channel => handlers.delete(channel),
+        handle(channel, action) {
+          assert.ok(!handlers.has(channel), channel);
+          handlers.set(channel, action);
+        }
+      } };
+    }
+  });
+  ipc.registerDesktopUpdateIpcHandlers(() => userData, () => {});
   const status = () => handlers.get("update:getStatus")();
   const invoke = () => handlers.get("update:restartAndInstall")();
   const marker = () => read(path.join(updates, "installing.json"));
-  return { root, resources, systemRoot, powershell, source, userData, updates, installerPath, pending, service, handlers, calls, quits, alive, app, invoke, status, marker };
+  return { root, resources, systemRoot, powershell, source, userData, updates, installerPath, pending, service, ipc, handlers, calls, quits, alive, app, invoke, status, marker };
 }
 
 try {
@@ -163,8 +178,12 @@ try {
   }
   {
     const f = fixture();
-    f.service.registerDesktopUpdateIpcHandlers(() => f.userData, () => { throw new Error("locked"); });
-    assert.throws(() => f.invoke(), /locked/); assert.equal(f.calls.length, 0); assertions++;
+    f.ipc.registerDesktopUpdateIpcHandlers(() => f.userData, () => { throw new Error("locked"); });
+    const mutations = ["update:check", "update:download", "update:savePreferences", "update:restartAndInstall"];
+    assert.deepEqual([...f.handlers.keys()], ["update:getStatus", ...mutations]);
+    assert.doesNotThrow(() => f.status());
+    for (const channel of mutations) assert.throws(() => f.handlers.get(channel)(), /locked/, channel);
+    assert.equal(f.calls.length, 0); assertions++;
   }
   {
     const f = fixture(); f.alive.add(9898);
@@ -229,9 +248,10 @@ try {
       require: name => {
         if (name === "electron") return { app: { isPackaged: true, getVersion: () => "1.0.0", getPath: () => "/tmp", getAppPath: () => "/tmp", on() {}, whenReady: async () => {}, exit: () => {} } };
         if (name === "node:path") return path;
+        if (name === "node:fs") return { existsSync: file => file === "/tmp/test-maintenance-marker" };
         if (name === "./desktop-update-service") return { applyPendingDesktopUpdateAtStartup: () => decision };
         if (name === "./desktop-logger") return { initializeDesktopLogging: () => null, desktopLog: { info() {}, warn() {}, error() {} } };
-        if (name === "./data-paths.js") return { resolveDataRoot: () => "/tmp", resolveDatabasePath: () => "/tmp/db" };
+        if (name === "./data-paths.js") return { resolveDataRoot: () => "/tmp", resolveDatabasePath: () => "/tmp/db", resolvePendingMaintenanceMarkerPath: () => "/tmp/test-maintenance-marker" };
         if (name === "./desktop-database-compatibility.js") return { inspectDesktopDatabaseCompatibility: () => ({ state: "current" }) };
         if (name === "./data-maintenance") return { applyPendingDataMaintenanceAtStartup: () => { maintenance = true; } };
         if (name === "./main") { imported = true; return {}; }

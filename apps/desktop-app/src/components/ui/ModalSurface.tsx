@@ -32,21 +32,25 @@ export function ModalSurface(props: ModalSurfaceProps) {
 function ModalSurfaceContent({ children, labelledBy, describedBy, className = "", style, role = "dialog", onClose,
   closeBlocked = false, dismissOnBackdrop = false, initialFocusRef, returnFocusRef }: ModalSurfaceProps) {
   const ref = useRef<HTMLDialogElement>(null);
-  // Bounded forms are also native dialogs, but are not WorkspaceFrames.
-  // Measure the real shell header so tall create forms leave the topbar
-  // feedback visible at any density, zoom or responsive header height.
+  // All native dialogs share the actual shell canvas below the responsive
+  // topbar. Form dialogs keep their existing scoped geometry variables.
   useLayoutEffect(() => {
-    if (!className.split(/\s+/).includes("form-dialog")) return;
     const dialog = ref.current;
     const content = document.querySelector<HTMLElement>(".desktop-shell > .content");
     const header = content?.querySelector<HTMLElement>(":scope > .page-header");
     if (!dialog || !content || !header) return;
+    const isForm = className.split(/\s+/).includes("form-dialog");
     const update = () => {
       const zoom = Number(getComputedStyle(document.documentElement).zoom) || 1;
       const bounds = content.getBoundingClientRect();
       const top = Math.min(window.innerHeight, Math.max(bounds.top, header.getBoundingClientRect().bottom));
-      dialog.style.setProperty("--form-canvas-top", `${top / zoom}px`);
-      dialog.style.setProperty("--form-canvas-height", `${Math.max(0, Math.min(window.innerHeight, bounds.bottom) - top) / zoom}px`);
+      const height = Math.max(0, Math.min(window.innerHeight, bounds.bottom) - top);
+      dialog.style.setProperty("--modal-canvas-top", `${top / zoom}px`);
+      dialog.style.setProperty("--modal-canvas-height", `${height / zoom}px`);
+      if (isForm) {
+        dialog.style.setProperty("--form-canvas-top", `${top / zoom}px`);
+        dialog.style.setProperty("--form-canvas-height", `${height / zoom}px`);
+      }
     };
     update();
     const observer = new ResizeObserver(update);

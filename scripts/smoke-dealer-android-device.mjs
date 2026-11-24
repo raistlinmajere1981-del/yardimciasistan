@@ -7,17 +7,29 @@ import { join, resolve } from "node:path";
 
 // Explicit manual fixture: never installs/reconfigures Companion or a real dealer account.
 const packageName = "com.yardimciasistan.dealer.fixture";
+const galleryCapture = process.argv.includes("--gallery");
+const landscapeViewport = process.argv.includes("--landscape-viewport");
+const onlineBuild = process.argv.includes("--online-build");
+if (landscapeViewport && !galleryCapture) throw new Error("--landscape-viewport yalnız --gallery ile kullanılabilir");
 const build = mkdtempSync(join(tmpdir(), "ya-dealer-native-"));
 const devices = run("adb", ["devices"]).split(/\r?\n/).filter(line => /\tdevice$/.test(line)).map(line => line.split("\t")[0]);
 const serial = process.env.ANDROID_SERIAL || (devices.length === 1 ? devices[0] : "");
 assert.ok(serial && devices.includes(serial), "Tek bağlı ADB cihazı veya ANDROID_SERIAL gerekli.");
 const adb = args => run("adb", ["-s", serial, ...args]);
-let installed = false, restoreSleep = false, accountFixture;
+let installed = false, restoreSleep = false, accountFixture, originalScreenOverride = null, screenChanged = false;
 try {
   assert.equal(adb(["shell", "pm", "list", "packages", packageName]).trim(), "", "Önceki fixture kurulumu korunur; üzerine yazılmaz.");
   const sdk = Number(adb(["shell", "getprop", "ro.build.version.sdk"]).trim()); assert.ok(sdk >= 26);
-  run(process.execPath, ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "-I", resolve("scripts/fixtures/dealer-android/fixture.init.gradle"), `-Dyardimci.dealerFixtureBuild=${build}`, "assembleDebug"], true);
+  run(process.execPath, ["scripts/run-android-gradle.mjs", "--dealer",
+    ...(onlineBuild ? [] : ["--offline"]), "-I", resolve("scripts/fixtures/dealer-android/fixture.init.gradle"),
+    `-Dyardimci.dealerFixtureBuild=${build}`, "assembleDebug"], true);
   adb(["install", "-t", join(build, "outputs/apk/debug/yardimci-asistan-bayi-debug.apk")]); installed = true;
+  if (landscapeViewport) {
+    const current = adb(["shell", "wm", "size"]);
+    originalScreenOverride = current.match(/Override size: (\d+x\d+)/)?.[1] ?? null;
+    adb(["shell", "wm", "size", "1280x720"]);
+    screenChanged = true;
+  }
   restoreSleep = /mWakefulness=Asleep/.test(adb(["shell", "dumpsys", "power"]));
   if (restoreSleep) adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"]);
   accountFixture = await createDealerAccountDeviceFixture(serial);
@@ -37,6 +49,11 @@ try {
     assert.match(file, /^[a-z-]+\.png$/);
     const picture = spawnSync("adb", ["-s", serial, "exec-out", "run-as", packageName, "cat", `files/ui-evidence/${file}`], { maxBuffer: 16 * 1024 * 1024 });
     assert.equal(picture.status, 0); writeFileSync(join(shots, file), picture.stdout);
+    if (galleryCapture) {
+      const gallery = resolve("artifacts/android-ui-gallery/bayi", landscapeViewport ? "yatay" : "dikey");
+      mkdirSync(gallery, {recursive: true});
+      writeFileSync(join(gallery, file), picture.stdout);
+    }
   }
   console.log(result.trim());
 } finally {
@@ -44,8 +61,11 @@ try {
   finally {
   try { if (installed) adb(["uninstall", packageName]); }
   finally {
-    try { adb(["shell", "input", "keyevent", "KEYCODE_HOME"]); if (restoreSleep) adb(["shell", "input", "keyevent", "KEYCODE_SLEEP"]); }
-    finally { rmSync(build, { recursive: true, force: true }); }
+    try {
+      if (screenChanged) adb(["shell", "wm", "size", originalScreenOverride ?? "reset"]);
+      adb(["shell", "input", "keyevent", "KEYCODE_HOME"]);
+      if (restoreSleep) adb(["shell", "input", "keyevent", "KEYCODE_SLEEP"]);
+    } finally { rmSync(build, { recursive: true, force: true }); }
   }
   }
 }

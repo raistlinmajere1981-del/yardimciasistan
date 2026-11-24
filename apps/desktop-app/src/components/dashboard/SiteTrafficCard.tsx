@@ -77,6 +77,9 @@ export function SiteTrafficCard() {
     };
   }, [open]);
   const value: SiteTrafficSnapshot | null = result?.ok ? result.value : null;
+  const peakSessions = open && value?.has_data
+    ? value.daily.reduce((peak, row) => Math.max(peak, row.sessions), 1)
+    : 1;
   const today = value?.daily.at(-1);
   const todayObserved = Boolean(today?.sessions || today?.views || today?.intents);
   const noData = !value?.has_data;
@@ -104,7 +107,16 @@ export function SiteTrafficCard() {
       {value && value.has_data ? <>
         <div className="dashboard-site-traffic-metrics"><div><small>Oturum</small><strong>{count(value.totals.sessions)}</strong></div><div><small>Sayfa gösterimi</small><strong>{count(value.totals.views)}</strong></div><div><small>İletişim tıklaması</small><strong>{count(value.totals.intents)}</strong></div>
           {value.conversions && <><div><small>Onaylı web talebi</small><strong>{count(value.conversions.requests)}</strong></div><div><small>Onaylı web siparişi</small><strong>{count(value.conversions.orders)}</strong></div></>}</div>
-        <div className="dashboard-site-traffic-chart" aria-label={`${period} günlük oturum grafiği`}>{value.daily.map(item => <div key={item.date} className="dashboard-site-traffic-bar" title={`${item.date}: ${item.sessions} yaklaşık oturum`}><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y={100 - Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))} width="100" height={Math.max(3, Math.round(item.sessions / Math.max(1, ...value.daily.map(row => row.sessions)) * 100))} /></svg></div>)}</div>
+        <div className="dashboard-site-traffic-chart" aria-label={`${period} günlük oturum grafiği`}>
+          {value.daily.map(item => {
+            const height = Math.max(3, Math.round(item.sessions / peakSessions * 100));
+            return <div key={item.date} className="dashboard-site-traffic-bar" title={`${item.date}: ${item.sessions} yaklaşık oturum`}>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="0" y={100 - height} width="100" height={height} />
+              </svg>
+            </div>;
+          })}
+        </div>
         <h4>En çok bakılan sayfalar</h4>
         {value.top_pages.length ? <ol>{value.top_pages.map(item => <li key={item.page}><span>{pageName(item.page)}</span><strong>{count(item.count)}</strong></li>)}</ol> : <small>Henüz sayfa kırılımı yok.</small>}
         <h4>Geliş kaynakları</h4>

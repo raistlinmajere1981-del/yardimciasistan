@@ -23,13 +23,20 @@ başlangıç dashboard'u veya çok adımlı sipariş sihirbazı yoktur.
 
 | Yüzey | İçerik ve eylem |
 | --- | --- |
-| İlk bağlantı | Bayi simgesi, kısa başlık, tek `Bayi davet bağlantısı` alanı, `Yapıştır`, `Giriş yap`. Panoya yalnız kullanıcının dokunuşuyla erişilir. |
+| İlk bağlantı | İşletmenin web adresi (örn. `https://ornek-isletme.com`) ve `İşletmeye bağlan`. Uygulama aynı sitede ortak `/yardimci-asistan/` modülünü bulur, halka açık hesap yapılandırmasını doğrular; ardından müşteri hesabıyla giriş sunar. Başka siteye yönlendirme veya teknik modül yolu girişi gerekmez. |
 | Başvuru | Aynı alana gelen başvuru bağlantısı uygun formu açar. Girişteki `Bayi başvurusu` eylemi tek bağlantı alanını başvuru moduna geçirir; teknik sunucu adresi istenmez. Form tek kaydırılan yüzeydir. Zorunlu firma/yetkili/telefon/e-posta, isteğe bağlı vergi bilgileri ve belgeler ayrı gruptur. Gönderimden sonra kısa alındı görünümü. |
 | Katalog | Sabit arama, tek satır kategori/marka/favori filtreleri, okunaklı ürün satırları. Fotoğraf, ad, kısa kod ve bayi fiyatı. Kartın kendisi ürünü açar; aynı eylemi tekrarlayan büyük inceleme düğmeleri kaldırılır. |
 | Ürün | Büyük gerçek ürün görseli, varsa fotoğraf sayacı, ad/kod/fiyat, miktar ve `Sepete ekle`. Görsele dokunma veya `Fotoğrafı incele` inceleyiciyi açar. Açıklama yalnız varsa gösterilir. |
-| Sepet | Ürün/miktar/çıkar, teslimat seçimi, yalnız gerektiğinde adres alanları, isteğe bağlı not, tahmini toplam, `Siparişi gönder`. Miktar için ayrıca `Uygula` adımı yoktur; doğrulama siparişten önce tamamlanır. |
+| Sepet | Ürün/miktar/çıkar, teslimat seçimi, yalnız gerektiğinde adres alanları, isteğe bağlı not, ürünler toplamı (teslimat ücreti hariç), `Siparişi gönder`. Miktar için ayrıca `Uygula` adımı yoktur; doğrulama siparişten önce tamamlanır. |
 | Siparişler | Durum, tarih, tutar ve kısa ürün özeti. Gerektiğinde aynı yerde ayrıntıyı açma ve tekrar sipariş. `İşletmeye iletiliyor` ile gerçek onay/tamamlanma ayrı gösterilir. |
 | Ayarlar | Görünüm kontrolleri, küçük hesap kartı, oturumu kapat. Teknik senkronizasyon açıklamaları ana ekrana taşınmaz. |
+
+Ürün fiyatı ve sepet toplamı yanında kalıcı “tahmini/değişebilir” uyarısı
+gösterilmez. Siparişten önce sunucu teklifi alınır; yalnız sunucunun doğruladığı
+ürün birim fiyatı kullanıcının sepette gördüğünden farklıysa onay ekranında
+fiyat değişikliği uyarısı görünür. Teslimat bedelinin ayrıca eklenmesi ürün
+fiyatı değişikliği sayılmaz. Otorite yine sunucu teklifidir; mobil fiyat
+hesaplaması sipariş isteğine eklenmez.
 
 Geri eylemi sırasıyla fotoğraf araçlarını, ürünü veya başvuruyu kapatır ve
 kullanıcının geldiği yere döner. Katalog araması, filtre, scroll, aktif sepet

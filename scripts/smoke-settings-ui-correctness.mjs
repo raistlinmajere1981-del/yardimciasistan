@@ -319,6 +319,15 @@ try {
       await expect(management.getByRole("button", { name: "Kaydet", exact: true })).toBeDisabled();
     }
     await verifySettingsAppearanceParity(page, `${kind}-management`);
+    if (process.env.SETTINGS_CSS_BASELINE) {
+      const viewport = page.viewportSize();
+      try {
+        await page.setViewportSize({ width: 800, height: viewport.height });
+        await verifySettingsAppearanceParity(page, `${kind}-management-800`);
+      } finally {
+        await page.setViewportSize(viewport);
+      }
+    }
     const managementBounds = await management.boundingBox();
     const shell = management.locator(".resource-management-shell");
     const shellBounds = await shell.boundingBox();

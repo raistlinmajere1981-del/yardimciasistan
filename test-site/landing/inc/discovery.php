@@ -355,6 +355,22 @@ function discovery_metadata(): array
 JSON, true, 512, JSON_THROW_ON_ERROR);
 }
 
+function discovery_highlights(): array
+{
+    // Editorial subfeatures only: inherit their owner's canonical capability,
+    // never create independent activation/permission nodes.
+    return [
+        'core.web' => ['ai_seo', 'web_translations'],
+        'channel.qr_menu' => ['table_qr', 'table_qr_print'],
+        'accommodation.folio' => ['room_qr', 'folio_transfer'],
+        'document.printing' => ['print_center', 'print_qr'],
+        'commerce.inventory' => ['ideal_stock', 'stock_count', 'image_stock'],
+        'commerce.catalog' => ['category_vat'],
+        'channel.online_sales' => ['web_checkout'],
+        'commerce.wholesale' => ['dealer_prices'],
+    ];
+}
+
 function capability_projection(): array
 {
     $path = dirname(__DIR__) . '/assets/assistant/capability-projection.json';
@@ -455,6 +471,7 @@ function render_discovery_tree(): void
           $current = $node['levels'][$sector] ?? null;
           $meta = $metadata[$id];
           $key = $meta['key'];
+          $highlights = discovery_highlights()[$id] ?? [];
           $service = in_array('services', $node['levels'], true);
           $cardIcon = match ($id) {
               'core.customers', 'customer.requests', 'accommodation.stays', 'integration.kbs', 'retail.suppliers', 'commerce.wholesale' => 'people',
@@ -472,11 +489,15 @@ function render_discovery_tree(): void
             <summary>
               <span class="capability-heading"><span class="card-symbol"><?= icon($cardIcon) ?></span><strong><?= e(t($key . '.title')) ?></strong></span>
               <span class="capability-benefit"><?= e(t($key . '.benefit')) ?></span>
+              <?php if ($highlights): ?><span class="capability-subfeatures" aria-label="<?= e(t('discovery.highlight.heading')) ?>"><?php foreach ($highlights as $highlight): ?><span><?= e(t('discovery.highlight.' . $highlight . '.title')) ?></span><?php endforeach; ?></span><?php endif; ?>
               <span class="capability-badges"><?php foreach ($meta['platforms'] as $platform): ?><span><?= e(t('platform.' . $platform)) ?></span><?php endforeach; ?><?php if ($meta['ai'] ?? false): ?><span class="ai-mark"><?= icon('spark') ?><?= e(t('tree.ai_badge')) ?></span><?php endif; ?><?php if ($service): ?><span><?= e(t('tree.setup')) ?></span><?php endif; ?></span>
               <span class="card-detail-action"><span class="detail-more"><?= e(t('tree.more')) ?></span><span class="detail-less"><?= e(t('tree.less')) ?></span><span class="detail-plus" aria-hidden="true">+</span></span>
             </summary>
             <div class="capability-detail">
               <p><?= e(t($key . '.body')) ?></p>
+              <?php if ($highlights): ?>
+              <div class="capability-feature-details"><strong><?= e(t('discovery.highlight.heading')) ?></strong><ul><?php foreach ($highlights as $highlight): ?><li><b><?= e(t('discovery.highlight.' . $highlight . '.title')) ?></b><span><?= e(t('discovery.highlight.' . $highlight . '.body')) ?></span></li><?php endforeach; ?></ul></div>
+              <?php endif; ?>
               <dl><dt><?= e(t('tree.where')) ?></dt><dd class="platform-tags"><?php foreach ($meta['platforms'] as $platform): ?><span><?= e(t('platform.' . $platform)) ?></span><?php endforeach; ?></dd>
               <dt><?= e(t('tree.ai')) ?></dt><dd><?= e(t(($meta['ai'] ?? false) ? $key . '.ai' : 'tree.no_ai')) ?><?php if ($meta['ai'] ?? false): ?><small><?= e(t('tree.ai_note')) ?></small><?php endif; ?></dd>
               <dt><?= e(t(!empty($node['owners']) ? 'tree.owners' : 'tree.needs')) ?></dt><dd>

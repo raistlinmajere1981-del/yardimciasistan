@@ -566,13 +566,7 @@ final class AndroidOperationCards {
         UiKit.TEXT,
         Typeface.BOLD
     ));
-    card.addView(UiKit.text(
-        activity,
-        "Stoklar siz onaylamadan değişmez. Görsel analiz için yapılandırılmış AI hizmetine gönderilir ve kalıcı saklanmaz.",
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
+
 
     LinearLayout actions = UiKit.row(activity);
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);

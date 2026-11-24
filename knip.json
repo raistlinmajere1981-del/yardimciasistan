@@ -42,8 +42,14 @@
       ]
     },
     "packages/image-inspector": {
-      "entry": ["runtime/*.js", "sync-web.mjs"],
-      "project": ["runtime/*.js", "sync-web.mjs", "test/*.test.mjs"]
+      "entry": [
+        "runtime/*.js",
+        "sync-web.mjs"
+      ],
+      "project": [
+        "runtime/*.js",
+        "test/*.test.mjs"
+      ]
     },
     "packages/shared": {
       "project": [

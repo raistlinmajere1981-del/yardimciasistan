@@ -748,11 +748,6 @@
     justify-self: start;
   }
 
-  .menu-category-inline-fields,
-  .menu-category-create-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .menu-category-create-actions {
     align-items: flex-start;
     flex-direction: column;

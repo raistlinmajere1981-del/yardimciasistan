@@ -42,7 +42,12 @@ export async function verifyCheckoutMembers(f, browser, product) {
     assert.ok(publication===null || publication.ok,publication?.message);
     await page.locator('#account-login [name=email]').fill(email);
     await page.locator('#account-login [name=password]').fill(accountPassword);
+    const loginProof = page.waitForResponse(response=>response.url().endsWith('/api/account/login.php')
+      && response.request().method()==='POST');
     await page.locator('#account-login button').click();
+    const signedIn = await loginProof;
+    assert.equal(signedIn.status(), 200);
+    assert.equal((await signedIn.json()).account?.email, email, 'Login must return verified profile');
     await expect(page.locator('#account-profile')).toBeVisible();
     if(kind==='customer')await expect(page.locator('#account-dealer-badge')).toBeHidden();
     if(kind==='dealer')await expect(page.locator('#account-dealer-badge')).toBeVisible();

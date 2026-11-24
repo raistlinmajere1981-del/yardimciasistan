@@ -16,6 +16,18 @@ Yeni masaüstü feature/UI/platform işi için:
 - `desktop-frontend-architecture.md` — renderer kompozisyonu ve frontend sınırları.
 
 Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
+Aktif ürün sürümü `product-version.json` içindedir; eski milestone belgelerindeki
+sürüm ve iş listeleri güncel talimat kabul edilmez.
+
+## Aktif çalışma ve sürüm kaydı
+
+- `dev/MILESTONE_2026_11_23_TEKNIK_TEMIZLIK_CHECKPOINT.md` — henüz kapanmamış
+  temizlik ve Android arayüz kontrol noktasının yalnız ilgili bölümleri.
+- `dev/RELEASE_2_5_0_CLEAN_DEPLOY_2026-11-21.md` — son yayımlanan 2.5.0
+  dağıtım kanıtı; **yeni çalışma talimatı değil**.
+- `dev/TEST_ENVIRONMENT_POLICY.md` — tek çalışan kopya ve geçici test ortamı.
+- `dev/ANDROID_COMPANION_V2_ALIGNMENT_2026-11-20.md` — Android veri
+  sözleşmeleri ve henüz yapılacak fiziksel UI kabulü.
 
 ## Sistem ve domain
 
@@ -58,10 +70,9 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `WINDOWS_HOSTING_FIELD_TEST.md`
 - [Windows update handoff](architecture/DESKTOP_WINDOWS_UPDATE_V1.md) — independent native installation window, result reconciliation and Windows validation.
 - `dev/LOCAL_COMPANION_NETWORK.md`
-- `dev/ADMIN_CONSOLE_TARGET.md` — mevcut Electron Admin Control Center'ın operasyon, secret ve paketleme sınırları.
-
+- `dev/ADMIN_CONSOLE_TARGET.md` — Electron Admin Control Center'ın operasyon ve paketleme sınırları.
+- `dev/ADMIN_SECRET_SYNC.md` — Admin kurulum anahtarlarını doğrulama ve sahiplik sınırları.
 - `dev/KBS_PROVIDER_VERIFICATION.md` — gerçek işletme hesabı gerektiren KBS doğrulama sınırları.
-- `dev/LOCAL_COMPANION_NETWORK.md` — yerel Android bağlantısının protokol ve güvenlik sınırları.
 
 ## Operasyonel geliştirme notları
 
@@ -78,5 +89,8 @@ Yeni belge eklemeden önce şu filtreyi kullanın:
 
 Yanıt yalnız tarihsel kanıt ise yeni belge tutmayın; commit/PR/Git geçmişi arşivdir.
 Tamamlanan plan/audit belgelerini aktif docs ağacında bırakmayın.
+Kapanan kontrol noktalarını Git geçmişinden gerektiğinde açın; ajanların her
+başlangıçta geçmiş raporları okumasını veya onlara yeni not eklemesini istemeyin.
 
-- [Desktop ürün ve müşteri veri aktarımı](architecture/DESKTOP_DATA_TRANSFER_V1.md)
+Yaşayan ilgili sözleşme:
+[Desktop ürün ve müşteri veri aktarımı](architecture/DESKTOP_DATA_TRANSFER_V1.md).

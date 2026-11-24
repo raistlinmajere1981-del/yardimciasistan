@@ -115,7 +115,12 @@ function markup(id: string) {
       <g data-part="lights"><circle class="nexa-rig-thinking-light" data-light="one" cx="138" cy="49" r="2.1" fill="#d2ffff" style="fill:#d2ffff"/><circle class="nexa-rig-thinking-light" data-light="two" cx="164" cy="114" r="1.4" fill="#acf5ff" style="fill:#acf5ff"/><path class="nexa-rig-success-highlight nexa-rig-edge" data-success-light="" d="M155 57L159 47M161 61L168 57" stroke="#b6f9f8" stroke-width="2" style="stroke:#b6f9f8;stroke-width:2"/></g>
     </svg>`;
 }
-const set = (node: SVGElement, attr: string, value: string | number) => node.setAttribute(attr, String(value));
+// SVG attribute writes invalidate paint even when the value is unchanged.
+// Preserve existing pose values while avoiding redundant DOM writes.
+const set = (node: SVGElement, attr: string, value: string | number) => {
+  const next = String(value);
+  if (node.getAttribute(attr) !== next) node.setAttribute(attr, next);
+};
 const wave = (time: number, period: number, phase = 0) => Math.sin(time / period * Math.PI * 2 + phase);
 function pose(rig: Rig, staticPose = false) {
   const t = staticPose ? 0 : rig.elapsed / 1000;
@@ -191,7 +196,8 @@ function pose(rig: Rig, staticPose = false) {
   set(rig.mouth, "d", mouth); set(rig.mouthLine, "d", mouthLine); set(rig.mouthLight, "d", mouthLight);
   set(rig.lightOne, "transform", `translate(${(movement * wave(t, 4.6) * 4).toFixed(3)} ${(-movement * (1 + wave(t, 4.6, 1)) * 3).toFixed(3)})`);
   set(rig.lightTwo, "transform", `translate(${(-movement * wave(t, 5.4) * 3).toFixed(3)} ${(movement * wave(t, 5.4, 2) * 5).toFixed(3)})`);
-  rig.successLight.style.opacity = String(state !== "success" ? 0 : staticPose ? .65 : Math.min(1, delight * 1.3));
+  const lightOpacity = String(state !== "success" ? 0 : staticPose ? .65 : Math.min(1, delight * 1.3));
+  if (rig.successLight.style.opacity !== lightOpacity) rig.successLight.style.opacity = lightOpacity;
 }
 
 /** Mount into an owned empty host. Throws on unsupported rendering, allowing
@@ -231,31 +237,51 @@ export function mountNexaRig(host: HTMLElement, initial: NexaRigOptions): NexaRi
     lightOne: find('[data-light="one"]'), lightTwo: find('[data-light="two"]'), successLight: find("[data-success-light]"),
     presence, natural: initial.natural ?? false, behavior: createNexaBehavior(),
   };
-  let options = initial, raf = 0, last = 0, disposed = false;
+  let options = initial, raf = 0, idleTimer = 0, last = 0, disposed = false;
   const reduced = view.matchMedia("(prefers-reduced-motion: reduce)");
   let inView = false;
   const active = () => !disposed && (rig.state !== "pleased" || rig.elapsed < 900)
     && (!rig.natural || rig.state !== "concerned" || rig.elapsed < 1200) && options.motion && rig.state !== "sleep" && inView
     && host.isConnected && doc.visibilityState === "visible" && doc.hasFocus() && !reduced.matches;
+  function scheduleNext() {
+    // Finite states (pleased/concerned) must commit the final static pose
+    // as soon as their animation expires, even when no more frames are needed.
+    if (!active()) { reconcile(); return; }
+    if (rig.natural && rig.state === "ready") {
+      // Quiet breathing and glances are slow. A single scheduled frame at
+      // ~14 fps is perceptually sufficient; do not poll rAF at 60 Hz while idle.
+      idleTimer = view!.setTimeout(() => {
+        idleTimer = 0;
+        if (active()) raf = view!.requestAnimationFrame(tick);
+        else reconcile();
+      }, 56);
+    } else {
+      raf = view!.requestAnimationFrame(tick);
+    }
+  }
   function tick(now: number) {
     raf = 0;
     if (!active()) { reconcile(); return; }
-    // The small Desktop character needs at most 30 poses per second.
-    if (rig.natural && last && now - last < 32) { raf = view!.requestAnimationFrame(tick); return; }
+    // Keep expressive/short response poses at the original 30 fps cadence.
+    if (rig.natural && rig.state !== "ready" && last && now - last < 32) {
+      raf = view!.requestAnimationFrame(tick);
+      return;
+    }
     rig.elapsed += last ? Math.min(now - last, 80) : 0;
     last = now;
     pose(rig);
-    raf = view!.requestAnimationFrame(tick);
+    scheduleNext();
   }
   function reconcile() {
     if (disposed) return;
     if (raf) view!.cancelAnimationFrame(raf);
-    raf = 0; last = 0;
+    if (idleTimer) view!.clearTimeout(idleTimer);
+    raf = 0; idleTimer = 0; last = 0;
     const running = active();
     svg!.dataset.motionActive = String(running);
     svg!.dataset.size = options.size <= 40 ? "small" : "full";
     pose(rig, !running);
-    if (running) raf = view!.requestAnimationFrame(tick);
+    if (running) scheduleNext();
   }
   const intersection = new view.IntersectionObserver(([entry]) => {
     inView = entry?.isIntersecting ?? false;
@@ -285,6 +311,7 @@ export function mountNexaRig(host: HTMLElement, initial: NexaRigOptions): NexaRi
       if (disposed) return;
       disposed = true;
       if (raf) view.cancelAnimationFrame(raf);
+      if (idleTimer) view.clearTimeout(idleTimer);
       svg.dataset.motionActive = "false";
       intersection.disconnect();
       reduced.removeEventListener("change", reconcile);

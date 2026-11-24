@@ -182,7 +182,7 @@ function ya_account_register(array $input): void
     // Never replace an existing pending identity/profile: resubmission cannot take ownership.
     if (!(bool)$account['email_verified']) ya_account_send_token($account, 'verify');
 }
-function ya_account_login(array $input): void
+function ya_account_login(array $input): array
 {
     ya_account_require_enabled(); $email = ya_account_email($input['email'] ?? null); ya_account_rate('login', $email);
     $password = $input['password'] ?? ''; if (!is_string($password) || strlen($password) > 72) throw new YaAccountError(401, 'invalid_credentials');
@@ -194,6 +194,9 @@ function ya_account_login(array $input): void
     if (password_needs_rehash($account['password_hash'], PASSWORD_ARGON2ID)) $db->prepare('UPDATE customer_accounts SET password_hash = ? WHERE id = ?')
         ->execute([password_hash($password, PASSWORD_ARGON2ID), $account['id']]);
     ya_account_issue_session($db, $account['id'], ($_SERVER['HTTP_X_YA_CLIENT'] ?? '') === 'android' ? 'android' : 'web');
+    // The login response is the authoritative identity proof for the browser.
+    // Rendering the account must not depend on a second session round-trip.
+    return ya_account_profile($account);
 }
 function ya_account_recovery(array $input): void
 {

@@ -42,6 +42,31 @@ final class DealerApi {
         || uri.getRawQuery() != null || uri.getRawFragment() != null) throw new IllegalArgumentException("İşletme için geçerli bir HTTPS bağlantısı girin.");
     return uri.toASCIIString().replaceAll("/+$", "") + "/";
   }
+  /**
+   * The business website address is sufficient for first-time setup. The common
+   * web module is installed in its fixed /yardimci-asistan/ directory. Keep
+   * direct URLs to that directory valid; never search other hosts or
+   * follow redirects, and do not send credentials during setup.
+   */
+  static String moduleBaseFromWebsite(String input) throws Exception {
+    String entered = input.trim();
+    if (!entered.contains("://")) entered = "https://" + entered;
+    String website;
+    try { website = normalizeBase(entered); }
+    catch (Exception error) {
+      throw new IllegalArgumentException("İşletmenin geçerli HTTPS web adresini girin.");
+    }
+    URI uri = new URI(website);
+    if (!uri.getHost().contains(".") && !"localhost".equalsIgnoreCase(uri.getHost())) {
+      throw new IllegalArgumentException("İşletmenin geçerli HTTPS web adresini girin.");
+    }
+    String path = uri.getRawPath();
+    if (path.contains("/../") || path.contains("/./") || path.contains("%2e") || path.contains("%2E")) {
+      throw new IllegalArgumentException("İşletmenin geçerli HTTPS web adresini girin.");
+    }
+    return website.endsWith("/yardimci-asistan/") ? website : website + "yardimci-asistan/";
+  }
+
   JSONObject submit(JSONObject request, String cookie) throws Exception {
     JSONObject recovery = call("receipt", new JSONObject().put("idempotencyKey", request.getString("idempotencyKey")), cookie).body;
     JSONObject previous = recovery.optJSONObject("receipt");

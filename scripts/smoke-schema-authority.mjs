@@ -71,6 +71,10 @@ withMemorySchema(schemaSql, db => {
   assert.throws(() => delivery.run("delivery-two", now.toISOString(), now.toISOString()), /UNIQUE/);
 });
 
+withMemorySchema(schemaSql, db => {
+  db.exec("ALTER TABLE rooms DROP COLUMN floor");
+  assert.equal(currentDesktopSchemaProblem(db, schemaSql), "Eksik alan: rooms.floor");
+});
 // Drift with all table/column names still present must be rejected. No giant DDL snapshots.
 for (const [from, to, expected] of [
   ["actor_source TEXT NOT NULL DEFAULT 'desktop'", "actor_source TEXT DEFAULT 'desktop'", "table:inventory_movements"],
@@ -155,11 +159,13 @@ try {
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM stay_guests WHERE stay_id = ? AND status = 'checked_in'").get(stay.savedId).n, 1);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM hospitality_notifications").get().n, 0);
     assert.equal(kbs.getKbsSettings(path).enabled, false);
+    assert.equal(database.getDashboardData().kbsOverview.enabled, false);
     ok(await kbs.testKbsConnection(path, { enabled: true, provider: "egm", facilityCode: "123456", username: "fixture",
       authorizedIdentityNumber: "10000000146", password: "fixture-not-a-real-secret", clearPassword: false }));
     ok(kbs.saveKbsSettings(path, { enabled: true, provider: "egm", facilityCode: "123456", username: "fixture",
       authorizedIdentityNumber: "10000000146", password: "fixture-not-a-real-secret", clearPassword: false }));
     assert.equal(kbs.getKbsSettings(path).passwordConfigured, true);
+    assert.equal(database.getDashboardData().kbsOverview.configured, true);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM hospitality_notifications WHERE kind = 'arrival'").get().n, 1,
       "Opt-in arrival data backfill is live product behavior, not a schema migration");
     ok(database.checkoutStay(stay.savedId));
@@ -185,6 +191,7 @@ try {
     const definition = raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table).sql;
     raw.exec(`DROP TABLE ${table}`);
     assert.throws(operation, /no such table/);
+    if (table === "kbs_service_settings") assert.throws(() => database.getDashboardData(), /no such table/);
     assert.equal(tableExists(raw, table), false);
     assert.throws(() => database.initialize(), error => error.message === CURRENT_DESKTOP_SCHEMA_ERROR);
     assert.equal(tableExists(raw, table), false);

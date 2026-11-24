@@ -237,6 +237,7 @@ function main() {
     version: DEMO_VERSION,
     generatedAt: FIXED_NOW,
     schema: "apps/desktop-app/db/schema.sql",
+    schemaSha256: sha256File(schemaPath),
     backupFormat: "yardimci-asistan-backup-v2",
     packages,
     limitations: [

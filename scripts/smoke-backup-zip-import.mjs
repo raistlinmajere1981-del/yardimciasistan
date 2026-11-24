@@ -6,13 +6,13 @@ import path from "node:path";
 import { runInNewContext } from "node:vm";
 import { DatabaseSync } from "node:sqlite";
 import { zipSync, strToU8 } from "fflate";
+import { prepareDemoZipFixtures } from "./test-helpers/demo-zip-fixtures.mjs";
 
 const dist = path.resolve("apps/desktop-app/dist-electron");
 const moduleRequire = createRequire(path.join(dist, "data-maintenance.js"));
+const [source, ...otherArchives] = prepareDemoZipFixtures();
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ya-backup-zip-smoke-"));
 const backupRoot = path.join(tempRoot, "backups");
-const source = path.resolve("artifacts/demo-data/yardimci-asistan-demo-2.2.1-a-pension-restaurant.zip");
-assert.ok(fs.existsSync(source), "Demo fixture ZIP dosyası bulunamadı.");
 const handlers = new Map();
 let selectedZip = source;
 const exports = {};
@@ -67,8 +67,8 @@ try {
   assert.ok(fs.existsSync(path.join(folder, "backup.json")), "Duplicate import must preserve existing backup");
 
   // Every published demo pack should enter the same backup list.
-  for (const pack of ["b-market", "c-market-dealer"]) {
-    selectedZip = path.resolve(`artifacts/demo-data/yardimci-asistan-demo-2.2.1-${pack}.zip`);
+  for (const archive of otherArchives) {
+    selectedZip = archive;
     const imported = await importZip();
     assert.equal(imported.ok, true, imported.message);
     assert.ok(fs.existsSync(path.join(imported.backup.folderPath, "backup.json")));

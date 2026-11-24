@@ -26,6 +26,23 @@ public class DealerApiTest {
     for (String url : new String[]{"http://firma.example", "https://u:p@firma.example", "https://firma.example/?secret=key", "https://firma.example/#token", "file:///tmp/f"})
       assertThrows(Exception.class, () -> DealerApi.normalizeBase(url));
   }
+  @Test public void websiteAddressFindsSameSiteInstalledDealerModule() throws Exception {
+    assertEquals("https://firma.example/yardimci-asistan/",
+        DealerApi.moduleBaseFromWebsite("firma.example"));
+    assertEquals("https://firma.example/yardimci-asistan/",
+        DealerApi.moduleBaseFromWebsite("https://firma.example/"));
+    assertEquals("https://firma.example/yardimci-asistan/",
+        DealerApi.moduleBaseFromWebsite("https://firma.example/yardimci-asistan/"));
+    assertEquals("https://firma.example/subsite/yardimci-asistan/",
+        DealerApi.moduleBaseFromWebsite("https://firma.example/subsite"));
+    assertEquals("https://localhost:8443/yardimci-asistan/",
+        DealerApi.moduleBaseFromWebsite("https://localhost:8443/"));
+    for (String bad : new String[]{"invalid", "http://firma.example", "ftp://firma.example",
+        "https://user:password@firma.example", "https://firma.example/?token=secret",
+        "https://firma.example/#secret", "file:///tmp/fixture", "https://"}) {
+      assertThrows("Rejected: " + bad, Exception.class, () -> DealerApi.moduleBaseFromWebsite(bad));
+    }
+  }
   @Test public void requestsUseExistingCookieAndPostHeaderNoSyncCredentials() throws Exception {
     Connection connection = new Connection(new URL("https://firma.example/"));
     DealerApi api = new DealerApi("https://firma.example/module/", url -> { assertEquals("https://firma.example/module/api/dealer/order.php", url.toString()); return connection; });

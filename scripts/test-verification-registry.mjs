@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   IGNORED_SMOKE_FILES,
@@ -39,6 +41,13 @@ test("release pre-main kapsamını taşır ve paket doğrulamalarını ekler", (
   for (const id of ["package-web-module", "package-desktop-dir", "android-release-apk", "dealer-android-release-apk", "android-release-aab", "desktop-package"]) {
     assert.ok(release.has(id), `release paket kontrolü eksik: ${id}`);
   }
+});
+
+test("release güncel A/B/C ZIP dosyalarının gerçek import smoke'unu çalıştırır", () => {
+  const plan = createVerificationPlan({ preset: "release", platform: "linux" });
+  const check = plan.find(item => item.id === "backup-zip-import");
+  assert.ok(check && !check.manual, "Demo ZIP import otomatik release kabulünde bulunmalı");
+  assert.ok(check.requires.includes("build-desktop"), "ZIP import güncel Electron derlemesi üstünde çalışmalı");
 });
 
 test("domain plan prerequisite'leri bir kez ekler", () => {
@@ -90,8 +99,59 @@ test("Android domain sync ve local companion çapraz akışlarını kapsar", () 
 });
 
 
+test("Android Bayi ve inspector release kontrolü soğuk Gradle cache'de offline zorlamaz", () => {
+  const keys = ["dealer-android-build", "dealer-android-tests", "image-inspector-device-build"];
+  for (const id of keys) {
+    const item = VERIFICATION_CHECKS.find(check => check.id === id);
+    assert.ok(item, id);
+    assert.equal(item.args.includes("--offline"), false, id + " Maven/Android lint araçlarını çözebilmeli");
+  }
+});
+
 test("release stages the current signed Companion before the desktop package",()=>{
   const ids=createVerificationPlan({preset:"release",platform:"linux"}).map(item=>item.id);
   assert.ok(ids.indexOf("android-release-apk")<ids.indexOf("package-desktop-dir"));
   assert.ok(ids.includes("dealer-android-release-apk"));
+});
+
+
+test("başarısız verify kontrolü gerçek stderr/stdout'u raporda özel dosyaya kaydeder", () => {
+  const root = mkdtempSync(join(tmpdir(), "ya-verify-log-fixture-"));
+  try {
+    mkdirSync(join(root, "scripts"));
+    copyFileSync("scripts/verify.mjs", join(root, "scripts/verify.mjs"));
+    writeFileSync(join(root, "scripts/verification-registry.mjs"), `
+export const VERIFICATION_CHECKS = [];
+export const VERIFICATION_PRESETS = ["release"];
+export const verificationDomains = () => [];
+export const validateVerificationRegistry = () => [];
+export const createVerificationPlan = () => [{
+  id: "fixture-fail", label: "Fixture", command: "node",
+  args: ["-e", "console.log('STDOUT-fixture'); if(process.env.TEST_FAIL === '1'){console.error('STDERR-fixture'); process.exit(23)}"],
+  requires: []
+}];
+`);
+    const execute = (fail) => spawnSync(process.execPath, ["scripts/verify.mjs", "--check", "fixture-fail"], {
+      cwd: root, encoding: "utf8", env: { ...process.env, TEST_FAIL: fail ? "1" : "0" }
+    });
+    const failed = execute(true);
+    assert.equal(failed.status, 1, failed.stderr);
+    assert.match(failed.stdout, /STDOUT-fixture/);
+    const reportPath = join(root, "artifacts/verify/latest.json");
+    const result = JSON.parse(readFileSync(reportPath, "utf8")).checks[0];
+    assert.equal(result.exit_code, 23);
+    assert.equal(result.status, "failed");
+    assert.ok(result.log_path);
+    const log = readFileSync(result.log_path, "utf8");
+    assert.match(log, /STDOUT-fixture/);
+    assert.match(log, /STDERR-fixture/);
+    if (process.platform !== "win32") assert.equal(statSync(result.log_path).mode & 0o777, 0o600);
+    const passed = execute(false);
+    assert.equal(passed.status, 0, passed.stderr);
+    const passCheck = JSON.parse(readFileSync(reportPath, "utf8")).checks[0];
+    assert.equal(passCheck.status, "passed");
+    assert.equal(passCheck.log_path, undefined, "Başarılı kontroller log saklamamalı");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

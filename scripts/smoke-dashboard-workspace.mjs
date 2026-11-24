@@ -84,8 +84,12 @@ try {
         window.__m8fTrafficCalls.push({ days, fresh });
         return { ok: true, stale: false, fetchedAt: "2026-11-02T15:00:00+03:00", value: {
           enabled: true, has_data: true, days,
-          totals: { sessions: 22, views: 48, intents: 3 },
-          daily: [{ date: "2026-11-02", sessions: 22, views: 48, intents: 3 }],
+          totals: { sessions: 77, views: 114, intents: 7 },
+          daily: [
+            { date: "2026-10-31", sessions: 0, views: 0, intents: 0 },
+            { date: "2026-11-01", sessions: 55, views: 66, intents: 4 },
+            { date: "2026-11-02", sessions: 22, views: 48, intents: 3 }
+          ],
           top_pages: [{ page: "catalog:part-1", count: 15 }],
           sources: [{ source: "search", count: 17 }],
           conversions: { requests: 1, orders: 2 },
@@ -121,6 +125,12 @@ try {
   expect(trafficGeometry.bottom).toBeLessThanOrEqual(900);
   await expect(trafficDialog).toContainText("Onaylı web siparişi");
   await expect(trafficDialog).toContainText("Katalog · part-1");
+  const bars = trafficDialog.locator(".dashboard-site-traffic-chart rect");
+  await expect(bars).toHaveCount(3);
+  for (const [index, height] of [3, 100, 40].entries()) {
+    await expect(bars.nth(index)).toHaveAttribute("height", String(height));
+    await expect(bars.nth(index)).toHaveAttribute("y", String(100 - height));
+  }
   await trafficDialog.getByRole("button", { name: "30 gün" }).click();
   await expect.poll(() => page.evaluate(() => window.__m8fTrafficCalls.some(call => call.days === 30))).toBe(true);
   await trafficDialog.getByRole("button", { name: "Raporu yenile" }).click();

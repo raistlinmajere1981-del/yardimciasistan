@@ -330,6 +330,11 @@
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
+.settings-service-feedback-result[role="alert"] {
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-soft);
+}
 .setup-ai-credentials { min-width: 0; display: grid; gap: var(--space-2); }
 .setup-ai-credentials-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); min-width: 0; align-items: start; }
 .setup-ai-credentials-grid .form-field { min-width: 0; max-width: none; }

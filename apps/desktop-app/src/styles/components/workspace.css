@@ -1,13 +1,14 @@
 /* One anatomy and modal boundary; presentation changes geometry only. */
 .modal-surface {
-  --backdrop-cutout-top: var(--header-height);
+  --backdrop-cutout-top: var(--modal-canvas-top, var(--header-height));
   position: fixed;
-  inset: 0;
+  inset: var(--modal-canvas-top, 0px) 0 0;
   margin: auto;
   padding: 0;
+  height: fit-content;
   min-width: 0;
   max-width: calc(100vw / var(--ui-scale) - var(--space-4));
-  max-height: calc(100dvh / var(--ui-scale) - var(--space-4));
+  max-height: max(0px, calc(var(--modal-canvas-height, 100dvh) - var(--space-4)));
   overflow: hidden;
   color: var(--color-text);
   background: var(--color-bg-panel);

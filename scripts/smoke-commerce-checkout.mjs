@@ -44,7 +44,20 @@ try {
   if(shipping)setupInput.arasShipping={enabled:true,environment:'test',customerCode:'fixture',username:'fixture',password:''};
   const saved=f.database.saveInitialSetup(setupInput,undefined,undefined,shipping ? {mode:'replace',encryptedValue:'safe-storage:v1:fixture-ciphertext'} : undefined);assert.equal(saved.ok,true,saved.message);
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'checkout settings join the canonical settings transaction');
-  assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,bank:{...settings.bank,iban:"GB83 WEST 1234 5698 7654 32"}}}).ok,false,'invalid bank checksum cannot be enabled');
+  const invalidIban = f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,bank:{...settings.bank,iban:"GB83 WEST 1234 5698 7654 32"}}});
+  assert.equal(invalidIban.ok,false,'invalid bank checksum cannot be enabled');
+  assert.match(invalidIban.message,/IBAN geçersiz/);
+  for (const [checkout,reason] of [
+    [{...settings,bank:{...settings.bank,name:" "}},/Banka adı boş bırakılamaz/],
+    [{...settings,bank:{...settings.bank,accountHolder:""}},/Hesap sahibi boş bırakılamaz/],
+    [{...settings,shippingFeeMinor:-1},/Kargo bedeli geçersiz/],
+    [{...settings,legal:{...settings.legal,preliminary:""}},/Ön bilgilendirme boş bırakılamaz/],
+    [{...settings,legal:{...settings.legal,agreement:""}},/Satış sözleşmesi boş bırakılamaz/]
+  ]) {
+    const rejected=f.database.saveInitialSetup({...setupInput,commerceCheckout:checkout});
+    assert.equal(rejected.ok,false,'incomplete payment settings must be rejected');
+    assert.match(rejected.message,reason);
+  }
   assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,demo:true}}).ok,false,'legacy demo flag cannot activate checkout');
   assert.equal(f.database.saveInitialSetup({...setupInput,commerceCheckout:{...settings,version:1}}).ok,false,'legacy checkout settings cannot activate checkout');
   assert.deepEqual(f.database.getSetupData().commerceCheckout,settings,'rejected settings leave the saved owner intact');

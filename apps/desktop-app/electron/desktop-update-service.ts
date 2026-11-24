@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, dialog } from "electron";
+import { app, BrowserWindow, net, dialog } from "electron";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -327,7 +327,7 @@ function publishStatus(status: DesktopUpdateStatus) {
   return status;
 }
 
-function getStatus(userDataPath: string): DesktopUpdateStatus {
+export function getDesktopUpdateStatus(userDataPath: string): DesktopUpdateStatus {
   const persistedStatus = buildStatus(userDataPath);
   if (!currentRuntimeStatus) return persistedStatus;
 
@@ -507,7 +507,7 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
   }
 }
 
-async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
+export async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
   if (updateOperation) return updateOperation.promise;
   const promise = performCheck(userDataPath, force);
   updateOperation = { kind: "check", promise };
@@ -731,7 +731,7 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
   }
 }
 
-async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
+export async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
   if (installationPreparation || readInstallingUpdate(resolveUpdatePaths(userDataPath))) {
     return publishStatus(buildStatus(userDataPath, { message: "Güncelleme kurulumu hazırlanıyor; indirme başlatılmadı." }));
   }
@@ -753,7 +753,7 @@ async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdat
   return promise;
 }
 
-function saveDesktopUpdatePreferences(
+export function saveDesktopUpdatePreferences(
   userDataPath: string,
   input: DesktopUpdatePreferencesInput
 ): DesktopUpdateActionResult {
@@ -788,7 +788,7 @@ function saveDesktopUpdatePreferences(
   }
 }
 
-async function restartForPendingDesktopUpdate(userDataPath: string): Promise<DesktopUpdateActionResult> {
+export async function restartForPendingDesktopUpdate(userDataPath: string): Promise<DesktopUpdateActionResult> {
   const paths = resolveUpdatePaths(userDataPath);
   if (!readPendingUpdate(paths) && !readInstallingUpdate(paths)) {
     const status = publishStatus(buildStatus(userDataPath, {
@@ -1048,40 +1048,6 @@ export async function applyPendingDesktopUpdateAtStartup(userDataPath: string): 
   }
   if (!installSupported()) return false; // Never invoke Windows launchers on Linux/dev.
   return preparePendingDesktopUpdate(userDataPath);
-}
-
-export function registerDesktopUpdateIpcHandlers(userDataPath: () => string, assertUnlocked: () => void) {
-  const channels = [
-    "update:getStatus",
-    "update:check",
-    "update:download",
-    "update:savePreferences",
-    "update:restartAndInstall"
-  ];
-  for (const channel of channels) ipcMain.removeHandler(channel);
-
-  // Local read-only update status is available while locked; explicit network,
-  // configuration and installer actions require the authoritative session.
-  ipcMain.handle("update:getStatus", () => getStatus(userDataPath()));
-  ipcMain.handle("update:check", (_event, force = true) => {
-    assertUnlocked();
-    return checkDesktopUpdate(userDataPath(), force === true);
-  });
-  ipcMain.handle("update:download", () => {
-    assertUnlocked();
-    return downloadDesktopUpdate(userDataPath());
-  });
-  ipcMain.handle(
-    "update:savePreferences",
-    (_event, input: DesktopUpdatePreferencesInput) => {
-      assertUnlocked();
-      return saveDesktopUpdatePreferences(userDataPath(), input);
-    }
-  );
-  ipcMain.handle("update:restartAndInstall", () => {
-    assertUnlocked();
-    return restartForPendingDesktopUpdate(userDataPath());
-  });
 }
 
 export function startAutomaticDesktopUpdateChecks(userDataPath: () => string) {

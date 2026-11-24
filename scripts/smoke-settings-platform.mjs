@@ -458,6 +458,26 @@ try {
   await productToggle.setChecked(!await productToggle.isChecked());
   await serviceSave();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'setup').length)).toBe(1);
+  // The save failure must be visible inside the delivery modal, not only in
+  // the application-wide header. Editing a field clears stale failure text.
+  await visit('?profile=market&wholesale=on&online=on');
+  await expand();
+  await page.evaluate(() => window.refreshSettings({
+    onlineSalesDeliveryEnabled: true,
+    onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false }
+  }));
+  overlay = await manage('settings-online-delivery');
+  const ibanInput = overlay.getByLabel('IBAN', { exact: true });
+  await expect(ibanInput).toHaveAttribute('placeholder', 'TR ile başlayan IBAN');
+  await expect(overlay).toContainText("Türkiye IBAN'ı 26 karakterdir");
+  await overlay.getByLabel('Banka adı', { exact: true }).fill('Örnek Banka');
+  await page.evaluate(() => { window.failSetup = true; });
+  await overlay.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(overlay.locator('.settings-service-feedback [role="alert"]')).toHaveText('Test kayıt hatası');
+  await expect(overlay).toBeVisible();
+  await overlay.getByLabel('Banka adı', { exact: true }).fill('Başka Banka');
+  await expect(overlay.locator('.settings-service-feedback [role="alert"]')).toHaveCount(0);
+  await cancel();
   await visit('?profile=restaurant');
   await expand();
   await expect(page.locator('#settings-kbs')).toHaveCount(0);

@@ -21,6 +21,9 @@ interface MarketingPageProps {
   onMessage?: (message: string) => void; onCalendar?: () => void;
 }
 type Surface = {kind: "share"; initial?: MarketingShareDetail; publication?: MarketingPublication; initialChannel?: MarketingChannel; focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput} | {kind: "website" | "drafts" | "publications"} | {kind: "recent"} | {kind: "delivery"; id: string};
+const REFRESH_FALLBACK_MS = 30_000;
+const REFRESH_EVENT_DELAY_MS = 100;
+
 export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: MarketingPageProps) {
   const webAvailable = useWebAvailability();
   const [snapshot, setSnapshot] = useState<MarketingStudioSnapshot | null>(null), [plans, setPlans] = useState<MarketingScheduleSnapshot | null>(null);
@@ -42,13 +45,58 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: Mark
     if(!mounted.current || ticket !== epoch.current)return;
     setSnapshot(resultValue(studio)); if(calendar) setPlans(resultValue(calendar));
   }, []);
-  useEffect(() => {mounted.current = true; if(!enabled)return;
+  useEffect(() => {
+    mounted.current = true;
+    if (!enabled) return;
     setLoading(true); void reload().catch(e => setMessage(e instanceof Error ? e.message : "Pazarlama verileri alınamadı.")).finally(() => setLoading(false));
     const bridge = window.yardimciDesktop!;
-    const refresh = () => void reload().catch(() => {});
-    const disposeCampaign = bridge.onMessagingCampaignsChanged?.(refresh), disposeSchedules = bridge.onMarketingSchedulesChanged?.(refresh), disposeProviders = bridge.onBusinessMessagingChanged?.(refresh);
-    const timer = setInterval(refresh, 5000);
-    return () => {mounted.current = false; invalidateMarketingEpoch(); clearInterval(timer); disposeCampaign?.(); disposeSchedules?.(); disposeProviders?.();};
+    let disposed = false;
+    let refreshing = false;
+    let refreshPending = false;
+    let eventTimer: number | undefined;
+    const refresh = () => {
+      if (disposed || document.visibilityState === "hidden") return;
+      if (refreshing) {
+        refreshPending = true;
+        return;
+      }
+      if (eventTimer !== undefined) return;
+      eventTimer = window.setTimeout(() => {
+        eventTimer = undefined;
+        if (document.visibilityState === "hidden") return;
+        refreshing = true;
+        void reload().catch(() => {}).finally(() => {
+          refreshing = false;
+          if (refreshPending) {
+            refreshPending = false;
+            refresh();
+          }
+        });
+      }, REFRESH_EVENT_DELAY_MS);
+    };
+    const disposeCampaign = bridge.onMessagingCampaignsChanged?.(refresh);
+    const disposeSchedules = bridge.onMarketingSchedulesChanged?.(refresh);
+    const disposeProviders = bridge.onBusinessMessagingChanged?.(refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    // Publication acknowledgements and missed events are reconciled by this read.
+    const fallback = window.setInterval(() => {
+      if (!refreshing) refresh();
+    }, REFRESH_FALLBACK_MS);
+    return () => {
+      disposed = true;
+      mounted.current = false;
+      invalidateMarketingEpoch();
+      window.clearTimeout(eventTimer);
+      window.clearInterval(fallback);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      disposeCampaign?.();
+      disposeSchedules?.();
+      disposeProviders?.();
+    };
   }, [enabled, reload, invalidateMarketingEpoch]);
   async function openContent(id: string, publication?: MarketingPublication, initialChannel?: MarketingChannel, plan?: {focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput}) {
     if (!webAvailable && (publication?.channel === "website" || initialChannel === "website" || plan?.createScheduleInput?.channel === "website")) return;

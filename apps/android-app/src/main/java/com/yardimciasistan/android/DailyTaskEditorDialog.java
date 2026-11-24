@@ -54,7 +54,7 @@ final class DailyTaskEditorDialog {
         form,
         "Not",
         editing ? existing.description : "",
-        "İş için kısa açıklama (isteğe bağlı)"
+        ""
     );
     // Keep the microphone next to the note it edits, not below the date/time fields.
     LinearLayout noteVoiceControls = new LinearLayout(context);

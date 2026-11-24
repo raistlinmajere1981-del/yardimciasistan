@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";
@@ -7,7 +8,8 @@ import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatib
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
   resolveDatabasePath,
-  resolveDataRoot
+  resolveDataRoot,
+  resolvePendingMaintenanceMarkerPath
 } from "./data-paths.js";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
@@ -15,6 +17,7 @@ import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc
 import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerCommerceIpcHandlers } from "./commerce-ipc";
 import { getWebSyncConfig } from "./sync-config";
+import { registerDesktopUpdateIpcHandlers } from "./ipc/desktop-update-ipc";
 import { registerDiagnosticsIpcHandlers } from "./ipc/diagnostics-ipc";
 import {
   assertPersistedBusinessCapability,
@@ -27,7 +30,6 @@ import {
 } from "./desktop-logger";
 import {
   applyPendingDesktopUpdateAtStartup,
-  registerDesktopUpdateIpcHandlers,
   startAutomaticDesktopUpdateChecks
 } from "./desktop-update-service";
 
@@ -93,11 +95,11 @@ app.on("before-quit", () => {
 // Worker receipts must flush before the diagnostic session is finalized. Keep its existing end reason.
 app.on("will-quit", () => finalizeDesktopLogging("before-quit"));
 
-function shouldDeferPendingMaintenanceToCleanStart(): boolean {
+function shouldDeferPendingMaintenanceToCleanStart(dataRoot: string): boolean {
   if (process.argv.includes("--clean-start")) return true;
 
   const compatibility = inspectDesktopDatabaseCompatibility(
-    resolveDatabasePath(userDataPath()),
+    resolveDatabasePath(dataRoot),
     path.join(app.getAppPath(), "db", "schema.sql")
   );
   return compatibility.state === "incompatible" || compatibility.state === "unreadable";
@@ -140,21 +142,24 @@ if (app.isPackaged && process.platform === "win32" && process.env.YA_DESKTOP_DAT
 // Defer domain startup until the independent, visible installer has either
 // acknowledged readiness or declined the handoff. SQLite is still unopened.
 async function loadMainProcess() {
-  if (await applyPendingDesktopUpdateAtStartup(userDataPath())) {
+  const dataRoot = userDataPath();
+  if (await applyPendingDesktopUpdateAtStartup(dataRoot)) {
     desktopLog.info({ scope: "update", event: "update.installer.handoff", message: "Başlangıç başlatıcısı denetimi görünür kurulum yardımcısına devretti." });
     process.exit(0);
   }
 
-  // Restore/reset operations precede the long-lived SQLite connection.
-  const deferPendingMaintenance = shouldDeferPendingMaintenanceToCleanStart();
-  if (deferPendingMaintenance) {
-    desktopLog.warn({
-      scope: "startup",
-      event: "startup.maintenance.deferred-for-clean-start",
-      message: "Eski veri bakımı temiz başlangıç kararı verilene kadar ertelendi."
-    });
-  } else {
-    applyPendingDataMaintenanceAtStartup(userDataPath());
+  // Only a pending operation needs a preflight before it can change the SQLite files.
+  // The main startup path always inspects the resulting database before opening it.
+  if (fs.existsSync(resolvePendingMaintenanceMarkerPath(dataRoot))) {
+    if (shouldDeferPendingMaintenanceToCleanStart(dataRoot)) {
+      desktopLog.warn({
+        scope: "startup",
+        event: "startup.maintenance.deferred-for-clean-start",
+        message: "Eski veri bakımı temiz başlangıç kararı verilene kadar ertelendi."
+      });
+    } else {
+      applyPendingDataMaintenanceAtStartup(dataRoot);
+    }
   }
   return import("./main");
 }

@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
+import { verifySettingsStyleParity } from "./test-helpers/settings-style-parity.mjs";
 
 const server = await createServer({
   root: resolve("apps/desktop-app"),
@@ -89,6 +90,23 @@ try {
       expect(layout.editor.x).toBeLessThan(layout.preview.x);
     } else {
       expect(layout.preview.y).toBeGreaterThan(layout.editor.y);
+    }
+  }
+  if (process.env.SETTINGS_CSS_BASELINE) {
+    const original = await page.evaluate(() => document.documentElement.dataset.colorScheme);
+    try {
+      for (const width of [1440, 960, 600]) {
+        await page.setViewportSize({ width, height: 800 });
+        for (const scheme of ["light", "dark"]) {
+          await page.evaluate(value => { document.documentElement.dataset.colorScheme = value; }, scheme);
+          await verifySettingsStyleParity(page, `seo-${scheme}-${width}`);
+        }
+      }
+    } finally {
+      await page.evaluate(value => {
+        if (value === undefined) delete document.documentElement.dataset.colorScheme;
+        else document.documentElement.dataset.colorScheme = value;
+      }, original);
     }
   }
   await dialog.getByRole("button", { name: "SEO Yönetimini kapat" }).click();

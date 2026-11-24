@@ -40,17 +40,19 @@ try {
   await expect(page.locator('.release-section .eyebrow')).toHaveText(`${release.desktopVersion} / Günlük iş akışları`);
   await expect(page.locator('[data-scenario-pane]:visible')).toHaveCount(1);
   await expect(page.locator('[data-scenario-pane="pension_restaurant"]')).toBeVisible();
-  await expect(page.locator('[data-scenario-pane="pension_restaurant"] .scenario-card')).toHaveCount(5);
+  await expect(page.locator('[data-scenario-pane="pension_restaurant"] .scenario-card')).toHaveCount(6);
   await expect(page.locator('[data-capability]:visible')).toHaveCount(40);
   await expect(page.locator('[data-capability="commerce.benefits"] .capability-badges')).toContainText('Android Companion');
   await page.locator('[data-scenario-sector="market"]').click();
   await expect(page.locator('[data-scenario-pane="market"]')).toBeVisible();
   await expect(page.locator('[data-sector="market"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-scenario-sector="market"]')).toHaveAttribute('aria-current', 'true');
-  await expect(page.locator('[data-scenario-pane="market"] .scenario-card')).toHaveCount(5);
+  await expect(page.locator('[data-scenario-pane="market"] .scenario-card')).toHaveCount(6);
   const webOrder = page.locator('[data-scenario-pane="market"] [data-scenario-id="market_online"]');
-  await expect(webOrder).toContainText('yerel test');
-  await expect(webOrder).toContainText('kısmi iade yoktur');
+  await expect(webOrder).toContainText('Kurulum / modül gerekli');
+  await expect(webOrder).toContainText('Siparişin son onayı ve karşılanması');
+  await expect(page.locator('[data-scenario-pane="market"] [data-scenario-id="market_stock"]')).toContainText('İdeal stoktan ihtiyaç listesine');
+  await expect(page.locator('[data-scenario-pane="pension"] [data-scenario-id="pension_room_qr"]')).toContainText('Odadan QR siparişi');
   await page.locator('[data-scenario-pane="market"] [data-scenario-id="market_credit"] [data-scenario-step="commerce.customer_credit"]').click();
   await expect(page.locator('[id="cap-commerce.customer_credit"]')).toHaveAttribute('open','');
   await page.goBack(); // scenario-step fragment

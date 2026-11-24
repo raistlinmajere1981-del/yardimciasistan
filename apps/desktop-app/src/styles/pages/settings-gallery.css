@@ -1,11 +1,8 @@
 /* settings-gallery feature layout; controls use the shared UI family. */
 .settings-gallery-overlay {
-  inset: 50% auto auto 50%;
-  margin: 0;
-  transform: translate(-50%, -50%);
   width: min(600px, calc(100vw / var(--ui-scale) - 2 * var(--space-4)));
-  height: min(620px, calc(100dvh / var(--ui-scale) - 2 * var(--space-4)));
-  max-height: calc(100dvh / var(--ui-scale) - 2 * var(--space-4));
+  height: min(620px, max(0px, calc(var(--modal-canvas-height, 100dvh) - 2 * var(--space-4))));
+  max-height: max(0px, calc(var(--modal-canvas-height, 100dvh) - 2 * var(--space-4)));
   padding: 0;
 }
 .settings-gallery-overlay[open] { display: flex; flex-direction: column; }

@@ -62,6 +62,7 @@ try {
   const loginResponse=page.waitForResponse(response=>response.url().endsWith('/api/account/login.php')&&response.request().method()==='POST');
   await page.locator('#account-login button').click();
   assert.equal((await loginResponse).status(),200,'browser sign-in must succeed before checking the dealer view');
+  assert.equal((await (await loginResponse).json()).account?.email,'browser@example.test','Login must return verified profile');
   await expect.poll(()=>page.evaluate(()=>window.YaAccount?.state.status)).toBe('authenticated');
   await expect(page.getByRole('heading',{name:'Hesabım',exact:true})).toBeVisible();
   await expect(page.locator('#account-dealer-badge')).toBeVisible();

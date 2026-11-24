@@ -160,10 +160,15 @@
     form.addEventListener('submit', async event => {
       event.preventDefault(); const submit = form.querySelector('button'); submit.disabled = true;
       try {
-        await owner.request(action === 'token' ? tokenAction : action, {...Object.fromEntries(new FormData(form)), ...(action === 'token' ? {token} : {})});
+        const result = await owner.request(action === 'token' ? tokenAction : action, {...Object.fromEntries(new FormData(form)), ...(action === 'token' ? {token} : {})});
         for (const password of form.querySelectorAll('input[type="password"]')) password.value = '';
         if (action === 'token') { const destination = new URL(location.href); destination.searchParams.delete('action'); destination.hash = ''; location.assign(destination.href); return; }
-        if (action === 'login') { owner.unlock(); await owner.refresh(); }
+        if (action === 'login') {
+          owner.unlock(result);
+          // Older backend installations have no profile in the login response.
+          // Keep backward compatibility; upgraded backends need no second request.
+          if (owner.state.status !== 'authenticated') await owner.refresh();
+        }
         else if (action === 'profile') await owner.refresh();
         else message(ui('Hesap mevcutsa doğrulama veya yenileme bağlantısı e-posta kuyruğuna alındı. E-posta kutunuzu kontrol edin.'));
       } catch (error) { if (error.code !== 'account_state_changed') message(error.message); }

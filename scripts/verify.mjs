@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync, renameSync, rmSync, rmdirSync, writeFileSync, writeSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -98,7 +98,7 @@ for (const [index, item] of plan.entries()) {
     continue;
   }
 
-  const result = run(item, progress);
+  const result = await run(item, progress);
   results.set(item.id, result);
   report.checks.push(result);
   save();
@@ -122,27 +122,62 @@ for (const item of skipped) console.log(`  - ${item.label} · ${item.reason}`);
 if (report.result !== "passed") process.exitCode = 1;
 else console.log("\nDoğrulama planı temiz.");
 
-function run(item, progress) {
+async function run(item, progress) {
   console.log(`\n▶ ${progress} [${item.id}] ${item.label}`);
   const startedAt = Date.now();
   const command = resolveCommand(item.command);
-  const out = spawnSync(command, item.args, {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: "inherit",
-    shell: false
-  });
+  // Keep the failing test's actual output, not just its exit code. Passing
+  // checks discard their temporary logs so a 330-check release stays lean.
+  const logsDir = join(reportDir, "failure-logs", stamp(started));
+  mkdirSync(logsDir, { recursive: true, mode: 0o700 });
+  const tempFile = join(logsDir, `${item.id}.partial.log`);
+  const file = openSync(tempFile, "w", 0o600);
+  let launchError;
+  let completion;
+  try {
+    const child = spawn(command, item.args, {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ["inherit", "pipe", "pipe"],
+      shell: false
+    });
+    for (const [stream, destination] of [
+      [child.stdout, process.stdout],
+      [child.stderr, process.stderr]
+    ]) {
+      stream.on("data", (chunk) => {
+        destination.write(chunk);
+        writeSync(file, chunk);
+      });
+    }
+    completion = await new Promise((resolve) => {
+      child.once("error", (error) => { launchError = error; });
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    });
+  } finally {
+    closeSync(file);
+  }
   const duration = Date.now() - startedAt;
-  const passed = out.status === 0 && !out.error;
-  console.log(`${passed ? "✓" : "✗"} ${progress} ${item.label} (${duration} ms)`);
-  return {
+  const passed = completion?.code === 0 && !launchError;
+  const result = {
     id: item.id,
     label: item.label,
     status: passed ? "passed" : "failed",
     duration_ms: duration,
-    exit_code: typeof out.status === "number" ? out.status : 1,
-    error: out.error?.message ?? ""
+    exit_code: typeof completion?.code === "number" ? completion.code : 1,
+    error: launchError?.message ?? (completion?.signal ? `Sinyal: ${completion.signal}` : "")
   };
+  if (passed) {
+    rmSync(tempFile, { force: true });
+    try { rmdirSync(logsDir); } catch { /* Earlier failed checks are retained. */ }
+  } else {
+    const failureLog = join(logsDir, `${item.id}.log`);
+    renameSync(tempFile, failureLog);
+    result.log_path = failureLog;
+    console.error(`  Hata çıktısı: ${failureLog}`);
+  }
+  console.log(`${passed ? "✓" : "✗"} ${progress} ${item.label} (${duration} ms)`);
+  return result;
 }
 
 function resolveCommand(command) {

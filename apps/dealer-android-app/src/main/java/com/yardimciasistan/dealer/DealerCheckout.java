@@ -1,6 +1,7 @@
 package com.yardimciasistan.dealer;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -53,6 +54,25 @@ final class DealerCheckout {
       }
     }
     return new JSONObject(quote.toString());
+  }
+
+  /**
+   * UI-only comparison at order review. The quote remains the sole authority:
+   * local catalog prices are not written back to the quote or sent in the order.
+   * Ignore delivery fees; only changed product prices merit a price warning.
+   */
+  static boolean displayedPricesDiffer(JSONObject quote, DealerState state) throws Exception {
+    String currency = quote.getString("currency");
+    JSONArray lines = quote.getJSONArray("items");
+    for (int i = 0; i < lines.length(); i++) {
+      JSONObject line = lines.getJSONObject(i);
+      JSONObject cached = state.product(line.getString("product_id"));
+      if (cached == null || !currency.equals(cached.optString("currency"))) return true;
+      long displayedMinor = new BigDecimal(cached.get("price").toString())
+          .movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+      if (displayedMinor != line.getLong("unit_price_minor")) return true;
+    }
+    return false;
   }
 
   private static boolean validIban(String value) {

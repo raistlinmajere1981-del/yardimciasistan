@@ -58,8 +58,9 @@ public final class DealerDeviceFixture extends Instrumentation {
               .put("dealer",
                   new JSONObject()
                       .put("access_id", "fixture-dealer")
-                      .put("display_name", "BAYİ UI TEST VERİSİ"))
-              .put("catalog_at", "Yerel fixture · canlı veri değil")
+                      .put("display_name", "ÖRNEK İŞLETME · TEST VERİLERİ"))
+              .put("catalog_at", new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm",
+                  new java.util.Locale("tr", "TR")).format(new java.util.Date()))
               .put("delivery", "pickup");
       JSONArray products = new JSONArray();
       products.put(new JSONObject()
@@ -161,17 +162,17 @@ public final class DealerDeviceFixture extends Instrumentation {
       requireText("Ürün sepetinize eklendi.");
       click("‹ Katalog");
       click("Sepet (1)");
-      requireText("Tahmini toplam 50,00 TL");
+      requireText("Ürünler toplamı: 50,00 TL");
       check(new JSONObject(disk.read()).getJSONObject("favorites").has("p"),
           "Favorite not persisted");
       setText("Fixture Parça miktarı", "3");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       screenshot("cart-light");
       restart();
       settle("Yenile");
       // Named independent carts on the real device; the original cart stays canonical for the order flow.
       click("Sepet (1)");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       requireText("Sepetler");
       requireText("Sepet 1");
       requireText("Etkin sepet: Sepet 1");
@@ -189,18 +190,18 @@ public final class DealerDeviceFixture extends Instrumentation {
       requireText("Ürün sepetinize eklendi.");
       click("‹ Katalog");
       click("Sepet (1)");
-      requireText("Tahmini toplam 5,00 TL");
+      requireText("Ürünler toplamı: 5,00 TL");
       click("Sepet 1");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       requireText("Etkin sepet: Sepet 1");
       restart();
       settle("Yenile");
       click("Sepet (1)");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       requireText("Sepet 1");
       requireText("İkinci Sepet");
       click("İkinci Sepet");
-      requireText("Tahmini toplam 5,00 TL");
+      requireText("Ürünler toplamı: 5,00 TL");
       requireText("Etkin sepet: İkinci Sepet");
       click("Adlandır");
       dialogSetText("Sepet adı", "Tedarik Sepeti");
@@ -211,19 +212,19 @@ public final class DealerDeviceFixture extends Instrumentation {
       click("Sil");
       dialogClick("Sepeti sil");
       requireText("Etkin sepet: Sepet 1");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       main(() -> check(findButton("Tedarik Sepeti") == null, "Deleted cart still listed"));
       JSONObject stored = new JSONObject(disk.read());
       check(stored.getJSONObject("carts").length() == 0, "Deleted cart retained on disk");
       check(stored.getJSONObject("cart").getDouble("p") == 3, "Original cart was not restored");
       click("Sepet (1)");
-      requireText("Tahmini toplam 75,00 TL");
+      requireText("Ürünler toplamı: 75,00 TL");
       click("Siparişler");
       for (String label : new String[] {
                "Sipariş alındı", "Onaylandı", "Tamamlandı", "İptal edildi", "İşletmeye iletiliyor"})
         requireText(label);
       clickDescription("fixture-placed ürünlerini tekrar sepete ekle");
-      requireText("Tahmini toplam 100,00 TL");
+      requireText("Ürünler toplamı: 100,00 TL");
       // The synthetic UI fixture uses an intentionally invalid hostname. It must
       // never persist a new order without a real authenticated server quote.
       click("Siparişi gönder");
@@ -302,9 +303,9 @@ public final class DealerDeviceFixture extends Instrumentation {
       check(views(EditText.class).get(0).getText().toString().equals(link), "VIEW did not prefill the business connection");
       check(activity.getIntent().getData() == null, "Consumed intent retained data");
     });
-    setText("İşletme bağlantısı", "invalid"); click("İşletmeye bağlan");
-    requireText("İşletme için geçerli bir HTTPS bağlantısı girin.");
-    setText("İşletme bağlantısı", ""); screenshot("login-light");
+    setText("İşletmenin web adresi", ""); screenshot("login-light");
+    setText("İşletmenin web adresi", "invalid"); click("İşletmeye bağlan");
+    requireText("İşletmenin geçerli HTTPS web adresini girin.");
     main(() -> activity.onNewIntent(new Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, link)));
     waitForIdleSync();
     main(() -> check(views(EditText.class).get(0).getText().toString().equals(link), "SEND business connection not captured"));

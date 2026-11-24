@@ -118,7 +118,14 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange, refres
   return (
     <div className="market-two-column">
       <section className="market-panel">
-        <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
+        <header className="market-panel-heading">
+          <span>Stok</span>
+          <div className="market-inventory-heading-row">
+            <h2>Fiziksel Sayım</h2>
+            <StockReplenishmentPanel refreshRevision={refreshRevision} />
+          </div>
+          <p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p>
+        </header>
         {utilityAction}
         <label className="form-field form-field--fluid">
           Ürün
@@ -167,7 +174,6 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange, refres
           {movements.length === 0 && <p className="market-muted">Bu ürün için stok hareketi yok.</p>}
         </div>
       </section>
-      <StockReplenishmentPanel refreshRevision={refreshRevision}/>
     </div>
   );
 }

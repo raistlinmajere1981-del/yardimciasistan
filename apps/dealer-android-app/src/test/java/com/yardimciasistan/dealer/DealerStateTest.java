@@ -161,16 +161,39 @@ public class DealerStateTest {
       assertFalse(state.data.has("pending"));
     }
   }
-  @Test public void offlineCartAndCatalogPricesAreExplicitlyUnconfirmed() throws Exception {
+  @Test public void offlineCartKeepsCachedPricesWithoutPermanentWarning() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2);
     String pending = approved(state).toString();
     DealerState reopened = state();
     assertEquals(2, reopened.object("cart").getInt("p"));
     assertEquals(pending, reopened.object("pending").toString());
     String activity = java.nio.file.Files.readString(java.nio.file.Paths.get("src/main/java/com/yardimciasistan/dealer/DealerActivity.java"));
-    assertTrue(activity.contains("Kayıtlı fiyat (değişebilir)"));
+    assertFalse(activity.contains("Kayıtlı fiyat (değişebilir)"));
+    assertFalse(activity.contains("Fiyatlar işletme onayında güncellenebilir."));
+    assertTrue(activity.contains("DealerCheckout.displayedPricesDiffer(quote, state)"));
     assertTrue(activity.contains("Çevrimdışı sepet (salt okunur)"));
     assertTrue(activity.contains("if (!state.text(\"cookie\").isEmpty() && state.object(\"cart\").length() > 0)"));
+  }
+  @Test public void priceWarningOnlyWhenServerChangesVisibleProductPrice() throws Exception {
+    DealerState state = signedIn(); state.quantity("p", 2);
+    JSONObject quote = quoted(state);
+    JSONObject draft = state.draftOrder();
+    assertFalse(DealerCheckout.displayedPricesDiffer(
+        DealerCheckout.verifiedQuote(new JSONObject().put("ok", true).put("quote", quote), draft), state));
+    JSONObject changed = new JSONObject(quote.toString());
+    changed.getJSONArray("items").getJSONObject(0)
+        .put("unit_price_minor", 1350).put("line_total_minor", 2700);
+    changed.put("subtotal_minor", 2700).put("total_minor", 2700);
+    JSONObject reviewed = DealerCheckout.verifiedQuote(
+        new JSONObject().put("ok", true).put("quote", changed), draft);
+    assertTrue(DealerCheckout.displayedPricesDiffer(reviewed, state));
+    assertEquals("24.70", state.total().toPlainString()); // review never reprices local cart
+    assertFalse(state.data.has("pending")); // only explicit confirmation freezes an order
+    JSONObject differentCurrency = new JSONObject(quote.toString()).put("currency", "EUR");
+    assertTrue(DealerCheckout.displayedPricesDiffer(differentCurrency, state));
+    JSONObject deliveryOnly = new JSONObject(quote.toString())
+        .put("delivery_fee_minor", 400).put("total_minor", 2870);
+    assertFalse(DealerCheckout.displayedPricesDiffer(deliveryOnly, state));
   }
   @Test public void offlineCartAndFavoritesSurviveRestart() throws Exception {
     DealerState state = signedIn(); state.quantity("p", 2); state.quantity("q", 3); state.favorite("p");

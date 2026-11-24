@@ -12,6 +12,7 @@ function scenario_definitions(): array
         'pension_folio' => ['status' => 'setup', 'steps' => ['food_service.orders', 'accommodation.folio', 'core.finance']],
         'pension_language' => ['status' => 'setup', 'steps' => ['core.web', 'core.sync']],
         'pension_android' => ['status' => 'setup', 'steps' => ['core.devices', 'service.android', 'accommodation.folio']],
+        'pension_room_qr' => ['status' => 'setup', 'steps' => ['accommodation.rooms', 'accommodation.folio', 'core.web']],
         'rest_table' => ['status' => 'standard', 'steps' => ['food_service.tables', 'food_service.orders', 'commerce.sales', 'core.finance']],
         'rest_qr' => ['status' => 'setup', 'steps' => ['food_service.menu', 'channel.qr_menu', 'core.web']],
         'rest_booking' => ['status' => 'setup', 'steps' => ['customer.requests', 'food_service.reservations']],
@@ -19,8 +20,9 @@ function scenario_definitions(): array
         'rest_receipt' => ['status' => 'setup', 'steps' => ['commerce.sales', 'document.printing']],
         'market_sale' => ['status' => 'standard', 'steps' => ['retail.barcode', 'commerce.sales', 'commerce.inventory']],
         'market_purchasing' => ['status' => 'setup', 'steps' => ['retail.purchasing', 'commerce.inventory', 'retail.labels']],
+        'market_stock' => ['status' => 'setup', 'steps' => ['commerce.catalog', 'commerce.inventory', 'document.printing']],
         'market_credit' => ['status' => 'setup', 'steps' => ['commerce.sales', 'commerce.customer_credit', 'core.finance']],
-        'market_online' => ['status' => 'local', 'steps' => ['channel.online_sales', 'commerce.orders', 'core.web']],
+        'market_online' => ['status' => 'setup', 'steps' => ['channel.online_sales', 'commerce.orders', 'core.web']],
         'dealer_portal' => ['status' => 'setup', 'steps' => ['commerce.wholesale', 'integration.dealerPortal', 'commerce.orders']],
     ];
 }
@@ -28,10 +30,10 @@ function scenario_definitions(): array
 function scenario_sectors(): array
 {
     return [
-        'pension' => ['pension_request', 'pension_walkin', 'pension_language', 'pension_android'],
-        'pension_restaurant' => ['pension_request', 'pension_folio', 'rest_table', 'rest_qr', 'rest_benefit'],
+        'pension' => ['pension_request', 'pension_walkin', 'pension_room_qr', 'pension_language', 'pension_android'],
+        'pension_restaurant' => ['pension_request', 'pension_folio', 'pension_room_qr', 'rest_table', 'rest_qr', 'rest_benefit'],
         'restaurant' => ['rest_table', 'rest_qr', 'rest_booking', 'rest_benefit', 'rest_receipt'],
-        'market' => ['market_sale', 'market_purchasing', 'market_credit', 'market_online', 'dealer_portal'],
+        'market' => ['market_sale', 'market_purchasing', 'market_stock', 'market_credit', 'market_online', 'dealer_portal'],
         'all' => ['pension_request', 'rest_table', 'market_sale', 'dealer_portal'],
     ];
 }

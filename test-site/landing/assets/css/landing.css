@@ -133,6 +133,16 @@ section[id], article[id], details[id] { scroll-margin-top: 105px; }
 .card-symbol .line-icon { width: 19px; height: 19px; }
 .capability-benefit { color: var(--ink-secondary); font-size: 14px; line-height: 1.65; min-height: 4.95em; font-weight: 400; }
 .capability-card[open] .capability-benefit { display: none; }
+/* Informational child features inherit the owner card's profile visibility. */
+.capability-subfeatures { display: flex; flex-wrap: wrap; gap: 5px; }
+.capability-subfeatures > span { display: inline-flex; align-items: center; padding: 4px 7px; border: 1px solid var(--group-line); background: var(--group-tint); border-radius: 6px; color: var(--group-ink); font-size: 11px; line-height: 1.4; font-weight: 550; }
+.capability-card[open] .capability-subfeatures { display: none; }
+.capability-feature-details { margin-bottom: 17px; }
+.capability-feature-details > strong { color: var(--ink); font-size: 12px; }
+.capability-feature-details ul { margin: 9px 0 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.capability-feature-details li { border-inline-start: 2px solid var(--group-line); padding-inline-start: 10px; }
+.capability-feature-details li b, .capability-feature-details li span { display: block; }
+.capability-feature-details li b { color: var(--ink); font-size: 12px; margin-bottom: 3px; }
 .capability-badges { display: flex; flex-wrap: wrap; gap: 5px; }
 .capability-badges > span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 5px; background: var(--group-tint); color: var(--group-ink); font-size: 10px; font-weight: 600; }
 .ai-mark .line-icon { width: 12px; height: 12px; }

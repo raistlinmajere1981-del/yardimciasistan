@@ -53,10 +53,12 @@ export function currentDesktopSchemaProblem(
     const expected = schemaObjects(canonical);
     const actual = schemaObjects(database);
 
-    // Retain useful missing-table/column diagnostics before checking full definitions.
+    // Exact DDL already fixes the column list. Inspect changed tables for a more specific diagnostic.
     for (const table of expected.values()) {
       if (table.type !== "table") continue;
-      if (!actual.has(`table:${table.name}`)) return `Eksik tablo: ${table.name}`;
+      const existing = actual.get(`table:${table.name}`);
+      if (!existing) return `Eksik tablo: ${table.name}`;
+      if (existing.sql === table.sql) continue;
       const columns = tableColumns(database, table.name);
       for (const columnName of tableColumns(canonical, table.name)) {
         if (!columns.has(columnName)) return `Eksik alan: ${table.name}.${columnName}`;

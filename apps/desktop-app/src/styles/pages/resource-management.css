@@ -94,6 +94,7 @@
 .room-media-panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   height: 100%;
 }
@@ -107,10 +108,6 @@
   border-start-start-radius: var(--radius-control);
   border-end-start-radius: var(--radius-control);
   background: var(--color-accent);
-}
-
-.room-media-panel {
-  min-width: 0;
 }
 
 .room-media-panel-header {
@@ -711,17 +708,11 @@
 @media (max-width: 760px) {
   .resource-management-header-actions { width: 100%; }
 }
-.settings-layout-overlay,
-.form-dialog.settings-layout-details-modal {
-  inset: 50% auto auto 50%;
-  margin: 0;
-  transform: translate(-50%, -50%);
-}
 .settings-layout-overlay {
   width: min(calc(88vw / var(--ui-scale)), 1120px);
   max-width: calc(100vw / var(--ui-scale) - 2 * var(--space-4));
-  height: auto;
-  max-height: calc(100dvh / var(--ui-scale) - 2 * var(--space-4));
+  height: fit-content;
+  max-height: max(0px, calc(var(--modal-canvas-height, 100dvh) - 2 * var(--space-4)));
   padding: 0;
 }
 .settings-layout-overlay[open] { display: flex; flex-direction: column; }
@@ -736,11 +727,11 @@
 .settings-layout-overlay [hidden] { display: none; }
 .form-dialog.settings-layout-details-modal {
   width: min(calc(720px / var(--ui-scale)), calc(100vw / var(--ui-scale) - 2 * var(--space-4)));
-  max-height: min(calc(80dvh / var(--ui-scale)), 700px);
+  max-height: min(700px, max(0px, calc(var(--form-canvas-height, 100dvh) - var(--space-4))));
   padding: 0;
 }
 .form-dialog.settings-layout-details-modal form {
-  max-height: min(calc(80dvh / var(--ui-scale)), 700px);
+  max-height: min(700px, max(0px, calc(var(--form-canvas-height, 100dvh) - var(--space-4))));
 }
 @media (max-width: 820px) {
   .settings-layout-overlay .resource-management-shell { height: auto; min-height: 0; }

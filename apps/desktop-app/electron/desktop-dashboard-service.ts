@@ -46,6 +46,12 @@ export function createDesktopDashboardData(
     getActiveResourceReservationTitles(db, "table")
   );
   const menu = getPublishedMenu(db, true);
+  const roomCounts = db.prepare(`
+    SELECT COUNT(*) FILTER (WHERE status = 'available') AS availableRooms,
+           COUNT(*) AS totalRooms
+    FROM rooms
+    WHERE is_active = 1 AND deleted_at = ''
+  `).get() as { availableRooms: number; totalRooms: number };
 
   return {
     revision: ++dashboardRevision,
@@ -83,14 +89,7 @@ export function createDesktopDashboardData(
         db,
         "SELECT COUNT(*) as count FROM daily_tasks WHERE status = 'pending' AND deleted_at = ''"
       ),
-      availableRooms: getScalarCount(
-        db,
-        "SELECT COUNT(*) as count FROM rooms WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"
-      ),
-      totalRooms: getScalarCount(
-        db,
-        "SELECT COUNT(*) as count FROM rooms WHERE is_active = 1 AND deleted_at = ''"
-      ),
+      ...roomCounts,
       availableTables: getScalarCount(
         db,
         "SELECT COUNT(*) as count FROM tables WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"

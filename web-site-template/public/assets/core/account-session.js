@@ -20,6 +20,16 @@
     emit();
     return state;
   }
+  function acceptAccount(profile, reason) {
+    const changed = identity(state.account) !== identity(profile);
+    const hadAccount = Boolean(state.account);
+    const account = Object.freeze({...profile, methods: Object.freeze([...(profile.methods || [])]),
+      dealer: profile.dealer ? Object.freeze({...profile.dealer}) : null});
+    state = Object.freeze({status:'authenticated', account, generation:state.generation + Number(changed), reason});
+    emit();
+    if (changed && hadAccount) broadcast('changed');
+    return state;
+  }
   function block() {
     blocked = true; logoutPending = true;
     loginSucceeded = false;
@@ -65,12 +75,7 @@
         }
         if (started !== state.generation || blocked || document.hidden) return state;
         if (!result.account || typeof result.account.id !== 'string') throw new Error('account_unavailable');
-        const changed = identity(state.account) !== identity(result.account);
-        const hadAccount = Boolean(state.account);
-        const account = Object.freeze({...result.account, methods: Object.freeze([...(result.account.methods || [])]), dealer: result.account.dealer ? Object.freeze({...result.account.dealer}) : null});
-        state = Object.freeze({status: 'authenticated', account, generation: state.generation + Number(changed), reason:'verified'});
-        emit();
-        if (changed && hadAccount) broadcast('changed');
+        acceptAccount(result.account, 'verified');
       } catch (error) {
         if (started === state.generation) clear(error.status === 401 ? 'guest' : 'unavailable');
       }
@@ -105,11 +110,16 @@
       if (file === 'login') loginInProgress = false;
     }
   }
-  function unlock() {
+  function unlock(loginResult) {
     if (!loginSucceeded) return;
     blocked = false; logoutPending = false; loginSucceeded = false;
     try { sessionStorage.removeItem(blockKey); } catch {}
-    clear('guest');
+    // A successful same-origin login already carries an authenticated profile.
+    // Accept it atomically; waiting for another session GET can leave the UI
+    // on the guest form when the second request is delayed or fails.
+    if (loginResult?.account && typeof loginResult.account.id === 'string')
+      acceptAccount(loginResult.account, 'login');
+    else clear('guest');
     broadcast('changed');
   }
   async function logout(all = false) {

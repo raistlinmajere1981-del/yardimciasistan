@@ -167,3 +167,26 @@ test('browser login waits for a guest refresh and blocks concurrent session rota
   assert.equal(f.owner.state.account.dealer.access_id, 'dealer-a');
   assert.equal(rotations, 2, 'only completed guest session checks may rotate cookies');
 });
+
+
+test('successful login response immediately establishes verified identity without another session GET', async () => {
+  let sessions = 0, logins = 0;
+  const profile = account({access_id: 'dealer-a', display_name: 'Verified dealer'});
+  const f = fixture(async url => {
+    if (url.pathname.endsWith('/session.php')) { sessions++; return response(401, {ok:false, code:'login_required'}); }
+    if (url.pathname.endsWith('/refresh.php')) return response(401, {ok:false, code:'login_required'});
+    if (url.pathname.endsWith('/login.php')) { logins++; return response(200, {ok:true, account:profile}); }
+    throw new Error('unexpected account endpoint');
+  });
+  await f.owner.ready;
+  assert.equal(f.owner.state.status, 'guest');
+  const before = sessions;
+  const result = await f.owner.request('login', {email:'a@example.test'});
+  f.owner.unlock(result);
+  assert.equal(logins, 1);
+  assert.equal(sessions, before, 'successful login must not need a second session fetch');
+  assert.equal(f.owner.state.status, 'authenticated');
+  assert.equal(f.owner.state.account.email, 'a@example.test');
+  assert.equal(f.owner.state.account.dealer.access_id, 'dealer-a');
+  assert.ok(Object.isFrozen(f.owner.state.account));
+});

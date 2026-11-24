@@ -425,7 +425,6 @@
 }
 
 @media (max-width: 760px) {
-
   .customer-messages-workspace .message-mode-switch {
     width: 100%;
   }
@@ -436,14 +435,6 @@
 
   .message-recipient-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .whatsapp-view-safe .whatsapp-request-panel {
-    min-height: 0;
-  }
-
-  .whatsapp-view-safe .whatsapp-copy-panel {
-    min-height: 0;
   }
 }
 

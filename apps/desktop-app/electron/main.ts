@@ -692,8 +692,8 @@ function registerIpcHandlers() {
     saveInitial: saveInitialSetupFromRenderer,
     finalizeDeviceMutation: finalizeAndroidDeviceMutation,
     assertRequestType: assertDesktopRequestType,
-    finalizeRecordDeletion: finalizeDesktopRecordDeletion,
-    finalizeCustomerMutation: finalizeDesktopCustomerMutation,
+    finalizeRecordDeletion: finalizeDesktopOperationMutation,
+    finalizeCustomerMutation: finalizeDesktopOperationMutation,
     finalizeCheckInMutation: finalizeDesktopCheckInMutation,
     finalizeCheckoutMutation: finalizeDesktopCheckoutMutation,
     finalizeRoomChangeMutation: finalizeDesktopRoomChangeMutation,
@@ -802,17 +802,7 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
   return result;
 }
 
-function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
-  if (result.ok) {
-    markLocalCompanionSnapshotDirty();
-    getDatabase().queueSyncJob("android_snapshot");
-    notifyDesktopDashboardChanged(result.dashboardData);
-    getSyncCoordinator().scheduleSoon();
-  }
-  return result;
-}
-
-function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
+function finalizeDesktopOperationMutation<T extends DesktopStatusUpdateResult>(result: T): T {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
     getDatabase().queueSyncJob("android_snapshot");
@@ -830,16 +820,6 @@ function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopSt
     if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
       getDatabase().queueSyncJob("menu_publish");
     }
-    getSyncCoordinator().scheduleSoon();
-  }
-  return result;
-}
-
-function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult): DesktopCustomerMutationResult {
-  if (result.ok) {
-    markLocalCompanionSnapshotDirty();
-    getDatabase().queueSyncJob("android_snapshot");
-    notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
   return result;
@@ -888,7 +868,7 @@ function finalizeDesktopHospitalityMutation(
     }
   }
 
-  return finalizeDesktopCustomerMutation(result);
+  return finalizeDesktopOperationMutation(result);
 }
 
 function scheduleRoomQrArrivalPrint(stayId: string) {

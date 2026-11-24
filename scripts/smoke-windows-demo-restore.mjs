@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
+import { prepareDemoZipFixtures } from "./test-helpers/demo-zip-fixtures.mjs";
 
 const require = createRequire(import.meta.url);
 const root = fs.mkdtempSync(path.join(fs.existsSync("/tmp/opencode") ? "/tmp/opencode" : os.tmpdir(), "windows-demo-restore-"));
@@ -95,25 +96,9 @@ try {
   const list = () => maintenance.handlers.get("dataMaintenance:listBackups")();
   assert.equal(list().ok, true);
   assert.equal(list().backups.length, 0, "empty list before extracting demo");
-  const version = JSON.parse(fs.readFileSync("product-version.json", "utf8")).version;
-  const packagedManifestPath = path.resolve("artifacts/demo-data/demo-data-manifest.json");
-  const packagedManifest = fs.existsSync(packagedManifestPath)
-    ? JSON.parse(fs.readFileSync(packagedManifestPath, "utf8"))
-    : null;
-  const packaged = packagedManifest?.packages?.find(item => item.id === "a-pension-restaurant");
-  const packagedZip = packaged?.zipFile ? path.resolve("artifacts/demo-data", packaged.zipFile) : "";
-  const packagedHasCovers = (packaged?.media?.counts?.roomCovers ?? 0) >= 4
-    && (packaged?.media?.counts?.tableCovers ?? 0) >= 6;
-  // Release artifacts are ignored by Git. On clean checkouts, a later schema or
-  // an older package without room/table covers, generate the real demo package
-  // locally instead of depending on uploaded ZIPs.
-  let zip = packagedZip;
-  if (process.env.YA_SMOKE_REGENERATE_DEMO === "1" || version !== "2.2.0" || !packagedHasCovers || !zip || !fs.existsSync(zip)) {
-    const generatedRoot = path.join(root, "generated-demo");
-    run(process.execPath, ["scripts/demo-data/generate-demo-data.mjs", "--output", generatedRoot]);
-    const manifest = JSON.parse(fs.readFileSync(path.join(generatedRoot, "demo-data-manifest.json"), "utf8"));
-    zip = path.join(generatedRoot, manifest.packages.find(item => item.id === "a-pension-restaurant").zipFile);
-  }
+  const [zip] = prepareDemoZipFixtures(["a-pension-restaurant"], {
+    regenerate: process.env.YA_SMOKE_REGENERATE_DEMO === "1"
+  });
   run("unzip", ["-q", zip, "-d", backupRoot]);
   const first = list();
   assert.equal(first.ok, true);

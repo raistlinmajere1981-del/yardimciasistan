@@ -5,14 +5,21 @@
 }
 @media (max-width: 760px) {
   :root { --page-padding: var(--space-3); --panel-padding: var(--space-4); }
-  .page-header { flex-wrap: wrap; gap: var(--space-2); }
-  .page-header__main { grid-template-columns: minmax(0, 1fr); }
+  .page-header__main { grid-template-columns: minmax(0, 1fr) max-content; }
   .page-header-copy { grid-column: 1; grid-row: 1; }
-  .page-header__actions { grid-column: 1; grid-row: 2; width: 100%; justify-self: stretch; }
-  .page-header__notice { grid-column: 1; grid-row: 3; }
-  .page-header-tools { justify-content: flex-start; }
+  .page-header__actions { grid-column: 2; grid-row: 1; width: auto; justify-self: end; }
+  .page-header__notice { grid-column: 1 / -1; grid-row: 2; }
+  .page-header-tools { justify-content: flex-end; }
   .page-header-eyebrow, .page-header__subtitle { display: none; }
   .page-header-title-row { flex-wrap: wrap; }
   .page-toolbar { align-items: stretch; flex-direction: column; }
   .page-toolbar__actions { margin-inline-start: 0; justify-content: flex-start; }
+}
+
+/* Only the very narrow shell uses a third header row; preserve access to every tool. */
+@media (max-width: 620px) {
+  .page-header__main { grid-template-columns: minmax(0, 1fr); }
+  .page-header__actions { grid-column: 1; grid-row: 2; width: 100%; justify-self: stretch; }
+  .page-header__notice { grid-column: 1; grid-row: 3; }
+  .page-header-tools { justify-content: flex-start; }
 }

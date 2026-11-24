@@ -3,7 +3,9 @@ import { ClipboardList, Download, Printer, RefreshCw } from "lucide-react";
 import type { PrintStockReplenishmentInput } from "@yardimci-asistan/shared";
 import type { StockReplenishmentRow } from "../../../electron/stock-replenishment";
 import { ActionButton } from "../ui/ActionButton";
+import { IconButton } from "../ui/IconButton";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
+import { DetailWorkspaceLayout } from "../workspace/DetailWorkspaceLayout";
 
 const collator = new Intl.Collator("tr-TR", { numeric: true, sensitivity: "base" });
 type Sort = "deficit" | "name" | "category";
@@ -11,12 +13,12 @@ type Sort = "deficit" | "name" | "category";
 /** Read-only purchasing projection. Never creates an order or inventory movement. */
 export function StockReplenishmentPanel({ refreshRevision = 0 }: { refreshRevision?: number }) {
   const [open, setOpen] = useState(false);
-  return <section className="market-panel market-stock-replenishment-launcher" aria-label="İdeal stok planlama">
-    <div><header className="market-panel-heading"><span>Satın Alma Planlama</span><h2>İdeal Stok Eksikleri</h2></header>
-      <p className="market-muted">İdeal stok ihtiyaçlarını inceleyin, seçin, CSV olarak alın veya Baskı Yönetimi üzerinden yazdırın.</p></div>
-    <ActionButton onClick={() => setOpen(true)}><ClipboardList size={17} aria-hidden="true"/> İhtiyaç listesini aç</ActionButton>
+  return <>
+    <ActionButton size="sm" onClick={() => setOpen(true)}>
+      <ClipboardList size={16} aria-hidden="true" /> İhtiyaç listesini aç
+    </ActionButton>
     {open && <StockReplenishmentWorkspace refreshRevision={refreshRevision} onClose={() => setOpen(false)} />}
-  </section>;
+  </>;
 }
 
 export function stockReplenishmentCsv(rows: StockReplenishmentRow[]): string {
@@ -59,16 +61,25 @@ function StockReplenishmentWorkspace({ refreshRevision, onClose }: { refreshRevi
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [refreshRevision, reload]);
-  const categories = useMemo(() => Array.from(new Map(rows.map(row => [row.categoryId, { id: row.categoryId, name: row.categoryName }])).values())
-    .sort((a, b) => collator.compare(a.name, b.name)), [rows]);
+  const categories = useMemo(() => {
+    const counts = new Map<string, { id: string; name: string; count: number }>();
+    for (const row of rows) {
+      const item = counts.get(row.categoryId);
+      if (item) item.count += 1;
+      else counts.set(row.categoryId, { id: row.categoryId, name: row.categoryName, count: 1 });
+    }
+    return [...counts.values()].sort((a, b) => collator.compare(a.name, b.name));
+  }, [rows]);
+  const activeCategoryId = categoryId && categories.some(item => item.id === categoryId) ? categoryId : "";
+  const activeCategoryName = categories.find(item => item.id === activeCategoryId)?.name ?? "Tüm kategoriler";
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("tr-TR");
-    return rows.filter(row => (!categoryId || row.categoryId === categoryId)
+    return rows.filter(row => (!activeCategoryId || row.categoryId === activeCategoryId)
       && (!term || (row.name + " " + row.sku + " " + row.categoryName).toLocaleLowerCase("tr-TR").includes(term)))
       .sort((a, b) => sort === "deficit" ? b.suggestedQuantity - a.suggestedQuantity || collator.compare(a.name, b.name)
         : sort === "name" ? collator.compare(a.name, b.name)
           : collator.compare(a.categoryName, b.categoryName) || collator.compare(a.name, b.name));
-  }, [rows, categoryId, search, sort]);
+  }, [rows, activeCategoryId, search, sort]);
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pages);
   const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -100,7 +111,7 @@ function StockReplenishmentWorkspace({ refreshRevision, onClose }: { refreshRevi
     if (!list.length) return;
     downloadCsv(list, name); setMessage(String(list.length) + " satırlık CSV hazırlandı.");
   };
-  return <WorkspaceFrame presentation="centered" className="stock-replenishment-workspace" bodyScroll="panes"
+  return <WorkspaceFrame presentation="centered" className="stock-replenishment-workspace detail-workspace-frame" bodyScroll="panes"
     title="İdeal Stok İhtiyaç Listesi" onClose={onClose} closeBlocked={printing}
     headerSummary={String(rows.length) + " eksik ürün"}
     footer={<>
@@ -114,58 +125,74 @@ function StockReplenishmentWorkspace({ refreshRevision, onClose }: { refreshRevi
       </div>
     </>}>
     <div className="stock-replenishment__content">
-      <div className="stock-replenishment__intro">
-        <p>Önerilen miktar = ideal stok − mevcut stok. Minimum stok yalnız uyarı eşiğidir; bu liste sipariş veya stok hareketi oluşturmaz.</p>
-        <ActionButton variant="secondary" disabled={loading || printing} onClick={() => setReload(n => n + 1)}><RefreshCw size={16}/> Yenile</ActionButton>
-      </div>
-      <div className="stock-replenishment__toolbar">
-        <label>Kategori<select aria-label="İhtiyaç kategorisi" value={categoryId} onChange={e => filter(() => setCategoryId(e.target.value))}>
-          <option value="">Tüm kategoriler</option>{categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select></label>
-        <label className="stock-replenishment__search">Ara<input aria-label="İhtiyaçlarda ara" value={search} onChange={e => filter(() => setSearch(e.target.value))} placeholder="Ürün, SKU veya kategori" /></label>
-        <label>Sıralama<select aria-label="İhtiyaç sıralaması" value={sort} onChange={e => filter(() => setSort(e.target.value as Sort))}>
-          <option value="deficit">En çok ihtiyaç</option><option value="name">Ürün adı</option><option value="category">Kategori</option>
-        </select></label>
-        <label>Sayfa boyutu<select aria-label="Sayfadaki ürün" value={pageSize} onChange={e => filter(() => setPageSize(Number(e.target.value) as 25 | 50 | 100))}>
-          {[25, 50, 100].map(value => <option value={value} key={value}>{value} ürün</option>)}
-        </select></label>
-      </div>
-      <div className="stock-replenishment__selection">
-        <ActionButton size="sm" variant="secondary" disabled={!pageRows.length || printing} onClick={() => select(pageRows.map(row => row.productId), !allOnPage)}>
-          {allOnPage ? "Bu sayfanın seçimini kaldır" : "Bu sayfayı seç"}
-        </ActionButton>
-        <ActionButton size="sm" variant="secondary" disabled={!filtered.length || printing} onClick={() => select(filtered.map(row => row.productId), !allFiltered)}>
-          {allFiltered ? "Filtre seçimini kaldır" : "Filtre sonucunu seç (" + String(filtered.length) + ")"}
-        </ActionButton>
-        <ActionButton size="sm" variant="ghost" disabled={!selectedIds.size || printing} onClick={() => setSelectedIds(new Set())}>Seçimi temizle</ActionButton>
-        <span className="market-muted">{selectedIds.size} ürün seçili</span>
-      </div>
-      {error && <p role="alert" className="stock-replenishment__notice">{error}</p>}
-      {message && <p role="status" className="stock-replenishment__notice">{message}</p>}
-      <div className="stock-replenishment__table-scroll">
-        <table className="stock-replenishment__table">
-          <thead><tr><th scope="col">Seç</th><th scope="col">Kategori</th><th scope="col">Ürün / SKU</th><th scope="col">Mevcut</th><th scope="col">Minimum</th><th scope="col">İdeal</th><th scope="col">İhtiyaç</th></tr></thead>
-          <tbody>{pageRows.map(row => <tr key={row.productId} data-selected={selectedIds.has(row.productId)}>
-            <td><input type="checkbox" aria-label={row.name + " seç"} checked={selectedIds.has(row.productId)} disabled={printing} onChange={event => select([row.productId], event.target.checked)}/></td>
-            <td>{row.categoryName}</td><td><strong>{row.name}</strong><small>{row.sku || "SKU yok"}</small></td>
-            <td>{row.quantity} <small>{row.unit}</small></td><td>{row.minimumQuantity}</td><td>{row.idealQuantity}</td>
-            <td className="stock-replenishment__need"><strong>{row.suggestedQuantity}</strong> <small>{row.unit}</small></td>
-          </tr>)}</tbody>
-        </table>
-        {loading && <p role="status" className="stock-replenishment__empty">Stok önerileri hesaplanıyor…</p>}
-        {!loading && !error && !filtered.length && <p className="stock-replenishment__empty">{rows.length ? "Arama ve kategoriye uygun ürün yok." : "İdeal stok altında ürün bulunmuyor. Ürün kartında ideal stok miktarı belirleyebilirsiniz."}</p>}
-      </div>
-      <div className="stock-replenishment__pagination">
-        <span className="market-muted">{filtered.length ? String((currentPage - 1) * pageSize + 1) + "–" + String(Math.min(currentPage * pageSize, filtered.length)) + " / " + String(filtered.length) + " ürün" : "0 ürün"}</span>
-        <div className="stock-replenishment__pages">
-          <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(1)}>İlk</ActionButton>
-          <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(n => Math.max(1, n - 1))}>Önceki</ActionButton>
-          <span aria-label="Sayfa numarası">{currentPage} / {pages}</span>
-          <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(n => Math.min(pages, n + 1))}>Sonraki</ActionButton>
-          <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(pages)}>Son</ActionButton>
-        </div>
-      </div>
-      <p className="market-muted stock-replenishment__print-note">Yazıcı ve yazdırma onayı: Ayarlar → Baskı Yönetimi → Stok ihtiyaç listesi. Yazdırılan belge, baskı anındaki güncel stoktan hazırlanır.</p>
+      <DetailWorkspaceLayout className="stock-replenishment__layout" railLabel="İhtiyaç kategorileri" contentLabel="İhtiyaç ürünleri"
+        rail={<section className="panel stock-replenishment__category-panel">
+          <header className="detail-section-card__heading"><h3>Kategoriler</h3><span className="market-muted">{categories.length}</span></header>
+          <nav className="stock-replenishment__category-list" aria-label="İhtiyaç kategorileri">
+            <button type="button" className="stock-replenishment__category-button" aria-pressed={!activeCategoryId}
+              onClick={() => filter(() => setCategoryId(""))}>
+              <span>Tüm kategoriler</span><span className="stock-replenishment__category-count">{rows.length}</span>
+            </button>
+            {categories.map(item => <button type="button" key={item.id} className="stock-replenishment__category-button"
+              aria-pressed={activeCategoryId === item.id} onClick={() => filter(() => setCategoryId(item.id))}>
+              <span>{item.name}</span><span className="stock-replenishment__category-count">{item.count}</span>
+            </button>)}
+          </nav>
+        </section>}>
+        <section className="panel stock-replenishment__results-panel">
+          <header className="detail-section-card__heading stock-replenishment__results-heading">
+            <h3>{activeCategoryName}</h3><span className="market-muted">{filtered.length} ürün</span>
+          </header>
+          <div className="stock-replenishment__toolbar">
+            <label className="stock-replenishment__search">Ara<input aria-label="İhtiyaçlarda ara" value={search} onChange={e => filter(() => setSearch(e.target.value))} placeholder="Ürün, SKU veya kategori" /></label>
+            <label>Sıralama<select aria-label="İhtiyaç sıralaması" value={sort} onChange={e => filter(() => setSort(e.target.value as Sort))}>
+              <option value="deficit">En çok ihtiyaç</option><option value="name">Ürün adı</option><option value="category">Kategori</option>
+            </select></label>
+            <label>Sayfa boyutu<select aria-label="Sayfadaki ürün" value={pageSize} onChange={e => filter(() => setPageSize(Number(e.target.value) as 25 | 50 | 100))}>
+              {[25, 50, 100].map(value => <option value={value} key={value}>{value} ürün</option>)}
+            </select></label>
+          </div>
+          <div className="stock-replenishment__selection">
+            <ActionButton size="sm" variant="secondary" disabled={!pageRows.length || printing} onClick={() => select(pageRows.map(row => row.productId), !allOnPage)}>
+              {allOnPage ? "Bu sayfanın seçimini kaldır" : "Bu sayfayı seç"}
+            </ActionButton>
+            <ActionButton size="sm" variant="secondary" disabled={!filtered.length || printing} onClick={() => select(filtered.map(row => row.productId), !allFiltered)}>
+              {allFiltered ? "Filtre seçimini kaldır" : "Filtre sonucunu seç (" + String(filtered.length) + ")"}
+            </ActionButton>
+            <ActionButton size="sm" variant="ghost" disabled={!selectedIds.size || printing} onClick={() => setSelectedIds(new Set())}>Seçimi temizle</ActionButton>
+            <span className="market-muted">{selectedIds.size} ürün seçili</span>
+            <IconButton variant="normal" aria-label="İhtiyaç listesini yenile" title="Yenile"
+              disabled={loading || printing} onClick={() => setReload(n => n + 1)}>
+              <RefreshCw size={17} aria-hidden="true" />
+            </IconButton>
+          </div>
+          {error && <p role="alert" className="stock-replenishment__notice">{error}</p>}
+          {message && <p role="status" className="stock-replenishment__notice">{message}</p>}
+          <div className="stock-replenishment__table-scroll">
+            <table className="stock-replenishment__table">
+              <thead><tr><th scope="col">Seç</th><th scope="col">Kategori</th><th scope="col">Ürün / SKU</th><th scope="col">Mevcut</th><th scope="col">Minimum</th><th scope="col">İdeal</th><th scope="col">İhtiyaç</th></tr></thead>
+              <tbody>{pageRows.map(row => <tr key={row.productId} data-selected={selectedIds.has(row.productId)}>
+                <td><input type="checkbox" aria-label={row.name + " seç"} checked={selectedIds.has(row.productId)} disabled={printing} onChange={event => select([row.productId], event.target.checked)}/></td>
+                <td>{row.categoryName}</td><td><strong>{row.name}</strong><small>{row.sku || "SKU yok"}</small></td>
+                <td>{row.quantity} <small>{row.unit}</small></td><td>{row.minimumQuantity}</td><td>{row.idealQuantity}</td>
+                <td className="stock-replenishment__need"><strong>{row.suggestedQuantity}</strong> <small>{row.unit}</small></td>
+              </tr>)}</tbody>
+            </table>
+            {loading && <p role="status" className="stock-replenishment__empty">Stok önerileri hesaplanıyor…</p>}
+            {!loading && !error && !filtered.length && <p className="stock-replenishment__empty">{rows.length ? "Arama ve kategoriye uygun ürün yok." : "İdeal stok altında ürün bulunmuyor. Ürün kartında ideal stok miktarı belirleyebilirsiniz."}</p>}
+          </div>
+          <div className="stock-replenishment__pagination">
+            <span className="market-muted">{filtered.length ? String((currentPage - 1) * pageSize + 1) + "–" + String(Math.min(currentPage * pageSize, filtered.length)) + " / " + String(filtered.length) + " ürün" : "0 ürün"}</span>
+            <div className="stock-replenishment__pages">
+              <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(1)}>İlk</ActionButton>
+              <ActionButton size="sm" variant="secondary" disabled={currentPage === 1} onClick={() => setPage(n => Math.max(1, n - 1))}>Önceki</ActionButton>
+              <span aria-label="Sayfa numarası">{currentPage} / {pages}</span>
+              <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(n => Math.min(pages, n + 1))}>Sonraki</ActionButton>
+              <ActionButton size="sm" variant="secondary" disabled={currentPage === pages} onClick={() => setPage(pages)}>Son</ActionButton>
+            </div>
+          </div>
+        </section>
+      </DetailWorkspaceLayout>
     </div>
   </WorkspaceFrame>;
 }

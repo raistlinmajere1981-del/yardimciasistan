@@ -10,10 +10,11 @@ import { useCalendarPageController } from '../../apps/desktop-app/src/components
 import '../../apps/desktop-app/src/styles/index.css';
 // The test bridge deliberately returns heterogeneous fixture payloads.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const fixture=window as typeof window & {__marketingCall:(method:string,args:unknown[])=>Promise<any>; __notifyScheduleChanged?:()=>void; __notifyCampaignChanged?:()=>void; __setMarketingWebAvailable?:(enabled:boolean)=>void};
+const fixture=window as typeof window & {__marketingCall:(method:string,args:unknown[])=>Promise<any>; __notifyScheduleChanged?:()=>void; __notifyCampaignChanged?:()=>void; __notifyBusinessMessagingChanged?:()=>void; __setMarketingWebAvailable?:(enabled:boolean)=>void};
 const call=(method:string,...args:unknown[])=>fixture.__marketingCall(method,args);
-const scheduleListeners=new Set<()=>void>(), campaignListeners=new Set<()=>void>();
+const scheduleListeners=new Set<()=>void>(), campaignListeners=new Set<()=>void>(), messagingListeners=new Set<()=>void>();
 fixture.__notifyScheduleChanged=()=>scheduleListeners.forEach(f=>f()); fixture.__notifyCampaignChanged=()=>campaignListeners.forEach(f=>f());
+fixture.__notifyBusinessMessagingChanged=()=>messagingListeners.forEach(listener=>listener());
 window.yardimciDesktop={getMarketingStudio:()=>call('snapshot'),getMarketingChannels:()=>call('channels'),saveMarketingContent:input=>call('content',input),
   getMarketingShare:id=>call('share',id),saveMarketingShare:input=>call('saveShare',input),submitMarketingShare:(...args)=>call('submitShare',...args),
   uploadMarketingAssets:()=>call('upload'),manageMarketingAsset:(...args)=>call('asset',...args),generateMarketingAi:input=>call('ai',input),
@@ -22,6 +23,7 @@ window.yardimciDesktop={getMarketingStudio:()=>call('snapshot'),getMarketingChan
   listMessagingSegments:()=>call('segments'),saveMessagingSegment:input=>call('saveSegment',input),previewMessagingSegment:(...args)=>call('previewSegment',...args),
   listBusinessMessagingTemplates:()=>call('templates'),getMessagingCampaign:id=>call('campaign',id),prepareMessagingCampaign:id=>call('prepareCampaign',id),startMessagingCampaign:id=>call('startCampaign',id),pauseMessagingCampaign:id=>call('pauseCampaign',id),resumeMessagingCampaign:id=>call('resumeCampaign',id),cancelMessagingCampaign:id=>call('cancelCampaign',id),
   onMessagingCampaignsChanged:listener=>{campaignListeners.add(listener);return()=>campaignListeners.delete(listener);}, onMarketingSchedulesChanged:listener=>{scheduleListeners.add(listener);return()=>scheduleListeners.delete(listener);},
+  onBusinessMessagingChanged:listener=>{messagingListeners.add(listener);return()=>messagingListeners.delete(listener);},
   getMarketingAnalytics:range=>call('analytics',range),getMarketingPublicationAnalytics:id=>call('publicationAnalytics',id),getMarketingCampaignAnalytics:id=>call('campaignAnalytics',id),refreshMarketingPublicationMetrics:id=>call('refresh',id),
   testMarketingWebsiteConnection:()=>call('test')} as typeof window.yardimciDesktop;
 // This fixture supplies only the fields consumed by its calendar scenario.

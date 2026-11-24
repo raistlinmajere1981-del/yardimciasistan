@@ -63,6 +63,7 @@ const SMOKE_FILES = [
   "scripts/smoke-dealer-android-device.mjs",
   "scripts/smoke-market-pilot-web.mjs",
   "scripts/smoke-desktop-ui-family.mjs",
+  "scripts/smoke-responsive-shell.mjs",
   "scripts/smoke-public-translations.mjs",
   "scripts/smoke-public-translations-web.mjs",
   "scripts/smoke-public-translations-ui.mjs",
@@ -299,8 +300,8 @@ export const IGNORED_SMOKE_FILES = new Set([
 ]);
 
 const MANUAL_SMOKE_FILES = new Set([
-  // Requires prebuilt A/B/C ZIPs in artifacts/demo-data (generate-demo-data.mjs).
-  "scripts/smoke-backup-zip-import.mjs",
+  // Demo ZIP import regenerates/cache-validates its fixture independently;
+  // smoke-backup-zip-import now runs in full/release with build-desktop.
   // Native Electron PDF host check requires Linux utilities (pdfinfo/pdftotext).
   "scripts/smoke-document-output-pdf.mjs",
   "scripts/smoke-dealer-android-device.mjs",
@@ -382,7 +383,7 @@ const BASE_CHECKS = [
   check("image-inspector-browser", "Ortak fotoğraf motoru: responsive tarayıcı, Worker ve gizlilik", "node", ["packages/image-inspector/test/browser.mjs"], {
     phase: 50, domains: ["android", "web", "commerce"]
   }),
-  check("image-inspector-device-build", "Ortak fotoğraf motoru: Android cihaz test APK derlemesi", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "assembleDebug", "assembleDebugAndroidTest"], {
+  check("image-inspector-device-build", "Ortak fotoğraf motoru: Android cihaz test APK derlemesi", "node", ["scripts/run-android-gradle.mjs", "--dealer", "assembleDebug", "assembleDebugAndroidTest"], {
     phase: 27, domains: ["android"]
   }),
   check("image-inspector-distribution", "Ortak fotoğraf motoru: kaynak, Teknikel ve APK byte eşitliği", "node", ["packages/image-inspector/test/distribution.mjs", "../teknikel_web", "apps/dealer-android-app/build/outputs/apk/debug/yardimci-asistan-bayi-debug.apk"], {
@@ -391,10 +392,10 @@ const BASE_CHECKS = [
   check("image-inspector-device", "Ortak fotoğraf motoru: bağlı cihazda native WebView testi", "node", ["packages/image-inspector/test/device.mjs"], {
     phase: 50, manual: true, domains: ["android"], requires: ["image-inspector-device-build"]
   }),
-  check("dealer-android-tests", "Bayi Android birim testleri ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "lintDebug"], {
+  check("dealer-android-tests", "Bayi Android birim testleri ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "testDebugUnitTest", "lintDebug"], {
     phase: 27, domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
   }),
-  check("dealer-android-build", "Bayi Android birim testleri, APK ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "--offline", "testDebugUnitTest", "assembleDebug", "lintDebug"], {
+  check("dealer-android-build", "Bayi Android birim testleri, APK ve lint", "node", ["scripts/run-android-gradle.mjs", "--dealer", "testDebugUnitTest", "assembleDebug", "lintDebug"], {
     phase: 27, presets: ["full"], domains: ["android", "commerce", "dealer-access"], requires: ["version-check"]
   }),
   check("android-ui-parity-v16", "Yerel Android V16 tasarım eşitliği tarayıcı kontrolü", "node", [".superdesign/android-companion/redesign-pixco-stitch-v1/test-parity-v16.cjs"], {
@@ -784,6 +785,7 @@ function smokeRequires(file) {
   // Own disposable native fixture build; does not consume the customer APK or Desktop.
   if (file === "scripts/smoke-android-native-ui-family.mjs") return [];
   if (file === "scripts/smoke-desktop-ui-family.mjs") return [];
+  if (file === "scripts/smoke-responsive-shell.mjs") return [];
   if (file === "scripts/smoke-market-pilot-web.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-public-translations-web.mjs") return ["build-desktop", "build-demo", "php-lint"];
   if (file.startsWith("scripts/smoke-public-translations")) return ["build-desktop"];
@@ -822,6 +824,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-responsive-shell.mjs") return ["desktop", "settings", "platform"];
   if (/^scripts\/smoke-(ai-connection-cancel|backup-zip-import|teknikel-shipping-repair)(-ui)?\.mjs$/.test(file)) return ["desktop", "settings"];
   if (file === "scripts/smoke-service-prerequisites.mjs" || file === "scripts/smoke-service-tiles-ui.mjs") return ["desktop", "settings"];
   if (file === "scripts/smoke-print-management-ui.mjs") return ["desktop", "settings"];

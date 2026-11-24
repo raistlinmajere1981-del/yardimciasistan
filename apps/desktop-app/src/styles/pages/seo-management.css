@@ -18,7 +18,6 @@
   scrollbar-gutter: stable;
 }
 .seo-management__pages { border-right: 1px solid var(--color-border); }
-.seo-management__preview { border-left: 1px solid var(--color-border); }
 .seo-management__editor { display: flex; flex-direction: column; gap: var(--space-3); background: var(--color-bg-surface); }
 .seo-management h3, .seo-management h4 { margin: 0; color: var(--color-shell-ink); font-size: var(--text-sm); }
 .seo-management__pages h3 { margin-bottom: var(--space-2); }
@@ -77,7 +76,12 @@
 .seo-management__suggestion p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .seo-management__suggestion strong { font-size: var(--text-sm); overflow-wrap: anywhere; }
 .seo-management__suggestion .action-button { justify-self: start; }
-.seo-management__preview { display: flex; flex-direction: column; gap: var(--space-3); }
+.seo-management__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
 .seo-management__preview-block { display: grid; gap: var(--space-2); min-width: 0; }
 .seo-management__eyebrow { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
 .seo-management__search-preview, .seo-management__social-preview {
@@ -129,6 +133,6 @@
   .seo-management__pages .action-button { flex: 0 0 8rem; margin: 0; }
   .seo-management__editor-heading { flex-wrap: wrap; }
   .seo-management__language { flex: 1 1 12rem; }
-  .seo-management__editor { padding: var(--space-2); }
+  .seo-management__editor,
   .seo-management__preview { padding: var(--space-2); }
 }

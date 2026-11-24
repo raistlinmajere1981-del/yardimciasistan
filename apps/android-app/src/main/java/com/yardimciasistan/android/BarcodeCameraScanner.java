@@ -134,7 +134,7 @@ final class BarcodeCameraScanner {
     statusView = UiKit.text(
         activity,
         qrMode ? "Kamerayı masaüstündeki eşleştirme QR koduna doğrultun." : continuous
-            ? "Kamerayı ürün barkoduna doğrultun. Okunan ürünler masaüstüne otomatik gönderilir."
+            ? "" // Kasa modunda yalnız gerçek okuma/hata geri bildirimi gösterilir.
             : "Kamerayı barkoda doğrultun. Barkod algılandığında otomatik devam edilir.",
         12,
         UiKit.SECONDARY,

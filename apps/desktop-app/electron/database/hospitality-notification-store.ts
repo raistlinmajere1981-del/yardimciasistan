@@ -72,12 +72,8 @@ export function getHospitalityNotifications(db: DatabaseSync, customerIds?: stri
 }
 
 export function getKbsOverview(db: DatabaseSync): DesktopKbsOverview {
-  const settingsTable = db.prepare(
-    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'kbs_service_settings' LIMIT 1"
-  ).get();
-  const settings = settingsTable
-    ? db.prepare("SELECT * FROM kbs_service_settings WHERE id = 'primary' LIMIT 1").get() as Record<string, unknown> | undefined
-    : undefined;
+  const settings = db.prepare("SELECT * FROM kbs_service_settings WHERE id = 'primary' LIMIT 1")
+    .get() as Record<string, unknown> | undefined;
   const provider = settings?.provider === "jandarma" ? "jandarma" : "egm";
   const enabled = Number(settings?.enabled ?? 0) === 1;
   const configured = enabled && Boolean(

@@ -1,3 +1,5 @@
+# Admin Kurulum Anahtarları — güncel kullanım
+
 ## Web bağlantı anahtarlarını yönetme
 
 Admin → Kurulumlar → bir işletme seçildiğinde ilgili web modülü anahtarı
@@ -11,8 +13,9 @@ yükleme loglarına, test raporlarına, Git'e veya herkese açık web sitesine y
 - BlackSea: `blacksea_web/.deploy/yardimci-asistan-install-info.txt`
   otomatik okunur. Bu yerel kayıt **canlı doğrulama değildir**; yerel
   saklanan anahtarla çelişirse mevcut anahtar otomatik değiştirilmez.
-  Natro FTP bağlantısı şifreli olmadığı için panel web secret'ını FTP
-  üzerinden çekmez. Gerekirse mevcut elle değiştirme alanı kullanılabilir.
+  BlackSea dağıtımında doğrulanmış FTPS kullanılır; Admin paneli buna
+  rağmen web secret'ını otomatik uzak sunucudan almaz. Gerekirse mevcut elle
+  değiştirme alanı kullanılabilir.
 - SSH/kurulum dosyası okunamıyorsa kayıt korunur. Panel güncelliği
   doğrulayamadığını belirtir; hatalı bir anahtar uydurmaz.
 

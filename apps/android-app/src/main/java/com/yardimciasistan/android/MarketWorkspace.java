@@ -215,20 +215,40 @@ final class MarketWorkspace {
     // Avoid repeating the same label in the content area.
     feedback.addPendingState(page);
 
+    Button cashBarcode = null;
     if (MarketUiRules.canScanToDesktop(data)) {
-      Button cashBarcode = UiKit.button(context, "▣  Kasa Barkod Modu", UiKit.PRIMARY,
+      cashBarcode = UiKit.button(context, "▣  Kasa Barkod Modu", UiKit.PRIMARY,
           view -> openCashBarcodeMode());
       cashBarcode.setContentDescription("Telefonu masaüstü kasası için sürekli barkod okuyucu olarak kullan");
-      ui.sizeButton(cashBarcode, 58, 0, 12);
-      page.addView(cashBarcode);
     }
-
+    Button barcode = null;
     if (MarketUiRules.canScanBarcode(data)) {
-      Button barcode = UiKit.button(context, "▣  Barkod Tara", UiKit.PRIMARY,
+      barcode = UiKit.button(context, "▣  Barkod Tara", UiKit.PRIMARY,
           view -> showBarcodeEntry(PURPOSE_LOOKUP));
       barcode.setContentDescription("Barkod tara veya barkod okuyucudan gir");
-      ui.sizeButton(barcode, 58, 0, 12);
-      page.addView(barcode);
+    }
+    if (cashBarcode != null && barcode != null) {
+      // Equal-width actions work in both orientations, including rooted ROMs
+      // that resize the window without dispatching a configuration event.
+      LinearLayout scanActions = UiKit.row(context);
+      for (Button action : new Button[] {cashBarcode, barcode}) {
+        action.setMinHeight(ui.dp(58));
+        action.setMinimumHeight(ui.dp(58));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
+        if (scanActions.getChildCount() > 0) params.setMargins(ui.dp(8), 0, 0, ui.dp(12));
+        else params.setMargins(0, 0, 0, ui.dp(12));
+        scanActions.addView(action, params);
+      }
+      page.addView(scanActions);
+    } else {
+      if (cashBarcode != null) {
+        ui.sizeButton(cashBarcode, 58, 0, 12);
+        page.addView(cashBarcode);
+      }
+      if (barcode != null) {
+        ui.sizeButton(barcode, 58, 0, 12);
+        page.addView(barcode);
+      }
     }
 
     ArrayList<ActionItem> actions = new ArrayList<>();

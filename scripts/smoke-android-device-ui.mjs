@@ -859,7 +859,8 @@ async function main() {
   scrollToTop();
   await delay(300);
   const adminStockTopXml = dumpUi("admin-stock-top.xml");
-  assertContains(adminStockTopXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stoklar siz onaylamadan değişmez"]);
+  assertContains(adminStockTopXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç"]);
+  assert(!adminStockTopXml.includes("Stoklar siz onaylamadan değişmez"), "Stok kartındaki eski açıklama kaldırılmalı.");
   captureScreenshot("admin-stock-image-import.png");
   await exerciseStockImageSources(adminStockTopXml);
   lockDevicePortrait();
@@ -919,10 +920,12 @@ function parseArgs(args) {
     designMarketFinanceOnly: false,
     designAuthorityOnly: false,
     appearanceOnly: false,
+    galleryPair: false,
     reportsOnly: false,
     companionOnly: false,
     commerceOnly: false,
-    marketOnly: false
+    marketOnly: false,
+    marketLayoutOnly: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -935,6 +938,8 @@ function parseArgs(args) {
       parsed.stockCameraOnly = true;
     } else if (arg === "--design-capture-only") {
       parsed.designCaptureOnly = true;
+    } else if (arg === "--gallery-pair") {
+      parsed.galleryPair = true;
     } else if (arg === "--design-operations-only") {
       parsed.designOperationsOnly = true;
     } else if (arg === "--design-tablet-only") {
@@ -951,6 +956,9 @@ function parseArgs(args) {
       parsed.reportsOnly = true;
     } else if (arg === "--market-only") {
       parsed.marketOnly = true;
+    } else if (arg === "--market-layout-only") {
+      parsed.marketOnly = true;
+      parsed.marketLayoutOnly = true;
     } else if (arg === "--companion-only") {
       parsed.companionOnly = true;
     } else if (arg === "--commerce-only") {
@@ -980,6 +988,9 @@ function parseArgs(args) {
     }
   }
 
+  if (parsed.galleryPair && ![parsed.designCaptureOnly, parsed.marketOnly, parsed.reportsOnly, parsed.appearanceOnly].some(Boolean)) {
+    throw new Error("--gallery-pair için --design-capture-only, --market-only, --reports-only veya --appearance-only seçilmeli.");
+  }
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
@@ -1524,6 +1535,35 @@ async function runMarketOnly(baseUrl) {
   ]);
   assertNotContains(xml, ["Bekleyen sipariş", "Satışı Tamamla"]);
   captureScreenshot("market-home.png");
+  const cashPortrait = centerOf(findClickableBoundsByText(xml, "▣  Kasa Barkod Modu"));
+  const scanPortrait = centerOf(findClickableBoundsByText(xml, "▣  Barkod Tara"));
+  assert(scanPortrait.x > cashPortrait.x && Math.abs(scanPortrait.y - cashPortrait.y) < 40,
+    "Dikey Market tarama butonlarının yan yana düzeni korunmalı.");
+
+  // Same physical handset, landscape-sized viewport: primary scanner actions
+  // must share one row. The actual device rotation remains untouched.
+  const displaySize = adb(["shell", "wm", "size"], { capture: true }).stdout;
+  const priorOverride = displaySize.match(/Override size: (\d+x\d+)/)?.[1] ?? null;
+  try {
+    adb(["shell", "wm", "size", "1280x720"]);
+    await delay(850);
+    const wide = await waitForUiCondition(
+      candidate => candidate.includes("Kasa Barkod Modu") && candidate.includes("Barkod Tara"),
+      6000, "Yatay Market butonları bulunamadı.");
+    const cash = centerOf(findClickableBoundsByText(wide, "▣  Kasa Barkod Modu"));
+    const scan = centerOf(findClickableBoundsByText(wide, "▣  Barkod Tara"));
+    assert(scan.x > cash.x && Math.abs(scan.y - cash.y) < 40,
+      "Yatay Market Kasa Barkod Modu ve Barkod Tara aynı satırda olmalı.");
+    captureScreenshot("market-home-wide.png");
+  } finally {
+    adb(["shell", "wm", "size", priorOverride ?? "reset"], { allowFailure: true });
+    await delay(800);
+  }
+
+  if (options.marketLayoutOnly) {
+    console.log("android-market-landscape-actions-layout-ok");
+    return;
+  }
 
   // Özet metrik kartı ilk viewport'a sığmayabilir (dump yalnızca görünür
   // alanı içerir); metrikleri kaydırarak birikimli dökümde doğrula.
@@ -1542,7 +1582,6 @@ async function runMarketOnly(baseUrl) {
   tap(centerOf(findClickableBoundsByText(xml, "▣  Kasa Barkod Modu")));
   xml = await waitForUiCondition(
     (candidate) => candidate.includes("Kasa Barkod Okuyucu")
-      && candidate.includes("Kamerayı ürün barkoduna doğrultun.")
       && candidate.includes("KAPAT"),
     8000,
     "Kasa Barkod Modu kamera overlay'i açılamadı."
@@ -2136,15 +2175,64 @@ async function runDesignCaptureOnly(baseUrl) {
   await waitForUiCondition(xml => xml.includes("Yönetici") && xml.includes('text="Bugün"'),
     12000, "Yönetici ekranı hazırlanmadı.");
   const screens = [
-    ["restaurant:reservations", "Restoran", "+ Yeni Rezervasyon", "restaurant-reservations"],
-    ["restaurant:tasks", "Restoran", "+ Yeni İş", "restaurant-tasks"],
+    ["restaurant:reservations", "Restoran", "Yeni rezervasyon", "restaurant-reservations"],
+    ["restaurant:tasks", "Restoran", "Yeni iş", "restaurant-tasks"],
     ["restaurant:menu", "Restoran", "Menü sunumu yönetimi", "restaurant-menu"],
-    ["pension:reservations", "Pansiyon", "+ Yeni Rezervasyon", "pension-reservations"],
-    ["pension:stays", "Pansiyon", "+ Müşteriyi Odaya Ata", "pension-stays"],
-    ["pension:tasks", "Pansiyon", "+ Yeni İş", "pension-tasks"]
+    ["pension:reservations", "Pansiyon", "Yeni rezervasyon", "pension-reservations"],
+    ["pension:stays", "Pansiyon", "Müşteriyi odaya ata", "pension-stays"],
+    ["pension:tasks", "Pansiyon", "Yeni iş", "pension-tasks"]
   ];
+  const unavailable = [];
+  if (options.galleryPair) {
+    const overviewScreens = [
+      ["today", "Bugün", "today-home"],
+      ["more", "Diğer", "more-menu"],
+      ["restaurant:tables", "Masalar", "restaurant-tables"],
+      ["restaurant:orders", "Açık Adisyon", "restaurant-orders"],
+      ["restaurant:stock", "Stok", "restaurant-stock"],
+      ["pension:rooms", "Odalar", "pension-rooms"],
+      ["pension:folios", "Oda Hesapları", "pension-folios"],
+      ["pension:kbs", "KBS", "pension-kbs"]
+    ];
+    for (const [route, marker, name] of overviewScreens) {
+      try {
+        adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+          "--es", "ya_notification_route", route]);
+        await waitForUiCondition(xml => xml.includes(`text="${marker}"`), 7000,
+          "Ek tasarım rotası görünmedi: " + route);
+        captureScreenshot("design-" + name + ".png");
+        console.log("gallery-overview-captured:", route);
+      } catch (error) {
+        unavailable.push({route, reason: String(error).slice(0, 250)});
+        console.warn("gallery-overview-skipped:", route, String(error).slice(0, 130));
+      }
+    }
+    try {
+      adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+        "--es", "ya_notification_route", "today"]);
+      const home = await waitForUiCondition(xml => xml.includes('content-desc="Ayarlar"'), 10000,
+        "Ayarlar erişim denetimi bulunamadı.");
+      tap(centerOf(findClickableBoundsByDescription(home, "Ayarlar")));
+      await waitForUiCondition(xml => xml.includes('text="Ayarlar"'), 8500,
+        "Ayarlar sayfası açılmadı.");
+      captureScreenshot("design-settings.png");
+      console.log("gallery-overview-captured: settings");
+    } catch (error) {
+      unavailable.push({route:"settings",reason:String(error).slice(0,250)});
+    }
+  }
   for (const spec of screens) {
-    await captureDesignRoute(spec);
+    try {
+      await captureDesignRoute(spec);
+    } catch (error) {
+      if (!options.galleryPair) throw error;
+      unavailable.push({route: spec[0], reason: String(error).slice(0, 250)});
+      console.warn("gallery-route-skipped:", spec[0], String(error).slice(0, 180));
+    }
+  }
+  if (options.galleryPair) {
+    writeFileSync(join(repoRoot, "artifacts", "android-ui-gallery", "companion-route-status.json"),
+      JSON.stringify({capturedAt: new Date().toISOString(), unavailable}, null, 2) + "\n");
   }
   console.log("design-fixture-ready");
 }
@@ -2160,7 +2248,7 @@ async function captureDesignRoute([route, title, marker, name]) {
   if (name === "restaurant-menu") return;
   const dialogTitle = name === "pension-stays" ? "Konaklama oluştur"
     : name.endsWith("reservations") ? "Yeni rezervasyon" : "Yeni günlük iş";
-  tap(centerOf(findBoundsByText(ui, marker)));
+  tap(centerOf(findClickableBoundsByDescription(ui, marker)));
   await waitForUiCondition(xml => xml.includes(dialogTitle),
     8500, "Tasarım formu açılamadı: " + route);
   captureScreenshot("design-" + name + "-form.png");
@@ -2169,7 +2257,6 @@ async function captureDesignRoute([route, title, marker, name]) {
   await waitForUiCondition(xml => xml.includes(`text="${title}"`) && xml.includes(marker),
     8000, "Form kapandıktan sonra ana ekran görünmedi: " + route);
 }
-
 async function runStockImageOnly(baseUrl) {
   const deviceId = readDeviceId();
   await publishDeviceRole(baseUrl, deviceId, "admin");
@@ -2354,8 +2441,29 @@ function captureScreenshot(fileName) {
     maxBuffer: 24 * 1024 * 1024
   });
   writeFileSync(outputPath, result.stdout);
+  if (!options.galleryPair) return;
+  const root = join(repoRoot, "artifacts", "android-ui-gallery", "companion");
+  const portraitDir = join(root, "dikey");
+  const landscapeDir = join(root, "yatay");
+  mkdirSync(portraitDir, {recursive: true});
+  mkdirSync(landscapeDir, {recursive: true});
+  writeFileSync(join(portraitDir, fileName), result.stdout);
+  // The test handset's display rotation is locked; simulate a 1280x720
+  // landscape viewport. Do not imply this is a physical-rotation capture.
+  const original = adb(["shell", "wm", "size"], {capture: true}).stdout;
+  const override = original.match(/Override size: (\d+x\d+)/)?.[1] ?? null;
+  try {
+    adb(["shell", "wm", "size", "1280x720"]);
+    adb(["shell", "sleep", "0.5"]);
+    const landscape = adb(["exec-out", "screencap", "-p"], {
+      binary: true, capture: true, maxBuffer: 24 * 1024 * 1024
+    });
+    writeFileSync(join(landscapeDir, fileName), landscape.stdout);
+  } finally {
+    adb(["shell", "wm", "size", override ?? "reset"], {allowFailure: true});
+    adb(["shell", "sleep", "0.3"], {allowFailure: true});
+  }
 }
-
 function tap(point) {
   adb(["shell", "input", "tap", String(point.x), String(point.y)]);
 }

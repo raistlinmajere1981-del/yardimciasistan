@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { runInNewContext } from "node:vm";
 
 const require = createRequire(import.meta.url);
 const {
@@ -148,10 +149,56 @@ try {
   assert.match(mainSource, /prepareRuntimeDataForStartup/);
   assert.match(mainSource, /resolveRuntimeDataRoot/);
 
-  const mainEntrySource = readFileSync("apps/desktop-app/electron/main-entry.ts", "utf8");
-  assert.match(mainEntrySource, /shouldDeferPendingMaintenanceToCleanStart/);
-  assert.match(mainEntrySource, /startup\.maintenance\.deferred-for-clean-start/);
-  assert.match(mainEntrySource, /if \(deferPendingMaintenance\)\s*\{[\s\S]*?\}\s*else\s*\{\s*applyPendingDataMaintenanceAtStartup\(userDataPath\(\)\)/);
+  const entry = readFileSync("apps/desktop-app/dist-electron/main-entry.js", "utf8");
+  const dataPaths = require("../apps/desktop-app/dist-electron/data-paths.js");
+  for (const [name, marker, incompatible, forced, expected] of [
+    ["ordinary", false, false, false, ["update", "main"]],
+    ["pending", true, false, false, ["update", "inspect:current", "maintenance", "main"]],
+    ["incompatible", true, true, false, ["update", "inspect:incompatible", "defer", "main"]],
+    ["forced", true, false, true, ["update", "defer", "main"]]
+  ]) {
+    const dataRoot = join(root, `entry-${name}`);
+    mkdirSync(dataRoot);
+    const databasePath = dataPaths.resolveDatabasePath(dataRoot);
+    if (incompatible) {
+      const db = new DatabaseSync(databasePath);
+      try { db.exec("CREATE TABLE retired (id INTEGER)"); } finally { db.close(); }
+    } else createCurrentSchemaFixture(databasePath);
+    if (marker) {
+      mkdirSync(dataPaths.resolveMaintenancePath(dataRoot));
+      writeFileSync(dataPaths.resolvePendingMaintenanceMarkerPath(dataRoot), JSON.stringify({ kind: "reset" }));
+    }
+    const calls = [];
+    runInNewContext(entry, {
+      exports: {},
+      process: { env: {}, argv: forced ? ["--clean-start"] : [] },
+      require(name) {
+        if (name === "node:fs" || name === "node:path") return require(name);
+        if (name === "electron") return { app: {
+          isPackaged: false, on() {}, getVersion: () => "fixture", getPath: () => dataRoot,
+          getAppPath: () => join(process.cwd(), "apps/desktop-app"), whenReady: () => new Promise(() => {})
+        } };
+        if (name === "./desktop-logger") return {
+          initializeDesktopLogging: () => null,
+          desktopLog: { warn: ({ event }) => { if (event === "startup.maintenance.deferred-for-clean-start") calls.push("defer"); } }
+        };
+        if (name === "./data-paths.js") return { ...dataPaths, resolveDataRoot: () => dataRoot };
+        if (name === "./desktop-database-compatibility.js") return {
+          inspectDesktopDatabaseCompatibility: (...args) => {
+            const state = inspectDesktopDatabaseCompatibility(...args);
+            calls.push(`inspect:${state.state}`);
+            return state;
+          }
+        };
+        if (name === "./desktop-update-service") return { applyPendingDesktopUpdateAtStartup: () => { calls.push("update"); return false; } };
+        if (name === "./data-maintenance") return { applyPendingDataMaintenanceAtStartup: () => calls.push("maintenance") };
+        if (name === "./main") calls.push("main");
+        return {};
+      }
+    });
+    await new Promise(setImmediate);
+    assert.deepEqual(calls, expected, name);
+  }
 
   const startDevSource = readFileSync("apps/desktop-app/scripts/start-dev.mjs", "utf8");
   assert.match(startDevSource, /const electronArgs = process\.argv\.slice\(2\)/);

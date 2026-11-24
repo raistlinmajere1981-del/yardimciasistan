@@ -81,6 +81,23 @@ try {
   await expect(page.locator('[data-capability][open]')).toHaveCount(0);
   const renderedIds = await page.locator('[data-capability]').evaluateAll(cards=>cards.map(card=>card.dataset.capability));
   assert.deepEqual([...renderedIds].sort(),projection.nodes.map(node=>node.id).sort(),'Benefit groups must include each canonical node exactly once');
+  // New user-facing subfeatures are editorial children of canonical capabilities:
+  // sector rules and the number of permission nodes must stay unchanged.
+  const featured = [
+    ['core.web','AI destekli SEO yönetimi'],
+    ['channel.qr_menu','QR menüden masaya sipariş'],
+    ['accommodation.folio','QR ile odadan sipariş'],
+    ['document.printing','Baskı Yönetimi'],
+    ['commerce.inventory','İdeal stok ve eksik ihtiyaç listesi'],
+    ['commerce.inventory','Fiziksel stok sayımı'],
+    ['commerce.catalog','Kategoriye göre varsayılan KDV'],
+    ['channel.online_sales','Web sepet ve ödeme adımları'],
+    ['commerce.wholesale','Bayilere özel fiyat ve sipariş']
+  ];
+  for (const [id,title] of featured)
+    await expect(page.locator(`[data-capability="${id}"] .capability-subfeatures`)).toContainText(title);
+  assert.equal(await page.locator('.capability-subfeatures > span').count(),14,
+    'Editorial features must not create independent capability/permission nodes');
   await expect(page.locator('[data-tree-group]')).toHaveCount(4);
   for (const benefit of await page.locator('[data-capability]:visible .capability-benefit').all()) {
     await expect(benefit).toBeVisible();assert.ok((await benefit.innerText()).length>20);
@@ -90,6 +107,10 @@ try {
   await expect(page.locator('[data-explanation="detailed"]')).toHaveAttribute('aria-current','true');
   await expect(page.locator('[data-capability][open]')).toHaveCount(projection.nodes.length);
   await expect(page.locator('.capability-card[open] .capability-benefit:visible')).toHaveCount(0);
+  await expect(page.locator('[data-capability="core.web"] .capability-feature-details'))
+    .toContainText('Sayfa ve dil bazında arama başlığı');
+  await expect(page.locator('[data-capability="commerce.inventory"] .capability-feature-details'))
+    .toContainText('Liste otomatik alım oluşturmaz');
   await expect(page.locator('[data-capability="core.finance"] dl')).toContainText('Nerede kullanılır?');
   await expect(page.locator('[data-capability="core.finance"] dl')).toContainText('Gereken modüller');
   await page.locator('[data-sector="market"]').click();
@@ -101,9 +122,19 @@ try {
   await page.goBack();await expect(page.locator('[data-explanation="detailed"]')).toHaveAttribute('aria-current','true');
   await page.goForward();await expect(page.locator('[data-explanation="simple"]')).toHaveAttribute('aria-current','true');
   console.log('PASS simple default, benefit groups, detailed mode, keyboard selector, reload and mode history');
+  await expect(page.locator('[data-scenario-id="pension_room_qr"]')).toHaveCount(2);
+  await expect(page.locator('[data-scenario-id="market_stock"]')).toHaveCount(1);
   for (const sector of ['pension','pension_restaurant','restaurant','market','all']) {
     await page.locator(`[data-sector="${sector}"]`).click();
     await expect(page.locator(`[data-sector="${sector}"]`)).toHaveAttribute('aria-current','true');
+    if (sector === 'market') {
+      await expect(page.locator('[data-capability="channel.qr_menu"]')).toBeHidden();
+      await expect(page.locator('[data-capability="commerce.inventory"]')).toBeVisible();
+    }
+    if (sector === 'pension') {
+      await expect(page.locator('[data-capability="accommodation.folio"]')).toBeVisible();
+      await expect(page.locator('[data-capability="channel.qr_menu"]')).toBeHidden();
+    }
     const expected = projection.nodes.filter(node=>node.levels[sector]);
     await expect(page.locator('[data-capability]:visible')).toHaveCount(expected.length);
     for (const core of shared.CORE_BUSINESS_CAPABILITIES) await expect(page.locator(`[data-capability="${core}"]`)).toBeVisible();

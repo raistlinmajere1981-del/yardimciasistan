@@ -113,5 +113,74 @@ try {
   await page.evaluate(() => window.__setMarketingWebAvailable(true));
   await expect(page.getByLabel('Aktif web içerikleri', {exact:true})).toBeVisible();
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length),0);
+  await page.clock.install();
+  await page.reload();
+  await expect(page.getByRole('button',{name:'Yeni paylaşım',exact:true})).toBeEnabled();
+  await page.evaluate(async () => {
+    window.__marketingReads = [0, 0];
+    const methods = ['getMarketingStudio', 'getMarketingSchedules'];
+    const reads = methods.map(method => window.yardimciDesktop[method]);
+    // Refresh real service data outside virtual-clock advances. Simulate local IPC
+    // completion within the clock so time jumps do not leave browser bindings pending.
+    let results;
+    window.__stageMarketingReads = async () => {results = await Promise.all(reads.map(read => read()));};
+    await window.__stageMarketingReads();
+    for (const [index, method] of methods.entries()) {
+      window.yardimciDesktop[method] = (...args) => {
+        if (args.length > 0) return reads[index](...args);
+        window.__marketingReads[index]++;
+        if (window.__marketingReadUnavailable) return Promise.reject(new Error('fixture offline'));
+        return Promise.resolve(results[index]);
+      };
+    }
+  });
+  const snapshotReads = () => page.evaluate(() => window.__marketingReads);
+  const setVisibility = state => page.evaluate(state => {
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: state});
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, state);
+  await page.clock.runFor(60_200);
+  assert.deepEqual(await snapshotReads(), [2, 2], 'visible idle: two reconciliation reads per projection');
+  await setVisibility('hidden');
+  await page.evaluate(() => window.__notifyCampaignChanged());
+  await page.clock.runFor(60_000);
+  assert.deepEqual(await snapshotReads(), [2, 2], 'hidden: no event or fallback IPC');
+
+  f.service.saveContent(editorialInput({title: 'Gizliyken eklenen taslak'}));
+  await page.evaluate(() => window.__stageMarketingReads());
+  await setVisibility('visible');
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'));
+    window.__notifyCampaignChanged();
+    window.__notifyScheduleChanged();
+    window.__notifyBusinessMessagingChanged();
+  });
+  await page.clock.runFor(150);
+  assert.deepEqual(await snapshotReads(), [3, 3], 'visibility, focus and event burst share one read');
+  await expect(page.getByLabel('Taslaklar',{exact:true})).toContainText('Gizliyken eklenen taslak');
+
+  await page.evaluate(() => {window.__marketingReadUnavailable = true; window.__notifyBusinessMessagingChanged();});
+  await page.clock.runFor(150);
+  assert.deepEqual(await snapshotReads(), [4, 4]);
+  await expect(page.getByLabel('Taslaklar',{exact:true})).toContainText('Gizliyken eklenen taslak');
+  f.service.saveContent(editorialInput({title: 'Kaçırılan olaydan sonraki taslak'}));
+  await page.evaluate(async () => {await window.__stageMarketingReads(); window.__marketingReadUnavailable = false;});
+  await page.clock.runFor(30_200);
+  assert.deepEqual(await snapshotReads(), [5, 5], 'fallback recovers without an event');
+  await expect(page.getByLabel('Taslaklar',{exact:true})).toContainText('Kaçırılan olaydan sonraki taslak');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.clock.runFor(150);
+  assert.deepEqual(await snapshotReads(), [6, 6], 'online event reconciles promptly');
+  await page.getByRole('button',{name:'Fixture sayfa değiştir',exact:true}).click();
+  await expect(page.getByText('Diğer sayfa',{exact:true})).toBeVisible();
+  await page.evaluate(() => window.__notifyScheduleChanged());
+  await page.clock.runFor(30_200);
+  assert.deepEqual(await snapshotReads(), [6, 6], 'navigation disposes listeners and timers');
+  await page.getByRole('button',{name:'Fixture sayfa değiştir',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Yeni paylaşım',exact:true})).toBeEnabled();
+  assert.deepEqual(await snapshotReads(), [7, 7], 'return navigation loads current data');
+  assert.deepEqual(errors,[]);
+  console.log('Marketing refresh: visible idle 4 bridge reads/min, hidden 0, event burst, fallback, online and route lifecycle passed.');
   console.log('Marketing UI: stable composer, draft preservation, explicit AI acceptance, media selection/upload/generation, audience, variants, preview, publish/live update/unpublish, schedule creation and Web visibility passed.');
 } finally {await ui?.close();f.dispose();}

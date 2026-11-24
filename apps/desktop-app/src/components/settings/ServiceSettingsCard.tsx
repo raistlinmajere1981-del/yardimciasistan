@@ -79,6 +79,7 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
   const host = useContext(ServiceSettingsContext);
   const [localOpen, setLocalOpen] = useState(false);
   const [working, setWorking] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const owner = host?.owner(id);
   const requestedOpen = host ? host.active === id : localOpen;
@@ -94,7 +95,7 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
   useEffect(() => {
     if (testMessage) reportAppStatus(messageState ?? (readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'error' : readiness === 'Kontrol ediliyor…' ? 'loading' : 'success'), testMessage);
   }, [messageState, readiness, testMessage]);
-  const close = () => { onDialogClose?.(); setConfirmClose(false); if (host) host.open(null); else setLocalOpen(false); };
+  const close = () => { onDialogClose?.(); setSaveError(""); setConfirmClose(false); if (host) host.open(null); else setLocalOpen(false); };
   const requestClose = () => {
     if (busy) return;
     if (owner?.dirty) { setConfirmClose(true); return; }
@@ -103,12 +104,17 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
   async function save() {
     if (!owner || busy || saveDisabled) return;
     setWorking(true);
+    setSaveError("");
     try {
       const result = await owner.save();
-      reportAppStatus(result.ok ? 'success' : 'error', result.message || (result.ok ? `${title} kaydedildi.` : 'Servis kaydedilemedi.'));
+      const message = result.message || (result.ok ? `${title} kaydedildi.` : 'Servis kaydedilemedi.');
+      reportAppStatus(result.ok ? 'success' : 'error', message);
       if (result.ok) close();
-      else setConfirmClose(false);
-    } catch { setConfirmClose(false); reportAppStatus('error', 'Servis kaydedilemedi. Tekrar deneyin.'); }
+      else { setSaveError(message); setConfirmClose(false); }
+    } catch {
+      const message = 'Servis kaydedilemedi. Tekrar deneyin.';
+      setSaveError(message); setConfirmClose(false); reportAppStatus('error', message);
+    }
     finally { setWorking(false); }
   }
   async function cancel() {
@@ -154,13 +160,14 @@ export function ServiceSettingsCard({ id, title, status, readiness = 'Test edilm
         onSaveAndContinue={() => void save()} onDiscardAndContinue={() => void cancel()} onStay={() => setConfirmClose(false)} />}
       footer={<><ActionButton type="button" variant="secondary" disabled={Boolean(busy)} onClick={() => void cancel()}>İptal</ActionButton>
         <ActionButton type="submit" disabled={!owner || Boolean(busy) || saveDisabled}>Kaydet</ActionButton></>}>
-      <div className={`settings-service-detail form-stack ${className}`}>
+      <div className={`settings-service-detail form-stack ${className}`} onChangeCapture={() => { if (saveError) setSaveError(""); }}>
         <div className="settings-service-feedback">
           <div className="settings-service-detail-status">
             <StatusBadge tone={owner?.dirty ? 'warning' : enabled ? 'success' : 'neutral'} aria-label="Etkinleştirme tercihi">{preference}</StatusBadge>
             <StatusBadge tone={readiness === 'Hazır' ? 'success' : readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'danger' : readiness === 'Kontrol ediliyor…' ? 'info' : 'neutral'} aria-label="Canlı kontrol durumu">{readiness}</StatusBadge>
           </div>
           {showTestMessageInDialog && testMessage && <div className="settings-service-feedback-result" role={readiness === 'Hata' || readiness === 'Kullanılamıyor' ? 'alert' : 'status'} aria-live="polite">{testMessage}</div>}
+          {saveError && <div className="settings-service-feedback-result" role="alert">{saveError}</div>}
         </div>
         {onEnabledChange && <label className="settings-service-toggle"><input type="checkbox" role="switch"
           aria-label={toggleAriaLabel ?? toggleLabel ?? `${title} servisi`} checked={enabled} disabled={Boolean(busy || (!enabled && (toggleDisabled || blockedReason)))}

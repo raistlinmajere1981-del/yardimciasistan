@@ -46,7 +46,7 @@ try {
     ya_account_require_enabled(); $input = ya_account_input();
     switch (YA_ACCOUNT_ACTION) {
         case 'register': ya_account_register($input); break;
-        case 'login': ya_account_login($input); break;
+        case 'login': ya_account_response(200, ['ok'=>true, 'account'=>ya_account_login($input)]);
         case 'refresh': ya_account_refresh(); break;
         case 'recover': ya_account_recovery($input); break;
         case 'verify': ya_account_consume_token($input, 'verify'); break;

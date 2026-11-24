@@ -1486,7 +1486,7 @@ Only these seven pre-existing files changed:
 - `apps/desktop-app/electron/market-sale-operation.ts`
 - `scripts/test-helpers/companion-reservation-witness.mjs`
 - `scripts/smoke-companion-points-ingress.mjs`
-- `docs/dev/CONTINUATION_BACKLOG_2026-10-29.md`
+- historical implementation log (available in Git history, not active agent context)
 - `docs/architecture/COMPANION_BENEFITS_C20A_TRANSACTION_CONTRACT.md`
 
 All tests below ran serially on the final source checkpoint; logs are
